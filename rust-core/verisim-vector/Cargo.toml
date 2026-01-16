@@ -9,7 +9,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-hnsw_rs.workspace = true
+# hnsw_rs.workspace = true  # TODO: Re-enable when implementing proper HNSW with lifetime management
 ndarray.workspace = true
 serde.workspace = true
 thiserror.workspace = true
