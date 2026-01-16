@@ -12,6 +12,10 @@ use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
+// Drift calculation algorithms
+mod calculator;
+pub use calculator::{DriftCalculator, TensorStats};
+
 /// Drift detection errors
 #[derive(Error, Debug)]
 pub enum DriftError {

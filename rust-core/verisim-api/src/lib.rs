@@ -17,8 +17,29 @@ use thiserror::Error;
 use tokio::net::TcpListener;
 use tracing::{info, instrument};
 
-use verisim_hexad::{Hexad, HexadBuilder, HexadId, HexadInput, HexadStatus};
-use verisim_normalizer::NormalizerStatus;
+use verisim_document::TantivyDocumentStore;
+use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
+use verisim_graph::OxiGraphStore;
+use verisim_hexad::{
+    HexadConfig, HexadDocumentInput, HexadGraphInput, HexadId, HexadInput,
+    HexadSemanticInput, HexadSnapshot, HexadStore, HexadTensorInput,
+    HexadVectorInput, InMemoryHexadStore,
+};
+use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
+use verisim_semantic::InMemorySemanticStore;
+use verisim_temporal::InMemoryVersionStore;
+use verisim_tensor::InMemoryTensorStore;
+use verisim_vector::{DistanceMetric, HnswVectorStore};
+
+/// Type alias for our concrete HexadStore implementation
+pub type ConcreteHexadStore = InMemoryHexadStore<
+    OxiGraphStore,
+    HnswVectorStore,
+    TantivyDocumentStore,
+    InMemoryTensorStore,
+    InMemorySemanticStore,
+    InMemoryVersionStore<HexadSnapshot>,
+>;
 
 /// API errors
 #[derive(Error, Debug)]
@@ -72,6 +93,8 @@ pub struct ApiConfig {
     pub enable_cors: bool,
     /// API version prefix
     pub version_prefix: String,
+    /// Vector dimension for embeddings
+    pub vector_dimension: usize,
 }
 
 impl Default for ApiConfig {
@@ -81,6 +104,7 @@ impl Default for ApiConfig {
             port: 8080,
             enable_cors: true,
             version_prefix: "/api/v1".to_string(),
+            vector_dimension: 384,
         }
     }
 }
@@ -112,6 +136,60 @@ pub struct HexadRequest {
     pub metadata: Option<std::collections::HashMap<String, String>>,
 }
 
+impl HexadRequest {
+    /// Convert to HexadInput
+    fn to_hexad_input(&self) -> HexadInput {
+        let mut input = HexadInput::default();
+
+        if let (Some(title), Some(body)) = (&self.title, &self.body) {
+            input.document = Some(HexadDocumentInput {
+                title: title.clone(),
+                body: body.clone(),
+                fields: std::collections::HashMap::new(),
+            });
+        } else if let Some(title) = &self.title {
+            input.document = Some(HexadDocumentInput {
+                title: title.clone(),
+                body: String::new(),
+                fields: std::collections::HashMap::new(),
+            });
+        }
+
+        if let Some(embedding) = &self.embedding {
+            input.vector = Some(HexadVectorInput {
+                embedding: embedding.clone(),
+                model: None,
+            });
+        }
+
+        if let Some(types) = &self.types {
+            input.semantic = Some(HexadSemanticInput {
+                types: types.clone(),
+                properties: std::collections::HashMap::new(),
+            });
+        }
+
+        if let Some(relationships) = &self.relationships {
+            input.graph = Some(HexadGraphInput {
+                relationships: relationships.clone(),
+            });
+        }
+
+        if let Some(tensor) = &self.tensor {
+            input.tensor = Some(HexadTensorInput {
+                shape: tensor.shape.clone(),
+                data: tensor.data.clone(),
+            });
+        }
+
+        if let Some(metadata) = &self.metadata {
+            input.metadata = metadata.clone();
+        }
+
+        input
+    }
+}
+
 /// Tensor data in request
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TensorRequest {
@@ -129,6 +207,7 @@ pub struct HexadResponse {
     pub has_tensor: bool,
     pub has_semantic: bool,
     pub has_document: bool,
+    pub version_count: u64,
 }
 
 /// Status response
@@ -139,8 +218,8 @@ pub struct HexadStatusResponse {
     pub version: u64,
 }
 
-impl From<&Hexad> for HexadResponse {
-    fn from(h: &Hexad) -> Self {
+impl From<&verisim_hexad::Hexad> for HexadResponse {
+    fn from(h: &verisim_hexad::Hexad) -> Self {
         Self {
             id: h.id.to_string(),
             status: HexadStatusResponse {
@@ -153,6 +232,7 @@ impl From<&Hexad> for HexadResponse {
             has_tensor: h.tensor.is_some(),
             has_semantic: h.semantic.is_some(),
             has_document: h.document.is_some(),
+            version_count: h.version_count,
         }
     }
 }
@@ -193,27 +273,70 @@ pub struct DriftStatusResponse {
     pub measurement_count: u64,
 }
 
-/// Application state
-#[derive(Clone, Debug)]
-pub struct AppState {
-    pub start_time: std::time::Instant,
-    // In a real implementation, these would be actual store instances
-    // pub hexad_store: Arc<dyn HexadStore>,
-    // pub normalizer: Arc<Normalizer>,
-    // pub drift_detector: Arc<DriftDetector>,
-}
-
-impl AppState {
-    pub fn new() -> Self {
+impl DriftStatusResponse {
+    fn from_metrics(drift_type: DriftType, metrics: &DriftMetrics) -> Self {
         Self {
-            start_time: std::time::Instant::now(),
+            drift_type: drift_type.to_string(),
+            current_score: metrics.current_score,
+            moving_average: metrics.moving_average,
+            max_score: metrics.max_score,
+            measurement_count: metrics.measurement_count,
         }
     }
 }
 
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
+/// Application state
+#[derive(Clone)]
+pub struct AppState {
+    pub start_time: std::time::Instant,
+    pub hexad_store: Arc<ConcreteHexadStore>,
+    pub drift_detector: Arc<DriftDetector>,
+    pub normalizer: Arc<Normalizer>,
+    pub config: ApiConfig,
+}
+
+impl AppState {
+    /// Create new application state with default configuration (async version)
+    pub async fn new_async(config: ApiConfig) -> Result<Self, ApiError> {
+        let hexad_config = HexadConfig {
+            vector_dimension: config.vector_dimension,
+            ..Default::default()
+        };
+
+        let graph = Arc::new(
+            OxiGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        let vector = Arc::new(HnswVectorStore::new(
+            config.vector_dimension,
+            DistanceMetric::Cosine,
+        ));
+        let document = Arc::new(
+            TantivyDocumentStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        let tensor = Arc::new(InMemoryTensorStore::new());
+        let semantic = Arc::new(InMemorySemanticStore::new());
+        let temporal = Arc::new(InMemoryVersionStore::new());
+
+        let hexad_store = Arc::new(InMemoryHexadStore::new(
+            hexad_config,
+            graph,
+            vector,
+            document,
+            tensor,
+            semantic,
+            temporal,
+        ));
+
+        let drift_detector = Arc::new(DriftDetector::new(DriftThresholds::default()));
+        let normalizer = Arc::new(create_default_normalizer(drift_detector.clone()).await);
+
+        Ok(Self {
+            start_time: std::time::Instant::now(),
+            hexad_store,
+            drift_detector,
+            normalizer,
+            config,
+        })
     }
 }
 
@@ -240,7 +363,7 @@ pub fn build_router(state: AppState) -> Router {
 }
 
 /// Health check handler
-#[instrument]
+#[instrument(skip(state))]
 async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "healthy".to_string(),
@@ -260,26 +383,16 @@ async fn ready_handler() -> StatusCode {
 async fn create_hexad_handler(
     State(state): State<AppState>,
     Json(request): Json<HexadRequest>,
-) -> Result<Json<HexadResponse>, ApiError> {
-    // In a real implementation, this would create a hexad in the store
-    let id = HexadId::generate();
+) -> Result<(StatusCode, Json<HexadResponse>), ApiError> {
+    let input = request.to_hexad_input();
 
-    // Build mock response
-    let response = HexadResponse {
-        id: id.to_string(),
-        status: HexadStatusResponse {
-            created_at: chrono::Utc::now().to_rfc3339(),
-            modified_at: chrono::Utc::now().to_rfc3339(),
-            version: 1,
-        },
-        has_graph: request.relationships.is_some(),
-        has_vector: request.embedding.is_some(),
-        has_tensor: request.tensor.is_some(),
-        has_semantic: request.types.is_some(),
-        has_document: request.title.is_some() || request.body.is_some(),
-    };
+    let hexad = state
+        .hexad_store
+        .create(input)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    Ok(Json(response))
+    Ok((StatusCode::CREATED, Json(HexadResponse::from(&hexad))))
 }
 
 /// Get hexad handler
@@ -288,8 +401,16 @@ async fn get_hexad_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<HexadResponse>, ApiError> {
-    // In a real implementation, this would fetch from the store
-    Err(ApiError::NotFound(format!("Hexad {} not found", id)))
+    let hexad_id = HexadId::new(&id);
+
+    let hexad = state
+        .hexad_store
+        .get(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Hexad {} not found", id)))?;
+
+    Ok(Json(HexadResponse::from(&hexad)))
 }
 
 /// Update hexad handler
@@ -299,8 +420,21 @@ async fn update_hexad_handler(
     Path(id): Path<String>,
     Json(request): Json<HexadRequest>,
 ) -> Result<Json<HexadResponse>, ApiError> {
-    // In a real implementation, this would update the hexad
-    Err(ApiError::NotFound(format!("Hexad {} not found", id)))
+    let hexad_id = HexadId::new(&id);
+    let input = request.to_hexad_input();
+
+    let hexad = state
+        .hexad_store
+        .update(&hexad_id, input)
+        .await
+        .map_err(|e| match e {
+            verisim_hexad::HexadError::NotFound(_) => {
+                ApiError::NotFound(format!("Hexad {} not found", id))
+            }
+            _ => ApiError::Internal(e.to_string()),
+        })?;
+
+    Ok(Json(HexadResponse::from(&hexad)))
 }
 
 /// Delete hexad handler
@@ -309,7 +443,19 @@ async fn delete_hexad_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    // In a real implementation, this would delete the hexad
+    let hexad_id = HexadId::new(&id);
+
+    state
+        .hexad_store
+        .delete(&hexad_id)
+        .await
+        .map_err(|e| match e {
+            verisim_hexad::HexadError::NotFound(_) => {
+                ApiError::NotFound(format!("Hexad {} not found", id))
+            }
+            _ => ApiError::Internal(e.to_string()),
+        })?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -322,8 +468,27 @@ async fn text_search_handler(
     let q = query.q.unwrap_or_default();
     let limit = query.limit.unwrap_or(10);
 
-    // In a real implementation, this would search the document store
-    Ok(Json(vec![]))
+    if q.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let hexads = state
+        .hexad_store
+        .search_text(&q, limit)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let results: Vec<SearchResultResponse> = hexads
+        .iter()
+        .enumerate()
+        .map(|(i, h)| SearchResultResponse {
+            id: h.id.to_string(),
+            score: 1.0 - (i as f32 * 0.1), // Approximate score based on ranking
+            title: h.document.as_ref().map(|d| d.title.clone()),
+        })
+        .collect();
+
+    Ok(Json(results))
 }
 
 /// Vector search handler
@@ -334,8 +499,31 @@ async fn vector_search_handler(
 ) -> Result<Json<Vec<SearchResultResponse>>, ApiError> {
     let k = request.k.unwrap_or(10);
 
-    // In a real implementation, this would search the vector store
-    Ok(Json(vec![]))
+    if request.vector.len() != state.config.vector_dimension {
+        return Err(ApiError::BadRequest(format!(
+            "Vector dimension mismatch: expected {}, got {}",
+            state.config.vector_dimension,
+            request.vector.len()
+        )));
+    }
+
+    let hexads = state
+        .hexad_store
+        .search_similar(&request.vector, k)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let results: Vec<SearchResultResponse> = hexads
+        .iter()
+        .enumerate()
+        .map(|(i, h)| SearchResultResponse {
+            id: h.id.to_string(),
+            score: 1.0 - (i as f32 * 0.1), // Approximate score based on ranking
+            title: h.document.as_ref().map(|d| d.title.clone()),
+        })
+        .collect();
+
+    Ok(Json(results))
 }
 
 /// Related entities search handler
@@ -343,9 +531,26 @@ async fn vector_search_handler(
 async fn related_search_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    Query(query): Query<RelatedQuery>,
 ) -> Result<Json<Vec<HexadResponse>>, ApiError> {
-    // In a real implementation, this would query the graph store
-    Ok(Json(vec![]))
+    let hexad_id = HexadId::new(&id);
+    let predicate = query.predicate.unwrap_or_else(|| "related".to_string());
+
+    let hexads = state
+        .hexad_store
+        .query_related(&hexad_id, &predicate)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let responses: Vec<HexadResponse> = hexads.iter().map(HexadResponse::from).collect();
+
+    Ok(Json(responses))
+}
+
+/// Query parameters for related search
+#[derive(Debug, Deserialize)]
+pub struct RelatedQuery {
+    pub predicate: Option<String>,
 }
 
 /// Drift status handler
@@ -353,8 +558,14 @@ async fn related_search_handler(
 async fn drift_status_handler(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DriftStatusResponse>>, ApiError> {
-    // In a real implementation, this would get drift metrics
-    Ok(Json(vec![]))
+    let all_metrics = state.drift_detector.all_metrics();
+
+    let responses: Vec<DriftStatusResponse> = all_metrics
+        .iter()
+        .map(|(drift_type, metrics)| DriftStatusResponse::from_metrics(*drift_type, metrics))
+        .collect();
+
+    Ok(Json(responses))
 }
 
 /// Normalizer status handler
@@ -362,15 +573,8 @@ async fn drift_status_handler(
 async fn normalizer_status_handler(
     State(state): State<AppState>,
 ) -> Result<Json<NormalizerStatus>, ApiError> {
-    // In a real implementation, this would get normalizer status
-    Ok(Json(NormalizerStatus {
-        running: true,
-        pending_count: 0,
-        active_count: 0,
-        completed_count: 0,
-        failure_count: 0,
-        last_normalization: None,
-    }))
+    let status = state.normalizer.status().await;
+    Ok(Json(status))
 }
 
 /// Trigger normalization handler
@@ -379,13 +583,28 @@ async fn trigger_normalization_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    // In a real implementation, this would trigger normalization
+    let hexad_id = HexadId::new(&id);
+
+    // Check if hexad exists
+    let _hexad = state
+        .hexad_store
+        .get(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Hexad {} not found", id)))?;
+
+    // In a full implementation, this would trigger actual normalization
+    // For now, we just verify the hexad exists and return accepted
+    info!(id = %id, "Normalization triggered for hexad");
+
     Ok(StatusCode::ACCEPTED)
 }
 
 /// Start the API server
 pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
-    let state = AppState::new();
+    let state = AppState::new_async(config.clone())
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     let app = build_router(state);
 
     let addr = format!("{}:{}", config.host, config.port);
@@ -404,9 +623,18 @@ mod tests {
     use axum::http::{Request, StatusCode};
     use tower::ServiceExt;
 
+    async fn create_test_state() -> AppState {
+        AppState::new_async(ApiConfig {
+            vector_dimension: 3,
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+    }
+
     #[tokio::test]
     async fn test_health_endpoint() {
-        let state = AppState::new();
+        let state = create_test_state().await;
         let app = build_router(state);
 
         let response = app
@@ -424,13 +652,125 @@ mod tests {
 
     #[tokio::test]
     async fn test_ready_endpoint() {
-        let state = AppState::new();
+        let state = create_test_state().await;
         let app = build_router(state);
 
         let response = app
             .oneshot(
                 Request::builder()
                     .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_create_and_get_hexad() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        // Create a hexad
+        let create_request = HexadRequest {
+            title: Some("Test Document".to_string()),
+            body: Some("Test body content".to_string()),
+            embedding: Some(vec![0.1, 0.2, 0.3]),
+            types: None,
+            relationships: None,
+            tensor: None,
+            metadata: None,
+        };
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/hexads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&create_request).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+
+        // Parse response to get ID
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let created: HexadResponse = serde_json::from_slice(&body).unwrap();
+
+        // Get the hexad
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/hexads/{}", created.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_text_search() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        // Create a hexad
+        let create_request = HexadRequest {
+            title: Some("Rust Programming".to_string()),
+            body: Some("Rust is a systems programming language".to_string()),
+            embedding: Some(vec![0.1, 0.2, 0.3]),
+            types: None,
+            relationships: None,
+            tensor: None,
+            metadata: None,
+        };
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/hexads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&create_request).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Search for it
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/search/text?q=Rust&limit=10")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_drift_status() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/drift/status")
                     .body(Body::empty())
                     .unwrap(),
             )

@@ -9,16 +9,19 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use thiserror::Error;
 
 // Re-export modality types
 pub use verisim_document::{Document, DocumentStore};
 pub use verisim_graph::{GraphEdge, GraphNode, GraphObject, GraphStore};
-pub use verisim_semantic::{ProofBlob, SemanticAnnotation, SemanticStore, SemanticType};
+pub use verisim_semantic::{ProofBlob, Provenance, SemanticAnnotation, SemanticStore, SemanticType, SemanticValue};
 pub use verisim_tensor::{Tensor, TensorStore};
 pub use verisim_temporal::{TemporalStore, TimeRange, Version};
 pub use verisim_vector::{Embedding, VectorStore};
+
+// In-memory store implementation
+mod store;
+pub use store::{HexadSnapshot, InMemoryHexadStore};
 
 /// Hexad errors
 #[derive(Error, Debug)]

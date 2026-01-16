@@ -11,6 +11,13 @@ license.workspace = true
 [dependencies]
 verisim-hexad = { path = "../verisim-hexad" }
 verisim-normalizer = { path = "../verisim-normalizer" }
+verisim-drift = { path = "../verisim-drift" }
+verisim-graph = { path = "../verisim-graph" }
+verisim-vector = { path = "../verisim-vector" }
+verisim-document = { path = "../verisim-document" }
+verisim-tensor = { path = "../verisim-tensor" }
+verisim-semantic = { path = "../verisim-semantic" }
+verisim-temporal = { path = "../verisim-temporal" }
 
 axum.workspace = true
 tokio.workspace = true
