@@ -225,17 +225,17 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(ready_handler))
         // Hexad CRUD
         .route("/hexads", post(create_hexad_handler))
-        .route("/hexads/:id", get(get_hexad_handler))
-        .route("/hexads/:id", put(update_hexad_handler))
-        .route("/hexads/:id", delete(delete_hexad_handler))
+        .route("/hexads/{id}", get(get_hexad_handler))
+        .route("/hexads/{id}", put(update_hexad_handler))
+        .route("/hexads/{id}", delete(delete_hexad_handler))
         // Search endpoints
         .route("/search/text", get(text_search_handler))
         .route("/search/vector", post(vector_search_handler))
-        .route("/search/related/:id", get(related_search_handler))
+        .route("/search/related/{id}", get(related_search_handler))
         // Drift and normalization
         .route("/drift/status", get(drift_status_handler))
         .route("/normalizer/status", get(normalizer_status_handler))
-        .route("/normalizer/trigger/:id", post(trigger_normalization_handler))
+        .route("/normalizer/trigger/{id}", post(trigger_normalization_handler))
         .with_state(state)
 }
 

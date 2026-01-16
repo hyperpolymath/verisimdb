@@ -448,9 +448,10 @@ mod tests {
             .unwrap();
         assert!(event.is_none());
 
-        // Record high score (above threshold)
+        // Record high score (above threshold of 0.3 for semantic_vector)
+        // Score 0.6 triggers Warning severity (> 0.5)
         let event = detector
-            .record(DriftType::SemanticVectorDrift, 0.5, vec!["entity1".to_string()])
+            .record(DriftType::SemanticVectorDrift, 0.6, vec!["entity1".to_string()])
             .await
             .unwrap();
         assert!(event.is_some());
