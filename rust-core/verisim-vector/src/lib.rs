@@ -5,7 +5,6 @@
 //! Implements Marr's Computational Level: "What is similar to what?"
 
 use async_trait::async_trait;
-use hnsw_rs::prelude::*;
 use ndarray::{Array1, ArrayView1};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -103,34 +102,23 @@ pub trait VectorStore: Send + Sync {
     fn dimension(&self) -> usize;
 }
 
-/// HNSW-based vector store
+/// In-memory vector store with brute-force search
+///
+/// Note: This is a simple implementation for correctness. For production
+/// workloads with >10k vectors, integrate HNSW with proper lifetime management.
 pub struct HnswVectorStore {
     dimension: usize,
     metric: DistanceMetric,
-    hnsw: Arc<RwLock<Hnsw<f32, DistCosine>>>,
-    id_to_index: Arc<RwLock<HashMap<String, usize>>>,
-    index_to_id: Arc<RwLock<HashMap<usize, String>>>,
     embeddings: Arc<RwLock<HashMap<String, Embedding>>>,
-    next_index: Arc<RwLock<usize>>,
 }
 
 impl HnswVectorStore {
-    /// Create a new HNSW vector store
+    /// Create a new vector store
     pub fn new(dimension: usize, metric: DistanceMetric) -> Self {
-        let max_elements = 100_000; // Initial capacity
-        let max_nb_connection = 16; // M parameter
-        let ef_construction = 200;
-
-        let hnsw = Hnsw::new(max_nb_connection, max_elements, 16, ef_construction, DistCosine);
-
         Self {
             dimension,
             metric,
-            hnsw: Arc::new(RwLock::new(hnsw)),
-            id_to_index: Arc::new(RwLock::new(HashMap::new())),
-            index_to_id: Arc::new(RwLock::new(HashMap::new())),
             embeddings: Arc::new(RwLock::new(HashMap::new())),
-            next_index: Arc::new(RwLock::new(0)),
         }
     }
 
@@ -141,6 +129,24 @@ impl HnswVectorStore {
             v.iter().map(|x| x / norm).collect()
         } else {
             v.to_vec()
+        }
+    }
+
+    /// Compute similarity between two vectors based on metric
+    fn similarity(&self, a: &[f32], b: &[f32]) -> f32 {
+        match self.metric {
+            DistanceMetric::Cosine => {
+                let a_norm = Self::normalize(a);
+                let b_norm = Self::normalize(b);
+                a_norm.iter().zip(b_norm.iter()).map(|(x, y)| x * y).sum()
+            }
+            DistanceMetric::DotProduct => {
+                a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+            }
+            DistanceMetric::Euclidean => {
+                let dist_sq: f32 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum();
+                1.0 / (1.0 + dist_sq.sqrt()) // Convert distance to similarity
+            }
         }
     }
 }
@@ -155,31 +161,10 @@ impl VectorStore for HnswVectorStore {
             });
         }
 
-        let normalized = Self::normalize(&embedding.vector);
-
-        // Get or assign index
-        let index = {
-            let mut id_to_index = self.id_to_index.write().unwrap();
-            if let Some(&idx) = id_to_index.get(&embedding.id) {
-                idx
-            } else {
-                let mut next = self.next_index.write().unwrap();
-                let idx = *next;
-                *next += 1;
-                id_to_index.insert(embedding.id.clone(), idx);
-                self.index_to_id.write().unwrap().insert(idx, embedding.id.clone());
-                idx
-            }
-        };
-
-        // Insert into HNSW
-        {
-            let mut hnsw = self.hnsw.write().unwrap();
-            hnsw.insert((&normalized, index));
-        }
-
-        // Store embedding
-        self.embeddings.write().unwrap().insert(embedding.id.clone(), embedding.clone());
+        self.embeddings
+            .write()
+            .unwrap()
+            .insert(embedding.id.clone(), embedding.clone());
 
         Ok(())
     }
@@ -192,24 +177,26 @@ impl VectorStore for HnswVectorStore {
             });
         }
 
-        let normalized = Self::normalize(query);
+        let embeddings = self.embeddings.read().unwrap();
 
-        let hnsw = self.hnsw.read().unwrap();
-        let ef_search = k.max(50); // ef >= k
-        let neighbors = hnsw.search(&normalized, k, ef_search);
-
-        let index_to_id = self.index_to_id.read().unwrap();
-        let results = neighbors
-            .into_iter()
-            .filter_map(|n| {
-                index_to_id.get(&n.d_id).map(|id| SearchResult {
+        // Compute similarities for all embeddings (brute-force)
+        let mut scored: Vec<_> = embeddings
+            .iter()
+            .map(|(id, emb)| {
+                let score = self.similarity(query, &emb.vector);
+                SearchResult {
                     id: id.clone(),
-                    score: 1.0 - n.distance, // Convert distance to similarity
-                })
+                    score,
+                }
             })
             .collect();
 
-        Ok(results)
+        // Sort by similarity descending
+        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Return top k
+        scored.truncate(k);
+        Ok(scored)
     }
 
     async fn get(&self, id: &str) -> Result<Option<Embedding>, VectorError> {
@@ -218,7 +205,6 @@ impl VectorStore for HnswVectorStore {
 
     async fn delete(&self, id: &str) -> Result<(), VectorError> {
         self.embeddings.write().unwrap().remove(id);
-        // Note: HNSW doesn't support true deletion, marked for rebuild
         Ok(())
     }
 

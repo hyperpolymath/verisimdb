@@ -22,6 +22,3 @@ bincode.workspace = true
 proptest.workspace = true
 criterion.workspace = true
 
-[[bench]]
-name = "vector_search"
-harness = false

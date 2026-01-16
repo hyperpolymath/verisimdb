@@ -11,8 +11,8 @@ use std::path::Path;
 use std::sync::Arc;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
-use tantivy::schema::{Field, Schema, STORED, TEXT};
-use tantivy::{Directory, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument};
+use tantivy::schema::{Field, Schema, Value, STORED, TEXT};
+use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
@@ -44,6 +44,12 @@ impl From<tantivy::TantivyError> for DocumentError {
 impl From<tantivy::query::QueryParserError> for DocumentError {
     fn from(e: tantivy::query::QueryParserError) -> Self {
         DocumentError::QueryError(e.to_string())
+    }
+}
+
+impl From<tantivy::directory::error::OpenDirectoryError> for DocumentError {
+    fn from(e: tantivy::directory::error::OpenDirectoryError) -> Self {
+        DocumentError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
     }
 }
 

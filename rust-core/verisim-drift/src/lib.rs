@@ -4,8 +4,8 @@
 //! Monitors cross-modal consistency degradation and triggers normalization.
 //! This is the "early warning system" for data quality issues.
 
-use chrono::{DateTime, Duration, Utc};
-use prometheus::{Counter, Gauge, Histogram, Registry};
+use chrono::{DateTime, Utc};
+use prometheus::{Counter, Gauge, Registry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
