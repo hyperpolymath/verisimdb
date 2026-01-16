@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+defmodule VeriSim.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :verisim,
+      version: "0.1.0",
+      elixir: "~> 1.17",
+      start_permanent: Mix.env() == :prod,
+      deps: deps(),
+      aliases: aliases(),
+
+      # Docs
+      name: "VeriSim Orchestration",
+      source_url: "https://gitlab.com/hyperpolymath/verisimdb",
+      docs: [
+        main: "VeriSim",
+        extras: ["README.md"]
+      ]
+    ]
+  end
+
+  def application do
+    [
+      extra_applications: [:logger],
+      mod: {VeriSim.Application, []}
+    ]
+  end
+
+  defp deps do
+    [
+      # HTTP client for Rust core communication
+      {:req, "~> 0.5"},
+
+      # JSON encoding/decoding
+      {:jason, "~> 1.4"},
+
+      # Telemetry and metrics
+      {:telemetry, "~> 1.2"},
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
+
+      # Process registry
+      {:horde, "~> 0.9"},
+
+      # Testing
+      {:ex_machina, "~> 2.7", only: :test},
+      {:mox, "~> 1.0", only: :test},
+
+      # Development
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      setup: ["deps.get"],
+      test: ["test"],
+      "test.watch": ["test.watch"]
+    ]
+  end
+end

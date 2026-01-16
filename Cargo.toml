@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# VeriSimDB - The Veridical Simulacrum Database
+# A 6-core multimodal database with self-normalization
+
+[workspace]
+resolver = "2"
+members = [
+    "rust-core/verisim-graph",
+    "rust-core/verisim-vector",
+    "rust-core/verisim-tensor",
+    "rust-core/verisim-semantic",
+    "rust-core/verisim-document",
+    "rust-core/verisim-temporal",
+    "rust-core/verisim-hexad",
+    "rust-core/verisim-normalizer",
+    "rust-core/verisim-drift",
+    "rust-core/verisim-api",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["hyperpolymath"]
+license = "AGPL-3.0-or-later"
+repository = "https://gitlab.com/hyperpolymath/verisimdb"
+
+[workspace.dependencies]
+# Graph modality (RDF/Property Graph)
+oxigraph = "0.4"
+sophia = "0.8"
+
+# Vector modality (HNSW)
+hnsw_rs = "0.3"
+ndarray = "0.16"
+
+# Tensor modality
+burn = "0.14"
+
+# Semantic modality
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ciborium = "0.2"  # CBOR for proof blobs
+
+# Document modality
+tantivy = "0.22"
+
+# Temporal modality
+chrono = { version = "0.4", features = ["serde"] }
+
+# API and networking
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+hyper = "1.0"
+
+# Serialization
+bincode = "1.3"
+postcard = { version = "1.0", features = ["alloc"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Testing
+proptest = "1.4"
+criterion = "0.5"
+
+# Async
+futures = "0.3"
+async-trait = "0.1"
+
+# Metrics
+prometheus = "0.13"
+
+# UUID
+uuid = { version = "1.11", features = ["v4"] }
+
+# Regex
+regex = "1.11"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"

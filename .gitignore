@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Elixir
+/_build/
+/deps/
+/*.ez
+*.beam
+/elixir-orchestration/_build/
+/elixir-orchestration/deps/
+/elixir-orchestration/*.ez
+erl_crash.dump
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+/cover/
+/elixir-orchestration/cover/
+
+# Documentation
+/doc/
+/elixir-orchestration/doc/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Data directories (for local dev)
+/data/
+/storage/
+
+# Container build artifacts
+*.tar

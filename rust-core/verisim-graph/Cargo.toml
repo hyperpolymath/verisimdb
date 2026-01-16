@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[package]
+name = "verisim-graph"
+description = "Graph modality - RDF and property graph storage via Oxigraph"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+oxigraph.workspace = true
+sophia.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

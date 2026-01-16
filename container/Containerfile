@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# VeriSimDB Container Image
+#
+# Build with Podman (preferred):
+#   podman build -t verisimdb:latest -f container/Containerfile .
+#
+# Or Docker:
+#   docker build -t verisimdb:latest -f container/Containerfile .
+
+# Stage 1: Build Rust
+FROM docker.io/rust:1.83-slim-bookworm AS rust-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Rust workspace
+COPY Cargo.toml ./
+COPY rust-core/ ./rust-core/
+
+# Build release
+RUN cargo build --release
+
+# Stage 2: Build Elixir
+FROM docker.io/elixir:1.17-slim AS elixir-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Elixir project
+COPY elixir-orchestration/ ./
+
+# Install deps and compile
+ENV MIX_ENV=prod
+RUN mix local.hex --force && \
+    mix local.rebar --force && \
+    mix deps.get --only prod && \
+    mix compile
+
+# Stage 3: Runtime
+FROM docker.io/debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Rust binary
+COPY --from=rust-builder /build/target/release/verisim-api /app/
+
+# Copy Elixir release (when we have releases configured)
+# COPY --from=elixir-builder /build/_build/prod/rel/verisim /app/elixir/
+
+# Environment
+ENV RUST_LOG=info
+ENV VERISIM_HOST=0.0.0.0
+ENV VERISIM_PORT=8080
+
+# Expose API port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run
+CMD ["/app/verisim-api"]
