@@ -194,7 +194,7 @@ pub struct DriftStatusResponse {
 }
 
 /// Application state
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppState {
     pub start_time: std::time::Instant,
     // In a real implementation, these would be actual store instances

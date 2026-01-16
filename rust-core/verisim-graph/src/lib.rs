@@ -5,7 +5,7 @@
 //! Implements Marr's Computational Level: "What relationships exist?"
 
 use async_trait::async_trait;
-use oxigraph::model::{NamedNode, Quad, Subject, Term};
+use oxigraph::model::{GraphName, NamedNode, Quad, Subject, Term};
 use oxigraph::store::Store;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -125,7 +125,7 @@ impl OxiGraphStore {
                 Term::Literal(oxigraph::model::Literal::new_simple_literal(value))
             }
         };
-        Ok(Quad::new(subject, predicate, object, None))
+        Ok(Quad::new(subject, predicate, object, GraphName::DefaultGraph))
     }
 }
 
@@ -148,7 +148,7 @@ impl GraphStore for OxiGraphStore {
                 Term::NamedNode(n) => GraphObject::Node(GraphNode::new(n.as_str())),
                 Term::Literal(l) => GraphObject::Literal {
                     value: l.value().to_string(),
-                    datatype: l.datatype().map(|d| d.as_str().to_string()),
+                    datatype: Some(l.datatype().as_str().to_string()),
                 },
                 _ => continue,
             };
