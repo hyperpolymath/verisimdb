@@ -1,12 +1,184 @@
-= RSR template repo - see RSR_OUTLINE.adoc in root for general background and specification
+// SPDX-License-Identifier: PMPL-1.0-or-later
 
-== This is your repo - don't forget to rename me!
+= VeriSimDB
+:toc:
+:toc-placement!:
 
-== AI CLI standards
+**The Veridical Simulacrum Database** - A 6-core multimodal database with self-normalization.
 
-- Include `ai-cli-crash-capture/` and `contractiles/` from this template in new repos.
-- Mirror 6SCM files into `.machine_readable/6scm/`.
-- Before any code generation, check `/var/mnt/eclipse/repos/proven` for the current Idris “unbreakable” library status.
-- If a project uses that Idris library, add an *Idris Inside* badge to the repo.
-- If new bindings are required, add them in `/var/mnt/eclipse/repos/proven` as `idris2-zig-<language>` during the work.
-- If new code suggests additional “unbreakable” Idris modules, add them under `/var/mnt/eclipse/repos/proven` and update binders across all supported languages.
+toc::[]
+
+== Overview
+
+VeriSimDB implements a novel database architecture where each entity (called a *Hexad*) exists simultaneously across six synchronized modalities:
+
+[cols="1,3"]
+|===
+|Modality |Purpose
+
+|**Graph**
+|RDF triples and property graph edges (Oxigraph)
+
+|**Vector**
+|Embeddings for similarity search (HNSW)
+
+|**Tensor**
+|Multi-dimensional numeric data (ndarray/Burn)
+
+|**Semantic**
+|Type annotations and CBOR proof blobs
+
+|**Document**
+|Full-text searchable content (Tantivy)
+
+|**Temporal**
+|Version history and time-series
+|===
+
+The system continuously monitors *drift* between modalities and automatically triggers *self-normalization* to maintain consistency.
+
+== Architecture
+
+----
+┌─────────────────────────────────────────────────────────────┐
+│  Elixir Orchestration Layer                                 │
+│    ├── VeriSim.EntityServer (GenServer per entity)          │
+│    ├── VeriSim.DriftMonitor (drift detection coordinator)   │
+│    ├── VeriSim.QueryRouter (distributes queries)            │
+│    └── VeriSim.SchemaRegistry (type system coordinator)     │
+│              ↓ HTTP                                         │
+├─────────────────────────────────────────────────────────────┤
+│  Rust Core (verisim-api)                                    │
+│    ├── verisim-graph      ├── verisim-semantic              │
+│    ├── verisim-vector     ├── verisim-document              │
+│    ├── verisim-tensor     ├── verisim-temporal              │
+│    ├── verisim-hexad      ├── verisim-drift                 │
+│    └── verisim-normalizer └── verisim-api                   │
+└─────────────────────────────────────────────────────────────┘
+----
+
+== Design Philosophy
+
+VeriSimDB follows David Marr's three levels of analysis:
+
+1. **Computational Level**: What problem are we solving?
+   - Maintain cross-modal consistency across 6 representations
+   - Detect drift before it causes data quality issues
+   - Provide unified querying across all modalities
+
+2. **Algorithmic Level**: How do we solve it?
+   - Hexad entities: one ID, six synchronized stores
+   - Drift detection with configurable thresholds
+   - Self-normalization triggered by drift events
+
+3. **Implementational Level**: How is it built?
+   - Rust for performance-critical modality stores
+   - Elixir/OTP for distributed coordination
+   - HTTP API for communication
+
+== Quick Start
+
+=== Prerequisites
+
+* Rust (edition 2024)
+* Elixir 1.17+
+* Podman (preferred) or Docker
+
+=== Build
+
+[source,bash]
+----
+# Rust core
+cargo build
+
+# Elixir orchestration
+cd elixir-orchestration
+mix deps.get
+mix compile
+----
+
+=== Run
+
+[source,bash]
+----
+# Start Rust API server
+cargo run -p verisim-api
+
+# Start Elixir orchestration (in another terminal)
+cd elixir-orchestration
+iex -S mix
+----
+
+=== Container
+
+[source,bash]
+----
+podman build -t verisimdb:latest -f container/Containerfile .
+podman run -p 8080:8080 verisimdb:latest
+----
+
+== API Examples
+
+=== Create a Hexad
+
+[source,bash]
+----
+curl -X POST http://localhost:8080/api/v1/hexads \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Machine Learning Paper",
+    "body": "An introduction to neural networks...",
+    "embedding": [0.1, 0.2, ...],
+    "types": ["http://example.org/Paper"],
+    "relationships": [["cites", "paper-123"]]
+  }'
+----
+
+=== Search by Text
+
+[source,bash]
+----
+curl "http://localhost:8080/api/v1/search/text?q=neural+networks&limit=10"
+----
+
+=== Search by Vector Similarity
+
+[source,bash]
+----
+curl -X POST http://localhost:8080/api/v1/search/vector \
+  -H "Content-Type: application/json" \
+  -d '{"vector": [0.1, 0.2, ...], "k": 5}'
+----
+
+== Project Structure
+
+----
+verisimdb/
+├── Cargo.toml                 # Rust workspace
+├── rust-core/                 # Rust crates
+│   ├── verisim-graph/         # Graph modality (Oxigraph)
+│   ├── verisim-vector/        # Vector modality (HNSW)
+│   ├── verisim-tensor/        # Tensor modality (ndarray)
+│   ├── verisim-semantic/      # Semantic modality (CBOR)
+│   ├── verisim-document/      # Document modality (Tantivy)
+│   ├── verisim-temporal/      # Temporal modality (versions)
+│   ├── verisim-hexad/         # Unified Hexad entity
+│   ├── verisim-drift/         # Drift detection
+│   ├── verisim-normalizer/    # Self-normalization
+│   └── verisim-api/           # HTTP API server
+├── elixir-orchestration/      # Elixir/OTP layer
+│   ├── lib/verisim/
+│   ├── config/
+│   └── mix.exs
+├── container/                 # Containerfiles
+├── docs/                      # Documentation
+└── .machine_readable/         # STATE.scm, META.scm, ECOSYSTEM.scm
+----
+
+== License
+
+PMPL-1.0-or-later
+
+== Contributing
+
+See CONTRIBUTING.adoc for guidelines.
