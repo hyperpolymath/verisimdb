@@ -849,6 +849,384 @@ defmodule VeriSim.ErrorMonitor do
 end
 ----
 
+== Verbosity Levels
+
+VQL supports **four verbosity levels** for error and diagnostic output:
+
+[cols="1,2,3"]
+|===
+|Level |Use Case |Output
+
+|**`SILENT`**
+|Production batch jobs, CI/CD
+|No output except fatal errors
+
+|**`NORMAL`** (default)
+|Interactive queries, REPL
+|Errors + warnings + query results
+
+|**`VERBOSE`**
+|Debugging, development
+|Errors + warnings + execution plan + timing
+
+|**`DEBUG`**
+|System debugging, troubleshooting
+|Full trace: parse tree, type checking, store calls, drift detection
+|===
+
+=== Configuration
+
+**Command-line:**
+[source,bash]
+----
+verisim query --verbosity=verbose query.vql
+verisim query --verbosity=silent query.vql  # CI/CD mode
+----
+
+**VQL pragma:**
+[source,vql]
+----
+SET VERBOSITY VERBOSE;
+
+SELECT GRAPH, DOCUMENT
+FROM verisim:semantic
+WHERE hexad.types INCLUDES "Paper"
+LIMIT 10;
+----
+
+**Environment variable:**
+[source,bash]
+----
+export VERISIM_VERBOSITY=debug
+verisim query query.vql
+----
+
+=== Verbosity Output Examples
+
+==== SILENT Mode
+
+[source,text]
+----
+# No output unless fatal error
+# Query succeeded: 0 bytes output
+----
+
+==== NORMAL Mode
+
+[source,text]
+----
+Warning: Store 'university-archive' cache expired, refreshing...
+Query returned 10 results in 234ms
+----
+
+==== VERBOSE Mode
+
+[source,text]
+----
+[PLAN] Query plan selected: federated-quorum (3 stores)
+[EXEC] Querying store 1/3: university-archive
+[EXEC] Querying store 2/3: research-lab
+[EXEC] Querying store 3/3: corporate-db
+[DRIFT] Detected title mismatch: "ML Paper" vs "Machine Learning Paper"
+[DRIFT] Repair strategy: quorum (2/3 agree on "Machine Learning Paper")
+[RESULT] Query returned 10 results in 1.2s
+[TIMING] Parse: 5ms, Type check: 12ms, Execute: 1183ms
+----
+
+==== DEBUG Mode
+
+[source,text]
+----
+[PARSE] Tokens: [SELECT, GRAPH, COMMA, DOCUMENT, FROM, ...]
+[PARSE] AST:
+  Query {
+    modalities: [GRAPH, DOCUMENT],
+    source: Source::Semantic("verisim:semantic"),
+    condition: Some(Condition::Includes(...))
+  }
+[TYPE] Checking modalities: GRAPH, DOCUMENT
+[TYPE] Hexad type: {h : Hexad | Graph(h) ≠ None ∧ Document(h) ≠ None}
+[TYPE] Condition type: Hexad → Bool
+[TYPE] Query type: QueryResult[{GRAPH, DOCUMENT}]
+[EXEC] HTTP GET https://university-archive.edu/verisim/query
+[EXEC] Response: 200 OK, 3 hexads
+[EXEC] HTTP GET https://research-lab.org/verisim/query
+[EXEC] Response: 200 OK, 5 hexads
+[EXEC] HTTP GET https://corporate-db.com/verisim/query
+[EXEC] Response: 504 Gateway Timeout (retry 1/3)
+[EXEC] Response: 200 OK, 2 hexads
+[DRIFT] Store 1 title: "ML Paper"
+[DRIFT] Store 2 title: "Machine Learning Paper"
+[DRIFT] Store 3 title: "Machine Learning Paper"
+[DRIFT] Quorum result: "Machine Learning Paper" (2/3)
+[RESULT] Merged 10 hexads with drift repair
+[TIMING] Total: 1.2s (Parse: 5ms, Type: 12ms, Execute: 1183ms)
+----
+
+== Friendly Notices and Warnings
+
+Beyond errors, VQL provides **helpful notices** for non-error situations:
+
+=== Notice Types
+
+[cols="1,2,3"]
+|===
+|Type |When Shown |Example
+
+|**Info**
+|Informational messages
+|"Cache hit for query XYZ (saved 2.3s)"
+
+|**Warning**
+|Potential issues, not errors
+|"Query uses deprecated syntax (VERSION 0.9)"
+
+|**Hint**
+|Performance/style suggestions
+|"Consider adding LIMIT clause for large result sets"
+
+|**Deprecation**
+|Features scheduled for removal
+|"FULLTEXT CONTAINS is deprecated, use FULLTEXT MATCHES instead (removal: v2.0)"
+|===
+
+=== Example Notices
+
+==== Cache Hit (Info)
+
+[source,text]
+----
+ℹ Cache hit for query SHA256:a1b2c3... (saved 1.8s)
+Query returned 10 results in 23ms
+----
+
+==== Deprecated Syntax (Warning)
+
+[source,vql]
+----
+VERSION 0.9;
+SELECT * FROM HEXAD abc-123;
+----
+
+[source,text]
+----
+⚠ Warning: VERSION 0.9 is deprecated (current: 1.0, removal: v2.0)
+  Migration guide: https://verisimdb.org/migration/v0.9-to-v1.0
+----
+
+==== Missing LIMIT (Hint)
+
+[source,vql]
+----
+SELECT GRAPH, DOCUMENT
+FROM FEDERATION /universities/*
+WHERE hexad.types INCLUDES "Paper";
+----
+
+[source,text]
+----
+💡 Hint: Federated query without LIMIT may return large result sets
+  Consider adding: LIMIT 100
+----
+
+==== Slow Query (Warning)
+
+[source,text]
+----
+⚠ Warning: Query took 5.2s (threshold: 1s)
+  Consider adding modality-specific filters to reduce result set
+----
+
+=== Configuration
+
+**Suppress warnings:**
+[source,bash]
+----
+verisim query --no-warnings query.vql
+----
+
+**Suppress hints:**
+[source,bash]
+----
+verisim query --no-hints query.vql
+----
+
+**Strict mode (warnings as errors):**
+[source,bash]
+----
+verisim query --strict query.vql
+# Exit code 1 on any warning
+----
+
+== Learning Hooks (v3 - miniKanren Integration)
+
+**Status:** STUB - Planned for v3.0
+
+VQL error handling will integrate with **miniKanren** (link:minikanren-integration-v3.adoc[see roadmap]) to:
+
+1. **Learn error patterns** - Synthesize predicates from error examples
+2. **Suggest fixes** - Generate correction rules from observed errors
+3. **Optimize recovery** - Infer optimal retry/fallback strategies
+
+=== Learning Hook Architecture (v3)
+
+[source,text]
+----
+┌─────────────────────────────────────────────────────────┐
+│  Error Handling Pipeline                                │
+│    ├── Error Detection (current v1)                     │
+│    ├── Error Logging (current v1)                       │
+│    ├── Error Recovery (current v1)                      │
+│    └── Error Learning (v3 - miniKanren) ◄─ NEW         │
+│              ↓                                           │
+├─────────────────────────────────────────────────────────┤
+│  miniKanren Learning Engine                             │
+│    ├── Pattern Synthesis (learn from examples)          │
+│    ├── Fix Generation (suggest corrections)             │
+│    └── Strategy Optimization (infer recovery policies)  │
+└─────────────────────────────────────────────────────────┘
+----
+
+=== Use Case 1: Pattern Synthesis (v3)
+
+**Problem:** Detect common error patterns across queries
+
+**miniKanren approach:**
+
+[source,scheme]
+----
+;; Learn error predicate from positive/negative examples
+(defrel (error-patterno examples pattern)
+  (fresh (error-examples success-examples)
+    (partition-errorso examples error-examples success-examples)
+    (pattern-matches-allo pattern error-examples)
+    (pattern-rejects-allo pattern success-examples)
+    (pattern-is-minimalo pattern)))
+
+;; Example: Learn that missing modality causes errors
+(run 1 (pattern)
+  (error-patterno
+    '((query "SELECT FROM hexad abc" . error)
+      (query "SELECT GRAPH FROM hexad abc" . ok)
+      (query "SELECT FROM store xyz" . error))
+    pattern))
+;; Output: (pattern (missing-modality-in-select))
+----
+
+=== Use Case 2: Fix Generation (v3)
+
+**Problem:** Suggest corrections for common syntax errors
+
+**miniKanren approach:**
+
+[source,scheme]
+----
+;; Relational specification of fixes
+(defrel (fix-suggestiono error-query fixed-query)
+  (conde
+    ;; Fix 1: Add missing modality
+    [(missing-modalityo error-query)
+     (add-default-modalityo error-query fixed-query)]
+
+    ;; Fix 2: Correct typo
+    [(typoo error-query field)
+     (correct-typoo error-query field fixed-query)]
+
+    ;; Fix 3: Add missing LIMIT
+    [(unbounded-queryo error-query)
+     (add-limito error-query 100 fixed-query)]))
+
+;; Query: What fix for this error?
+(run* (fixed)
+  (fix-suggestiono
+    "SELECT GRPH FROM hexad abc"  ;; Typo: GRPH
+    fixed))
+;; Output: ("SELECT GRAPH FROM hexad abc")
+----
+
+=== Use Case 3: Strategy Optimization (v3)
+
+**Problem:** Given error history, infer optimal retry/fallback strategy
+
+**miniKanren approach:**
+
+[source,scheme]
+----
+;; Learn retry strategy from error history
+(defrel (retry-strategyo error-history strategy)
+  (fresh (error-type frequency transient?)
+    (classify-errorso error-history error-type frequency)
+    (transient-erroro? error-type transient?)
+    (conde
+      ;; High-frequency transient: exponential backoff
+      [(>o frequency 0.3)
+       (== transient? #t)
+       (== strategy 'exponential-backoff)]
+
+      ;; Low-frequency transient: simple retry
+      [(<o frequency 0.1)
+       (== transient? #t)
+       (== strategy 'simple-retry)]
+
+      ;; Permanent error: no retry
+      [(== transient? #f)
+       (== strategy 'fail-fast)])))
+----
+
+=== Integration Points (v3)
+
+**Error collection:**
+
+[source,elixir]
+----
+# lib/verisim/error_recovery.ex (v1 - collect data)
+defmodule VeriSim.ErrorRecovery do
+  def handle_error(error, context) do
+    # v1: Log error
+    ErrorLogger.log(error, context)
+
+    # v3: Send to miniKanren for learning
+    if @enable_learning do
+      MiniKanren.record_error_example(error, context)
+    end
+
+    # Recovery strategy
+    apply_recovery_strategy(error)
+  end
+end
+----
+
+**Fix suggestion:**
+
+[source,elixir]
+----
+# lib/verisim/query_parser.ex (v3 - suggest fixes)
+defmodule VeriSim.QueryParser do
+  def parse(query_string) do
+    case VQLParser.parse(query_string) do
+      {:ok, ast} -> {:ok, ast}
+      {:error, parse_error} ->
+        # v3: Ask miniKanren for fix suggestions
+        suggested_fixes = MiniKanren.suggest_fixes(parse_error, query_string)
+
+        {:error, parse_error, suggestions: suggested_fixes}
+    end
+  end
+end
+----
+
+**Output example (v3):**
+
+[source,text]
+----
+Parse Error at 1:8: Expected 'GRAPH', 'VECTOR', ..., found 'GRPH'
+  Hint: Did you mean 'GRAPH'?
+  Suggested fix (confidence: 95%):
+    SELECT GRAPH FROM HEXAD abc-123
+            ^^^^^
+  [miniKanren learned from 47 similar errors]
+----
+
 == Summary
 
 **Error Handling Guarantees:**

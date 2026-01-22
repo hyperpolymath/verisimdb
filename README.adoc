@@ -295,7 +295,9 @@ verisimdb/
 - link:docs/rescript-registry-types.adoc[Registry Types] - ReScript type definitions
 - link:docs/snapshotting-and-truncation-logic.adoc[Snapshotting] - Log truncation and recovery
 - **VQL (VeriSim Query Language):**
-  * link:docs/vql-grammar.ebnf[VQL Grammar] - Formal EBNF grammar specification
+  * link:docs/vql-grammar.ebnf[VQL Grammar] - Formal EBNF grammar specification (ISO/IEC 14977 compliant)
+  * link:docs/vql-formal-semantics.adoc[**VQL Formal Semantics**] - Operational semantics, big-step/small-step evaluation, drift semantics
+  * link:docs/vql-type-system.adoc[**VQL Type System**] - Static type rules, dependent types, refinement types, bidirectional type checking
   * link:docs/vql-examples.adoc[VQL Examples] - 42 example queries for all modalities (includes VERSION and DRIFT features)
   * link:docs/vql-architecture.adoc[VQL Architecture] - Dual-path router design (corrected)
   * link:src/vql/VQLParser.res[VQL Parser] - ReScript slipstream parser implementation
