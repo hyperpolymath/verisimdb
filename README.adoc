@@ -309,9 +309,16 @@ verisimdb/
 - **Error Handling & Safety:**
   * link:docs/error-handling-strategy.adoc[Error Handling Strategy] - Comprehensive error types, recovery strategies, audit trail
   * link:docs/safety-and-fault-tolerance.adoc[Safety & Fault Tolerance] - Memory safety, kernel safety, platform safety, supply chain, socio-technical safety
+  * link:docs/safety-theory-applied.adoc[Safety Theory Applied] - Reason, Groeneweg, Rasmussen, Leveson, Hollnagel, Vaughan, Snook applied to VeriSimDB
   * link:src/vql/VQLError.res[VQL Error Types] - Structured error representation (ReScript)
   * link:lib/verisim/error_recovery.ex[Error Recovery] - Retry with backoff, circuit breakers, compensating transactions
   * link:lib/verisim/circuit_breaker.ex[Circuit Breaker] - Prevent cascading failures
+- **Backwards Compatibility & Learning:**
+  * link:docs/backwards-compatibility.adoc[Backwards Compatibility Strategy] - Semantic versioning, deprecation process, migration strategies, API/VQL/data format evolution
+  * link:lib/verisim/adaptive_learner.ex[Adaptive Learner] - Feedback loops for cache TTL, normalization thresholds, drift tolerance, query plan selection
+- **Drift Handling:**
+  * link:docs/drift-handling.adoc[Drift Handling] - Detection, repair strategies, drift-aware queries, federation drift, Byzantine tolerance
+  * link:rust-core/verisim-drift/[Drift Detection Crate] - Rust implementation of cross-modal drift detection
 - link:docs/security-lessons.lgt[Security Lessons] - Logtalk rules for gitbot-fleet integration
 - link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
 
