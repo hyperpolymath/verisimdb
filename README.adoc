@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: PMPL-1.0-or-later
 
 = VeriSimDB
 :toc:
@@ -177,7 +177,7 @@ verisimdb/
 
 == License
 
-AGPL-3.0-or-later
+PMPL-1.0-or-later
 
 == Contributing
 
