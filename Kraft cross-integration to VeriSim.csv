@@ -1,6 +1,0 @@
-Feature,KRaft (Kafka),VeriSimDB (Proposed)
-"The ""Brain""",Metadata Quorum (3-5 nodes),Federated Registry Quorum
-Consistency,Strong (via Raft),Strong (via Paxos/Raft Integration)
-Data Format,Event-sourced Log,Merkle Search Tree (MST)
-Scalability,Millions of partitions,Millions of Hexads
-Addressing,Broker/Topic Mapping,UUID/Modality Mapping

@@ -320,7 +320,7 @@ verisimdb/
   * link:docs/drift-handling.adoc[Drift Handling] - Detection, repair strategies, drift-aware queries, federation drift, Byzantine tolerance
   * link:rust-core/verisim-drift/[Drift Detection Crate] - Rust implementation of cross-modal drift detection
 - link:docs/security-lessons.lgt[Security Lessons] - Logtalk rules for gitbot-fleet integration
-- link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
+- link:kraft-comparison.adoc[KRaft Comparison] - VeriSimDB vs Kafka KRaft metadata management
 
 == Use Cases
 
