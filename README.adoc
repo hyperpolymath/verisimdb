@@ -282,10 +282,15 @@ verisimdb/
 
 - link:WHITEPAPER.md[White Paper] (link:WHITEPAPER.pdf[PDF]) - Architecture rationale and federation design
 - link:docs/deployment-modes.adoc[Deployment Modes] - Standalone vs Federated vs Hybrid
+- **Deployment Challenges:**
+  * link:docs/challenges-standalone.adoc[Standalone Challenges] - Vertical scaling, SPOF, resource interference
+  * link:docs/challenges-hybrid.adoc[Hybrid Challenges] - Mixed consistency, cross-boundary drift
+  * link:docs/challenges-federated.adoc[Federated Challenges] - Consensus overhead, Byzantine faults, GDPR compliance
 - link:docs/technical-specification-kraft-metadata-log.adoc[KRaft Integration] - Metadata consensus protocol
 - link:docs/zkp-and-sanctify-integration.adoc[Zero-Trust Security] - ZKP verification with proven + sactify-php
 - link:docs/rescript-registry-types.adoc[Registry Types] - ReScript type definitions
 - link:docs/snapshotting-and-truncation-logic.adoc[Snapshotting] - Log truncation and recovery
+- link:docs/security-lessons.lgt[Security Lessons] - Logtalk rules for gitbot-fleet integration
 - link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
 
 == Use Cases
