@@ -126,16 +126,18 @@ uuid = hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_dig
        hex_digit, hex_digit, hex_digit, hex_digit, '-',
        hex_digit, hex_digit, hex_digit, hex_digit, '-',
        hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit ;
-hex_digit = [0-9a-fA-F] ;
+hex_digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+          | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
+          | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' ;
 
-identifier = [a-zA-Z_], { [a-zA-Z0-9_] } ;
+identifier = ? letter or underscore ?, { ? letter, digit, or underscore ? } ;
 store_id = identifier ;
 verifier_id = identifier ;
 actor_id = identifier ;
 version_id = identifier ;
 
-integer = [0-9], { [0-9] } ;
-float = [0-9], { [0-9] }, '.', [0-9], { [0-9] }, [('e' | 'E'), ['+' | '-'], [0-9], { [0-9] }] ;
+integer = ? digit ?, { ? digit ? } ;
+float = ? digit ?, { ? digit ? }, '.', ? digit ?, { ? digit ? }, [('e' | 'E'), ['+' | '-'], ? digit ?, { ? digit ? }] ;
 
 string_literal = "'", { ? any character except ' and \ ? | "\'", | "\\" }, "'" ;
 regex_literal = '/', { ? any character except / and \ ? | '\/' | '\\' }, '/' ;
@@ -144,7 +146,7 @@ timestamp = iso8601_datetime ;
 iso8601_datetime = year, '-', month, '-', day, 'T', hour, ':', minute, ':', second, ('.', fraction)?, timezone ;
 
 glob_pattern = '/', path_segment, { '/', path_segment }, ('/*' | '/**') ;
-path_segment = [a-zA-Z0-9_-], { [a-zA-Z0-9_-] } ;
+path_segment = ? alphanumeric, underscore, or hyphen ?, { ? alphanumeric, underscore, or hyphen ? } ;
 
 array_literal = '[', literal, { ',', literal }, ']' ;
 scalar_literal = integer | float | string_literal | boolean ;
