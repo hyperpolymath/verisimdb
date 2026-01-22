@@ -5,6 +5,7 @@
 :toc-placement!:
 
 **The Veridical Simulacrum Database** - A 6-core multimodal database with self-normalization.
+Bridging the Map and the Territory.
 
 toc::[]
 
@@ -82,7 +83,7 @@ VeriSimDB follows David Marr's three levels of analysis:
 
 * Rust (edition 2024)
 * Elixir 1.17+
-* Podman (preferred) or Docker
+* nerdctl, with Podman fallback for containerisation
 
 === Build
 

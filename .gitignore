@@ -1,52 +1,94 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# RSR-compliant .gitignore - merged local+remote
 
-# Rust
-/target/
-**/*.rs.bk
-Cargo.lock
-
-# Elixir
-/_build/
-/deps/
-/*.ez
-*.beam
-/elixir-orchestration/_build/
-/elixir-orchestration/deps/
-/elixir-orchestration/*.ez
-erl_crash.dump
-
-# IDE
-.idea/
-.vscode/
+# OS & Editor
+.DS_Store
+Thumbs.db
 *.swp
 *.swo
 *~
+.idea/
+.vscode/
 
-# OS
-.DS_Store
-Thumbs.db
+# Build
+/target/
+/_build/
+/build/
+/dist/
+/out/
 
-# Environment
+# Dependencies
+/node_modules/
+/vendor/
+/deps/
+/.elixir_ls/
+
+# Rust
+**/*.rs.bk
+# Cargo.lock  # Keep for binaries
+
+# Elixir
+/cover/
+/doc/
+/elixir-orchestration/_build/
+/elixir-orchestration/deps/
+/elixir-orchestration/cover/
+/elixir-orchestration/doc/
+/elixir-orchestration/*.ez
+*.ez
+*.beam
+erl_crash.dump
+
+# Julia
+*.jl.cov
+*.jl.mem
+/Manifest.toml
+
+# ReScript
+/lib/bs/
+/.bsb.lock
+
+# Python (SaltStack only)
+__pycache__/
+*.py[cod]
+.venv/
+
+# Ada/SPARK
+*.ali
+/obj/
+/bin/
+
+# Haskell
+/.stack-work/
+/dist-newstyle/
+
+# Chapel
+*.chpl.tmp.*
+
+# Secrets & Environment
 .env
+.env.*
 .env.local
 .env.*.local
+*.pem
+*.key
+secrets/
 
-# Test coverage
-/cover/
-/elixir-orchestration/cover/
-
-# Documentation
-/doc/
-/elixir-orchestration/doc/
-
-# Temporary
-tmp/
-temp/
-*.tmp
+# Test/Coverage
+/coverage/
+htmlcov/
 
 # Logs
 *.log
+/logs/
 logs/
+
+# Temp
+/tmp/
+tmp/
+temp/
+*.tmp
+*.bak
 
 # Data directories (for local dev)
 /data/
