@@ -82,7 +82,7 @@ VeriSimDB follows David Marr's three levels of analysis:
 
 * Rust (edition 2024)
 * Elixir 1.17+
-* Podman (preferred) or Docker
+* nerdctl, with Podman fallback for containerisation 
 
 === Build
 
