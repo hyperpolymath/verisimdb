@@ -280,7 +280,7 @@ verisimdb/
 
 == Key Documentation
 
-- link:WHITEPAPER.md[White Paper] - Architecture rationale and federation design
+- link:WHITEPAPER.md[White Paper] (link:WHITEPAPER.pdf[PDF]) - Architecture rationale and federation design
 - link:docs/deployment-modes.adoc[Deployment Modes] - Standalone vs Federated vs Hybrid
 - link:docs/technical-specification-kraft-metadata-log.adoc[KRaft Integration] - Metadata consensus protocol
 - link:docs/zkp-and-sanctify-integration.adoc[Zero-Trust Security] - ZKP verification with proven + sactify-php
