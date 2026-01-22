@@ -8,7 +8,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     groups:
       actions:
         patterns:
@@ -18,31 +18,31 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
 
   # Elixir/Mix
-  - package-ecosystem: "mix"
+  - package-ecosystem: "weeklymix"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
 
   # Node.js/npm
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
 
   # Python/pip
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
 
   # Nix flakes
   - package-ecosystem: "nix"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
