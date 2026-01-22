@@ -281,8 +281,11 @@ verisimdb/
 == Key Documentation
 
 - link:WHITEPAPER.md[White Paper] - Architecture rationale and federation design
-- link:Technical%20Specification%20-%20KRaft%20Metadata%20Log.md[KRaft Integration] - Metadata consensus protocol
-- link:ZKP%20and%20Sanctify%20Integration.md[Zero-Trust Security] - ZKP verification with proven + sactify-php
+- link:docs/deployment-modes.adoc[Deployment Modes] - Standalone vs Federated vs Hybrid
+- link:docs/technical-specification-kraft-metadata-log.adoc[KRaft Integration] - Metadata consensus protocol
+- link:docs/zkp-and-sanctify-integration.adoc[Zero-Trust Security] - ZKP verification with proven + sactify-php
+- link:docs/rescript-registry-types.adoc[Registry Types] - ReScript type definitions
+- link:docs/snapshotting-and-truncation-logic.adoc[Snapshotting] - Log truncation and recovery
 - link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
 
 == Use Cases
