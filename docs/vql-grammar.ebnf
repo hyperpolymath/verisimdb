@@ -1,0 +1,237 @@
+(* SPDX-License-Identifier: PMPL-1.0-or-later *)
+(* VeriSim Query Language (VQL) Grammar *)
+(* Format: Extended Backus-Naur Form (EBNF) *)
+(* Version: 1.0 *)
+(* Date: 2026-01-22 *)
+
+(* ============================================================================
+   1. TOP-LEVEL QUERY STRUCTURE
+   ============================================================================ *)
+
+query ::= select_clause
+          from_clause
+          [where_clause]
+          [proof_clause]
+          [limit_clause]
+          [offset_clause]
+          ;
+
+(* ============================================================================
+   2. SELECT CLAUSE - Modality Selection
+   ============================================================================ *)
+
+select_clause ::= "SELECT" modality_list ;
+
+modality_list ::= modality_spec ("," modality_spec)* ;
+
+modality_spec ::= "GRAPH" [graph_projection]
+                | "VECTOR" [vector_projection]
+                | "TENSOR" [tensor_projection]
+                | "SEMANTIC" [semantic_projection]
+                | "DOCUMENT" [document_projection]
+                | "TEMPORAL" [temporal_projection]
+                | "*"  (* All available modalities *)
+                ;
+
+(* Projection specifics per modality *)
+graph_projection ::= "(" sparql_pattern ")" ;
+vector_projection ::= "(" vector_fields ")" ;
+tensor_projection ::= "(" tensor_slice ")" ;
+semantic_projection ::= "(" contract_names ")" ;
+document_projection ::= "(" document_fields ")" ;
+temporal_projection ::= "(" version_spec ")" ;
+
+(* ============================================================================
+   3. FROM CLAUSE - Data Sources
+   ============================================================================ *)
+
+from_clause ::= "FROM" source_spec ;
+
+source_spec ::= hexad_source
+              | federation_source
+              | store_source
+              ;
+
+(* Direct hexad reference *)
+hexad_source ::= "HEXAD" uuid ;
+
+(* Federation pattern (multiple nodes) *)
+federation_source ::= "FEDERATION" node_pattern [drift_policy] ;
+
+node_pattern ::= glob_pattern  (* e.g., "/universities/*" *)
+               | node_list      (* e.g., "[node1, node2, node3]" *)
+               ;
+
+drift_policy ::= "WITH" "DRIFT" drift_mode ;
+drift_mode ::= "STRICT"     (* Fail on any drift *)
+             | "REPAIR"     (* Auto-repair detected drift *)
+             | "TOLERATE"   (* Return data despite drift *)
+             | "LATEST"     (* Use most recent version *)
+             ;
+
+(* Specific store reference *)
+store_source ::= "STORE" store_id ;
+
+(* ============================================================================
+   4. WHERE CLAUSE - Filtering Conditions
+   ============================================================================ *)
+
+where_clause ::= "WHERE" condition ;
+
+condition ::= simple_condition
+            | compound_condition
+            | "(" condition ")"
+            ;
+
+simple_condition ::= graph_condition
+                   | vector_condition
+                   | tensor_condition
+                   | semantic_condition
+                   | document_condition
+                   | temporal_condition
+                   ;
+
+compound_condition ::= condition "AND" condition
+                     | condition "OR" condition
+                     | "NOT" condition
+                     ;
+
+(* 4.1. Graph Conditions (SPARQL-like) *)
+graph_condition ::= sparql_pattern
+                  | path_pattern
+                  ;
+
+sparql_pattern ::= "(" node_var ")" edge_pattern "(" node_var ")" ;
+edge_pattern ::= "-[" edge_type "]->" | "-[" edge_type "]-" | "<-[" edge_type "]-" ;
+node_var ::= identifier | "?" identifier ;
+edge_type ::= ":" identifier ;
+
+path_pattern ::= node_var path_quantifier node_var ;
+path_quantifier ::= "-[" edge_type ("*" | "+" | "{" integer "," integer "}") "]->" ;
+
+(* 4.2. Vector Conditions (Similarity Search) *)
+vector_condition ::= vector_field "SIMILAR" "TO" vector_literal [similarity_threshold]
+                   | vector_field "NEAREST" integer [metric_type]
+                   ;
+
+vector_field ::= identifier "." "embedding" ;
+vector_literal ::= "[" float ("," float)* "]" ;
+similarity_threshold ::= "WITHIN" float ;
+metric_type ::= "USING" ("COSINE" | "EUCLIDEAN" | "DOT_PRODUCT") ;
+
+(* 4.3. Tensor Conditions (Multi-dimensional) *)
+tensor_condition ::= tensor_field tensor_op tensor_literal ;
+tensor_op ::= "==" | ">" | "<" | ">=" | "<=" | "SHAPE" | "RANK" ;
+tensor_literal ::= array_literal | scalar_literal ;
+
+(* 4.4. Semantic Conditions (ZKP Contracts) *)
+semantic_condition ::= "SATISFIES" contract_name [contract_params]
+                     | "HAS" "PROOF" proof_type
+                     | "VERIFIED" "BY" verifier_id
+                     ;
+
+contract_name ::= identifier ;
+contract_params ::= "(" param_list ")" ;
+param_list ::= identifier "=" literal ("," identifier "=" literal)* ;
+
+(* 4.5. Document Conditions (Full-text Search) *)
+document_condition ::= "FULLTEXT" "CONTAINS" string_literal
+                     | "FULLTEXT" "MATCHES" regex_literal
+                     | "FIELD" identifier comparison_op literal
+                     ;
+
+comparison_op ::= "==" | "!=" | ">" | "<" | ">=" | "<=" | "LIKE" ;
+
+(* 4.6. Temporal Conditions (Versioning) *)
+temporal_condition ::= "AS" "OF" timestamp
+                     | "BETWEEN" timestamp "AND" timestamp
+                     | "VERSION" version_id
+                     | "MODIFIED" "BY" actor_id
+                     ;
+
+(* ============================================================================
+   5. PROOF CLAUSE - Dependent-Type Safety
+   ============================================================================ *)
+
+proof_clause ::= "PROOF" proof_spec ;
+
+proof_spec ::= proof_type "(" contract_name ")" [proof_params] ;
+
+proof_type ::= "EXISTENCE"    (* Hexad exists and is accessible *)
+             | "CITATION"     (* Citation chain is valid *)
+             | "ACCESS"       (* User has access rights *)
+             | "INTEGRITY"    (* Data has not been tampered with *)
+             | "PROVENANCE"   (* Lineage is verifiable *)
+             | "CUSTOM"       (* Custom ZKP contract *)
+             ;
+
+proof_params ::= "WITH" param_list ;
+
+(* ============================================================================
+   6. PAGINATION CLAUSES
+   ============================================================================ *)
+
+limit_clause ::= "LIMIT" integer ;
+offset_clause ::= "OFFSET" integer ;
+
+(* ============================================================================
+   7. LEXICAL ELEMENTS
+   ============================================================================ *)
+
+uuid ::= hex_digit{8} "-" hex_digit{4} "-" hex_digit{4} "-" hex_digit{4} "-" hex_digit{12} ;
+hex_digit ::= [0-9a-fA-F] ;
+
+identifier ::= [a-zA-Z_] [a-zA-Z0-9_]* ;
+store_id ::= identifier ;
+verifier_id ::= identifier ;
+actor_id ::= identifier ;
+version_id ::= identifier ;
+
+integer ::= [0-9]+ ;
+float ::= [0-9]+ "." [0-9]+ ([eE] [+-]? [0-9]+)? ;
+
+string_literal ::= '"' ([^"\] | '\"' | '\\')* '"' ;
+regex_literal ::= "/" ([^/\] | '\/' | '\\')* "/" ;
+
+timestamp ::= iso8601_datetime ;
+iso8601_datetime ::= year "-" month "-" day "T" hour ":" minute ":" second ("." fraction)? timezone ;
+
+glob_pattern ::= "/" path_segment ("/" path_segment)* ("/*" | "/**") ;
+path_segment ::= [a-zA-Z0-9_-]+ ;
+
+array_literal ::= "[" literal ("," literal)* "]" ;
+scalar_literal ::= integer | float | string_literal | boolean ;
+boolean ::= "true" | "false" ;
+literal ::= scalar_literal | array_literal ;
+
+(* ============================================================================
+   8. COMMENTS
+   ============================================================================ *)
+
+comment ::= "--" [^\n]* "\n"  (* Line comment *)
+          | "/*" .* "*/"       (* Block comment *)
+          ;
+
+(* ============================================================================
+   9. RESERVED KEYWORDS
+   ============================================================================ *)
+
+(* Keywords are case-insensitive in VQL *)
+keywords ::= "SELECT" | "FROM" | "WHERE" | "PROOF" | "LIMIT" | "OFFSET"
+           | "GRAPH" | "VECTOR" | "TENSOR" | "SEMANTIC" | "DOCUMENT" | "TEMPORAL"
+           | "HEXAD" | "FEDERATION" | "STORE" | "WITH" | "DRIFT"
+           | "STRICT" | "REPAIR" | "TOLERATE" | "LATEST"
+           | "AND" | "OR" | "NOT"
+           | "SIMILAR" | "TO" | "WITHIN" | "NEAREST" | "USING"
+           | "SATISFIES" | "HAS" | "VERIFIED" | "BY"
+           | "FULLTEXT" | "CONTAINS" | "MATCHES" | "FIELD" | "LIKE"
+           | "AS" | "OF" | "BETWEEN" | "VERSION" | "MODIFIED"
+           | "EXISTENCE" | "CITATION" | "ACCESS" | "INTEGRITY" | "PROVENANCE" | "CUSTOM"
+           | "COSINE" | "EUCLIDEAN" | "DOT_PRODUCT"
+           | "SHAPE" | "RANK"
+           | "true" | "false"
+           ;
+
+(* ============================================================================
+   END OF GRAMMAR
+   ============================================================================ *)
