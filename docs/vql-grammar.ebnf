@@ -77,7 +77,7 @@ path_quantifier = '-[', edge_type, ('*' | '+' | '{', integer, ',', integer, '}')
 vector_condition = vector_field, 'SIMILAR', 'TO', vector_literal, [similarity_threshold] | vector_field, 'NEAREST', integer, [metric_type] ;
 
 vector_field = identifier, '.', 'embedding' ;
-vector_literal = '[', float, { ',', float } ']' ;
+vector_literal = '[', float, { ',', float }, ']' ;
 similarity_threshold = 'WITHIN', float ;
 metric_type = 'USING', ('COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT') ;
 
@@ -146,7 +146,7 @@ iso8601_datetime = year, '-', month, '-', day, 'T', hour, ':', minute, ':', seco
 glob_pattern = '/', path_segment, { '/', path_segment }, ('/*' | '/**') ;
 path_segment = [a-zA-Z0-9_-], { [a-zA-Z0-9_-] } ;
 
-array_literal = '[', literal, { ',', literal } ']' ;
+array_literal = '[', literal, { ',', literal }, ']' ;
 scalar_literal = integer | float | string_literal | boolean ;
 boolean = 'true' | 'false' ;
 literal = scalar_literal | array_literal ;
