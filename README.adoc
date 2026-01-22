@@ -295,6 +295,12 @@ verisimdb/
   * link:docs/vql-examples.adoc[VQL Examples] - 35+ example queries for all modalities
   * link:docs/vql-architecture.adoc[VQL Architecture] - Dual-path router design (corrected)
   * link:src/vql/VQLParser.res[VQL Parser] - ReScript slipstream parser implementation
+  * link:src/vql/VQLExplain.res[VQL EXPLAIN] - Query plan visualization with performance hints
+- **Query Optimization & Reversibility:**
+  * link:docs/query-optimization-overview.adoc[**Overview**] - Complete guide to query optimization and reversibility
+  * link:lib/verisim/query_planner_config.ex[Query Planner Config] - Conservative/Balanced/Aggressive modes with adaptive tuning
+  * link:lib/verisim/query_planner_bidirectional.ex[Bidirectional Optimization] - Forward propagation (push predicates) + backward propagation (pull store capabilities)
+  * link:docs/reversibility-design.adoc[Reversibility Design] - Time-travel queries, undo operations, drift repair validation (80% free!)
 - link:docs/security-lessons.lgt[Security Lessons] - Logtalk rules for gitbot-fleet integration
 - link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
 
