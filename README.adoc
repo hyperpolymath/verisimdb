@@ -66,11 +66,13 @@ VeriSimDB's architecture adapts to your deployment mode. Below shows federated d
 
 ----
 ┌─────────────────────────────────────────────────────────────┐
-│  Elixir Orchestration Layer                                 │
+│  Elixir Orchestration Layer (v1.x)                          │
 │    ├── VeriSim.EntityServer (GenServer per Hexad)           │
 │    ├── VeriSim.DriftMonitor (drift detection coordinator)   │
 │    ├── VeriSim.QueryRouter (distributes queries)            │
-│    └── VeriSim.SchemaRegistry (type system coordinator)     │
+│    ├── VeriSim.SchemaRegistry (type system coordinator)     │
+│    ├── VeriSim.AdaptiveLearner (feedback loops - v1)        │
+│    └── VeriSim.MiniKanren (constraint solving - v3 stub)    │
 │              ↓ HTTP                                         │
 ├─────────────────────────────────────────────────────────────┤
 │  Rust Modality Stores (All Local)                           │
@@ -119,7 +121,9 @@ The reference implementation supports **all three deployment modes**. The stack 
 │    ├── VeriSim.EntityServer (GenServer per Hexad)           │
 │    ├── VeriSim.DriftMonitor (drift detection coordinator)   │
 │    ├── VeriSim.QueryRouter (distributes queries)            │
-│    └── VeriSim.SchemaRegistry (type system coordinator)     │
+│    ├── VeriSim.SchemaRegistry (type system coordinator)     │
+│    ├── VeriSim.AdaptiveLearner (feedback loops - v1)        │
+│    └── VeriSim.MiniKanren (constraint solving - v3 stub)    │
 │              ↓ HTTP                                         │
 ├─────────────────────────────────────────────────────────────┤
 │  Rust Modality Crates (Optional Reference Stores)           │
@@ -315,7 +319,8 @@ verisimdb/
   * link:lib/verisim/circuit_breaker.ex[Circuit Breaker] - Prevent cascading failures
 - **Backwards Compatibility & Learning:**
   * link:docs/backwards-compatibility.adoc[Backwards Compatibility Strategy] - Semantic versioning, deprecation process, migration strategies, API/VQL/data format evolution
-  * link:lib/verisim/adaptive_learner.ex[Adaptive Learner] - Feedback loops for cache TTL, normalization thresholds, drift tolerance, query plan selection
+  * link:lib/verisim/adaptive_learner.ex[Adaptive Learner] - Feedback loops for cache TTL, normalization thresholds, drift tolerance, query plan selection (v1)
+  * link:docs/minikanren-integration-v3.adoc[**miniKanren Integration (v3 Stub)**] - Constraint-based query optimization, rule synthesis, symbolic reasoning (planned for v3)
 - **Drift Handling:**
   * link:docs/drift-handling.adoc[Drift Handling] - Detection, repair strategies, drift-aware queries, federation drift, Byzantine tolerance
   * link:rust-core/verisim-drift/[Drift Detection Crate] - Rust implementation of cross-modal drift detection
