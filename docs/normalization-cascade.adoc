@@ -14,6 +14,136 @@ This document analyzes the **normalization cascade** in VeriSimDB - the hierarch
 1. **Database-only normalization** - Ensuring its own internal consistency?
 2. **System-wide normalization** - Actively propagating changes across federated nodes?
 
+== ⭐ RECOMMENDATION: Hybrid Push/Pull with Database-Internal Focus
+
+[IMPORTANT]
+====
+**Decision:** VeriSimDB normalizes what it controls, advises on what it doesn't.
+
+**Core Philosophy:** Push is expensive - reserve for safety-critical issues. Pull scales better for optimization.
+====
+
+=== Strategy by Level (The Answer)
+
+[cols="1,2,1,3"]
+|===
+|Level |Scope |Strategy |Rationale
+
+|**L0: Intra-Modality**
+|Within single modality store
+|✅ **PULL**
+|Stores normalize on insert. VeriSimDB delegates to modality stores.
+
+|**L1: Cross-Modality**
+|Across modalities in hexad
+|✅ **HYBRID**
+|**PUSH:** Critical (integrity violations, retractions) +
+**PULL:** Optimization (title mismatches, cosmetic drift) +
+*This is VeriSimDB's unique value - multi-modal consistency*
+
+|**L2: Cross-Hexad**
+|Between related hexads
+|✅ **PULL**
+|Validate citations at query time. Most citations are valid, scales better.
+
+|**L3: Cross-Store**
+|Federated VeriSimDB instances
+|✅ **HYBRID**
+|**ASYNC PUSH:** Critical (retractions, access changes) +
+**PULL:** Version drift, schema updates +
+*Shared responsibility, no single authority*
+
+|**L4: Cross-Lineage**
+|External systems (arXiv, PubMed, etc.)
+|⚠️ **ADVISORY**
+|Best-effort validation, cache results, warn but don't enforce. +
+*VeriSimDB can't control external systems*
+|===
+
+=== What Gets Pushed vs Pulled
+
+**PUSH (Proactive Propagation):**
+
+- ❗ **Retractions** - Paper retracted → notify all citing papers
+- ❗ **Integrity violations** - Hash mismatch detected → immediate alert
+- ❗ **Access revocations** - User loses permission → propagate immediately
+- ⚠️ **Major version updates** - Schema change → background sync (async push)
+
+**PULL (On-Demand Repair):**
+
+- ✏️ **Title mismatches** - "ML Paper" vs "Machine Learning Paper" → repair at query time
+- ✏️ **Citation counts** - Derived data → recompute on demand
+- ✏️ **Cache invalidation** - Stale cache → refresh when accessed
+- ✏️ **External validation** - Check DOI exists → best-effort at query time
+
+=== Why This Works
+
+✅ **Scales:** Most drift is cosmetic, doesn't need immediate propagation
+
+✅ **Clear boundaries:** VeriSimDB controls L0-L2 (internal), collaborates on L3 (federation), advises on L4 (external)
+
+✅ **User control:** Conservative/Balanced/Aggressive modes let users tune aggressiveness
+
+✅ **Learns:** Adaptive learner can promote frequent drift from PULL→PUSH based on observations
+
+✅ **Safety-first:** Critical issues are pushed immediately, optimizations are pulled lazily
+
+=== Configuration Example
+
+```elixir
+# config/config.exs
+config :verisim, VeriSim.NormalizationCoordinator,
+  # Conservative: minimal push (retractions only)
+  # Balanced: push critical + important (DEFAULT)
+  # Aggressive: push nearly everything
+  mode: :balanced,
+
+  # What triggers immediate push?
+  push_critical: [
+    :retraction,           # Paper retracted
+    :integrity_violation,  # Hash mismatch
+    :access_revocation     # Permission removed
+  ],
+
+  # What triggers async push (background job)?
+  push_important: [
+    :schema_version,  # Schema updated
+    :major_update     # Significant change
+  ],
+
+  # Everything else: PULL (query-time repair)
+
+  # External systems
+  validate_external: true,     # Best-effort validation
+  external_timeout: 5_000,     # Don't wait > 5s
+  external_cache_ttl: :timer.hours(24)
+```
+
+=== The Answer to "Is This VeriSimDB's Job?"
+
+[cols="1,2,1"]
+|===
+|Level |VeriSimDB's Job? |Why?
+
+|L0-L1
+|✅ **Yes** (core responsibility)
+|Multi-modal consistency is VeriSimDB's unique value
+
+|L2
+|✅ **Yes** (internal graphs)
+|VeriSimDB can query its own graph store
+
+|L3
+|✅ **Yes** (federation)
+|VeriSimDB instances collaborate via KRaft
+
+|L4
+|⚠️ **Partial** (advisory)
+|External systems unreliable, can't enforce
+|===
+
+**Bottom line:** VeriSimDB normalizes L0-L3 (what it controls), advises on L4 (what it doesn't).
+
 == Normalization Cascade Levels
 
 We identify **five levels** of normalization scope:
