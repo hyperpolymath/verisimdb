@@ -23,12 +23,12 @@ select_clause = 'SELECT', modality_list ;
 
 modality_list = modality_spec, { ',', modality_spec } ;
 
-modality_spec = 'GRAPH' [graph_projection]
-                | 'VECTOR' [vector_projection]
-                | 'TENSOR' [tensor_projection]
-                | 'SEMANTIC' [semantic_projection]
-                | 'DOCUMENT' [document_projection]
-                | 'TEMPORAL' [temporal_projection]
+modality_spec = 'GRAPH', [graph_projection]
+                | 'VECTOR', [vector_projection]
+                | 'TENSOR', [tensor_projection]
+                | 'SEMANTIC', [semantic_projection]
+                | 'DOCUMENT', [document_projection]
+                | 'TEMPORAL', [temporal_projection]
                 | '*'  (* All available modalities *)
                 ;
 
