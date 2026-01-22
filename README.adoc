@@ -4,14 +4,80 @@
 :toc:
 :toc-placement!:
 
-**The Veridical Simulacrum Database** - A 6-core multimodal database with self-normalization.
+**The Veridical Simulacrum Database** - A tiny core (<5k LOC) for universal federated knowledge.
 Bridging the Map and the Territory.
 
 toc::[]
 
 == Overview
 
-VeriSimDB implements a novel database architecture where each entity (called a *Hexad*) exists simultaneously across six synchronized modalities:
+VeriSimDB is a **minimalistic coordination layer** that enables federated knowledge stores to interoperate while maintaining drift tolerance, ethical governance, and Zero-Trust security.
+
+**What VeriSimDB Is:**
+
+- **A Universal Namespace** - ReScript registry mapping 128-bit UUIDs to federated store locations
+- **A Tiny Core** - Less than 5,000 lines of coordination logic (ReScript + Elixir)
+- **KRaft-Inspired** - Replicated state machine with Raft consensus for metadata
+- **Drift-Tolerant** - Continuous monitoring and repair across federated nodes
+- **Zero-Trust** - Integration with `proven` (ZKP) and `sactify-php` for verifiable claims
+
+**What VeriSimDB Is NOT:**
+
+- A drop-in replacement for PostgreSQL or MongoDB
+- A monolithic database that stores everything itself
+- A standalone vector/graph/document database
+- A blockchain or distributed ledger
+
+=== Federated vs Monolithic
+
+[cols="1,2,2"]
+|===
+|Aspect |Traditional DB |VeriSimDB
+
+|**Storage**
+|Database owns and stores all data
+|Federated stores own data; registry coordinates
+
+|**Consistency**
+|Strong ACID guarantees
+|Drift-tolerant with controlled repair policies
+
+|**Scaling**
+|Vertical + sharding
+|Horizontal federation across institutions
+
+|**Trust**
+|Single authority
+|Zero-Trust with cryptographic proofs
+
+|**Modalities**
+|Single paradigm (relational, document, etc.)
+|Six modalities coordinated via Hexad namespace
+|===
+
+== Architecture
+
+=== High-Level Federation
+
+----
+┌────────────────────────────────────────────────────────────────┐
+│  ReScript Registry (Tiny Core)                                 │
+│    ├── UUID → Store Mapping                                    │
+│    ├── KRaft Metadata Log (Raft consensus)                     │
+│    └── Trust Window Management                                 │
+│              ↓ Federation Protocol                             │
+├────────────────────────────────────────────────────────────────┤
+│  Federated Stores (Independent Operators)                      │
+│    ├── University Archive (Graph + Document)                   │
+│    ├── Research Lab (Vector + Tensor)                          │
+│    ├── Corporate DB (Semantic + Temporal)                      │
+│    └── Community Node (All modalities)                         │
+└────────────────────────────────────────────────────────────────┘
+----
+
+=== Six Modalities (Federated)
+
+Each **Hexad** (knowledge unit) can have representations across six modalities, stored in **any combination of federated stores**:
 
 [cols="1,3"]
 |===
@@ -27,7 +93,7 @@ VeriSimDB implements a novel database architecture where each entity (called a *
 |Multi-dimensional numeric data (ndarray/Burn)
 
 |**Semantic**
-|Type annotations and CBOR proof blobs
+|Type annotations and CBOR proof blobs (proven + sactify-php)
 
 |**Document**
 |Full-text searchable content (Tantivy)
@@ -36,20 +102,20 @@ VeriSimDB implements a novel database architecture where each entity (called a *
 |Version history and time-series
 |===
 
-The system continuously monitors *drift* between modalities and automatically triggers *self-normalization* to maintain consistency.
+=== Reference Implementation Stack
 
-== Architecture
+The reference implementation provides **one possible instantiation** of a VeriSimDB node:
 
 ----
 ┌─────────────────────────────────────────────────────────────┐
 │  Elixir Orchestration Layer                                 │
-│    ├── VeriSim.EntityServer (GenServer per entity)          │
+│    ├── VeriSim.EntityServer (GenServer per Hexad)           │
 │    ├── VeriSim.DriftMonitor (drift detection coordinator)   │
 │    ├── VeriSim.QueryRouter (distributes queries)            │
 │    └── VeriSim.SchemaRegistry (type system coordinator)     │
 │              ↓ HTTP                                         │
 ├─────────────────────────────────────────────────────────────┤
-│  Rust Core (verisim-api)                                    │
+│  Rust Modality Crates (Optional Reference Stores)           │
 │    ├── verisim-graph      ├── verisim-semantic              │
 │    ├── verisim-vector     ├── verisim-document              │
 │    ├── verisim-tensor     ├── verisim-temporal              │
@@ -63,19 +129,21 @@ The system continuously monitors *drift* between modalities and automatically tr
 VeriSimDB follows David Marr's three levels of analysis:
 
 1. **Computational Level**: What problem are we solving?
-   - Maintain cross-modal consistency across 6 representations
-   - Detect drift before it causes data quality issues
-   - Provide unified querying across all modalities
+   - Enable heterogeneous knowledge stores to federate without forced consistency
+   - Detect and repair drift across institutional boundaries
+   - Provide verifiable, tamper-evident knowledge exchange
 
 2. **Algorithmic Level**: How do we solve it?
-   - Hexad entities: one ID, six synchronized stores
-   - Drift detection with configurable thresholds
-   - Self-normalization triggered by drift events
+   - Hexad namespace: one UUID, N federated modality representations
+   - KRaft-inspired metadata log with Raft consensus
+   - Drift detection with configurable repair policies
+   - ZKP integration for privacy-preserving verification
 
 3. **Implementational Level**: How is it built?
-   - Rust for performance-critical modality stores
-   - Elixir/OTP for distributed coordination
-   - HTTP API for communication
+   - ReScript for type-safe registry logic (compiles to WASM)
+   - Elixir/OTP for fault-tolerant coordination
+   - Rust for reference modality implementations
+   - Proven + sactify-php for Zero-Trust security
 
 == Quick Start
 
@@ -85,11 +153,11 @@ VeriSimDB follows David Marr's three levels of analysis:
 * Elixir 1.17+
 * nerdctl, with Podman fallback for containerisation
 
-=== Build
+=== Build Reference Implementation
 
 [source,bash]
 ----
-# Rust core
+# Rust reference stores
 cargo build
 
 # Elixir orchestration
@@ -102,7 +170,7 @@ mix compile
 
 [source,bash]
 ----
-# Start Rust API server
+# Start Rust API server (reference stores)
 cargo run -p verisim-api
 
 # Start Elixir orchestration (in another terminal)
@@ -120,7 +188,21 @@ podman run -p 8080:8080 verisimdb:latest
 
 == API Examples
 
-=== Create a Hexad
+=== Register a Hexad in the Namespace
+
+[source,bash]
+----
+curl -X POST http://localhost:8080/api/v1/registry/hexads \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hexad_id": "550e8400-e29b-41d4-a716-446655440000",
+    "store_endpoint": "https://university-archive.edu/verisim",
+    "modalities": ["graph", "document", "temporal"],
+    "policy_hash": "sha256:abc123..."
+  }'
+----
+
+=== Create a Hexad (in Reference Store)
 
 [source,bash]
 ----
@@ -135,20 +217,24 @@ curl -X POST http://localhost:8080/api/v1/hexads \
   }'
 ----
 
-=== Search by Text
+=== Query Across Federated Stores
 
 [source,bash]
 ----
-curl "http://localhost:8080/api/v1/search/text?q=neural+networks&limit=10"
+curl "http://localhost:8080/api/v1/federation/search?q=neural+networks&modalities=document,vector&limit=10"
 ----
 
-=== Search by Vector Similarity
+=== Verify ZKP (without data access)
 
 [source,bash]
 ----
-curl -X POST http://localhost:8080/api/v1/search/vector \
+curl -X POST http://localhost:8080/api/v1/verify/zkp \
   -H "Content-Type: application/json" \
-  -d '{"vector": [0.1, 0.2, ...], "k": 5}'
+  -d '{
+    "hexad_id": "550e8400-e29b-41d4-a716-446655440000",
+    "contract": "CitationContract",
+    "witness": "0x1a2b3c..."
+  }'
 ----
 
 == Project Structure
@@ -156,25 +242,55 @@ curl -X POST http://localhost:8080/api/v1/search/vector \
 ----
 verisimdb/
 ├── Cargo.toml                 # Rust workspace
-├── rust-core/                 # Rust crates
+├── rust-core/                 # Reference store implementations
 │   ├── verisim-graph/         # Graph modality (Oxigraph)
 │   ├── verisim-vector/        # Vector modality (HNSW)
 │   ├── verisim-tensor/        # Tensor modality (ndarray)
-│   ├── verisim-semantic/      # Semantic modality (CBOR)
+│   ├── verisim-semantic/      # Semantic modality (CBOR + ZKP)
 │   ├── verisim-document/      # Document modality (Tantivy)
 │   ├── verisim-temporal/      # Temporal modality (versions)
 │   ├── verisim-hexad/         # Unified Hexad entity
 │   ├── verisim-drift/         # Drift detection
 │   ├── verisim-normalizer/    # Self-normalization
 │   └── verisim-api/           # HTTP API server
+├── registry/                  # ReScript registry (tiny core)
+│   ├── src/
+│   │   ├── Registry.res       # UUID → Store mapping
+│   │   ├── KRaftLog.res       # Metadata consensus log
+│   │   └── TrustWindow.res    # Ephemeral key management
+│   └── rescript.json
 ├── elixir-orchestration/      # Elixir/OTP layer
 │   ├── lib/verisim/
 │   ├── config/
 │   └── mix.exs
 ├── container/                 # Containerfiles
 ├── docs/                      # Documentation
+│   ├── WHITEPAPER.md          # Architecture rationale
+│   ├── Technical Specification - KRaft Metadata Log.md
+│   └── ZKP and Sanctify Integration.md
 └── .machine_readable/         # STATE.scm, META.scm, ECOSYSTEM.scm
 ----
+
+== Key Documentation
+
+- link:WHITEPAPER.md[White Paper] - Architecture rationale and federation design
+- link:Technical%20Specification%20-%20KRaft%20Metadata%20Log.md[KRaft Integration] - Metadata consensus protocol
+- link:ZKP%20and%20Sanctify%20Integration.md[Zero-Trust Security] - ZKP verification with proven + sactify-php
+- link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
+
+== Use Cases
+
+=== Open Science Federation
+Universities and research institutions federate their archives while maintaining local control. Drift detection ensures retractions propagate correctly.
+
+=== Neurosymbolic AI Pipelines
+Vector embeddings and symbolic graphs coexist in the same namespace. AI systems query both modalities without ETL.
+
+=== FAIR Data Compliance
+Funding agencies require verifiable provenance. ZKP proofs demonstrate compliance without exposing sensitive data.
+
+=== Decentralized Web (Web3)
+Community-governed knowledge stores with tamper-evident audit trails and cryptographic verification.
 
 == License
 
