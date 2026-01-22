@@ -5,6 +5,7 @@
 :toc-placement!:
 
 **The Veridical Simulacrum Database** - A 6-core multimodal database with self-normalization.
+Bridging the Map and the Territory.
 
 toc::[]
 
