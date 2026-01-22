@@ -11,53 +11,40 @@ toc::[]
 
 == Overview
 
-VeriSimDB is a **minimalistic coordination layer** that enables federated knowledge stores to interoperate while maintaining drift tolerance, ethical governance, and Zero-Trust security.
+VeriSimDB is a **multimodal database with federation capabilities**. It can operate as a traditional standalone database OR as a federated coordinator—you choose the deployment mode that fits your needs.
 
-**What VeriSimDB Is:**
+=== Is VeriSimDB a Database?
 
-- **A Universal Namespace** - ReScript registry mapping 128-bit UUIDs to federated store locations
+**Yes.** VeriSimDB is a database that supports three deployment modes:
+
+1. **Standalone** - Traditional database with all 6 modalities local (like PostgreSQL or MongoDB)
+2. **Federated** - Coordinator for distributed stores across institutions
+3. **Hybrid** - Some modalities local (fast), others federated (shared)
+
+See link:docs/deployment-modes.adoc[Deployment Modes] for detailed comparison.
+
+=== Core Capabilities
+
+- **A Universal Namespace** - ReScript registry mapping 128-bit UUIDs to modality store locations
 - **A Tiny Core** - Less than 5,000 lines of coordination logic (ReScript + Elixir)
 - **KRaft-Inspired** - Replicated state machine with Raft consensus for metadata
-- **Drift-Tolerant** - Continuous monitoring and repair across federated nodes
+- **Drift-Tolerant** - Continuous monitoring and repair across nodes (local or federated)
 - **Zero-Trust** - Integration with `proven` (ZKP) and `sactify-php` for verifiable claims
 
-**What VeriSimDB Is NOT:**
+=== What Makes It Different
 
-- A drop-in replacement for PostgreSQL or MongoDB
-- A monolithic database that stores everything itself
-- A standalone vector/graph/document database
-- A blockchain or distributed ledger
+Unlike traditional databases (single consistency model, single machine) or pure federation systems (no local storage), VeriSimDB:
 
-=== Federated vs Monolithic
-
-[cols="1,2,2"]
-|===
-|Aspect |Traditional DB |VeriSimDB
-
-|**Storage**
-|Database owns and stores all data
-|Federated stores own data; registry coordinates
-
-|**Consistency**
-|Strong ACID guarantees
-|Drift-tolerant with controlled repair policies
-
-|**Scaling**
-|Vertical + sharding
-|Horizontal federation across institutions
-
-|**Trust**
-|Single authority
-|Zero-Trust with cryptographic proofs
-
-|**Modalities**
-|Single paradigm (relational, document, etc.)
-|Six modalities coordinated via Hexad namespace
-|===
+- **Combines both** - Operates as database AND coordinator
+- **Six modalities** - Graph, Vector, Tensor, Semantic, Document, Temporal in one system
+- **Flexible deployment** - Start standalone, federate later (or vice versa)
+- **Drift awareness** - Detects and repairs cross-modal inconsistencies
 
 == Architecture
 
-=== High-Level Federation
+VeriSimDB's architecture adapts to your deployment mode. Below shows federated deployment; standalone mode collapses all stores to one system.
+
+=== Federated Deployment
 
 ----
 ┌────────────────────────────────────────────────────────────────┐
@@ -75,9 +62,29 @@ VeriSimDB is a **minimalistic coordination layer** that enables federated knowle
 └────────────────────────────────────────────────────────────────┘
 ----
 
-=== Six Modalities (Federated)
+=== Standalone Deployment
 
-Each **Hexad** (knowledge unit) can have representations across six modalities, stored in **any combination of federated stores**:
+----
+┌─────────────────────────────────────────────────────────────┐
+│  Elixir Orchestration Layer                                 │
+│    ├── VeriSim.EntityServer (GenServer per Hexad)           │
+│    ├── VeriSim.DriftMonitor (drift detection coordinator)   │
+│    ├── VeriSim.QueryRouter (distributes queries)            │
+│    └── VeriSim.SchemaRegistry (type system coordinator)     │
+│              ↓ HTTP                                         │
+├─────────────────────────────────────────────────────────────┤
+│  Rust Modality Stores (All Local)                           │
+│    ├── verisim-graph      ├── verisim-semantic              │
+│    ├── verisim-vector     ├── verisim-document              │
+│    ├── verisim-tensor     ├── verisim-temporal              │
+│    ├── verisim-hexad      ├── verisim-drift                 │
+│    └── verisim-normalizer └── verisim-api                   │
+└─────────────────────────────────────────────────────────────┘
+----
+
+=== Six Modalities
+
+Each **Hexad** (knowledge unit) can have representations across six modalities. In standalone mode, all modalities are local. In federated mode, they can be **distributed across stores**:
 
 [cols="1,3"]
 |===
@@ -102,9 +109,9 @@ Each **Hexad** (knowledge unit) can have representations across six modalities, 
 |Version history and time-series
 |===
 
-=== Reference Implementation Stack
+=== Reference Implementation
 
-The reference implementation provides **one possible instantiation** of a VeriSimDB node:
+The reference implementation supports **all three deployment modes**. The stack shown above provides a complete standalone database that can optionally federate:
 
 ----
 ┌─────────────────────────────────────────────────────────────┐
