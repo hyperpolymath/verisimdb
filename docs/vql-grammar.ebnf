@@ -21,7 +21,7 @@ query = select_clause,
 
 select_clause = 'SELECT', modality_list ;
 
-modality_list = modality_spec, (',', modality_spec)* ;
+modality_list = modality_spec, { ',', modality_spec } ;
 
 modality_spec = 'GRAPH' [graph_projection]
                 | 'VECTOR' [vector_projection]
@@ -114,7 +114,7 @@ vector_condition = vector_field, 'SIMILAR', 'TO', vector_literal, [similarity_th
                    ;
 
 vector_field = identifier, '.', 'embedding' ;
-vector_literal = '[', float, (',', float)* ']' ;
+vector_literal = '[', float, { ',', float } ']' ;
 similarity_threshold = 'WITHIN', float ;
 metric_type = 'USING', ('COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT') ;
 
@@ -131,7 +131,7 @@ semantic_condition = 'SATISFIES', contract_name, [contract_params]
 
 contract_name = identifier ;
 contract_params = '(', param_list, ')' ;
-param_list = identifier, '=', literal, (',', identifier, '=', literal)* ;
+param_list = identifier, '=', literal, { ',', identifier, '=', literal } ;
 
 (* 4.5. Document Conditions (Full-text Search) *)
 document_condition = 'FULLTEXT', 'CONTAINS', string_literal
@@ -180,25 +180,25 @@ offset_clause = 'OFFSET', integer ;
 uuid = hex_digit{8}, '-', hex_digit{4}, '-', hex_digit{4}, '-', hex_digit{4}, '-', hex_digit{12} ;
 hex_digit = [0-9a-fA-F] ;
 
-identifier = [a-zA-Z_], [a-zA-Z0-9_]* ;
+identifier = [a-zA-Z_], { [a-zA-Z0-9_] } ;
 store_id = identifier ;
 verifier_id = identifier ;
 actor_id = identifier ;
 version_id = identifier ;
 
-integer = [0-9]+ ;
-float = [0-9]+, '.', [0-9]+, ([eE], [+-]?, [0-9]+)? ;
+integer = [0-9], { [0-9] } ;
+float = [0-9], { [0-9] }, '.', [0-9], { [0-9] }, ([eE], [ [+-] ], [0-9], { [0-9] })? ;
 
-string_literal = ''' ([^'\] | '\'' | '\\')* ''' ;
-regex_literal = '/', ([^/\] | '\/' | '\\')* '/' ;
+string_literal = ''' { [^'\] | '\'' | '\\' } ''' ;
+regex_literal = '/', { [^/\] | '\/' | '\\' } '/' ;
 
 timestamp = iso8601_datetime ;
 iso8601_datetime = year, '-', month, '-', day, 'T', hour, ':', minute, ':', second, ('.', fraction)?, timezone ;
 
-glob_pattern = '/', path_segment, ('/', path_segment)*, ('/*' | '/**') ;
-path_segment = [a-zA-Z0-9_-]+ ;
+glob_pattern = '/', path_segment, { '/', path_segment }, ('/*' | '/**') ;
+path_segment = [a-zA-Z0-9_-], { [a-zA-Z0-9_-] } ;
 
-array_literal = '[', literal, (',', literal)* ']' ;
+array_literal = '[', literal, { ',', literal } ']' ;
 scalar_literal = integer | float | string_literal | boolean ;
 boolean = 'true' | 'false' ;
 literal = scalar_literal | array_literal ;
@@ -207,7 +207,7 @@ literal = scalar_literal | array_literal ;
    8. COMMENTS,
    ============================================================================ *)
 
-comment = '--' [^\n]* '\n'  (* Line comment *)
+comment = '--' { [^\n] } '\n'  (* Line comment *)
           | '/*' .* '*/'       (* Block comment *)
           ;
 
