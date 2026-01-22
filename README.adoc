@@ -301,6 +301,17 @@ verisimdb/
   * link:lib/verisim/query_planner_config.ex[Query Planner Config] - Conservative/Balanced/Aggressive modes with adaptive tuning
   * link:lib/verisim/query_planner_bidirectional.ex[Bidirectional Optimization] - Forward propagation (push predicates) + backward propagation (pull store capabilities)
   * link:docs/reversibility-design.adoc[Reversibility Design] - Time-travel queries, undo operations, drift repair validation (80% free!)
+- **Caching:**
+  * link:docs/caching-strategy.adoc[Caching Strategy] - Multi-layer cache (L1/L2/L3) with drift-aware invalidation
+  * link:docs/cache-sharing-strategy.adoc[Cache Sharing Strategy] - Tiering and sharing across organizations (with diagrams)
+  * link:lib/verisim/query_cache.ex[Query Cache] - Implementation with per-modality TTL policies
+  * link:lib/verisim/query_router_cached.ex[Cached Query Router] - Wrapper with AST/plan/result caching
+- **Error Handling & Safety:**
+  * link:docs/error-handling-strategy.adoc[Error Handling Strategy] - Comprehensive error types, recovery strategies, audit trail
+  * link:docs/safety-and-fault-tolerance.adoc[Safety & Fault Tolerance] - Memory safety, kernel safety, platform safety, supply chain, socio-technical safety
+  * link:src/vql/VQLError.res[VQL Error Types] - Structured error representation (ReScript)
+  * link:lib/verisim/error_recovery.ex[Error Recovery] - Retry with backoff, circuit breakers, compensating transactions
+  * link:lib/verisim/circuit_breaker.ex[Circuit Breaker] - Prevent cascading failures
 - link:docs/security-lessons.lgt[Security Lessons] - Logtalk rules for gitbot-fleet integration
 - link:Kraft%20cross-integration%20to%20VeriSim.csv[KRaft Comparison] - VeriSimDB vs Kafka KRaft
 
