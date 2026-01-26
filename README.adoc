@@ -350,3 +350,14 @@ PMPL-1.0-or-later
 == Contributing
 
 See CONTRIBUTING.adoc for guidelines.
+
+== OPSM Link
+
+[source]
+----
+OPSM Core
+  |
+  v
+verisimdb (storage backend candidate for OPSM metadata and audits)
+
+----

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: PMPL-1.0-or-later
 = YOUR Template Repo Roadmap
 
 == Current Status
@@ -20,3 +20,14 @@ Initial development phase.
 == Future Directions
 
 _To be determined based on community feedback._
+
+== OPSM Integration
+
+[source]
+----
+OPSM Core
+  |
+  v
+verisimdb (storage backend candidate for OPSM metadata and audits)
+
+----
