@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: PMPL-1.0-or-later
 //! VeriSim Temporal Modality
 //!
 //! Time-series and versioning for audit-grade history.
 //! Implements Marr's Computational Level: "What happened when?"
+
+pub mod diff;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -152,6 +154,34 @@ pub trait TemporalStore: Send + Sync {
 
     /// Get version history
     async fn history(&self, entity_id: &str, limit: usize) -> Result<Vec<Version<Self::Data>>, TemporalError>;
+
+    /// Diff two versions
+    async fn diff(&self, entity_id: &str, v1: u64, v2: u64) -> Result<diff::Diff<Self::Data>, TemporalError>
+    where
+        Self::Data: PartialEq,
+    {
+        let version1 = self.at_version(entity_id, v1).await?;
+        let version2 = self.at_version(entity_id, v2).await?;
+
+        Ok(diff::compare_values(
+            version1.as_ref().map(|v| &v.data),
+            version2.as_ref().map(|v| &v.data),
+        ))
+    }
+
+    /// Diff two timestamps
+    async fn diff_time(&self, entity_id: &str, t1: DateTime<Utc>, t2: DateTime<Utc>) -> Result<diff::Diff<Self::Data>, TemporalError>
+    where
+        Self::Data: PartialEq,
+    {
+        let version1 = self.at_time(entity_id, t1).await?;
+        let version2 = self.at_time(entity_id, t2).await?;
+
+        Ok(diff::compare_values(
+            version1.as_ref().map(|v| &v.data),
+            version2.as_ref().map(|v| &v.data),
+        ))
+    }
 }
 
 /// In-memory versioned store
