@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: PMPL-1.0-or-later
 //! HNSW (Hierarchical Navigable Small World) Index
 //!
 //! Implementation of the HNSW algorithm for approximate nearest neighbor search.

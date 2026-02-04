@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: PMPL-1.0-or-later
 //! In-memory HexadStore implementation
 //!
 //! Coordinates all six modality stores for unified entity management.
