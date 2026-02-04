@@ -41,8 +41,8 @@
 ;; ============================================================================
 
 (define current-position
-  '((phase . "design-and-documentation")
-    (overall-completion . 35)
+  '((phase . "implementation-ramp-up")
+    (overall-completion . 30)
     (components
       ((architecture-design . 90)
        (vql-specification . 95)
