@@ -170,6 +170,108 @@ cargo test --test integration # Rust integration tests
 mix test test/integration     # Elixir integration tests
 ```
 
+## GitHub CI Integration (Priority - Sonnet Task)
+
+VeriSimDB needs to service all ~290 hyperpolymath repos from GitHub Actions CI.
+
+### Architecture: Git-Backed Flat-File Store
+
+Instead of running verisimdb as a persistent server in GitHub, use a **git-backed data repo**:
+
+```
+hyperpolymath/verisimdb-data (new repo)
+├── scans/                    # panic-attack scan results per repo
+│   ├── echidna.json
+│   ├── verisimdb.json
+│   └── ...
+├── hardware/                 # hardware-crash-team findings
+│   └── latest-scan.json
+├── drift/                    # drift detection snapshots
+│   └── drift-status.json
+├── index.json                # Master index of all hexads
+└── .github/workflows/
+    └── ingest.yml            # Workflow: receive data, update index
+```
+
+### How It Works
+
+1. **Each repo's CI** runs panic-attack, produces JSON, pushes to `verisimdb-data` via workflow dispatch
+2. **verisimdb-data ingest workflow** receives the JSON, stores it, updates the index
+3. **Query** by checking out verisimdb-data and reading JSON (no server needed)
+4. **Local dev**: Run `verisim-api` server locally, load from the data repo
+
+### Implementation Steps (for Sonnet)
+
+1. Create `verisimdb-data` repo from rsr-template-repo
+2. Add `ingest.yml` workflow that accepts repository_dispatch events with scan payloads
+3. Add a reusable workflow `scan-and-report.yml` that repos can call:
+   - Runs `panic-attack assail` on the repo
+   - Sends results to verisimdb-data via repository_dispatch
+4. Add the reusable workflow to 2-3 pilot repos first (echidna, panic-attacker, ambientops)
+5. Add a `query.sh` script that clones verisimdb-data and searches the index
+
+### Future: Persistent Server
+
+When ready to scale beyond flat files:
+- Deploy verisim-api to **Fly.io free tier** (3 shared VMs, 1GB persistent volume)
+- Use the Containerfile already in `container/`
+- GitHub Actions calls the Fly.io endpoint instead of repository_dispatch
+- Keep verisimdb-data as backup/mirror
+
+## Hypatia Integration Pipeline (Priority - Sonnet Task)
+
+### Data Flow (NOT YET IMPLEMENTED)
+
+```
+panic-attack assail → verisimdb hexads → hypatia rules → gitbot-fleet
+                      ↑ WORKS            ↑ BUILD THIS   ↑ BUILD THIS
+```
+
+### What Needs Building
+
+1. **verisimdb → hypatia connector**: Hypatia needs a Logtalk rule that queries verisimdb-data
+   - Read scan results from verisimdb-data repo (or API)
+   - Transform weak points into Logtalk facts
+   - Fire rules to detect patterns (e.g., "3+ repos have same unsafe pattern")
+
+2. **hypatia → gitbot-fleet dispatcher**: When hypatia detects actionable patterns
+   - sustainabot: receives EcoScore/EconScore metrics from scan results
+   - echidnabot: receives proof obligations ("verify this fix resolves these weak points")
+   - rhodibot: receives automated fix suggestions
+
+3. **Hexad schema for scan results**:
+   ```rust
+   // Document modality: full JSON report as searchable text
+   // Graph modality: file -> weakness -> recommendation triples
+   // Temporal modality: track results over time (drift detection)
+   // Vector modality: embed weakness descriptions for similarity search
+   ```
+
+## Model Router (Future Tool - Sonnet Task)
+
+A tool to auto-select Claude model based on task complexity. Architecture:
+
+```
+User prompt → Haiku classifier → Route to:
+  ├── Haiku:  single-file edits, template creation, simple queries
+  ├── Sonnet: multi-file implementation, feature work, testing
+  └── Opus:   architecture decisions, debugging, cross-repo design
+```
+
+### Classification Signals
+- File count affected (1 = Haiku, 2-5 = Sonnet, 5+ = Opus)
+- Task type (create = Sonnet, debug = Opus, edit = Haiku)
+- CLAUDE.md complexity rating per repo
+- Presence of "why", "how", "design" in prompt → Opus
+- Presence of "add", "create", "implement" → Sonnet
+- Presence of "fix typo", "rename", "update version" → Haiku
+
+### Implementation
+- Rust CLI tool or Claude Code hook
+- Reads CLAUDE.md to understand repo complexity
+- Uses Haiku API call (~0.001 cents) to classify
+- Returns recommended model as stdout
+
 ## User Preferences
 
 - **Container runtime**: Podman > Docker
