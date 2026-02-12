@@ -5,7 +5,7 @@
 
 (define-module (verisimdb state)
   #:version "1.0.0"
-  #:updated "2026-02-12T18:00:00Z")
+  #:updated "2026-02-12T18:30:00Z")
 
 ;; ============================================================================
 ;; METADATA
@@ -266,6 +266,17 @@
 
 (define session-history
   '((session
+      (date . "2026-02-12b")
+      (phase . "workflow-automation")
+      (accomplishments
+        "- Updated security-scan.yml to pass VERISIMDB_PAT to reusable workflow
+         - Enables automated cross-repo dispatch when PAT is configured
+         - Pushed workflow update to GitHub")
+      (key-decisions
+        "- VERISIMDB_PAT passed as secret to scan-and-report.yml
+         - Fallback to GITHUB_TOKEN if PAT not configured"))
+
+    (session
       (date . "2026-02-12")
       (phase . "honest-audit-and-stub-fixes")
       (accomplishments
