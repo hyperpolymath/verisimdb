@@ -50,7 +50,7 @@ impl From<tantivy::query::QueryParserError> for DocumentError {
 
 impl From<tantivy::directory::error::OpenDirectoryError> for DocumentError {
     fn from(e: tantivy::directory::error::OpenDirectoryError) -> Self {
-        DocumentError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+        DocumentError::IoError(std::io::Error::other(e.to_string()))
     }
 }
 

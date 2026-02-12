@@ -129,7 +129,7 @@ impl ModalityStatus {
 }
 
 /// Input data for creating/updating a Hexad
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HexadInput {
     /// Graph relationships (optional)
     pub graph: Option<HexadGraphInput>,
@@ -145,18 +145,6 @@ pub struct HexadInput {
     pub metadata: HashMap<String, String>,
 }
 
-impl Default for HexadInput {
-    fn default() -> Self {
-        Self {
-            graph: None,
-            vector: None,
-            tensor: None,
-            semantic: None,
-            document: None,
-            metadata: HashMap::new(),
-        }
-    }
-}
 
 /// Graph modality input
 #[derive(Debug, Clone, Serialize, Deserialize)]

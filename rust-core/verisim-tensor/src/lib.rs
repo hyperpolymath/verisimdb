@@ -5,7 +5,7 @@
 //! Implements Marr's Computational Level: "What transformations apply?"
 
 use async_trait::async_trait;
-use ndarray::{Array, ArrayD, IxDyn, ShapeBuilder};
+use ndarray::{Array, ArrayD, IxDyn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

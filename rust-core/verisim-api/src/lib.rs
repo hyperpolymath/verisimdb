@@ -604,7 +604,7 @@ async fn trigger_normalization_handler(
 pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
     let state = AppState::new_async(config.clone())
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     let app = build_router(state);
 
     let addr = format!("{}:{}", config.host, config.port);

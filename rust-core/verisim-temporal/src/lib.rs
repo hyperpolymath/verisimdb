@@ -184,10 +184,13 @@ pub trait TemporalStore: Send + Sync {
     }
 }
 
+/// Type alias for version history map
+type VersionHistory<T> = HashMap<String, BTreeMap<u64, Version<T>>>;
+
 /// In-memory versioned store
 pub struct InMemoryVersionStore<T> {
     /// Map of entity_id -> (version -> Version<T>)
-    versions: Arc<RwLock<HashMap<String, BTreeMap<u64, Version<T>>>>>,
+    versions: Arc<RwLock<VersionHistory<T>>>,
 }
 
 impl<T: Clone + Send + Sync + 'static> InMemoryVersionStore<T> {

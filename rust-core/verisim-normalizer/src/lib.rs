@@ -4,6 +4,8 @@
 //! Self-normalization engine that maintains cross-modal consistency.
 //! When drift is detected, the normalizer orchestrates repairs.
 
+#![allow(unused)] // Infrastructure code with planned future usage
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -140,6 +142,7 @@ pub struct NormalizerStatus {
 pub struct Normalizer {
     config: NormalizerConfig,
     strategies: Arc<RwLock<Vec<Arc<dyn NormalizationStrategy>>>>,
+    #[allow(dead_code)] // Will be used for drift-based normalization triggers
     drift_detector: Arc<DriftDetector>,
     status: Arc<RwLock<NormalizerStatus>>,
     result_sender: Option<mpsc::Sender<NormalizationResult>>,
