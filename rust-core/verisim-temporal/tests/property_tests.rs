@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 //! Property-based tests for temporal modality
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use proptest::prelude::*;
 use verisim_temporal::{diff, InMemoryTimeSeriesStore, InMemoryVersionStore, TemporalStore, TimePoint, TimeRange, TimeSeriesStore};
 
