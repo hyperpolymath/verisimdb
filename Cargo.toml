@@ -20,8 +20,8 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["hyperpolymath"]
-license = "AGPL-3.0-or-later"
+authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]
+license = "PMPL-1.0-or-later"
 repository = "https://gitlab.com/hyperpolymath/verisimdb"
 
 [workspace.dependencies]
@@ -54,7 +54,8 @@ tower = "0.5"
 hyper = "1.0"
 
 # Serialization
-bincode = "2.0.0-rc.3"  # TODO: Migrate to maintained alternative (ciborium, postcard)
+# bincode removed — not used in codebase. Use postcard or ciborium for future serialization needs.
+# bincode = "2.0.0-rc.3"
 postcard = { version = "1.0", features = ["alloc"] }
 
 # Error handling

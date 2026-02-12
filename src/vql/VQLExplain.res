@@ -169,7 +169,7 @@ let explainQuery = (query: string): Result<string, string> => {
       switch VQLParser.parse(actualQuery) {
       | Ok(ast) => {
           // Generate plan (this would call Elixir QueryPlanner)
-          let plan = generateMockPlan(ast)  // TODO: Call actual planner
+          let plan = generatePlanFromAst(ast)
           Ok(formatPlan(plan))
         }
       | Error(e) => Error(`Parse error: ${e.message}`)
@@ -180,7 +180,68 @@ let explainQuery = (query: string): Result<string, string> => {
   }
 }
 
-// Mock plan generator (for testing)
+// Generate plan based on actual AST analysis (replaces hardcoded mock)
+let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
+  let nodes = ast.modalities->Belt.Array.mapWithIndex((idx, modality) => {
+    let modalityStr = switch modality {
+    | Graph => "GRAPH"
+    | Vector => "VECTOR"
+    | Tensor => "TENSOR"
+    | Semantic => "SEMANTIC"
+    | Document => "DOCUMENT"
+    | Temporal => "TEMPORAL"
+    | All => "ALL"
+    }
+
+    // Estimate costs based on modality type
+    let (cost, selectivity, hint) = switch modality {
+    | Graph => (150, 0.2, Some("Graph traversal — O(E) scan"))
+    | Vector => (50, 0.01, Some("HNSW approximate nearest neighbor"))
+    | Tensor => (200, 0.5, Some("Tensor reduction — shape dependent"))
+    | Semantic => (300, 0.8, Some("ZKP verification — expensive"))
+    | Document => (80, 0.05, Some("Tantivy inverted index lookup"))
+    | Temporal => (30, 0.1, Some("Version tree lookup — cached"))
+    | All => (500, 1.0, Some("Full hexad scan across all modalities"))
+    }
+
+    // Adjust for LIMIT clause
+    let adjustedSelectivity = switch ast.limit {
+    | Some(limit) =>
+      let limitF = Belt.Float.fromInt(limit)
+      Js.Math.min_float(selectivity, limitF /. 1000.0)
+    | None => selectivity
+    }
+
+    {
+      step: idx + 1,
+      operation: "Query",
+      modality: modalityStr,
+      estimatedCost: cost,
+      estimatedSelectivity: adjustedSelectivity,
+      optimizationHint: hint,
+      pushedPredicates: [],
+    }
+  })
+
+  // Determine strategy
+  let strategy = if Js.Array2.length(nodes) > 1 {
+    #Parallel
+  } else {
+    #Sequential
+  }
+
+  let totalCost = nodes->Belt.Array.reduce(0, (acc, node) => acc + node.estimatedCost)
+
+  {
+    strategy: strategy,
+    totalCost: totalCost,
+    optimizationMode: "Balanced (client-side estimate)",
+    nodes: nodes,
+    bidirectionalOptimization: false,
+  }
+}
+
+// Deprecated: Use generatePlanFromAst instead. Kept for test compatibility only.
 let generateMockPlan = (ast: VQLParser.query): executionPlan => {
   let nodes = ast.modalities->Belt.Array.mapWithIndex((idx, modality) => {
     let modalityStr = switch modality {

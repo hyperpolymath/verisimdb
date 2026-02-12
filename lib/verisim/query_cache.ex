@@ -292,6 +292,7 @@ defmodule VeriSim.QueryCache do
   def init(_opts) do
     # Create ETS tables for L1 cache
     :ets.new(:cache_l1, [:set, :public, :named_table, read_concurrency: true])
+    :ets.new(:cache_l2, [:set, :public, :named_table, read_concurrency: true])
     :ets.new(:cache_stats, [:set, :public, :named_table])
     :ets.new(:cache_tags, [:bag, :public, :named_table])  # key → tags mapping
 
@@ -426,41 +427,86 @@ defmodule VeriSim.QueryCache do
     :ok
   end
 
-  defp get_from_l2(_key) do
-    # TODO: Implement distributed cache (Redis or custom Raft-based)
-    {:error, :not_implemented}
+  defp get_from_l2(key) do
+    case :ets.lookup(:cache_l2, key) do
+      [{^key, entry}] ->
+        if DateTime.compare(entry.expires_at, DateTime.utc_now()) == :gt do
+          updated_entry = %{entry |
+            access_count: entry.access_count + 1,
+            last_accessed: DateTime.utc_now()
+          }
+          :ets.insert(:cache_l2, {key, updated_entry})
+          {:ok, updated_entry}
+        else
+          :ets.delete(:cache_l2, key)
+          {:error, :expired}
+        end
+      [] ->
+        {:error, :not_found}
+    end
   end
 
-  defp put_in_l2(_key, _entry) do
-    # TODO: Implement distributed cache
+  defp put_in_l2(key, entry) do
+    # L2 entries get 3x the TTL of L1
+    extended_entry = %{entry |
+      layer: :l2,
+      expires_at: DateTime.add(entry.expires_at, entry.expires_at |> DateTime.diff(entry.created_at, :second) |> Kernel.*(2), :second)
+    }
+    :ets.insert(:cache_l2, {key, extended_entry})
     :ok
   end
 
-  defp get_from_l3(_key) do
-    # TODO: Implement persistent cache in verisim-temporal
-    {:error, :not_implemented}
+  defp get_from_l3(key) do
+    path = l3_cache_path(key)
+    case File.read(path) do
+      {:ok, content} ->
+        case :erlang.binary_to_term(content) do
+          %CacheEntry{} = entry ->
+            if DateTime.compare(entry.expires_at, DateTime.utc_now()) == :gt do
+              {:ok, entry}
+            else
+              File.rm(path)
+              {:error, :expired}
+            end
+          _ ->
+            {:error, :not_found}
+        end
+      {:error, _} ->
+        {:error, :not_found}
+    end
   end
 
-  defp put_in_l3(_key, _entry) do
-    # TODO: Implement persistent cache
+  defp put_in_l3(key, entry) do
+    path = l3_cache_path(key)
+    File.mkdir_p!(Path.dirname(path))
+    l3_entry = %{entry | layer: :l3}
+    File.write!(path, :erlang.term_to_binary(l3_entry))
     :ok
   end
 
   defp clear_l2 do
-    # TODO: Implement
+    :ets.delete_all_objects(:cache_l2)
     :ok
   end
 
   defp clear_l3 do
-    # TODO: Implement
+    l3_dir = l3_cache_dir()
+    if File.exists?(l3_dir) do
+      File.rm_rf!(l3_dir)
+      File.mkdir_p!(l3_dir)
+    end
     :ok
   end
 
   defp invalidate_key(key) do
     :ets.delete(:cache_l1, key)
+    :ets.delete(:cache_l2, key)
     :ets.match_delete(:cache_tags, {key, :_})
 
-    # TODO: Invalidate L2 and L3
+    # Invalidate L3
+    path = l3_cache_path(key)
+    File.rm(path)
+
     :ok
   end
 
@@ -513,6 +559,15 @@ defmodule VeriSim.QueryCache do
   defp schedule_cleanup do
     # Run cleanup every 60 seconds
     Process.send_after(self(), :cleanup, 60_000)
+  end
+
+  defp l3_cache_dir do
+    Path.join(System.tmp_dir!(), "verisimdb_cache_l3")
+  end
+
+  defp l3_cache_path(key) do
+    safe_key = key |> :erlang.phash2() |> Integer.to_string()
+    Path.join(l3_cache_dir(), "#{safe_key}.cache")
   end
 
   defp get_config do

@@ -52,7 +52,7 @@
          (steps
            "1. Start VeriSimDB: ./verisimdb start
             2. Check logs: tail -f logs/verisimdb.log
-            3. Verify health: curl http://localhost:8080/health
+            3. Verify health: curl https://localhost:8080/health
             4. Run smoke tests: ./scripts/smoke-test.sh")
          (success-criteria
            "- Server starts without errors
@@ -182,7 +182,7 @@
         "1. Check network connectivity:
             $ ./verisimdb-cli ping-stores
          2. Check registry status:
-            $ curl http://registry-node/health
+            $ curl https://registry-node/health
          3. Check Raft log:
             $ ./verisimdb-cli raft-status")
       (resolution

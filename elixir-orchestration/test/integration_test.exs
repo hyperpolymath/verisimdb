@@ -87,7 +87,7 @@ defmodule VeriSim.IntegrationTest do
     test "handles multi-modal queries" do
       params = %{
         text: "machine learning",
-        types: ["http://example.org/Document"]
+        types: ["https://example.org/Document"]
       }
 
       result = QueryRouter.query(:multi, params, limit: 10)
@@ -131,7 +131,7 @@ defmodule VeriSim.IntegrationTest do
   describe "Schema Registry" do
     test "registers and retrieves types" do
       type_def = %{
-        iri: "http://test.example.org/TestType",
+        iri: "https://test.example.org/TestType",
         label: "Test Type",
         supertypes: ["verisim:Entity"],
         constraints: [
@@ -145,7 +145,7 @@ defmodule VeriSim.IntegrationTest do
 
       assert :ok == SchemaRegistry.register_type(type_def)
 
-      retrieved = SchemaRegistry.get_type("http://test.example.org/TestType")
+      retrieved = SchemaRegistry.get_type("https://test.example.org/TestType")
       assert retrieved != nil
       assert retrieved.label == "Test Type"
     end

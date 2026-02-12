@@ -260,22 +260,72 @@ defmodule VeriSim.QueryPlanner.Bidirectional do
 
   # === Helper Functions ===
 
-  defp decompose_conditions_by_modality(conditions) do
-    # Split WHERE conditions by which modality can evaluate them
-    # Example: "h.embedding SIMILAR TO" → VECTOR
-    #          "FULLTEXT CONTAINS" → DOCUMENT
-    #          "(h)-[:CITES]->" → GRAPH
-    # TODO: Implement condition decomposition
-    %{}
+  defp decompose_conditions_by_modality(conditions) when is_list(conditions) do
+    Enum.reduce(conditions, %{}, fn condition, acc ->
+      modality = classify_condition_modality(condition)
+      Map.update(acc, modality, [condition], &[condition | &1])
+    end)
   end
+
+  defp decompose_conditions_by_modality(conditions) when is_map(conditions) do
+    # Single condition wrapped in a map
+    modality = classify_condition_modality(conditions)
+    %{modality => [conditions]}
+  end
+
+  defp decompose_conditions_by_modality(_), do: %{}
+
+  defp classify_condition_modality(condition) when is_map(condition) do
+    cond do
+      Map.has_key?(condition, :embedding) or Map.has_key?(condition, :similar_to) ->
+        "VECTOR"
+      Map.has_key?(condition, :edge_type) or Map.has_key?(condition, :traversal) ->
+        "GRAPH"
+      Map.has_key?(condition, :fulltext) or Map.has_key?(condition, :contains) ->
+        "DOCUMENT"
+      Map.has_key?(condition, :proof) or Map.has_key?(condition, :contract) ->
+        "SEMANTIC"
+      Map.has_key?(condition, :shape) or Map.has_key?(condition, :tensor_op) ->
+        "TENSOR"
+      Map.has_key?(condition, :version) or Map.has_key?(condition, :as_of) ->
+        "TEMPORAL"
+      true ->
+        "GRAPH"  # Default modality
+    end
+  end
+
+  defp classify_condition_modality(condition) when is_binary(condition) do
+    upper = String.upcase(condition)
+    cond do
+      String.contains?(upper, "SIMILAR") or String.contains?(upper, "EMBEDDING") -> "VECTOR"
+      String.contains?(upper, "CITES") or String.contains?(upper, "EDGE") or String.contains?(upper, ")-[") -> "GRAPH"
+      String.contains?(upper, "FULLTEXT") or String.contains?(upper, "CONTAINS") -> "DOCUMENT"
+      String.contains?(upper, "PROOF") or String.contains?(upper, "VERIFY") -> "SEMANTIC"
+      String.contains?(upper, "TENSOR") or String.contains?(upper, "SHAPE") -> "TENSOR"
+      String.contains?(upper, "VERSION") or String.contains?(upper, "AS OF") -> "TEMPORAL"
+      true -> "GRAPH"
+    end
+  end
+
+  defp classify_condition_modality(_), do: "GRAPH"
 
   defp aggregate_hints(hints_list) do
     hints_list
   end
 
-  defp extract_fulltext_fields(condition) do
-    # Extract field names from fulltext conditions
-    # TODO: Implement field extraction
-    []
+  defp extract_fulltext_fields(condition) when is_map(condition) do
+    case Map.get(condition, :fulltext) do
+      nil ->
+        case Map.get(condition, :fields) do
+          nil -> ["title", "body"]  # Default searchable fields
+          fields when is_list(fields) -> fields
+          field when is_binary(field) -> [field]
+          _ -> ["title", "body"]
+        end
+      %{fields: fields} when is_list(fields) -> fields
+      _ -> ["title", "body"]
+    end
   end
+
+  defp extract_fulltext_fields(_condition), do: ["title", "body"]
 end

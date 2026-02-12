@@ -310,7 +310,7 @@ fn bench_cross_modal_query(c: &mut Criterion) {
                     fields: HashMap::new(),
                 }),
                 vector: Some(embedding.into()),
-                semantic: Some(vec!["http://example.org/Document".to_string()].into()),
+                semantic: Some(vec!["https://example.org/Document".to_string()].into()),
                 ..Default::default()
             };
             store.create(input).await.unwrap();

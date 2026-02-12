@@ -230,9 +230,9 @@ mod tests {
     async fn test_insert_and_query() {
         let store = OxiGraphStore::in_memory().unwrap();
         let edge = GraphEdge {
-            subject: GraphNode::new("http://example.org/Alice"),
-            predicate: GraphNode::new("http://example.org/knows"),
-            object: GraphObject::Node(GraphNode::new("http://example.org/Bob")),
+            subject: GraphNode::new("https://example.org/Alice"),
+            predicate: GraphNode::new("https://example.org/knows"),
+            object: GraphObject::Node(GraphNode::new("https://example.org/Bob")),
         };
 
         store.insert(&edge).await.unwrap();

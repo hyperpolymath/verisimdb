@@ -43,7 +43,7 @@ defmodule VeriSim.QueryRouter do
       QueryRouter.query(:graph, %{start: "entity-1", predicate: "relates_to"})
 
       # Multi-modal
-      QueryRouter.query(:multi, %{text: "AI", types: ["http://example.org/Paper"]})
+      QueryRouter.query(:multi, %{text: "AI", types: ["https://example.org/Paper"]})
   """
   def query(type, params, opts \\ []) do
     GenServer.call(__MODULE__, {:query, type, params, opts})

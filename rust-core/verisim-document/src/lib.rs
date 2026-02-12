@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, Schema, Value, STORED, TEXT};
+use tantivy::snippet::SnippetGenerator;
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument};
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -225,8 +226,15 @@ impl DocumentStore for TantivyDocumentStore {
             vec![self.schema.title, self.schema.body],
         );
 
-        let query = query_parser.parse_query(query)?;
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(limit))?;
+        let parsed_query = query_parser.parse_query(query)?;
+        let top_docs = searcher.search(&parsed_query, &TopDocs::with_limit(limit))?;
+
+        // Create snippet generator for body field
+        let snippet_generator = SnippetGenerator::create(
+            &searcher,
+            &parsed_query,
+            self.schema.body,
+        )?;
 
         let mut results = Vec::new();
         for (score, doc_address) in top_docs {
@@ -244,11 +252,20 @@ impl DocumentStore for TantivyDocumentStore {
                 .unwrap_or("")
                 .to_string();
 
+            // Generate snippet with highlights
+            let snippet = snippet_generator.snippet_from_doc(&retrieved_doc);
+            let snippet_html = snippet.to_html();
+            let snippet_text = if snippet_html.is_empty() {
+                None
+            } else {
+                Some(snippet_html)
+            };
+
             results.push(SearchResult {
                 id,
                 score,
                 title,
-                snippet: None, // TODO: implement highlighting
+                snippet: snippet_text,
             });
         }
 
@@ -291,5 +308,24 @@ mod tests {
         let results = store.search("Rust", 10).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "d1");
+    }
+
+    #[tokio::test]
+    async fn test_search_with_snippets() {
+        let store = TantivyDocumentStore::in_memory().unwrap();
+
+        let doc = Document::new(
+            "d1",
+            "Rust Guide",
+            "Rust is a systems programming language focused on safety and performance",
+        );
+        store.index(&doc).await.unwrap();
+        store.commit().await.unwrap();
+
+        let results = store.search("safety", 10).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].snippet.is_some(), "Snippet should not be None");
+        let snippet = results[0].snippet.as_ref().unwrap();
+        assert!(snippet.contains("safety"), "Snippet should contain the search term");
     }
 }

@@ -11,7 +11,7 @@ A multimodal database with federation capabilities,
 built using Rust and Elixir on Debian Bookworm Slim,
 as defined by its Containerfile and cerro-torre manifest.
 """
-license = "AGPL-3.0-or-later" # VeriSimDB license from Containerfile
+license = "PMPL-1.0-or-later" # VeriSimDB license from Containerfile
 homepage = "https://github.com/hyperpolymath/verisimdb"
 maintainer = "cerro-torre:db-team"
 

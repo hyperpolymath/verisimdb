@@ -269,7 +269,7 @@ pub struct HexadConfig {
 impl Default for HexadConfig {
     fn default() -> Self {
         Self {
-            base_iri: "http://verisim.db/entity".to_string(),
+            base_iri: "https://verisim.db/entity".to_string(),
             vector_dimension: 384,
             require_complete: false,
         }
@@ -364,7 +364,7 @@ mod tests {
     fn test_hexad_id() {
         let id = HexadId::new("test-123");
         assert_eq!(id.as_str(), "test-123");
-        assert_eq!(id.to_iri("http://example.org"), "http://example.org/test-123");
+        assert_eq!(id.to_iri("https://example.org"), "https://example.org/test-123");
     }
 
     #[test]
@@ -372,7 +372,7 @@ mod tests {
         let input = HexadBuilder::new()
             .with_document("Test", "Test content")
             .with_embedding(vec![0.1, 0.2, 0.3])
-            .with_types(vec!["http://example.org/Person"])
+            .with_types(vec!["https://example.org/Person"])
             .with_metadata("source", "test")
             .build();
 

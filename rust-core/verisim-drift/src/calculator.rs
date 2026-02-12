@@ -394,9 +394,9 @@ mod tests {
 
         // Embedding that matches type embedding
         let embedding = vec![1.0, 0.0, 0.0];
-        let semantic_types = vec!["http://example.org/Person".to_string()];
+        let semantic_types = vec!["https://example.org/Person".to_string()];
         let type_embeddings = vec![(
-            "http://example.org/Person".to_string(),
+            "https://example.org/Person".to_string(),
             vec![1.0, 0.0, 0.0],
         )];
 
@@ -410,9 +410,9 @@ mod tests {
 
         // Embedding completely different from type embedding
         let embedding = vec![1.0, 0.0, 0.0];
-        let semantic_types = vec!["http://example.org/Person".to_string()];
+        let semantic_types = vec!["https://example.org/Person".to_string()];
         let type_embeddings = vec![(
-            "http://example.org/Person".to_string(),
+            "https://example.org/Person".to_string(),
             vec![0.0, 1.0, 0.0],
         )];
 

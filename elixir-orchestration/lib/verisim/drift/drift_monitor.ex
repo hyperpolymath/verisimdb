@@ -207,12 +207,23 @@ defmodule VeriSim.DriftMonitor do
   end
 
   defp perform_sweep(state) do
-    Logger.debug("Performing drift sweep")
+    Logger.debug("Performing drift sweep across #{map_size(state.entity_drift)} entities")
 
-    # In a real implementation, this would query the Rust core
-    # for drift metrics across all entities
+    # Check each entity that has reported drift
+    new_state = state.entity_drift
+      |> Enum.reduce(state, fn {entity_id, drift_scores}, acc ->
+        # Check each drift type for this entity
+        Enum.reduce(drift_scores, acc, fn {drift_type, score}, inner_acc ->
+          # Re-evaluate thresholds (scores may have changed since last check)
+          maybe_trigger_normalization(inner_acc, entity_id, score, drift_type)
+        end)
+      end)
 
-    %{state | last_sweep: DateTime.utc_now()}
+    # TODO: Query Rust core when get_drift_summary HTTP endpoint is ready
+    # Future: Add RustClient.get_drift_summary() call here to query /api/drift/summary
+    # and update entity_drift map with latest metrics from Rust core
+
+    %{new_state | last_sweep: DateTime.utc_now()}
   end
 
   defp maybe_trigger_normalization(state, entity_id, score, drift_type) do

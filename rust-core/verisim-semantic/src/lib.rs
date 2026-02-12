@@ -240,12 +240,12 @@ impl Default for InMemorySemanticStore {
 #[async_trait]
 impl SemanticStore for InMemorySemanticStore {
     async fn register_type(&self, typ: &SemanticType) -> Result<(), SemanticError> {
-        self.types.write().unwrap().insert(typ.iri.clone(), typ.clone());
+        self.types.write().expect("types RwLock poisoned").insert(typ.iri.clone(), typ.clone());
         Ok(())
     }
 
     async fn get_type(&self, iri: &str) -> Result<Option<SemanticType>, SemanticError> {
-        Ok(self.types.read().unwrap().get(iri).cloned())
+        Ok(self.types.read().expect("types RwLock poisoned").get(iri).cloned())
     }
 
     async fn annotate(&self, annotation: &SemanticAnnotation) -> Result<(), SemanticError> {
@@ -254,16 +254,16 @@ impl SemanticStore for InMemorySemanticStore {
         if !violations.is_empty() {
             return Err(SemanticError::ConstraintViolation(violations.join("; ")));
         }
-        self.annotations.write().unwrap().insert(annotation.entity_id.clone(), annotation.clone());
+        self.annotations.write().expect("annotations RwLock poisoned").insert(annotation.entity_id.clone(), annotation.clone());
         Ok(())
     }
 
     async fn get_annotations(&self, entity_id: &str) -> Result<Option<SemanticAnnotation>, SemanticError> {
-        Ok(self.annotations.read().unwrap().get(entity_id).cloned())
+        Ok(self.annotations.read().expect("annotations RwLock poisoned").get(entity_id).cloned())
     }
 
     async fn validate(&self, annotation: &SemanticAnnotation) -> Result<Vec<String>, SemanticError> {
-        let types = self.types.read().unwrap();
+        let types = self.types.read().expect("types RwLock poisoned");
         let mut violations = Vec::new();
 
         for type_iri in &annotation.types {
@@ -295,7 +295,7 @@ impl SemanticStore for InMemorySemanticStore {
     }
 
     async fn store_proof(&self, proof: &ProofBlob) -> Result<(), SemanticError> {
-        self.proofs.write().unwrap()
+        self.proofs.write().expect("proofs RwLock poisoned")
             .entry(proof.claim.clone())
             .or_default()
             .push(proof.clone());
@@ -303,7 +303,7 @@ impl SemanticStore for InMemorySemanticStore {
     }
 
     async fn get_proofs(&self, claim: &str) -> Result<Vec<ProofBlob>, SemanticError> {
-        Ok(self.proofs.read().unwrap().get(claim).cloned().unwrap_or_default())
+        Ok(self.proofs.read().expect("proofs RwLock poisoned").get(claim).cloned().unwrap_or_default())
     }
 }
 
@@ -315,7 +315,7 @@ mod tests {
     async fn test_type_registration() {
         let store = InMemorySemanticStore::new();
 
-        let person_type = SemanticType::new("http://example.org/Person", "Person")
+        let person_type = SemanticType::new("https://example.org/Person", "Person")
             .with_constraint(Constraint {
                 name: "name_required".to_string(),
                 kind: ConstraintKind::Required("name".to_string()),
@@ -324,7 +324,7 @@ mod tests {
 
         store.register_type(&person_type).await.unwrap();
 
-        let retrieved = store.get_type("http://example.org/Person").await.unwrap();
+        let retrieved = store.get_type("https://example.org/Person").await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().label, "Person");
     }

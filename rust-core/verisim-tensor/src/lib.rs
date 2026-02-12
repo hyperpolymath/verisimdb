@@ -100,7 +100,8 @@ impl Tensor {
     /// Convert to ndarray
     pub fn to_ndarray(&self) -> ArrayD<f64> {
         let shape = IxDyn(&self.shape);
-        Array::from_shape_vec(shape.f(), self.data.clone())
+        // Use C order (row-major) to match data layout documented on line 49
+        Array::from_shape_vec(shape, self.data.clone())
             .expect("Shape should match data length")
     }
 
@@ -186,25 +187,25 @@ impl Default for InMemoryTensorStore {
 #[async_trait]
 impl TensorStore for InMemoryTensorStore {
     async fn put(&self, tensor: &Tensor) -> Result<(), TensorError> {
-        self.tensors.write().unwrap().insert(tensor.id.clone(), tensor.clone());
+        self.tensors.write().expect("tensors RwLock poisoned").insert(tensor.id.clone(), tensor.clone());
         Ok(())
     }
 
     async fn get(&self, id: &str) -> Result<Option<Tensor>, TensorError> {
-        Ok(self.tensors.read().unwrap().get(id).cloned())
+        Ok(self.tensors.read().expect("tensors RwLock poisoned").get(id).cloned())
     }
 
     async fn delete(&self, id: &str) -> Result<(), TensorError> {
-        self.tensors.write().unwrap().remove(id);
+        self.tensors.write().expect("tensors RwLock poisoned").remove(id);
         Ok(())
     }
 
     async fn list(&self) -> Result<Vec<String>, TensorError> {
-        Ok(self.tensors.read().unwrap().keys().cloned().collect())
+        Ok(self.tensors.read().expect("tensors RwLock poisoned").keys().cloned().collect())
     }
 
     async fn map(&self, id: &str, op: fn(f64) -> f64) -> Result<Tensor, TensorError> {
-        let tensor = self.tensors.read().unwrap()
+        let tensor = self.tensors.read().expect("tensors RwLock poisoned")
             .get(id)
             .cloned()
             .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
@@ -220,7 +221,7 @@ impl TensorStore for InMemoryTensorStore {
     }
 
     async fn reduce(&self, id: &str, axis: usize, op: ReduceOp) -> Result<Tensor, TensorError> {
-        let tensor = self.tensors.read().unwrap()
+        let tensor = self.tensors.read().expect("tensors RwLock poisoned")
             .get(id)
             .cloned()
             .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
@@ -238,14 +239,19 @@ impl TensorStore for InMemoryTensorStore {
             ReduceOp::Sum => arr.sum_axis(ndarray::Axis(axis)),
             ReduceOp::Mean => arr.mean_axis(ndarray::Axis(axis)).expect("non-empty axis"),
             ReduceOp::Max => {
-                // ndarray doesn't have max_axis that returns ArrayD directly
-                // Simplified implementation for now
-                arr.sum_axis(ndarray::Axis(axis)) // TODO: proper max
+                arr.map_axis(ndarray::Axis(axis), |lane| {
+                    lane.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                })
             }
-            ReduceOp::Min => arr.sum_axis(ndarray::Axis(axis)), // TODO: proper min
+            ReduceOp::Min => {
+                arr.map_axis(ndarray::Axis(axis), |lane| {
+                    lane.iter().copied().fold(f64::INFINITY, f64::min)
+                })
+            }
             ReduceOp::Prod => {
-                // No built-in prod_axis
-                arr.sum_axis(ndarray::Axis(axis)) // TODO: proper prod
+                arr.map_axis(ndarray::Axis(axis), |lane| {
+                    lane.iter().copied().product()
+                })
             }
         };
 
@@ -274,5 +280,43 @@ mod tests {
         let tensor = Tensor::new("t", vec![2, 2], vec![1.0, 2.0, 3.0, 4.0]).unwrap();
         let arr = tensor.to_ndarray();
         assert_eq!(arr.shape(), &[2, 2]);
+    }
+
+    #[tokio::test]
+    async fn test_reduce_max() {
+        let store = InMemoryTensorStore::new();
+        // 2x3 tensor: [[1, 5, 3], [4, 2, 6]]
+        let tensor = Tensor::new("t_max", vec![2, 3], vec![1.0, 5.0, 3.0, 4.0, 2.0, 6.0]).unwrap();
+        store.put(&tensor).await.unwrap();
+
+        // Max along axis 0 → [4, 5, 6]
+        let result = store.reduce("t_max", 0, ReduceOp::Max).await.unwrap();
+        assert_eq!(result.data, vec![4.0, 5.0, 6.0]);
+
+        // Max along axis 1 → [5, 6]
+        let result = store.reduce("t_max", 1, ReduceOp::Max).await.unwrap();
+        assert_eq!(result.data, vec![5.0, 6.0]);
+    }
+
+    #[tokio::test]
+    async fn test_reduce_min() {
+        let store = InMemoryTensorStore::new();
+        let tensor = Tensor::new("t_min", vec![2, 3], vec![1.0, 5.0, 3.0, 4.0, 2.0, 6.0]).unwrap();
+        store.put(&tensor).await.unwrap();
+
+        // Min along axis 0 → [1, 2, 3]
+        let result = store.reduce("t_min", 0, ReduceOp::Min).await.unwrap();
+        assert_eq!(result.data, vec![1.0, 2.0, 3.0]);
+    }
+
+    #[tokio::test]
+    async fn test_reduce_prod() {
+        let store = InMemoryTensorStore::new();
+        let tensor = Tensor::new("t_prod", vec![2, 3], vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+        store.put(&tensor).await.unwrap();
+
+        // Prod along axis 0 → [1*4, 2*5, 3*6] = [4, 10, 18]
+        let result = store.reduce("t_prod", 0, ReduceOp::Prod).await.unwrap();
+        assert_eq!(result.data, vec![4.0, 10.0, 18.0]);
     }
 }

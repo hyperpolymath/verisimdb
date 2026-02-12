@@ -50,7 +50,7 @@ async fn test_cross_modal_consistency() {
         .with_document("Cross-Modal Test", "Testing all modalities together")
         .with_embedding(vec![0.1; 128])
         .with_tensor(vec![2, 2], vec![1.0, 2.0, 3.0, 4.0])
-        .with_semantic(vec!["http://example.org/TestType".to_string()])
+        .with_semantic(vec!["https://example.org/TestType".to_string()])
         .with_relationship("relatedTo", "other-entity")
         .build();
 
@@ -301,15 +301,15 @@ async fn test_semantic_persistence() {
     // Create and populate semantic store
     let store = InMemorySemanticStore::new();
 
-    let person_type = SemanticType::new("http://example.org/Person", "Person")
-        .with_supertype("http://example.org/Entity")
+    let person_type = SemanticType::new("https://example.org/Person", "Person")
+        .with_supertype("https://example.org/Entity")
         .with_constraint(Constraint {
             name: "name_required".to_string(),
             kind: ConstraintKind::Required("name".to_string()),
             message: "Person must have a name".to_string(),
         });
 
-    let org_type = SemanticType::new("http://example.org/Organization", "Organization");
+    let org_type = SemanticType::new("https://example.org/Organization", "Organization");
 
     store.register_type(&person_type).await.unwrap();
     store.register_type(&org_type).await.unwrap();
@@ -321,11 +321,11 @@ async fn test_semantic_persistence() {
     let loaded = InMemorySemanticStore::load_from_file(temp_path).unwrap();
 
     // Verify types
-    let retrieved = loaded.get_type("http://example.org/Person").await.unwrap().unwrap();
+    let retrieved = loaded.get_type("https://example.org/Person").await.unwrap().unwrap();
     assert_eq!(retrieved.label, "Person");
     assert_eq!(retrieved.constraints.len(), 1);
 
-    let org = loaded.get_type("http://example.org/Organization").await.unwrap();
+    let org = loaded.get_type("https://example.org/Organization").await.unwrap();
     assert!(org.is_some());
 
     // Cleanup

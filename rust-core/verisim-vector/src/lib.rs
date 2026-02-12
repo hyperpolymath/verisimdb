@@ -106,13 +106,13 @@ pub trait VectorStore: Send + Sync {
 ///
 /// Note: This is a simple implementation for correctness. For production
 /// workloads with >10k vectors, integrate HNSW with proper lifetime management.
-pub struct HnswVectorStore {
+pub struct BruteForceVectorStore {
     dimension: usize,
     metric: DistanceMetric,
     embeddings: Arc<RwLock<HashMap<String, Embedding>>>,
 }
 
-impl HnswVectorStore {
+impl BruteForceVectorStore {
     /// Create a new vector store
     pub fn new(dimension: usize, metric: DistanceMetric) -> Self {
         Self {
@@ -152,7 +152,7 @@ impl HnswVectorStore {
 }
 
 #[async_trait]
-impl VectorStore for HnswVectorStore {
+impl VectorStore for BruteForceVectorStore {
     async fn upsert(&self, embedding: &Embedding) -> Result<(), VectorError> {
         if embedding.dim() != self.dimension {
             return Err(VectorError::DimensionMismatch {
@@ -163,7 +163,7 @@ impl VectorStore for HnswVectorStore {
 
         self.embeddings
             .write()
-            .unwrap()
+            .expect("embeddings RwLock poisoned")
             .insert(embedding.id.clone(), embedding.clone());
 
         Ok(())
@@ -177,7 +177,7 @@ impl VectorStore for HnswVectorStore {
             });
         }
 
-        let embeddings = self.embeddings.read().unwrap();
+        let embeddings = self.embeddings.read().expect("embeddings RwLock poisoned");
 
         // Compute similarities for all embeddings (brute-force)
         let mut scored: Vec<_> = embeddings
@@ -200,11 +200,11 @@ impl VectorStore for HnswVectorStore {
     }
 
     async fn get(&self, id: &str) -> Result<Option<Embedding>, VectorError> {
-        Ok(self.embeddings.read().unwrap().get(id).cloned())
+        Ok(self.embeddings.read().expect("embeddings RwLock poisoned").get(id).cloned())
     }
 
     async fn delete(&self, id: &str) -> Result<(), VectorError> {
-        self.embeddings.write().unwrap().remove(id);
+        self.embeddings.write().expect("embeddings RwLock poisoned").remove(id);
         Ok(())
     }
 
@@ -231,7 +231,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_upsert_and_search() {
-        let store = HnswVectorStore::new(3, DistanceMetric::Cosine);
+        let store = BruteForceVectorStore::new(3, DistanceMetric::Cosine);
 
         let e1 = Embedding::new("e1", vec![1.0, 0.0, 0.0]);
         let e2 = Embedding::new("e2", vec![0.9, 0.1, 0.0]);

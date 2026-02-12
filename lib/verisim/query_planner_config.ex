@@ -244,14 +244,31 @@ defmodule VeriSim.QueryPlannerConfig do
   end
 
   defp load_config_from_storage do
-    # Load from verisim-temporal or registry
-    # TODO: Implement persistence
-    nil
+    path = config_storage_path()
+    case File.read(path) do
+      {:ok, content} ->
+        try do
+          :erlang.binary_to_term(content)
+        rescue
+          _ -> nil
+        end
+      {:error, _} -> nil
+    end
   end
 
-  defp persist_config(_config) do
-    # Persist to verisim-temporal
-    # TODO: Implement persistence
+  defp persist_config(config) do
+    path = config_storage_path()
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, :erlang.term_to_binary(config))
     :ok
+  rescue
+    e ->
+      require Logger
+      Logger.warning("Failed to persist config: #{inspect(e)}")
+      :ok
+  end
+
+  defp config_storage_path do
+    Path.join([System.tmp_dir!(), "verisimdb", "query_planner_config.bin"])
   end
 end

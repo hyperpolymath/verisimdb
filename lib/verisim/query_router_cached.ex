@@ -268,9 +268,33 @@ defmodule VeriSim.QueryRouter.Cached do
   # === Helper Functions ===
 
   defp parse_query(raw_query) do
-    # Call VQL parser
-    # TODO: Implement actual parser call
-    %{raw: raw_query, modalities: ["GRAPH"], source: {:hexad, "abc-123"}}
+    modalities = extract_modalities(raw_query)
+    source = extract_source(raw_query)
+    %{raw: raw_query, modalities: modalities, source: source}
+  end
+
+  defp extract_modalities(query) do
+    upper = String.upcase(query)
+    modalities = []
+    modalities = if String.contains?(upper, "GRAPH"), do: ["GRAPH" | modalities], else: modalities
+    modalities = if String.contains?(upper, "VECTOR"), do: ["VECTOR" | modalities], else: modalities
+    modalities = if String.contains?(upper, "TENSOR"), do: ["TENSOR" | modalities], else: modalities
+    modalities = if String.contains?(upper, "SEMANTIC"), do: ["SEMANTIC" | modalities], else: modalities
+    modalities = if String.contains?(upper, "DOCUMENT"), do: ["DOCUMENT" | modalities], else: modalities
+    modalities = if String.contains?(upper, "TEMPORAL"), do: ["TEMPORAL" | modalities], else: modalities
+    if modalities == [], do: ["GRAPH"], else: Enum.reverse(modalities)
+  end
+
+  defp extract_source(query) do
+    cond do
+      String.contains?(query, "FEDERATION") ->
+        case Regex.run(~r/FEDERATION\s+(\S+)/, query) do
+          [_, pattern] -> {:federation, pattern, %{}}
+          _ -> {:hexad, "unknown"}
+        end
+      true ->
+        {:hexad, "unknown"}
+    end
   end
 
   defp generate_plan(ast) do
@@ -297,10 +321,11 @@ defmodule VeriSim.QueryRouter.Cached do
     tags ++ hexad_tags ++ modality_tags
   end
 
-  defp modality_to_string(modality) do
-    # TODO: Implement proper conversion
-    "#{modality}"
+  defp modality_to_string(modality) when is_binary(modality), do: modality
+  defp modality_to_string(modality) when is_atom(modality) do
+    modality |> Atom.to_string() |> String.upcase()
   end
+  defp modality_to_string(modality), do: "#{modality}"
 
   defp compute_data_hash(data) do
     :crypto.hash(:blake3, :erlang.term_to_binary(data))

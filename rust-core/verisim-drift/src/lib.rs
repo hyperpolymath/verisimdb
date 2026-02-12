@@ -322,7 +322,7 @@ impl DriftDetector {
     pub async fn record(&self, drift_type: DriftType, score: f64, entities: Vec<String>) -> Result<Option<DriftEvent>, DriftError> {
         // Update metrics
         {
-            let mut metrics = self.metrics.write().unwrap();
+            let mut metrics = self.metrics.write().expect("metrics RwLock poisoned");
             if let Some(m) = metrics.get_mut(&drift_type) {
                 m.record(score);
             }
@@ -379,17 +379,17 @@ impl DriftDetector {
 
     /// Get current metrics for a drift type
     pub fn get_metrics(&self, drift_type: DriftType) -> Option<DriftMetrics> {
-        self.metrics.read().unwrap().get(&drift_type).cloned()
+        self.metrics.read().expect("metrics RwLock poisoned").get(&drift_type).cloned()
     }
 
     /// Get all metrics
     pub fn all_metrics(&self) -> HashMap<DriftType, DriftMetrics> {
-        self.metrics.read().unwrap().clone()
+        self.metrics.read().expect("metrics RwLock poisoned").clone()
     }
 
     /// Check overall health
     pub fn health_check(&self) -> DriftHealthStatus {
-        let metrics = self.metrics.read().unwrap();
+        let metrics = self.metrics.read().expect("metrics RwLock poisoned");
         let mut worst_score = 0.0;
         let mut worst_type = DriftType::QualityDrift;
 

@@ -94,7 +94,7 @@ async fn test_cross_modal_consistency() {
             fields: HashMap::new(),
         }),
         vector: Some(vec![0.2; 384].into()),
-        semantic: Some(vec!["http://example.org/Document".to_string()].into()),
+        semantic: Some(vec!["https://example.org/Document".to_string()].into()),
         ..Default::default()
     };
 
@@ -288,7 +288,7 @@ async fn test_multi_modal_query() {
             fields: HashMap::new(),
         }),
         vector: Some(vec![0.6; 384].into()),
-        semantic: Some(vec!["http://example.org/Document".to_string()].into()),
+        semantic: Some(vec!["https://example.org/Document".to_string()].into()),
         ..Default::default()
     };
 

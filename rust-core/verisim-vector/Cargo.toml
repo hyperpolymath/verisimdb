@@ -9,14 +9,16 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-# hnsw_rs.workspace = true  # TODO: Re-enable when implementing proper HNSW with lifetime management
+# HNSW integration deferred — brute-force O(n) search used. Acceptable for <10k vectors.
+# hnsw_rs.workspace = true  # Deferred: lifetime management issues with hnsw_rs 0.3
 ndarray.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
-bincode.workspace = true
+# bincode removed — not used in crate
+# bincode.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

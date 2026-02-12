@@ -198,7 +198,7 @@ where
                 key.clone(),
                 SemanticValue::TypedLiteral {
                     value: value.clone(),
-                    datatype: "http://www.w3.org/2001/XMLSchema#string".to_string(),
+                    datatype: "https://www.w3.org/2001/XMLSchema#string".to_string(),
                 },
             );
         }
@@ -597,11 +597,11 @@ mod tests {
     use verisim_semantic::InMemorySemanticStore;
     use verisim_temporal::InMemoryVersionStore;
     use verisim_tensor::InMemoryTensorStore;
-    use verisim_vector::{DistanceMetric, HnswVectorStore};
+    use verisim_vector::{DistanceMetric, BruteForceVectorStore};
 
     fn create_test_store() -> InMemoryHexadStore<
         OxiGraphStore,
-        HnswVectorStore,
+        BruteForceVectorStore,
         TantivyDocumentStore,
         InMemoryTensorStore,
         InMemorySemanticStore,
@@ -615,7 +615,7 @@ mod tests {
         InMemoryHexadStore::new(
             config,
             Arc::new(OxiGraphStore::in_memory().unwrap()),
-            Arc::new(HnswVectorStore::new(3, DistanceMetric::Cosine)),
+            Arc::new(BruteForceVectorStore::new(3, DistanceMetric::Cosine)),
             Arc::new(TantivyDocumentStore::in_memory().unwrap()),
             Arc::new(InMemoryTensorStore::new()),
             Arc::new(InMemorySemanticStore::new()),

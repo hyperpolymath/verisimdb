@@ -39,7 +39,7 @@ defmodule VeriSim.SchemaRegistry do
   ## Example
 
       SchemaRegistry.register_type(%{
-        iri: "http://example.org/Person",
+        iri: "https://example.org/Person",
         label: "Person",
         supertypes: ["verisim:Entity"],
         constraints: [

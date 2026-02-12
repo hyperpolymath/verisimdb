@@ -29,12 +29,12 @@ use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
-use verisim_vector::{DistanceMetric, HnswVectorStore};
+use verisim_vector::{DistanceMetric, BruteForceVectorStore};
 
 /// Type alias for our concrete HexadStore implementation
 pub type ConcreteHexadStore = InMemoryHexadStore<
     OxiGraphStore,
-    HnswVectorStore,
+    BruteForceVectorStore,
     TantivyDocumentStore,
     InMemoryTensorStore,
     InMemorySemanticStore,
@@ -306,7 +306,7 @@ impl AppState {
         let graph = Arc::new(
             OxiGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
         );
-        let vector = Arc::new(HnswVectorStore::new(
+        let vector = Arc::new(BruteForceVectorStore::new(
             config.vector_dimension,
             DistanceMetric::Cosine,
         ));
