@@ -9,8 +9,8 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-# HNSW integration deferred — brute-force O(n) search used. Acceptable for <10k vectors.
-# hnsw_rs.workspace = true  # Deferred: lifetime management issues with hnsw_rs 0.3
+# hnsw_rs removed — we implement HNSW from scratch to avoid
+# the 'b lifetime parameter issue in hnsw_rs 0.3.
 ndarray.workspace = true
 serde.workspace = true
 thiserror.workspace = true

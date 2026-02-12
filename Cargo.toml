@@ -83,6 +83,9 @@ uuid = { version = "1.11", features = ["v4"] }
 # Regex
 regex = "1.11"
 
+# Cryptography (ZKP proofs in semantic store)
+sha2 = "0.10"
+
 [profile.release]
 lto = true
 codegen-units = 1

@@ -4,6 +4,8 @@
 //! HTTP API server for VeriSimDB.
 //! Exposes all database functionality via REST endpoints.
 
+pub mod federation;
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -292,6 +294,7 @@ pub struct AppState {
     pub hexad_store: Arc<ConcreteHexadStore>,
     pub drift_detector: Arc<DriftDetector>,
     pub normalizer: Arc<Normalizer>,
+    pub federation: federation::FederationState,
     pub config: ApiConfig,
 }
 
@@ -330,11 +333,18 @@ impl AppState {
         let drift_detector = Arc::new(DriftDetector::new(DriftThresholds::default()));
         let normalizer = Arc::new(create_default_normalizer(drift_detector.clone()).await);
 
+        let self_endpoint = format!("http://{}:{}{}", config.host, config.port, config.version_prefix);
+        let federation = federation::FederationState::new(
+            "self".to_string(),
+            self_endpoint,
+        );
+
         Ok(Self {
             start_time: std::time::Instant::now(),
             hexad_store,
             drift_detector,
             normalizer,
+            federation,
             config,
         })
     }
@@ -342,6 +352,8 @@ impl AppState {
 
 /// Build the API router
 pub fn build_router(state: AppState) -> Router {
+    let federation_routes = federation::federation_router(state.federation.clone());
+
     Router::new()
         // Health endpoints
         .route("/health", get(health_handler))
@@ -360,6 +372,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/normalizer/status", get(normalizer_status_handler))
         .route("/normalizer/trigger/{id}", post(trigger_normalization_handler))
         .with_state(state)
+        // Federation endpoints (separate state)
+        .merge(federation_routes)
 }
 
 /// Health check handler

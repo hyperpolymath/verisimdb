@@ -4,6 +4,10 @@
 //! HNSW-based similarity search for embeddings.
 //! Implements Marr's Computational Level: "What is similar to what?"
 
+mod hnsw;
+
+pub use hnsw::{HnswConfig, HnswVectorStore};
+
 use async_trait::async_trait;
 use ndarray::{Array1, ArrayView1};
 use serde::{Deserialize, Serialize};

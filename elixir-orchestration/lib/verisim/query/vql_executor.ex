@@ -57,9 +57,10 @@ defmodule VeriSim.Query.VQLExecutor do
   For better performance, parse once and execute multiple times.
   """
   def execute_string(query_string, opts \\ []) do
-    # In production, this would call the ReScript VQLParser via Node/Deno
-    # For now, return placeholder
-    {:error, :not_implemented}
+    case VeriSim.Query.VQLBridge.parse(query_string) do
+      {:ok, ast} -> execute(ast, opts)
+      {:error, reason} -> {:error, {:parse_error, reason}}
+    end
   end
 
   # Private Functions

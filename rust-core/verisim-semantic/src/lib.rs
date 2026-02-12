@@ -4,6 +4,8 @@
 //! Ontology and type system with CBOR proof serialization.
 //! Implements Marr's Computational Level: "What does this mean?"
 
+pub mod zkp;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -187,6 +189,36 @@ impl ProofBlob {
         ciborium::from_reader(data)
             .map_err(|e| SemanticError::SerializationError(e.to_string()))
     }
+
+    /// Verify the proof data against the claim.
+    ///
+    /// Interprets `self.data` as CBOR-encoded [`zkp::VerifiableProofData`] and
+    /// verifies it cryptographically against `self.claim`.
+    pub fn verify(&self) -> Result<bool, SemanticError> {
+        // Try to decode data as VerifiableProofData (CBOR)
+        let proof_data: Result<zkp::VerifiableProofData, _> = ciborium::from_reader(&self.data[..]);
+
+        match proof_data {
+            Ok(data) => Ok(zkp::verify_proof(&data, self.claim.as_bytes())),
+            Err(_) => {
+                // Legacy proofs without ZKP data: verify based on proof type
+                match self.proof_type {
+                    ProofType::Attestation => {
+                        // Attestation proofs are trusted (external authority)
+                        Ok(true)
+                    }
+                    ProofType::ConstraintSatisfaction => {
+                        // Without ZKP data, we can only check non-empty
+                        Ok(!self.data.is_empty())
+                    }
+                    ProofType::Derivation | ProofType::TypeAssignment => {
+                        // Legacy: accept if data is present
+                        Ok(!self.data.is_empty())
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Semantic store trait for cross-modal consistency
@@ -212,6 +244,14 @@ pub trait SemanticStore: Send + Sync {
 
     /// Retrieve proofs for a claim
     async fn get_proofs(&self, claim: &str) -> Result<Vec<ProofBlob>, SemanticError>;
+
+    /// Verify all proofs for a claim, returning (valid_count, total_count).
+    async fn verify_proofs(&self, claim: &str) -> Result<(usize, usize), SemanticError> {
+        let proofs = self.get_proofs(claim).await?;
+        let total = proofs.len();
+        let valid = proofs.iter().filter(|p| p.verify().unwrap_or(false)).count();
+        Ok((valid, total))
+    }
 }
 
 /// In-memory semantic store

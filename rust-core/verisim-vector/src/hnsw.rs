@@ -1,158 +1,115 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-//! HNSW (Hierarchical Navigable Small World) Index
+//! HNSW (Hierarchical Navigable Small World) vector index
 //!
-//! Implementation of the HNSW algorithm for approximate nearest neighbor search.
-//! Based on the paper "Efficient and robust approximate nearest neighbor search
-//! using Hierarchical Navigable Small World graphs" by Malkov and Yashunin.
+//! Pure Rust implementation with proper lifetime management.
+//! Avoids the `'b` lifetime parameter issue in hnsw_rs 0.3 by owning
+//! all graph data directly — no self-referential structs needed.
+//!
+//! Algorithm: Malkov & Yashunin, "Efficient and robust approximate
+//! nearest neighbor search using Hierarchical Navigable Small World graphs"
 
-use crate::DistanceMetric;
-use rand::Rng;
+use crate::{DistanceMetric, Embedding, SearchResult, VectorError, VectorStore};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::{Arc, RwLock};
 
-/// HNSW parameters
+/// Maximum supported layers in the HNSW graph.
+const MAX_LEVELS: usize = 16;
+
+/// Monotonic counter for level assignment entropy.
+static INSERT_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+// ---------------------------------------------------------------------------
+// Ordered f32 for BinaryHeap (f32 doesn't implement Ord)
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq)]
+struct Dist(f32);
+
+impl Eq for Dist {}
+
+impl PartialOrd for Dist {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Dist {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.partial_cmp(&other.0).unwrap_or(Ordering::Equal)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+/// HNSW index configuration parameters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HnswParams {
-    /// Maximum number of connections per element (M)
-    pub m: usize,
-    /// Size of the dynamic candidate list during construction
+pub struct HnswConfig {
+    /// Max bidirectional connections per node per layer (M parameter).
+    pub max_connections: usize,
+    /// Max connections for layer 0 (typically 2*M).
+    pub max_connections_layer0: usize,
+    /// Size of dynamic candidate list during construction.
     pub ef_construction: usize,
-    /// Default size of the dynamic candidate list during search
+    /// Size of dynamic candidate list during search.
     pub ef_search: usize,
 }
 
-impl Default for HnswParams {
+impl Default for HnswConfig {
     fn default() -> Self {
         Self {
-            m: 16,
+            max_connections: 16,
+            max_connections_layer0: 32,
             ef_construction: 200,
-            ef_search: 50,
+            ef_search: 64,
         }
     }
 }
 
-/// A node in the HNSW graph
-#[derive(Debug, Clone)]
-struct HnswNode {
-    /// The vector data
+// ---------------------------------------------------------------------------
+// Internal graph structures (no public lifetime parameters)
+// ---------------------------------------------------------------------------
+
+/// Internal node — owns its vector data.
+struct Node {
+    id: String,
     vector: Vec<f32>,
-    /// Neighbors at each level (level -> neighbor indices)
+    metadata: HashMap<String, String>,
+    /// Neighbors per layer (layer index -> vec of node indices).
     neighbors: Vec<Vec<usize>>,
+    /// Assigned level for this node.
+    level: usize,
+    /// Soft-delete flag.
+    deleted: bool,
 }
 
-/// Candidate for search (used in priority queue)
-#[derive(Debug, Clone)]
-struct Candidate {
-    index: usize,
-    distance: f32,
-}
-
-impl PartialEq for Candidate {
-    fn eq(&self, other: &Self) -> bool {
-        self.distance == other.distance
-    }
-}
-
-impl Eq for Candidate {}
-
-impl PartialOrd for Candidate {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Candidate {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse ordering for min-heap behavior (closest first)
-        other
-            .distance
-            .partial_cmp(&self.distance)
-            .unwrap_or(Ordering::Equal)
-    }
-}
-
-/// Max-heap candidate (for keeping track of furthest)
-#[derive(Debug, Clone)]
-struct MaxCandidate {
-    index: usize,
-    distance: f32,
-}
-
-impl PartialEq for MaxCandidate {
-    fn eq(&self, other: &Self) -> bool {
-        self.distance == other.distance
-    }
-}
-
-impl Eq for MaxCandidate {}
-
-impl PartialOrd for MaxCandidate {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for MaxCandidate {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Normal ordering for max-heap behavior (furthest first)
-        self.distance
-            .partial_cmp(&other.distance)
-            .unwrap_or(Ordering::Equal)
-    }
-}
-
-/// HNSW Index for approximate nearest neighbor search
-pub struct HnswIndex {
-    /// Dimension of vectors
-    dimension: usize,
-    /// Distance metric
-    metric: DistanceMetric,
-    /// Parameters
-    params: HnswParams,
-    /// All nodes in the graph
-    nodes: Vec<HnswNode>,
-    /// Entry point (index of the highest level node)
+/// Internal graph state — fully owned, no lifetimes.
+struct Graph {
+    nodes: Vec<Node>,
+    id_map: HashMap<String, usize>,
     entry_point: Option<usize>,
-    /// Maximum level in the graph
-    max_level: usize,
-    /// Probability multiplier for level generation
-    level_mult: f64,
-    /// Map from external ID to internal index
-    id_to_index: HashMap<usize, usize>,
+    current_max_level: usize,
 }
 
-impl HnswIndex {
-    /// Create a new HNSW index
-    pub fn new(dimension: usize, metric: DistanceMetric, params: HnswParams) -> Self {
-        let level_mult = 1.0 / (params.m as f64).ln();
+impl Graph {
+    fn new() -> Self {
         Self {
-            dimension,
-            metric,
-            params,
             nodes: Vec::new(),
+            id_map: HashMap::new(),
             entry_point: None,
-            max_level: 0,
-            level_mult,
-            id_to_index: HashMap::new(),
+            current_max_level: 0,
         }
     }
 
-    /// Get the maximum level
-    pub fn max_level(&self) -> usize {
-        self.max_level
-    }
-
-    /// Generate a random level for a new node
-    fn random_level(&self) -> usize {
-        let mut rng = rand::rng();
-        let r: f64 = rng.random();
-        (-r.ln() * self.level_mult).floor() as usize
-    }
-
-    /// Compute distance between two vectors
-    fn distance(&self, a: &[f32], b: &[f32]) -> f32 {
-        match self.metric {
+    /// Compute distance between two vectors (lower = closer).
+    fn distance(metric: DistanceMetric, a: &[f32], b: &[f32]) -> f32 {
+        match metric {
             DistanceMetric::Cosine => {
                 let mut dot = 0.0f32;
                 let mut norm_a = 0.0f32;
@@ -162,173 +119,105 @@ impl HnswIndex {
                     norm_a += x * x;
                     norm_b += y * y;
                 }
-                let denom = (norm_a * norm_b).sqrt();
+                let denom = norm_a.sqrt() * norm_b.sqrt();
                 if denom > 0.0 {
-                    1.0 - (dot / denom) // Convert similarity to distance
+                    1.0 - dot / denom
                 } else {
                     1.0
                 }
             }
-            DistanceMetric::Euclidean => {
-                a.iter()
-                    .zip(b.iter())
-                    .map(|(x, y)| (x - y).powi(2))
-                    .sum::<f32>()
-                    .sqrt()
-            }
+            DistanceMetric::Euclidean => a
+                .iter()
+                .zip(b.iter())
+                .map(|(x, y)| (x - y).powi(2))
+                .sum::<f32>()
+                .sqrt(),
             DistanceMetric::DotProduct => {
-                // Negative dot product as distance (higher dot = lower distance)
+                // Negate so lower value = higher dot product = more similar
                 -a.iter().zip(b.iter()).map(|(x, y)| x * y).sum::<f32>()
             }
         }
     }
 
-    /// Insert a vector into the index
-    pub fn insert(&mut self, external_id: usize, vector: &[f32]) {
-        let node_level = self.random_level();
-
-        // Create the new node
-        let new_node = HnswNode {
-            vector: vector.to_vec(),
-            neighbors: vec![Vec::new(); node_level + 1],
-        };
-
-        let new_idx = self.nodes.len();
-        self.nodes.push(new_node);
-        self.id_to_index.insert(external_id, new_idx);
-
-        // If this is the first node, it becomes the entry point
-        if self.entry_point.is_none() {
-            self.entry_point = Some(new_idx);
-            self.max_level = node_level;
-            return;
-        }
-
-        let entry_point = self.entry_point.unwrap();
-
-        // Find the entry point's level
-        let mut current_idx = entry_point;
-        let mut current_dist = self.distance(vector, &self.nodes[current_idx].vector);
-
-        // Traverse from the highest level down to node_level + 1
-        for level in (node_level + 1..=self.max_level).rev() {
-            let mut changed = true;
-            while changed {
-                changed = false;
-                let neighbors = &self.nodes[current_idx].neighbors;
-                if level < neighbors.len() {
-                    for &neighbor_idx in &neighbors[level] {
-                        let dist = self.distance(vector, &self.nodes[neighbor_idx].vector);
-                        if dist < current_dist {
-                            current_idx = neighbor_idx;
-                            current_dist = dist;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-        }
-
-        // For levels from min(node_level, max_level) down to 0, search and connect
-        let top_level = node_level.min(self.max_level);
-        for level in (0..=top_level).rev() {
-            let candidates = self.search_layer(vector, current_idx, self.params.ef_construction, level);
-
-            // Select neighbors
-            let neighbors = self.select_neighbors(&candidates, self.params.m);
-
-            // Connect the new node to its neighbors
-            self.nodes[new_idx].neighbors[level] = neighbors.clone();
-
-            // Add reverse connections
-            for &neighbor_idx in &neighbors {
-                let neighbor_level = self.nodes[neighbor_idx].neighbors.len();
-                if level < neighbor_level {
-                    self.nodes[neighbor_idx].neighbors[level].push(new_idx);
-
-                    // Prune if too many connections
-                    if self.nodes[neighbor_idx].neighbors[level].len() > self.params.m * 2 {
-                        let neighbor_vec = self.nodes[neighbor_idx].vector.clone();
-                        let neighbor_neighbors: Vec<_> = self.nodes[neighbor_idx].neighbors[level]
-                            .iter()
-                            .map(|&idx| {
-                                let dist = self.distance(&neighbor_vec, &self.nodes[idx].vector);
-                                (idx, dist)
-                            })
-                            .collect();
-                        let pruned = self.select_neighbors(&neighbor_neighbors, self.params.m * 2);
-                        self.nodes[neighbor_idx].neighbors[level] = pruned;
-                    }
-                }
-            }
-
-            // Update current entry point for next level
-            if !candidates.is_empty() {
-                current_idx = candidates[0].0;
-            }
-        }
-
-        // Update entry point if new node has higher level
-        if node_level > self.max_level {
-            self.entry_point = Some(new_idx);
-            self.max_level = node_level;
+    /// Convert HNSW distance back to similarity score for results.
+    fn distance_to_score(metric: DistanceMetric, distance: f32) -> f32 {
+        match metric {
+            DistanceMetric::Cosine => 1.0 - distance,
+            DistanceMetric::Euclidean => 1.0 / (1.0 + distance),
+            DistanceMetric::DotProduct => -distance,
         }
     }
 
-    /// Search a single layer for nearest neighbors
+    /// Assign a random level using hash-based PRNG (no `rand` dependency).
+    fn assign_level(id: &str, max_connections: usize) -> usize {
+        let count = INSERT_COUNTER.fetch_add(1, AtomicOrdering::Relaxed);
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        id.hash(&mut hasher);
+        count.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        // Convert to uniform float in (0, 1), avoiding ln(0)
+        let uniform = ((hash >> 11) as f64 + 1.0) / ((1u64 << 53) as f64 + 1.0);
+        let ml = 1.0 / (max_connections as f64).ln();
+        let level = (-uniform.ln() * ml).floor() as usize;
+        level.min(MAX_LEVELS - 1)
+    }
+
+    /// Search a single layer, returning up to `ef` nearest neighbors.
+    /// Returns Vec<(distance, node_index)> sorted by distance ascending.
     fn search_layer(
         &self,
         query: &[f32],
-        entry_idx: usize,
+        entry_points: &[usize],
         ef: usize,
-        level: usize,
-    ) -> Vec<(usize, f32)> {
-        let entry_dist = self.distance(query, &self.nodes[entry_idx].vector);
-
+        layer: usize,
+        metric: DistanceMetric,
+    ) -> Vec<(f32, usize)> {
         let mut visited = HashSet::new();
-        visited.insert(entry_idx);
+        // Min-heap for candidates (closest first)
+        let mut candidates: BinaryHeap<Reverse<(Dist, usize)>> = BinaryHeap::new();
+        // Max-heap for results (furthest first, for pruning)
+        let mut results: BinaryHeap<(Dist, usize)> = BinaryHeap::new();
 
-        let mut candidates: BinaryHeap<Candidate> = BinaryHeap::new();
-        candidates.push(Candidate {
-            index: entry_idx,
-            distance: entry_dist,
-        });
+        for &ep in entry_points {
+            if ep >= self.nodes.len() {
+                continue;
+            }
+            let dist = Self::distance(metric, query, &self.nodes[ep].vector);
+            visited.insert(ep);
+            // Always add to candidates (for navigation), only add live nodes to results
+            candidates.push(Reverse((Dist(dist), ep)));
+            if !self.nodes[ep].deleted {
+                results.push((Dist(dist), ep));
+            }
+        }
 
-        let mut results: BinaryHeap<MaxCandidate> = BinaryHeap::new();
-        results.push(MaxCandidate {
-            index: entry_idx,
-            distance: entry_dist,
-        });
-
-        while let Some(current) = candidates.pop() {
-            // Get the furthest result
-            let furthest_dist = results.peek().map(|r| r.distance).unwrap_or(f32::MAX);
-
-            // If current is further than furthest result, we're done
-            if current.distance > furthest_dist {
+        while let Some(Reverse((Dist(c_dist), c_idx))) = candidates.pop() {
+            let furthest_dist = results.peek().map(|(Dist(d), _)| *d).unwrap_or(f32::MAX);
+            // For deleted-heavy graphs, only break when we have enough results
+            if c_dist > furthest_dist && results.len() >= ef {
                 break;
             }
 
-            // Explore neighbors
-            let neighbors = &self.nodes[current.index].neighbors;
-            if level < neighbors.len() {
-                for &neighbor_idx in &neighbors[level] {
-                    if visited.insert(neighbor_idx) {
-                        let dist = self.distance(query, &self.nodes[neighbor_idx].vector);
-                        let furthest_dist = results.peek().map(|r| r.distance).unwrap_or(f32::MAX);
+            if layer < self.nodes[c_idx].neighbors.len() {
+                for &neighbor_idx in &self.nodes[c_idx].neighbors[layer] {
+                    if neighbor_idx >= self.nodes.len() || visited.contains(&neighbor_idx) {
+                        continue;
+                    }
+                    visited.insert(neighbor_idx);
 
+                    let dist = Self::distance(metric, query, &self.nodes[neighbor_idx].vector);
+
+                    // Always add to candidates for graph traversal
+                    candidates.push(Reverse((Dist(dist), neighbor_idx)));
+
+                    // Only add live nodes to results
+                    if !self.nodes[neighbor_idx].deleted {
+                        let furthest_dist =
+                            results.peek().map(|(Dist(d), _)| *d).unwrap_or(f32::MAX);
                         if dist < furthest_dist || results.len() < ef {
-                            candidates.push(Candidate {
-                                index: neighbor_idx,
-                                distance: dist,
-                            });
-                            results.push(MaxCandidate {
-                                index: neighbor_idx,
-                                distance: dist,
-                            });
-
-                            // Keep only top ef results
-                            while results.len() > ef {
+                            results.push((Dist(dist), neighbor_idx));
+                            if results.len() > ef {
                                 results.pop();
                             }
                         }
@@ -337,152 +226,444 @@ impl HnswIndex {
             }
         }
 
-        // Convert to sorted vector
-        let mut result_vec: Vec<_> = results
-            .into_iter()
-            .map(|c| (c.index, c.distance))
-            .collect();
-        result_vec.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+        let mut result_vec: Vec<(f32, usize)> =
+            results.into_iter().map(|(Dist(d), idx)| (d, idx)).collect();
+        result_vec.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
         result_vec
     }
 
-    /// Select neighbors using simple heuristic
-    fn select_neighbors(&self, candidates: &[(usize, f32)], m: usize) -> Vec<usize> {
-        candidates
-            .iter()
-            .take(m)
-            .map(|(idx, _)| *idx)
-            .collect()
+    /// Select M nearest neighbors from sorted candidates.
+    fn select_neighbors(candidates: &[(f32, usize)], m: usize) -> Vec<usize> {
+        candidates.iter().take(m).map(|(_, idx)| *idx).collect()
     }
 
-    /// Search for k nearest neighbors
-    pub fn search(&self, query: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
-        if self.nodes.is_empty() || self.entry_point.is_none() {
-            return Vec::new();
+    /// Insert a node into the HNSW graph.
+    fn insert(
+        &mut self,
+        id: String,
+        vector: Vec<f32>,
+        metadata: HashMap<String, String>,
+        config: &HnswConfig,
+        metric: DistanceMetric,
+    ) {
+        // Upsert: if ID exists, update vector in place (connections stay valid
+        // for approximate search — small perturbations don't break HNSW).
+        if let Some(&existing_idx) = self.id_map.get(&id) {
+            self.nodes[existing_idx].vector = vector;
+            self.nodes[existing_idx].metadata = metadata;
+            self.nodes[existing_idx].deleted = false;
+            return;
         }
 
-        let entry_point = self.entry_point.unwrap();
-        let mut current_idx = entry_point;
-        let mut current_dist = self.distance(query, &self.nodes[current_idx].vector);
+        let level = Self::assign_level(&id, config.max_connections);
+        let node_idx = self.nodes.len();
 
-        // Traverse from top level to level 1
-        for level in (1..=self.max_level).rev() {
-            let mut changed = true;
-            while changed {
-                changed = false;
-                let neighbors = &self.nodes[current_idx].neighbors;
-                if level < neighbors.len() {
-                    for &neighbor_idx in &neighbors[level] {
-                        let dist = self.distance(query, &self.nodes[neighbor_idx].vector);
-                        if dist < current_dist {
-                            current_idx = neighbor_idx;
-                            current_dist = dist;
-                            changed = true;
-                        }
-                    }
+        let node = Node {
+            id: id.clone(),
+            vector,
+            metadata,
+            neighbors: (0..=level).map(|_| Vec::new()).collect(),
+            level,
+            deleted: false,
+        };
+        self.nodes.push(node);
+        self.id_map.insert(id, node_idx);
+
+        // First node — just set as entry point.
+        if self.entry_point.is_none() {
+            self.entry_point = Some(node_idx);
+            self.current_max_level = level;
+            return;
+        }
+
+        let ep = self.entry_point.unwrap();
+        let mut current_ep = vec![ep];
+
+        // Phase 1: Greedy descent from top layer to (node level + 1)
+        let top = self.current_max_level;
+        if top > level {
+            for l in (level + 1..=top).rev() {
+                let nearest = self.search_layer(
+                    &self.nodes[node_idx].vector,
+                    &current_ep,
+                    1,
+                    l,
+                    metric,
+                );
+                if let Some(&(_, idx)) = nearest.first() {
+                    current_ep = vec![idx];
                 }
             }
         }
 
-        // Search at level 0 with ef
-        let candidates = self.search_layer(query, current_idx, ef.max(k), 0);
+        // Phase 2: Insert at each layer from min(level, top) down to 0
+        let insert_top = level.min(top);
+        for l in (0..=insert_top).rev() {
+            let max_conn = if l == 0 {
+                config.max_connections_layer0
+            } else {
+                config.max_connections
+            };
 
-        // Map internal indices back to external IDs and return top k
-        let reverse_map: HashMap<usize, usize> = self
-            .id_to_index
-            .iter()
-            .map(|(&ext, &int)| (int, ext))
-            .collect();
+            let nearest = self.search_layer(
+                &self.nodes[node_idx].vector,
+                &current_ep,
+                config.ef_construction,
+                l,
+                metric,
+            );
 
-        candidates
-            .into_iter()
-            .take(k)
-            .filter_map(|(internal_idx, dist)| {
-                reverse_map.get(&internal_idx).map(|&ext_id| (ext_id, dist))
-            })
-            .collect()
+            let selected = Self::select_neighbors(&nearest, max_conn);
+
+            // Bidirectional connections
+            for &neighbor_idx in &selected {
+                // node -> neighbor
+                if l < self.nodes[node_idx].neighbors.len() {
+                    self.nodes[node_idx].neighbors[l].push(neighbor_idx);
+                }
+
+                // neighbor -> node (ensure neighbor has layer allocated)
+                while self.nodes[neighbor_idx].neighbors.len() <= l {
+                    self.nodes[neighbor_idx].neighbors.push(Vec::new());
+                }
+                self.nodes[neighbor_idx].neighbors[l].push(node_idx);
+
+                // Prune neighbor if over capacity
+                if self.nodes[neighbor_idx].neighbors[l].len() > max_conn {
+                    let neighbor_vec = self.nodes[neighbor_idx].vector.clone();
+                    let mut scored: Vec<(f32, usize)> = self.nodes[neighbor_idx].neighbors[l]
+                        .iter()
+                        .map(|&n| {
+                            let d = Self::distance(metric, &neighbor_vec, &self.nodes[n].vector);
+                            (d, n)
+                        })
+                        .collect();
+                    scored.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+                    self.nodes[neighbor_idx].neighbors[l] =
+                        scored.iter().take(max_conn).map(|(_, idx)| *idx).collect();
+                }
+            }
+
+            current_ep = nearest.iter().map(|(_, idx)| *idx).collect();
+            if current_ep.is_empty() {
+                current_ep = vec![ep];
+            }
+        }
+
+        // Update entry point if new node has higher level
+        if level > self.current_max_level {
+            self.entry_point = Some(node_idx);
+            self.current_max_level = level;
+        }
     }
 
-    /// Get the number of nodes in the index
-    pub fn len(&self) -> usize {
-        self.nodes.len()
-    }
+    /// Search the graph for k nearest neighbors.
+    fn search(
+        &self,
+        query: &[f32],
+        k: usize,
+        ef_search: usize,
+        metric: DistanceMetric,
+    ) -> Vec<(f32, usize)> {
+        let ep = match self.entry_point {
+            Some(ep) => ep,
+            None => return Vec::new(),
+        };
 
-    /// Check if the index is empty
-    pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+        let mut current_ep = vec![ep];
+
+        // Greedy descent from top layer to layer 1
+        for l in (1..=self.current_max_level).rev() {
+            let nearest = self.search_layer(query, &current_ep, 1, l, metric);
+            if let Some(&(_, idx)) = nearest.first() {
+                current_ep = vec![idx];
+            }
+        }
+
+        // Beam search on layer 0
+        let mut results = self.search_layer(query, &current_ep, ef_search.max(k), 0, metric);
+        results.truncate(k);
+        results
     }
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/// HNSW-indexed vector store.
+///
+/// Provides O(log n) approximate nearest neighbor search with configurable
+/// recall/speed tradeoff via `ef_search`. Thread-safe: concurrent reads,
+/// exclusive writes via `RwLock`.
+pub struct HnswVectorStore {
+    config: HnswConfig,
+    dimension: usize,
+    metric: DistanceMetric,
+    graph: Arc<RwLock<Graph>>,
+}
+
+impl HnswVectorStore {
+    /// Create a new HNSW vector store with custom configuration.
+    pub fn new(dimension: usize, metric: DistanceMetric, config: HnswConfig) -> Self {
+        Self {
+            config,
+            dimension,
+            metric,
+            graph: Arc::new(RwLock::new(Graph::new())),
+        }
+    }
+
+    /// Create with default HNSW parameters (M=16, ef_construction=200, ef_search=64).
+    pub fn with_defaults(dimension: usize, metric: DistanceMetric) -> Self {
+        Self::new(dimension, metric, HnswConfig::default())
+    }
+
+    /// Get the number of non-deleted vectors in the index.
+    pub fn len(&self) -> usize {
+        let graph = self.graph.read().expect("graph RwLock poisoned");
+        graph.nodes.iter().filter(|n| !n.deleted).count()
+    }
+
+    /// Check if the index is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Get the current HNSW configuration.
+    pub fn config(&self) -> &HnswConfig {
+        &self.config
+    }
+}
+
+#[async_trait]
+impl VectorStore for HnswVectorStore {
+    async fn upsert(&self, embedding: &Embedding) -> Result<(), VectorError> {
+        if embedding.dim() != self.dimension {
+            return Err(VectorError::DimensionMismatch {
+                expected: self.dimension,
+                actual: embedding.dim(),
+            });
+        }
+
+        let mut graph = self.graph.write().expect("graph RwLock poisoned");
+        graph.insert(
+            embedding.id.clone(),
+            embedding.vector.clone(),
+            embedding.metadata.clone(),
+            &self.config,
+            self.metric,
+        );
+        Ok(())
+    }
+
+    async fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>, VectorError> {
+        if query.len() != self.dimension {
+            return Err(VectorError::DimensionMismatch {
+                expected: self.dimension,
+                actual: query.len(),
+            });
+        }
+
+        let graph = self.graph.read().expect("graph RwLock poisoned");
+        let results = graph.search(query, k, self.config.ef_search, self.metric);
+
+        Ok(results
+            .into_iter()
+            .map(|(dist, idx)| SearchResult {
+                id: graph.nodes[idx].id.clone(),
+                score: Graph::distance_to_score(self.metric, dist),
+            })
+            .collect())
+    }
+
+    async fn get(&self, id: &str) -> Result<Option<Embedding>, VectorError> {
+        let graph = self.graph.read().expect("graph RwLock poisoned");
+        Ok(graph.id_map.get(id).and_then(|&idx| {
+            let node = &graph.nodes[idx];
+            if node.deleted {
+                None
+            } else {
+                Some(Embedding {
+                    id: node.id.clone(),
+                    vector: node.vector.clone(),
+                    metadata: node.metadata.clone(),
+                })
+            }
+        }))
+    }
+
+    async fn delete(&self, id: &str) -> Result<(), VectorError> {
+        let mut graph = self.graph.write().expect("graph RwLock poisoned");
+        if let Some(&idx) = graph.id_map.get(id) {
+            graph.nodes[idx].deleted = true;
+        }
+        Ok(())
+    }
+
+    fn dimension(&self) -> usize {
+        self.dimension
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_hnsw_basic() {
-        let mut index = HnswIndex::new(3, DistanceMetric::Cosine, HnswParams::default());
+    #[tokio::test]
+    async fn test_hnsw_basic_insert_and_search() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
 
-        // Insert some vectors
-        index.insert(0, &[1.0, 0.0, 0.0]);
-        index.insert(1, &[0.9, 0.1, 0.0]);
-        index.insert(2, &[0.0, 1.0, 0.0]);
-        index.insert(3, &[0.0, 0.0, 1.0]);
+        let e1 = Embedding::new("e1", vec![1.0, 0.0, 0.0]);
+        let e2 = Embedding::new("e2", vec![0.9, 0.1, 0.0]);
+        let e3 = Embedding::new("e3", vec![0.0, 1.0, 0.0]);
 
-        // Search
-        let results = index.search(&[1.0, 0.0, 0.0], 2, 10);
+        store.upsert(&e1).await.unwrap();
+        store.upsert(&e2).await.unwrap();
+        store.upsert(&e3).await.unwrap();
+
+        let results = store.search(&[1.0, 0.0, 0.0], 2).await.unwrap();
         assert_eq!(results.len(), 2);
-        // First result should be vector 0 (exact match)
-        assert_eq!(results[0].0, 0);
-        assert!(results[0].1 < 0.01);
+        assert_eq!(results[0].id, "e1");
+        assert_eq!(results[1].id, "e2");
     }
 
-    #[test]
-    fn test_hnsw_euclidean() {
-        let mut index = HnswIndex::new(3, DistanceMetric::Euclidean, HnswParams::default());
+    #[tokio::test]
+    async fn test_hnsw_upsert_updates_vector() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
 
-        index.insert(0, &[0.0, 0.0, 0.0]);
-        index.insert(1, &[1.0, 0.0, 0.0]);
-        index.insert(2, &[10.0, 0.0, 0.0]);
+        store
+            .upsert(&Embedding::new("e1", vec![1.0, 0.0, 0.0]))
+            .await
+            .unwrap();
+        store
+            .upsert(&Embedding::new("e1", vec![0.0, 1.0, 0.0]))
+            .await
+            .unwrap();
 
-        let results = index.search(&[0.5, 0.0, 0.0], 2, 10);
-        assert_eq!(results.len(), 2);
-        // Should find 0 and 1 as closest
-        let ids: Vec<_> = results.iter().map(|(id, _)| *id).collect();
-        assert!(ids.contains(&0));
-        assert!(ids.contains(&1));
+        let emb = store.get("e1").await.unwrap().unwrap();
+        assert_eq!(emb.vector, vec![0.0, 1.0, 0.0]);
     }
 
-    #[test]
-    fn test_hnsw_larger_scale() {
-        let params = HnswParams {
-            m: 8,
-            ef_construction: 100,
-            ef_search: 20,
-        };
-        let mut index = HnswIndex::new(64, DistanceMetric::Cosine, params);
+    #[tokio::test]
+    async fn test_hnsw_delete() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
 
-        // Insert 100 vectors
-        for i in 0..100 {
-            let mut vec = vec![0.0f32; 64];
-            vec[i % 64] = 1.0;
-            index.insert(i, &vec);
+        store
+            .upsert(&Embedding::new("e1", vec![1.0, 0.0, 0.0]))
+            .await
+            .unwrap();
+        store.delete("e1").await.unwrap();
+
+        assert!(store.get("e1").await.unwrap().is_none());
+        assert_eq!(store.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_dimension_mismatch() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
+        let result = store
+            .upsert(&Embedding::new("e1", vec![1.0, 0.0]))
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_euclidean() {
+        let store = HnswVectorStore::with_defaults(2, DistanceMetric::Euclidean);
+
+        store
+            .upsert(&Embedding::new("origin", vec![0.0, 0.0]))
+            .await
+            .unwrap();
+        store
+            .upsert(&Embedding::new("near", vec![1.0, 0.0]))
+            .await
+            .unwrap();
+        store
+            .upsert(&Embedding::new("far", vec![10.0, 10.0]))
+            .await
+            .unwrap();
+
+        let results = store.search(&[0.0, 0.0], 2).await.unwrap();
+        assert_eq!(results[0].id, "origin");
+        assert_eq!(results[1].id, "near");
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_dot_product() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::DotProduct);
+
+        store
+            .upsert(&Embedding::new("high", vec![1.0, 1.0, 1.0]))
+            .await
+            .unwrap();
+        store
+            .upsert(&Embedding::new("low", vec![0.1, 0.1, 0.1]))
+            .await
+            .unwrap();
+
+        let results = store.search(&[1.0, 1.0, 1.0], 2).await.unwrap();
+        assert_eq!(results[0].id, "high");
+        assert!(results[0].score > results[1].score);
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_many_vectors() {
+        let dim = 32;
+        let store = HnswVectorStore::with_defaults(dim, DistanceMetric::Cosine);
+
+        for i in 0..200 {
+            let mut vec = vec![0.0f32; dim];
+            vec[i % dim] = 1.0;
+            vec[(i * 7) % dim] += 0.5;
+            store
+                .upsert(&Embedding::new(format!("v{i}"), vec))
+                .await
+                .unwrap();
         }
 
-        // Query
-        let mut query = vec![0.0f32; 64];
-        query[0] = 1.0;
+        let results = store.search(&vec![1.0; dim], 10).await.unwrap();
+        assert_eq!(results.len(), 10);
 
-        let results = index.search(&query, 5, 50);
-        assert_eq!(results.len(), 5);
-
-        // Vector 0 should be the closest (same direction)
-        assert_eq!(results[0].0, 0);
+        // Scores should be monotonically non-increasing
+        for w in results.windows(2) {
+            assert!(w[0].score >= w[1].score);
+        }
     }
 
-    #[test]
-    fn test_hnsw_empty() {
-        let index = HnswIndex::new(3, DistanceMetric::Cosine, HnswParams::default());
-        let results = index.search(&[1.0, 0.0, 0.0], 5, 10);
+    #[tokio::test]
+    async fn test_hnsw_empty_search() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
+        let results = store.search(&[1.0, 0.0, 0.0], 5).await.unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_deleted_not_in_results() {
+        let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
+
+        store
+            .upsert(&Embedding::new("a", vec![1.0, 0.0, 0.0]))
+            .await
+            .unwrap();
+        store
+            .upsert(&Embedding::new("b", vec![0.9, 0.1, 0.0]))
+            .await
+            .unwrap();
+        store
+            .upsert(&Embedding::new("c", vec![0.0, 1.0, 0.0]))
+            .await
+            .unwrap();
+
+        store.delete("a").await.unwrap();
+
+        let results = store.search(&[1.0, 0.0, 0.0], 3).await.unwrap();
+        assert!(!results.iter().any(|r| r.id == "a"));
+        assert_eq!(results[0].id, "b");
     }
 }
