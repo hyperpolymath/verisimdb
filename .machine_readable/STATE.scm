@@ -42,7 +42,7 @@
 
 (define current-position
   '((phase . "alpha-hardened")
-    (overall-completion . 88)
+    (overall-completion . 92)
     (components
       ((architecture-design . 100)
        (vql-implementation . 95)
@@ -81,8 +81,15 @@
        ✅ Structured JSON logging
        ✅ /health, /ready, /metrics operational endpoints
        ✅ cargo-deny for dependency auditing
-       ✅ Integration tests (317 Rust tests pass, Elixir compiles clean)
-       ✅ License headers fixed (PMPL-1.0-or-later)")
+       ✅ Integration tests (510 Rust tests pass, Elixir compiles clean)
+       ✅ License headers fixed (PMPL-1.0-or-later)
+       ✅ ZKP bridge wired into semantic store + API endpoints
+       ✅ Proven bridge (Idris2 proof certificates) + Sanctify bridge (security reports)
+       ✅ ACID transaction manager (WAL-backed begin/commit/rollback)
+       ✅ EXPLAIN ANALYZE + prepared statements API
+       ✅ VQL Playground PWA builds cleanly (ReScript 11 fixes)
+       ✅ 3 C deps eliminated (openssl-sys, aws-lc-sys, zstd-sys) — pure Rust TLS + compression
+       ✅ Container builds with Podman (wolfi-base, non-root, OTP 27)")
     (completed-recently
       "- 7-phase security + operations + feature plan completed (2026-02-13):
          Phase 1: RwLock poisoning fixes (35+ locations), error leakage fixes, input validation, federation PSK auth
@@ -94,7 +101,7 @@
          Phase 7: Homoiconicity (queries as hexads, REFLECT keyword, /queries API, self-optimization)")
     (blocked-on
       "- VQL-DT not connected to VQL PROOF runtime (Lean checker not invoked)
-       - ZKP/proven library not integrated (custom circuits work, but no real ZKP proofs)
+       - oxrocksdb-sys (RocksDB C++) still in tree — needs fjall/redb replacement
        - Hypatia pipeline at 40% (connector works, fleet dispatch logged but not live)")))
 
 ;; ============================================================================
@@ -181,7 +188,9 @@
           ✅ Custom ZKP circuit registry + R1CS compiler
           ✅ Verification key management with rotation + federation export
           ✅ VQL PROOF CUSTOM with circuit parameters
-          🔲 proven library integration (real ZKP proofs)
+          ✅ proven bridge (certificate-based Idris2 ZKP integration)
+          ✅ sanctify bridge (Haskell security report integration)
+          ✅ ACID transaction manager (WAL-backed)
           🔲 VQL-DT Lean type checker wired to runtime"))
 
       ((milestone "M7: Testing & Documentation")
@@ -191,7 +200,7 @@
          "✅ Architecture documentation
           ✅ VQL specification
           ✅ API design
-          ✅ Integration tests (Rust) - 317 tests
+          ✅ Integration tests (Rust) - 510 tests
           ✅ Integration tests (Elixir) - full stack
           ✅ Test infrastructure (setup, helpers, mocks)
           ✅ Criterion benchmarks for all modalities
@@ -222,13 +231,13 @@
 
     (medium
       ("VQL-DT Lean type checker not wired to VQL PROOF runtime"
-       "proven library not integrated (custom circuits work but no real ZKP proofs)"
+       "oxrocksdb-sys C++ dependency needs pure-Rust replacement (fjall or redb)"
        "Hypatia pipeline at 40% (connector works, fleet dispatch not live)"))
 
     (low
       ("Query lineage tracking not implemented"
        "Full Raft consensus (currently quorum-based)"
-       "verisim-repl has rustyline API incompatibility"))))
+       "protoc binary still required at build time (pre-generate proto code to eliminate)"))))
 
 ;; ============================================================================
 ;; CRITICAL NEXT ACTIONS
@@ -294,6 +303,32 @@
 
 (define session-history
   '((session
+      (date . "2026-02-13c")
+      (phase . "zkp-integration-c-dep-elimination-container-fixes")
+      (accomplishments
+        "- Completed 7-phase ZKP/Sanctify integration plan (all phases)
+         - Phase 0: Committed untracked .verisimdb/, scripts/, zkp_bridge.rs
+         - Phase 1: Wired zkp_bridge.rs into semantic store + 3 API endpoints
+         - Phase 2: Created proven_bridge.rs (277 LOC) + sanctify_bridge.rs (413 LOC), VQL PROOF routing
+         - Phase 3: ACID transaction manager (466 LOC) with begin/commit/rollback/status API
+         - Phase 4: EXPLAIN ANALYZE + prepared statements API endpoints wired
+         - Phase 5: VQL Playground PWA ReScript 11 fixes (Highlighter, Linter, App)
+         - Phase 6: Tagged v0.1.0-alpha.2, pushed to GitHub + GitLab
+         - Eliminated 3 C/C++ dependencies: openssl-sys, aws-lc-sys, zstd-sys
+         - Switched to pure Rust: rustls+ring for TLS, lz4_flex for compression
+         - Fixed Containerfile: added protoc+clang-19, pinned OTP 27, added erlang-27-dev
+         - Customized SECURITY.md and CONTRIBUTING.md (replaced all template placeholders)
+         - 510 Rust tests pass (up from 476), 0 failures")
+      (key-decisions
+        "- TLS: rustls + ring crypto provider (no OpenSSL, no aws-lc-sys)
+         - Compression: lz4_flex for Tantivy (no zstd C library)
+         - Crypto provider: ring installed explicitly in main() and client::new()
+         - Container: OTP 27 pinned (mint 1.7.1 incompatible with OTP 28)
+         - ZKP scheme: PLONK via arkworks (per Trustfile), pure Rust
+         - Proven integration: certificate-based JSON/CBOR (not direct Idris2 FFI)
+         - Sanctify integration: contract-binding via security reports"))
+
+    (session
       (date . "2026-02-13b")
       (phase . "security-operations-features-7-phase-plan")
       (accomplishments

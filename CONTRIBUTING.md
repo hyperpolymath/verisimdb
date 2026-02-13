@@ -1,48 +1,62 @@
+# Contributing to VeriSimDB
+
+<!-- SPDX-License-Identifier: PMPL-1.0-or-later -->
+<!-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk> -->
+
+Thank you for your interest in contributing to VeriSimDB. This document explains how to get started, our development workflow, and how to submit changes.
+
+## Quick Start
+
+### Prerequisites
+
+- **Rust** (nightly) — `asdf install rust nightly` or `rustup install nightly`
+- **Elixir** 1.17+ with Erlang/OTP 27+ — `asdf install elixir` / `asdf install erlang`
+- **Podman** — for container builds (never Docker)
+
+### Setup
+
+```bash
 # Clone the repository
-git clone https://{{FORGE}}/{{OWNER}}/{{REPO}}.git
-cd {{REPO}}
+git clone https://github.com/hyperpolymath/verisimdb.git
+cd verisimdb
 
-# Using Nix (recommended for reproducibility)
-nix develop
+# Build Rust core
+cargo build
+cargo test
 
-# Or using toolbox/distrobox
-toolbox create {{REPO}}-dev
-toolbox enter {{REPO}}-dev
-# Install dependencies manually
-
-# Verify setup
-just check   # or: cargo check / mix compile / etc.
-just test    # Run test suite
+# Build Elixir orchestration
+cd elixir-orchestration
+mix deps.get
+mix compile
+mix test
 ```
 
 ### Repository Structure
+
 ```
-{{REPO}}/
-├── src/                 # Source code (Perimeter 1-2)
-├── lib/                 # Library code (Perimeter 1-2)
-├── extensions/          # Extensions (Perimeter 2)
-├── plugins/             # Plugins (Perimeter 2)
-├── tools/               # Tooling (Perimeter 2)
-├── docs/                # Documentation (Perimeter 3)
-│   ├── architecture/    # ADRs, specs (Perimeter 2)
-│   └── proposals/       # RFCs (Perimeter 3)
-├── examples/            # Examples (Perimeter 3)
-├── spec/                # Spec tests (Perimeter 3)
-├── tests/               # Test suite (Perimeter 2-3)
-├── .well-known/         # Protocol files (Perimeter 1-3)
-├── .github/             # GitHub config (Perimeter 1)
-│   ├── ISSUE_TEMPLATE/
-│   └── workflows/
-├── CHANGELOG.md
-├── CODE_OF_CONDUCT.md
-├── CONTRIBUTING.md      # This file
-├── GOVERNANCE.md
-├── LICENSE
-├── MAINTAINERS.md
-├── README.adoc
-├── SECURITY.md
-├── flake.nix            # Nix flake (Perimeter 1)
-└── justfile             # Task runner (Perimeter 1)
+verisimdb/
+├── rust-core/                # Rust crates (14 workspace members)
+│   ├── verisim-api/          # HTTP/gRPC API server
+│   ├── verisim-graph/        # Graph modality (RDF/Property Graph)
+│   ├── verisim-vector/       # Vector modality (HNSW)
+│   ├── verisim-tensor/       # Tensor modality (Burn)
+│   ├── verisim-semantic/     # Semantic modality (CBOR proofs)
+│   ├── verisim-document/     # Document modality (Tantivy)
+│   ├── verisim-temporal/     # Temporal modality (versioning)
+│   ├── verisim-hexad/        # Unified 6-modal entity
+│   ├── verisim-drift/        # Drift detection
+│   ├── verisim-normalizer/   # Self-normalization
+│   ├── verisim-planner/      # Cost-based query planner
+│   ├── verisim-repl/         # Interactive VQL REPL
+│   ├── verisim-wal/          # Write-ahead log
+│   └── verisim-storage/      # Storage backend abstraction
+├── elixir-orchestration/     # Elixir/OTP coordination layer
+├── playground/               # VQL Playground PWA (ReScript)
+├── container/                # Containerfile for Podman builds
+├── docs/                     # Architecture and design documents
+├── contractiles/             # Trust, security, and policy contracts
+├── .machine_readable/        # SCM checkpoint files
+└── .github/workflows/        # CI/CD pipelines
 ```
 
 ---
@@ -52,44 +66,34 @@ just test    # Run test suite
 ### Reporting Bugs
 
 **Before reporting**:
-1. Search existing issues
-2. Check if it's already fixed in `{{MAIN_BRANCH}}`
-3. Determine which perimeter the bug affects
+1. Search existing issues on [GitHub](https://github.com/hyperpolymath/verisimdb/issues) or [GitLab](https://gitlab.com/hyperpolymath/verisimdb/-/issues)
+2. Check if it's already fixed in `main`
 
-**When reporting**:
-
-Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md) and include:
-
+**When reporting**, include:
 - Clear, descriptive title
-- Environment details (OS, versions, toolchain)
+- Environment details (OS, Rust version, Elixir version)
 - Steps to reproduce
 - Expected vs actual behaviour
-- Logs, screenshots, or minimal reproduction
+- Logs, error messages, or minimal reproduction
 
 ### Suggesting Features
 
 **Before suggesting**:
-1. Check the [roadmap](ROADMAP.md) if available
+1. Check the [roadmap](ROADMAP.adoc)
 2. Search existing issues and discussions
-3. Consider which perimeter the feature belongs to
 
-**When suggesting**:
-
-Use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.md) and include:
-
+**When suggesting**, include:
 - Problem statement (what pain point does this solve?)
 - Proposed solution
 - Alternatives considered
-- Which perimeter this affects
+- Which modality or component it affects
 
 ### Your First Contribution
 
 Look for issues labelled:
-
-- [`good first issue`](https://{{FORGE}}/{{OWNER}}/{{REPO}}/labels/good%20first%20issue) — Simple Perimeter 3 tasks
-- [`help wanted`](https://{{FORGE}}/{{OWNER}}/{{REPO}}/labels/help%20wanted) — Community help needed
-- [`documentation`](https://{{FORGE}}/{{OWNER}}/{{REPO}}/labels/documentation) — Docs improvements
-- [`perimeter-3`](https://{{FORGE}}/{{OWNER}}/{{REPO}}/labels/perimeter-3) — Community sandbox scope
+- [`good first issue`](https://github.com/hyperpolymath/verisimdb/labels/good%20first%20issue) — Simple tasks
+- [`help wanted`](https://github.com/hyperpolymath/verisimdb/labels/help%20wanted) — Community help needed
+- [`documentation`](https://github.com/hyperpolymath/verisimdb/labels/documentation) — Docs improvements
 
 ---
 
@@ -97,12 +101,12 @@ Look for issues labelled:
 
 ### Branch Naming
 ```
-docs/short-description       # Documentation (P3)
-test/what-added              # Test additions (P3)
-feat/short-description       # New features (P2)
-fix/issue-number-description # Bug fixes (P2)
-refactor/what-changed        # Code improvements (P2)
-security/what-fixed          # Security fixes (P1-2)
+docs/short-description       # Documentation
+test/what-added              # Test additions
+feat/short-description       # New features
+fix/issue-number-description # Bug fixes
+refactor/what-changed        # Code improvements
+security/what-fixed          # Security fixes
 ```
 
 ### Commit Messages
@@ -114,3 +118,70 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 [optional body]
 
 [optional footer]
+```
+
+Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `security`
+
+### Testing
+
+```bash
+# Rust — all tests
+cargo test
+
+# Rust — specific crate
+cargo test -p verisim-semantic
+
+# Elixir
+cd elixir-orchestration && mix test
+
+# Container build verification
+podman build -t verisimdb:latest -f container/Containerfile .
+```
+
+### Code Quality
+
+```bash
+# Rust linting
+cargo clippy -- -D warnings
+
+# Check formatting
+cargo fmt --check
+```
+
+---
+
+## Language Policy
+
+### Allowed Languages
+
+| Language | Use Case |
+|----------|----------|
+| **Rust** | Core database engine, modality stores, CLI tools |
+| **Elixir** | OTP orchestration, distributed coordination |
+| **ReScript** | VQL parser, playground PWA |
+| **VQL** | VeriSim Query Language (query interface) |
+
+### Not Accepted
+
+- TypeScript (use ReScript instead)
+- Python (use Rust or Julia instead)
+- Go (use Rust instead)
+- Node.js/npm/bun (use Deno if JS runtime needed)
+
+---
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the **PMPL-1.0-or-later** (Palimpsest License). All source files must include:
+
+```
+// SPDX-License-Identifier: PMPL-1.0-or-later
+```
+
+---
+
+## Contact
+
+- **Issues**: [GitHub](https://github.com/hyperpolymath/verisimdb/issues) or [GitLab](https://gitlab.com/hyperpolymath/verisimdb/-/issues)
+- **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
+- **Maintainer**: Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>

@@ -213,22 +213,34 @@ Added `rescript.json` for build configuration.
 
 **Resolution:** Wire the Lean type checker into the VQL-DT execution path. See link:docs/vql-vs-vql-dt.adoc[VQL Slipstream vs VQL-DT].
 
-=== 22. proven Library Not Integrated (OPEN)
+=== 22. proven Library Not Integrated — ✅ RESOLVED
 
-**Location:** Design docs only
+**Location:** `rust-core/verisim-semantic/src/proven_bridge.rs`
 
-**Current state:** Custom ZKP circuits work via R1CS constraint systems with in-process verification. However, the `proven` library for generating actual zero-knowledge proofs (where a verifier can confirm a property without seeing the data) is not integrated.
+**Resolved:** 2026-02-13. Created `proven_bridge.rs` (277 LOC) that parses JSON/CBOR proof certificates from the proven library, verifies signatures, and converts certificates to ProofBlob format for storage in the semantic modality. VQL executor routes `PROOF PROVEN(...)` queries through the bridge. Integration is certificate-based (JSON exchange) rather than direct Idris2 FFI.
 
-**Impact:** Privacy-preserving proofs are not available. Current circuit verification requires the witness (private input) to be present, which defeats the zero-knowledge property.
-
-**Resolution:** Integrate proven library after VQL-DT (issue 21) is resolved.
-
-=== 23. verisim-repl Has Build Issues (OPEN — LOW)
+=== 23. verisim-repl Has Build Issues — ✅ RESOLVED
 
 **Location:** `rust-core/verisim-repl/`
 
-**Current state:** The REPL crate was added by a linter with rustyline API incompatibilities (`Completer`, `Highlighter`, `Hinter`, `Validator` traits are private in the installed version). The workspace builds successfully with `--exclude verisim-repl`.
+**Resolved:** 2026-02-13. REPL builds and all 67 tests pass. Fixed by a previous session that resolved rustyline API incompatibilities. Also added `rustls` dependency with ring crypto provider installation for TLS-free HTTP client.
 
-**Impact:** Low. The REPL is a developer convenience tool, not a core component.
+=== 24. oxrocksdb-sys C++ Dependency (OPEN — MEDIUM)
 
-**Resolution:** Update rustyline API calls to match installed version, or pin a compatible version.
+**Location:** `rust-core/verisim-graph/` via `oxigraph`
+
+**Current state:** Oxigraph 0.4 unconditionally pulls in `oxrocksdb-sys`, which compiles ~400K lines of C++ from source. This requires `clang-19` and `build-base` in the container image, adding ~1GB to the build stage and ~15 minutes to container build time.
+
+**Impact:** Medium. Container builds are slow. The `clang-19` and RocksDB C++ compilation is the single largest contributor to build time and image size.
+
+**Resolution:** Replace Oxigraph's RocksDB backend with a pure-Rust alternative. Options: `fjall` (LSM-tree, same architecture as RocksDB), `redb` (B-tree, simpler), or move graph storage to Elixir/ETS. The existing `GraphStore` trait abstraction makes this a backend swap.
+
+=== 25. protoc Binary Required at Build Time (OPEN — LOW)
+
+**Location:** `rust-core/verisim-api/build.rs`
+
+**Current state:** `prost-build` shells out to the `protoc` binary to compile `verisim.proto` (179 lines). This requires the `protoc` package in the container.
+
+**Impact:** Low. The proto file is stable and rarely changes.
+
+**Resolution:** Pre-generate the protobuf Rust code, commit it, and remove the build.rs dependency on protoc. Only regenerate when the proto changes.
