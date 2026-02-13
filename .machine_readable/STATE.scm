@@ -93,7 +93,7 @@
          Phase 6: ZKP custom circuits (circuit registry, R1CS compiler, verification key management, VQL circuit DSL)
          Phase 7: Homoiconicity (queries as hexads, REFLECT keyword, /queries API, self-optimization)")
     (blocked-on
-      "- GQL-DT not connected to VQL PROOF runtime (Lean checker not invoked)
+      "- VQL-DT not connected to VQL PROOF runtime (Lean checker not invoked)
        - ZKP/proven library not integrated (custom circuits work, but no real ZKP proofs)
        - Hypatia pipeline at 40% (connector works, fleet dispatch logged but not live)")))
 
@@ -182,7 +182,7 @@
           ✅ Verification key management with rotation + federation export
           ✅ VQL PROOF CUSTOM with circuit parameters
           🔲 proven library integration (real ZKP proofs)
-          🔲 GQL-DT Lean type checker wired to runtime"))
+          🔲 VQL-DT Lean type checker wired to runtime"))
 
       ((milestone "M7: Testing & Documentation")
        (status . "COMPLETED")
@@ -221,7 +221,7 @@
       ())
 
     (medium
-      ("GQL-DT Lean type checker not wired to VQL PROOF runtime"
+      ("VQL-DT Lean type checker not wired to VQL PROOF runtime"
        "proven library not integrated (custom circuits work but no real ZKP proofs)"
        "Hypatia pipeline at 40% (connector works, fleet dispatch not live)"))
 
@@ -236,7 +236,7 @@
 
 (define critical-next-actions
   '((immediate
-      "1. Wire GQL-DT Lean type checker into VQL PROOF runtime
+      "1. Wire VQL-DT Lean type checker into VQL PROOF runtime
        2. Integrate proven library for real ZKP proofs
        3. Complete Hypatia fleet dispatch (live GraphQL integration)")
 

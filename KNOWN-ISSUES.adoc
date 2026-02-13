@@ -48,11 +48,11 @@ VeriSimDB is a working system with real implementations in its core modality sto
 
 **Original issue:** Drift detection had to be triggered manually. No scheduled or event-driven trigger existed.
 
-=== 5. GQL-DT Not Connected to VQL PROOF Runtime
+=== 5. VQL-DT Not Connected to VQL PROOF Runtime
 
-**Location:** `gql-dt/` (Lean type definitions), VQL query router
+**Location:** `vql-dt/` (Lean type definitions), VQL query router
 
-**Current state:** Lean type definitions exist in the `gql-dt/` directory specifying dependent type contracts for all six PROOF types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION). The VQL parser correctly parses `PROOF` clauses and the query router routes to the dependent-type execution path. However, the Lean type checker is not invoked at runtime. VQL-DT queries execute but do not generate real proof certificates.
+**Current state:** Lean type definitions exist in the `vql-dt/` directory specifying dependent type contracts for all six PROOF types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION). The VQL parser correctly parses `PROOF` clauses and the query router routes to the dependent-type execution path. However, the Lean type checker is not invoked at runtime. VQL-DT queries execute but do not generate real proof certificates.
 
 **Impact:** The `PROOF` clause is syntactically supported but semantically inert. Queries with `PROOF` clauses return data but the accompanying proof certificates are placeholders, not verifiable. This is the gap between the designed architecture and the current implementation.
 
@@ -203,13 +203,13 @@ Added `rescript.json` for build configuration.
 
 **Original issue:** The `CUSTOM` proof type used a hardcoded circuit configuration with no DSL, compiler, or registry.
 
-=== 21. GQL-DT Not Connected to VQL PROOF Runtime (OPEN)
+=== 21. VQL-DT Not Connected to VQL PROOF Runtime (OPEN)
 
-**Location:** `gql-dt/` (Lean type definitions), VQL query router
+**Location:** `vql-dt/` (Lean type definitions), VQL query router
 
 **Current state:** Lean type definitions exist specifying dependent type contracts for all six PROOF types. The VQL parser parses `PROOF` clauses and the executor routes proofs through `verify_single_proof/1` which validates contract existence. However, the Lean type checker itself is not invoked at runtime. VQL-DT queries execute but proof certificates are not formally verified by the Lean checker.
 
-**Impact:** PROOF clauses are semantically checked (contract existence, parameter validation) but not formally verified via the Lean dependent type checker. Custom ZKP circuits work (R1CS verification), but the GQL-DT formal path is not wired.
+**Impact:** PROOF clauses are semantically checked (contract existence, parameter validation) but not formally verified via the Lean dependent type checker. Custom ZKP circuits work (R1CS verification), but the VQL-DT formal path is not wired.
 
 **Resolution:** Wire the Lean type checker into the VQL-DT execution path. See link:docs/vql-vs-vql-dt.adoc[VQL Slipstream vs VQL-DT].
 
@@ -221,7 +221,7 @@ Added `rescript.json` for build configuration.
 
 **Impact:** Privacy-preserving proofs are not available. Current circuit verification requires the witness (private input) to be present, which defeats the zero-knowledge property.
 
-**Resolution:** Integrate proven library after GQL-DT (issue 21) is resolved.
+**Resolution:** Integrate proven library after VQL-DT (issue 21) is resolved.
 
 === 23. verisim-repl Has Build Issues (OPEN — LOW)
 

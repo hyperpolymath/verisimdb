@@ -275,12 +275,10 @@ User prompt → Haiku classifier → Route to:
 
 ## Known Issues
 
-See `KNOWN-ISSUES.adoc` at repo root for all honest gaps. Key items:
-1. Normalizer regeneration strategies are stubs
-2. Federation executor returns empty results
-3. GQL-DT not connected to VQL PROOF clause
-4. ZKP/proven library not integrated
-5. ReScript registry ~60% complete
+See `KNOWN-ISSUES.adoc` at repo root for all honest gaps. Key open items:
+1. VQL-DT not connected to VQL PROOF runtime (Lean type checker not invoked)
+2. proven library not integrated (ZKP privacy-preserving proofs)
+3. verisim-repl has build issues (rustyline API incompatibilities, low priority)
 
 ## Hypatia Integration Status
 
