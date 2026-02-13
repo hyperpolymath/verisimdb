@@ -140,6 +140,9 @@ defmodule VeriSim.Query.VQLExecutor do
 
           {:store, store_id} ->
             execute_store_query(store_id, modalities, pushdown_conditions, limit, offset, timeout)
+
+          :reflect ->
+            execute_reflect_query(modalities, pushdown_conditions, limit, offset, timeout)
         end
 
         # Post-process
@@ -699,6 +702,60 @@ defmodule VeriSim.Query.VQLExecutor do
     end
   end
 
+  defp execute_reflect_query(modalities, where_clause, limit, _offset, _timeout) do
+    # REFLECT queries the query store itself — meta-circular homoiconicity.
+    # Stored queries are hexads, so we search them via the /queries/similar
+    # and /search/text endpoints filtered to type=vql_query.
+    Logger.info("REFLECT query: querying the query store")
+
+    text_query = extract_text_query(where_clause)
+    search_limit = limit || 20
+
+    # Search stored queries by text similarity
+    result = if text_query != "" do
+      case RustClient.post("/search/text", %{q: "type:vql_query #{text_query}", limit: search_limit}) do
+        {:ok, %{status: 200, body: %{"results" => results}}} -> {:ok, results}
+        {:ok, %{status: 200, body: body}} when is_list(body) -> {:ok, body}
+        {:ok, %{status: 200, body: body}} when is_map(body) -> {:ok, Map.get(body, "results", [])}
+        {:error, reason} -> {:error, {:reflect_query_failed, reason}}
+        _ -> {:ok, []}
+      end
+    else
+      # No text filter — list all stored queries
+      case RustClient.post("/search/text", %{q: "type:vql_query", limit: search_limit}) do
+        {:ok, %{status: 200, body: %{"results" => results}}} -> {:ok, results}
+        {:ok, %{status: 200, body: body}} when is_list(body) -> {:ok, body}
+        {:ok, %{status: 200, body: body}} when is_map(body) -> {:ok, Map.get(body, "results", [])}
+        {:error, reason} -> {:error, {:reflect_query_failed, reason}}
+        _ -> {:ok, []}
+      end
+    end
+
+    # Enrich results with query-specific metadata
+    case result do
+      {:ok, rows} ->
+        enriched = Enum.map(rows, fn row ->
+          row
+          |> Map.put("_source", "reflect")
+          |> Map.put("_type", "stored_query")
+          |> maybe_filter_modalities(modalities)
+        end)
+        {:ok, enriched}
+
+      error -> error
+    end
+  end
+
+  defp maybe_filter_modalities(row, [:all]), do: row
+  defp maybe_filter_modalities(row, modalities) do
+    mod_strings = Enum.map(modalities, &to_string/1)
+    base_keys = ["id", "_source", "_type", "status"]
+    keep_keys = base_keys ++ mod_strings
+    Map.take(row, keep_keys ++ Map.keys(row) |> Enum.filter(fn k ->
+      Enum.any?(mod_strings, &String.starts_with?(k, &1))
+    end))
+  end
+
   defp filter_hexad(hexad, modalities, _where_clause) do
     if :all in modalities do
       hexad
@@ -891,6 +948,7 @@ defmodule VeriSim.Query.VQLExecutor do
           {:hexad, id} -> {"Hexad lookup", 2, "Direct ID: #{id}"}
           {:federation, pattern, _} -> {"Federation fan-out", 100, "Pattern: #{inspect(pattern)}"}
           {:store, id} -> {"Store query", 15, "Store: #{id}"}
+          :reflect -> {"REFLECT (meta-query)", 20, "Query the query store itself"}
         end
         steps = [%{operation: source_type, cost_ms: source_cost, notes: source_notes} | steps]
 
@@ -1047,7 +1105,14 @@ defmodule VeriSim.Query.VQLExecutor do
   # ---------------------------------------------------------------------------
 
   defp extract_modalities(query_ast), do: Map.get(query_ast, :modalities, [:all])
-  defp extract_source(query_ast), do: Map.get(query_ast, :source, {:hexad, "default"})
+  defp extract_source(query_ast) do
+    case Map.get(query_ast, :source, {:hexad, "default"}) do
+      %{TAG: "Reflect"} -> :reflect
+      :reflect -> :reflect
+      "REFLECT" -> :reflect
+      other -> other
+    end
+  end
   defp extract_where(query_ast), do: Map.get(query_ast, :where, nil)
 
   defp extract_proof(query_ast) do

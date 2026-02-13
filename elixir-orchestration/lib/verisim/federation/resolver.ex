@@ -159,7 +159,21 @@ defmodule VeriSim.Federation.Resolver do
     if drift_policy == :repair do
       Enum.each(excluded, fn peer ->
         Logger.info("Federation: triggering repair on drifted store #{peer.store_id}")
-        # Would trigger normalization on the peer
+
+        Task.start(fn ->
+          url = "#{peer.endpoint}/normalizer/trigger/all"
+
+          case Req.post(url, json: %{}, receive_timeout: @default_timeout) do
+            {:ok, %Req.Response{status: status}} when status in 200..299 ->
+              Logger.info("Federation: repair triggered on #{peer.store_id}")
+
+            {:ok, %Req.Response{status: status}} ->
+              Logger.warning("Federation: repair request to #{peer.store_id} returned #{status}")
+
+            {:error, reason} ->
+              Logger.warning("Federation: repair request to #{peer.store_id} failed: #{inspect(reason)}")
+          end
+        end)
       end)
     end
 
@@ -237,8 +251,16 @@ defmodule VeriSim.Federation.Resolver do
     {peers, []}
   end
 
-  defp query_peer(peer, _modalities, limit) do
-    url = "#{peer.endpoint}/search/text"
+  defp query_peer(peer, modalities, limit) do
+    # Route to appropriate endpoint based on requested modalities
+    url =
+      cond do
+        :vector in modalities -> "#{peer.endpoint}/search/vector"
+        :graph in modalities -> "#{peer.endpoint}/search/related"
+        :text in modalities -> "#{peer.endpoint}/search/text"
+        true -> "#{peer.endpoint}/hexads"
+      end
+
     start = System.monotonic_time(:millisecond)
 
     case Req.get(url, params: [limit: limit], receive_timeout: @default_timeout) do

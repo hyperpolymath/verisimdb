@@ -11,9 +11,13 @@
 //! - [`regeneration`]: Authority-ranked regeneration subsystem with configurable
 //!   strategies (`FromAuthoritative`, `Merge`, `UserResolve`), an audit event
 //!   trail, and a manual-resolution queue.
+//! - [`conflict`]: Policy-based conflict resolution between modalities, with
+//!   configurable policies (last-writer-wins, modality-priority, manual-resolve,
+//!   auto-merge, custom), threshold-gated escalation, and full history tracking.
 
 #![allow(unused)] // Infrastructure code with planned future usage
 
+pub mod conflict;
 pub mod regeneration;
 
 use async_trait::async_trait;

@@ -4,8 +4,8 @@
 ;; Last updated: 2026-01-22
 
 (define-module (verisimdb meta)
-  #:version "1.0.0"
-  #:updated "2026-01-22T12:30:00Z")
+  #:version "1.1.0"
+  #:updated "2026-02-13T22:00:00Z")
 
 ;; ============================================================================
 ;; ARCHITECTURE DECISIONS (ADR Format)
@@ -98,7 +98,51 @@
       (consequences
         (positive . "Latest language features, better diagnostics, improved ergonomics")
         (negative . "Requires Rust 1.85+ (late 2024), smaller ecosystem compatibility")
-        (neutral . "Edition 2021 code can be dependencies without issues")))))
+        (neutral . "Edition 2021 code can be dependencies without issues")))
+
+    (adr-009
+      (title . "IPv6-Only Default with IPv4 Override")
+      (status . "accepted")
+      (date . "2026-02-13")
+      (context . "Network binding default: IPv4 (0.0.0.0), IPv6 (::), or dual-stack. IPv6 adoption is standard in modern infrastructure.")
+      (decision . "Default to [::] (IPv6 any). VERISIM_ENABLE_IPV4=true enables dual-stack. Without override: IPv6-only.")
+      (consequences
+        (positive . "Forward-looking, works on all modern infrastructure, avoids IPv4 exhaustion")
+        (negative . "Legacy IPv4-only networks need explicit override")
+        (neutral . "Container orchestrators (Podman, Kubernetes) support IPv6 natively")))
+
+    (adr-010
+      (title . "Federation Closed by Default (PSK Authentication)")
+      (status . "accepted")
+      (date . "2026-02-13")
+      (context . "Federation peer registration was open to anyone. This is a security risk in production.")
+      (decision . "Federation registration requires X-Federation-PSK header. VERISIM_FEDERATION_KEYS env var provides allowed store_id:key pairs. When unset, federation registration is disabled entirely.")
+      (consequences
+        (positive . "Secure by default, no accidental open federation")
+        (negative . "Requires PSK distribution for federation setup")
+        (neutral . "PSK is simple; future: upgrade to mTLS or signed tokens")))
+
+    (adr-011
+      (title . "Homoiconicity: Queries as Hexads")
+      (status . "accepted")
+      (date . "2026-02-13")
+      (context . "VQL queries are structured data. Storing them as hexads enables meta-circular operations: query the query store, optimize stored queries, track query lineage.")
+      (decision . "VQL queries are stored as hexads with all 6 modalities populated. REFLECT keyword queries the query store itself. /queries/{id}/optimize enables self-modification.")
+      (consequences
+        (positive . "Meta-circular: system can reason about its own queries. Similarity search over past queries. Self-optimization.")
+        (negative . "Storage overhead for query hexads. Risk of infinite recursion with REFLECT queries.")
+        (neutral . "REFLECT queries are themselves stored as hexads, enabling arbitrary meta-levels")))
+
+    (adr-012
+      (title . "R1CS Constraint System for Custom ZKP Circuits")
+      (status . "accepted")
+      (date . "2026-02-13")
+      (context . "Custom circuits need a representation for verification. Options: R1CS (Rank-1 Constraint System), Plonk, AIR (Algebraic Intermediate Representation).")
+      (decision . "Use R1CS (A * B = C constraint format) for custom circuits. Gates compile to R1CS constraints. SHA-256 for Merkle commitments within circuits.")
+      (consequences
+        (positive . "Well-understood, compatible with existing ZKP libraries (Groth16, Spartan)")
+        (negative . "Less expressive than Plonk for some circuit patterns")
+        (neutral . "Can add Plonk support later as alternative backend")))))
 
 ;; ============================================================================
 ;; DEVELOPMENT PRACTICES

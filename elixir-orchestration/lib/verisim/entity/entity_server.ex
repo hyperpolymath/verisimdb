@@ -134,16 +134,40 @@ defmodule VeriSim.EntityServer do
   def handle_cast(:normalize, state) do
     Logger.info("Starting normalization for #{state.id}")
 
+    # Snapshot current state via temporal store before normalization
+    RustClient.post("/hexads/#{state.id}/versions", %{
+      version: state.version,
+      modalities: state.modalities,
+      drift_score: state.drift_score,
+      timestamp: DateTime.to_iso8601(DateTime.utc_now())
+    })
+
     new_state = %{state | status: :normalizing}
 
+    # Determine which modalities have drifted and need normalization
+    drifted_modalities =
+      case RustClient.get_drift_score(state.id) do
+        {:ok, score} when is_map(score) ->
+          score
+          |> Enum.filter(fn {_k, v} -> is_number(v) and v > 0.3 end)
+          |> Enum.map(fn {k, _v} -> k end)
+
+        _ ->
+          # If we can't determine drift per-modality, normalize all
+          [:graph, :vector, :tensor, :semantic, :document, :temporal]
+      end
+
     # Trigger async normalization via Rust core
+    server_pid = self()
+
     Task.start(fn ->
       case RustClient.normalize(state.id) do
         {:ok, _result} ->
-          send(self(), {:normalization_complete, :success})
+          send(server_pid, {:normalization_complete, :success, drifted_modalities})
+
         {:error, reason} ->
           Logger.error("Normalization failed for #{state.id}: #{inspect(reason)}")
-          send(self(), {:normalization_complete, :failure})
+          send(server_pid, {:normalization_complete, :failure, drifted_modalities})
       end
     end)
 
@@ -169,11 +193,29 @@ defmodule VeriSim.EntityServer do
   end
 
   @impl true
+  def handle_info({:normalization_complete, result, modalities}, state) do
+    new_status = if result == :success, do: :active, else: :stale
+
+    Logger.info(
+      "Normalization #{result} for #{state.id}, modalities: #{inspect(modalities)}"
+    )
+
+    new_state =
+      %{state | status: new_status}
+      |> bump_version()
+      |> update_timestamp()
+
+    {:noreply, new_state}
+  end
+
+  # Backwards-compatible catch for old-format messages
+  @impl true
   def handle_info({:normalization_complete, result}, state) do
     new_status = if result == :success, do: :active, else: :stale
 
-    new_state = %{state | status: new_status}
-    |> update_timestamp()
+    new_state =
+      %{state | status: new_status}
+      |> update_timestamp()
 
     {:noreply, new_state}
   end

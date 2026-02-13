@@ -16,6 +16,8 @@ mod client;
 mod completer;
 mod formatter;
 mod highlighter;
+pub mod linter;
+pub mod vql_fmt;
 
 use clap::Parser;
 use colored::Colorize;

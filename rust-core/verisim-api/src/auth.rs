@@ -208,6 +208,8 @@ pub struct AuthState {
     pub config: AuthConfig,
     pub key_registry: ApiKeyRegistry,
     pub rate_limiter: RateLimiter,
+    /// RBAC state for fine-grained authorization checks.
+    pub rbac: crate::rbac::RbacState,
 }
 
 impl AuthState {
@@ -218,6 +220,18 @@ impl AuthState {
             config,
             key_registry: ApiKeyRegistry::new(),
             rate_limiter,
+            rbac: crate::rbac::RbacState::default(),
+        }
+    }
+
+    /// Create auth state from config with a custom RBAC policy.
+    pub fn with_rbac(config: AuthConfig, rbac: crate::rbac::RbacState) -> Self {
+        let rate_limiter = RateLimiter::new(config.rate_limit_per_minute);
+        Self {
+            config,
+            key_registry: ApiKeyRegistry::new(),
+            rate_limiter,
+            rbac,
         }
     }
 }
@@ -230,9 +244,9 @@ impl Default for AuthState {
 
 /// Authentication error response.
 #[derive(Debug, Serialize)]
-struct AuthError {
-    error: String,
-    code: u16,
+pub struct AuthError {
+    pub error: String,
+    pub code: u16,
 }
 
 /// Axum middleware that performs authentication and rate limiting.
@@ -285,6 +299,24 @@ pub async fn auth_middleware(
             }),
         )
             .into_response();
+    }
+
+    // RBAC authorization check.
+    let method = request.method().clone();
+    if let Err(authz_err) = crate::rbac::check_authorization(
+        &identity,
+        &path,
+        &method,
+        &auth.rbac,
+    ) {
+        warn!(
+            client = %identity.id,
+            role = ?identity.role,
+            path = %path,
+            "Authorization denied: {}",
+            authz_err.error
+        );
+        return authz_err.into_response();
     }
 
     next.run(request).await

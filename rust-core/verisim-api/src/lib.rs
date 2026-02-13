@@ -8,6 +8,7 @@ pub mod auth;
 pub mod federation;
 pub mod graphql;
 pub mod grpc;
+pub mod rbac;
 
 use axum::{
     extract::{Path, Query, State},
@@ -446,6 +447,7 @@ pub fn build_router(state: AppState) -> Router {
         // Meta-query store (homoiconicity: queries as hexads)
         .route("/queries", post(store_query_handler))
         .route("/queries/similar", post(similar_queries_handler))
+        .route("/queries/{id}/optimize", put(optimize_query_handler))
         // Query planner
         .route("/query/plan", post(query_plan_handler))
         .route("/query/explain", post(query_explain_handler))
@@ -948,6 +950,171 @@ async fn planner_stats_handler(
 ) -> Result<Json<StatisticsCollector>, ApiError> {
     let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     Ok(Json(planner.stats().clone()))
+}
+
+// --- Meta-Query Store (Homoiconicity) ---
+
+/// Store query request body
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoreQueryRequest {
+    /// The VQL query text
+    pub query: String,
+    /// Optional embedding for the query
+    pub embedding: Option<Vec<f32>>,
+    /// Optional cost vector from the planner
+    pub cost_vector: Option<Vec<f64>>,
+    /// Optional proof obligations
+    pub proof_obligations: Option<Vec<String>>,
+}
+
+/// Store a VQL query as a hexad (homoiconicity)
+#[instrument(skip(state, request))]
+async fn store_query_handler(
+    State(state): State<AppState>,
+    Json(request): Json<StoreQueryRequest>,
+) -> Result<(StatusCode, Json<HexadResponse>), ApiError> {
+    use verisim_hexad::QueryHexadBuilder;
+
+    let mut builder = QueryHexadBuilder::new(&request.query);
+
+    if let Some(embedding) = request.embedding {
+        validate_vector(&embedding)?;
+        builder = builder.with_embedding(embedding);
+    }
+
+    if let Some(costs) = request.cost_vector {
+        builder = builder.with_cost_vector(costs);
+    }
+
+    if let Some(obligations) = request.proof_obligations {
+        builder = builder.with_proof_obligations(obligations);
+    }
+
+    builder = builder.with_metadata("stored_at", chrono::Utc::now().to_rfc3339());
+
+    let (_query_id, input) = builder.build();
+
+    let hexad = state
+        .hexad_store
+        .create(input)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    info!(hexad_id = %hexad.id, "Stored query as hexad");
+
+    Ok((StatusCode::CREATED, Json(HexadResponse::from(&hexad))))
+}
+
+/// Find similar past queries by vector similarity
+#[instrument(skip(state, request))]
+async fn similar_queries_handler(
+    State(state): State<AppState>,
+    Json(request): Json<VectorSearchRequest>,
+) -> Result<Json<Vec<SearchResultResponse>>, ApiError> {
+    let k = validate_limit(request.k.unwrap_or(10));
+
+    if request.vector.len() != state.config.vector_dimension {
+        return Err(ApiError::BadRequest(format!(
+            "Vector dimension mismatch: expected {}, got {}",
+            state.config.vector_dimension,
+            request.vector.len()
+        )));
+    }
+    validate_vector(&request.vector)?;
+
+    // Search for similar hexads (which includes query-hexads)
+    let hexads = state
+        .hexad_store
+        .search_similar(&request.vector, k)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    // Filter to only query hexads (those with "vql_query" type in document fields)
+    let results: Vec<SearchResultResponse> = hexads
+        .iter()
+        .filter(|h| {
+            h.document
+                .as_ref()
+                .map(|d| d.title.starts_with("VQL Query:"))
+                .unwrap_or(false)
+        })
+        .enumerate()
+        .map(|(i, h)| SearchResultResponse {
+            id: h.id.to_string(),
+            score: 1.0 - (i as f32 * 0.1),
+            title: h.document.as_ref().map(|d| d.title.clone()),
+        })
+        .collect();
+
+    Ok(Json(results))
+}
+
+/// Optimize a stored query — re-plan and update its tensor modality with new costs.
+/// This is reflection: the system modifying its own queries based on learned costs.
+/// Accepts an optional LogicalPlan body; if absent, uses existing tensor as baseline.
+#[instrument(skip(state))]
+async fn optimize_query_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    body: Option<Json<LogicalPlan>>,
+) -> Result<Json<HexadResponse>, ApiError> {
+    validate_hexad_id(&id)?;
+    let hexad_id = HexadId::new(&id);
+
+    // Get the existing query hexad
+    let hexad = state
+        .hexad_store
+        .get(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Query hexad {} not found", id)))?;
+
+    // Compute cost vector from the planner
+    let cost_vector = if let Some(Json(logical_plan)) = body {
+        // If a logical plan was provided, run the planner on it
+        let planner = state.planner.lock().map_err(|_| {
+            ApiError::Internal("Planner lock poisoned".to_string())
+        })?;
+
+        match planner.explain(&logical_plan) {
+            Ok(explain) => {
+                explain
+                    .steps
+                    .iter()
+                    .map(|s| s.estimated_cost_ms)
+                    .collect::<Vec<f64>>()
+            }
+            Err(_) => vec![1.0, 0.0, 0.0],
+        }
+    } else {
+        // No plan provided — use existing tensor data scaled by a learning factor,
+        // or default to [1.0] if no tensor exists
+        hexad
+            .tensor
+            .as_ref()
+            .map(|t| t.data.iter().map(|v| v * 0.95).collect())
+            .unwrap_or_else(|| vec![1.0])
+    };
+
+    // Update the hexad with new tensor data (cost vector)
+    let mut update_input = HexadInput::default();
+    update_input.tensor = Some(HexadTensorInput {
+        shape: vec![1, cost_vector.len()],
+        data: cost_vector,
+    });
+    update_input
+        .metadata
+        .insert("optimized_at".to_string(), chrono::Utc::now().to_rfc3339());
+
+    let updated = state
+        .hexad_store
+        .update(&hexad_id, update_input)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    info!(hexad_id = %id, "Optimized query hexad with new cost vector");
+
+    Ok(Json(HexadResponse::from(&updated)))
 }
 
 /// Start the API server (plain HTTP)

@@ -11,6 +11,9 @@ pub mod error;
 pub mod explain;
 pub mod optimizer;
 pub mod plan;
+pub mod prepared;
+pub mod profiler;
+pub mod slow_query;
 pub mod stats;
 pub mod vql_bridge;
 
@@ -24,6 +27,9 @@ pub use error::PlannerError;
 pub use explain::ExplainOutput;
 pub use optimizer::Planner;
 pub use plan::{LogicalPlan, PhysicalPlan};
+pub use profiler::{ExplainAnalyzeOutput, Profiler, ProfileStep, QueryProfile};
+pub use prepared::{CacheConfig, CacheError, CacheStats, ParamValue, PlanCache, PreparedId, PreparedStatement};
+pub use slow_query::{SlowQueryConfig, SlowQueryEntry, SlowQueryLog, SlowQuerySummary};
 pub use stats::{AdaptiveTuner, StatisticsCollector, StoreStatistics};
 
 /// The six modalities of VeriSimDB.

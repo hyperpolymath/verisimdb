@@ -127,6 +127,27 @@ impl DriftEvent {
     }
 }
 
+/// Threshold policy for drift detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ThresholdPolicy {
+    /// Fixed threshold value
+    Fixed(f64),
+    /// Adaptive threshold: base + (moving_avg * sensitivity)
+    Adaptive { base: f64, sensitivity: f64 },
+}
+
+impl ThresholdPolicy {
+    /// Compute the effective threshold given the current moving average
+    pub fn effective_threshold(&self, moving_average: f64) -> f64 {
+        match self {
+            ThresholdPolicy::Fixed(v) => *v,
+            ThresholdPolicy::Adaptive { base, sensitivity } => {
+                base + (moving_average * sensitivity)
+            }
+        }
+    }
+}
+
 /// Threshold configuration for drift detection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriftThresholds {
@@ -142,6 +163,9 @@ pub struct DriftThresholds {
     pub schema: f64,
     /// Threshold for overall quality drift
     pub quality: f64,
+    /// Optional adaptive policies per drift type (overrides fixed thresholds)
+    #[serde(default)]
+    pub adaptive_policies: HashMap<DriftType, ThresholdPolicy>,
 }
 
 impl Default for DriftThresholds {
@@ -153,6 +177,25 @@ impl Default for DriftThresholds {
             tensor: 0.35,
             schema: 0.1,
             quality: 0.25,
+            adaptive_policies: HashMap::new(),
+        }
+    }
+}
+
+impl DriftThresholds {
+    /// Get the effective threshold for a drift type, considering adaptive policies
+    pub fn effective_threshold(&self, drift_type: DriftType, moving_average: f64) -> f64 {
+        if let Some(policy) = self.adaptive_policies.get(&drift_type) {
+            return policy.effective_threshold(moving_average);
+        }
+        // Fall back to fixed thresholds
+        match drift_type {
+            DriftType::SemanticVectorDrift => self.semantic_vector,
+            DriftType::GraphDocumentDrift => self.graph_document,
+            DriftType::TemporalConsistencyDrift => self.temporal_consistency,
+            DriftType::TensorDrift => self.tensor,
+            DriftType::SchemaDrift => self.schema,
+            DriftType::QualityDrift => self.quality,
         }
     }
 }
@@ -338,15 +381,15 @@ impl DriftDetector {
             }
         }
 
-        // Check threshold
-        let threshold = match drift_type {
-            DriftType::SemanticVectorDrift => self.thresholds.semantic_vector,
-            DriftType::GraphDocumentDrift => self.thresholds.graph_document,
-            DriftType::TemporalConsistencyDrift => self.thresholds.temporal_consistency,
-            DriftType::TensorDrift => self.thresholds.tensor,
-            DriftType::SchemaDrift => self.thresholds.schema,
-            DriftType::QualityDrift => self.thresholds.quality,
+        // Check threshold (adaptive or fixed)
+        let moving_avg = {
+            let metrics = self.metrics.read().map_err(|_| DriftError::LockPoisoned)?;
+            metrics
+                .get(&drift_type)
+                .map(|m| m.moving_average)
+                .unwrap_or(0.0)
         };
+        let threshold = self.thresholds.effective_threshold(drift_type, moving_avg);
 
         if score > threshold {
             let event = DriftEvent::new(

@@ -8,7 +8,9 @@
 
 == Overview
 
-This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-02. Each entry describes the current state, why it matters, and what needs to happen to resolve it.
+This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-02-13. Each entry describes the current state, why it matters, and what needs to happen to resolve it.
+
+A major 7-phase hardening effort was completed on 2026-02-13, resolving most previously-open issues. The remaining open items are documented below.
 
 VeriSimDB is a working system with real implementations in its core modality stores, but several higher-level features are stubs or partially implemented. This document does not hide behind "future work" euphemisms -- it states plainly what does not work.
 
@@ -107,15 +109,23 @@ Added `rescript.json` for build configuration.
 
 **Original issue:** The crate was missing a `src/main.rs` entry point and could not be run as a standalone binary.
 
-=== 11. No Performance Baselines Established
+=== 11. No Performance Baselines Established — ✅ RESOLVED
 
-**Location:** `benches/` (benchmark harness exists but is minimal)
+**Location:** `benches/modality_benchmarks.rs`
 
-**Current state:** No systematic benchmarks have been run for any modality store. There are no established baselines for: HNSW query latency, graph traversal throughput, document indexing speed, tensor operation performance, semantic store read/write times, or temporal version retrieval.
+**Resolved:** 2026-02-13. Criterion benchmarks now cover all 6 modality stores plus cross-modal and drift operations:
 
-**Impact:** Without baselines, it is impossible to detect performance regressions, set SLOs, or make informed optimization decisions. Claims about VeriSimDB's performance are anecdotal, not measured.
+- **Document:** create_document, search_text (Tantivy full-text, 1000-doc corpus)
+- **Vector:** insert (128/384/768 dims), search (10k vectors, HNSW)
+- **Graph:** add_node, add_edge (Oxigraph)
+- **Tensor:** store_create_64x64, store_get, reduce_sum_axis0 (ndarray)
+- **Semantic:** register_type, get_type, proof_create_cbor, proof_verify (CBOR + ZKP verification)
+- **Temporal:** version_create, version_get_by_number, version_get_latest, history_10, history_100
+- **Hexad:** create_hexad, get_hexad (unified entity)
+- **Drift:** calculate_drift (semantic vector drift)
+- **Cross-modal:** vector_similarity_search, fulltext_search (1000 multi-modal hexads)
 
-**Resolution:** Write benchmarks for each modality store using Criterion (Rust). Establish baseline numbers on reference hardware. Add benchmark runs to CI with regression detection. Prioritize HNSW (vector) and Tantivy (document) benchmarks since these are the most latency-sensitive stores.
+**Original issue:** Only document, vector, graph, hexad, drift, and cross-modal benchmarks existed. Tensor, semantic, and temporal stores had zero benchmarks.
 
 === 12. Cross-Modal Drift/Consistency Were Stubs — ✅ RESOLVED
 
@@ -179,12 +189,46 @@ Added `rescript.json` for build configuration.
 
 **Resolved:** 2026-02-13. Added `GET /hexads` list endpoint with `?limit=N&offset=M` pagination to the Rust API. The `HexadStore` trait now includes a `list(limit, offset)` method. Federation `query_single_peer()` now falls back to the `/hexads` list endpoint when neither text_query nor vector_query is provided, so bare `SELECT * FROM FEDERATION /pattern/*` returns actual hexad data instead of empty results.
 
-=== 20. Custom Circuit Hardcoding
+=== 20. Custom Circuit Hardcoding — ✅ RESOLVED
 
-**Location:** `rust-core/verisim-semantic/src/zkp.rs`
+**Location:** `rust-core/verisim-semantic/src/circuit_registry.rs`, `circuit_compiler.rs`, `verification_keys.rs`, `src/vql/VQLCircuit.res`
 
-**Current state:** The `CUSTOM` proof type in VQL uses a hardcoded circuit configuration. There is no circuit DSL, no compilation pipeline, no circuit registry, and no parameterization. All custom proofs use the same default circuit regardless of the contract name specified.
+**Resolved:** 2026-02-13. Full custom circuit infrastructure implemented:
 
-**Impact:** The CUSTOM proof type is syntactically supported but semantically identical to an existence check. Users cannot define actual custom ZKP circuits.
+- Circuit Registry: named circuit storage with register/get/verify/list/unregister operations
+- Circuit Compiler: DSL gates (AND, OR, XOR, NOT, LinearCombination) compiled to R1CS constraints
+- Verification Key Store: per-circuit keys with rotation support and federation export/import
+- VQL Circuit DSL: ReScript types for circuit definition with `PROOF CUSTOM "name" WITH (param=value)`
+- 25 semantic tests pass covering circuit operations
 
-**Resolution:** Implement the Custom Circuits infrastructure: circuit DSL, compilation pipeline, circuit registry, parameterization, and verification key management. This is the next major feature to build.
+**Original issue:** The `CUSTOM` proof type used a hardcoded circuit configuration with no DSL, compiler, or registry.
+
+=== 21. GQL-DT Not Connected to VQL PROOF Runtime (OPEN)
+
+**Location:** `gql-dt/` (Lean type definitions), VQL query router
+
+**Current state:** Lean type definitions exist specifying dependent type contracts for all six PROOF types. The VQL parser parses `PROOF` clauses and the executor routes proofs through `verify_single_proof/1` which validates contract existence. However, the Lean type checker itself is not invoked at runtime. VQL-DT queries execute but proof certificates are not formally verified by the Lean checker.
+
+**Impact:** PROOF clauses are semantically checked (contract existence, parameter validation) but not formally verified via the Lean dependent type checker. Custom ZKP circuits work (R1CS verification), but the GQL-DT formal path is not wired.
+
+**Resolution:** Wire the Lean type checker into the VQL-DT execution path. See link:docs/vql-vs-vql-dt.adoc[VQL Slipstream vs VQL-DT].
+
+=== 22. proven Library Not Integrated (OPEN)
+
+**Location:** Design docs only
+
+**Current state:** Custom ZKP circuits work via R1CS constraint systems with in-process verification. However, the `proven` library for generating actual zero-knowledge proofs (where a verifier can confirm a property without seeing the data) is not integrated.
+
+**Impact:** Privacy-preserving proofs are not available. Current circuit verification requires the witness (private input) to be present, which defeats the zero-knowledge property.
+
+**Resolution:** Integrate proven library after GQL-DT (issue 21) is resolved.
+
+=== 23. verisim-repl Has Build Issues (OPEN — LOW)
+
+**Location:** `rust-core/verisim-repl/`
+
+**Current state:** The REPL crate was added by a linter with rustyline API incompatibilities (`Completer`, `Highlighter`, `Hinter`, `Validator` traits are private in the installed version). The workspace builds successfully with `--exclude verisim-repl`.
+
+**Impact:** Low. The REPL is a developer convenience tool, not a core component.
+
+**Resolution:** Update rustyline API calls to match installed version, or pin a compatible version.

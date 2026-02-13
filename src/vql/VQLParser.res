@@ -20,6 +20,7 @@ module AST = {
     | Hexad(string)  // UUID
     | Federation(string, option<driftPolicy>)  // pattern, drift policy
     | Store(string)  // store ID
+    | Reflect  // Meta-circular: query the query store itself
 
   and driftPolicy =
     | Strict
@@ -116,6 +117,7 @@ module AST = {
   and proofSpec = {
     proofType: proofType,
     contractName: string,
+    customParams: option<array<(string, string)>>,  // WITH (key=value, ...) for Custom proofs
   }
 
   and proofType =
