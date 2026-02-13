@@ -66,15 +66,20 @@ VeriSimDB is a working system with real implementations in its core modality sto
 
 **Resolution:** Implement sanctify integration after VQL-DT (issue 5) is resolved, since ZKP proof generation depends on the dependent type checking pipeline being functional.
 
-=== 7. ReScript Registry 60% Complete
+=== 7. ReScript Registry 60% Complete — ✅ RESOLVED
 
-**Location:** ReScript source files (type definitions and registry bindings)
+**Location:** `src/registry/Registry.res`, `rescript.json`
 
-**Current state:** Type definitions for the ReScript schema registry are complete. These define the types for hexad entities, modality metadata, drift scores, and federation configuration. Runtime bindings (the code that connects ReScript types to the Rust core and Elixir orchestration layer) are partially implemented.
+**Resolved:** 2026-02-13. All 7 previously stubbed functions now have real implementations:
 
-**Impact:** The schema registry cannot be fully managed from the ReScript layer. Some registry operations require direct Elixir or Rust API calls instead of going through the typed ReScript interface.
+- `executeFederatedQuery`: HTTP fan-out to eligible peer stores with trust filtering, response mapping, and result aggregation with limit enforcement.
+- `achieveConsensus`: Quorum-based consensus with configurable mode (Strong/Quorum/Eventual), concurrent store fetch, agreement calculation.
+- `replicateHexad`: Fetches hexad from source store via HTTP, pushes to all target stores, reports per-target errors.
+- `checkReplicationStatus`: Examines mapping locations, checks store liveness against maxStoreDowntimeMs, detects trust divergence as data divergence proxy.
+- `detectByzantineFaults`: Computes median trust across stores for a hexad, flags stores deviating >0.3 from median.
+- `serializeRegistry`/`deserializeRegistry`: Full JSON serialization and deserialization of registry state (stores, mappings, config).
 
-**Resolution:** Complete the remaining runtime bindings for registry CRUD operations, drift policy management, and federation configuration.
+Added `rescript.json` for build configuration.
 
 === 8. `debugger/Cargo.toml` Had Wrong Author
 
