@@ -59,7 +59,8 @@ The following files in `.machine_readable/` contain structured project metadata:
 ### ALLOWED
 - **Rust** - Core database engine, modality stores
 - **Elixir** - OTP orchestration layer
-- **SQL** - Query interface (future)
+- **ReScript** - VQL parser, federation registry
+- **VQL** - VeriSim Query Language (native query interface, NOT SQL)
 
 ### BANNED
 - Python - Use Rust instead
@@ -271,6 +272,26 @@ User prompt → Haiku classifier → Route to:
 - Reads CLAUDE.md to understand repo complexity
 - Uses Haiku API call (~0.001 cents) to classify
 - Returns recommended model as stdout
+
+## Known Issues
+
+See `KNOWN-ISSUES.adoc` at repo root for all honest gaps. Key items:
+1. Normalizer regeneration strategies are stubs
+2. Federation executor returns empty results
+3. GQL-DT not connected to VQL PROOF clause
+4. ZKP/proven library not integrated
+5. ReScript registry ~60% complete
+
+## Hypatia Integration Status
+
+**Working:**
+- Hypatia VQL layer reads verisimdb-data flat files directly
+- Built-in Elixir VQL parser (no external Deno/Node needed)
+- 954 canonical patterns tracked across 298 repos
+- Cross-repo analytics: `pipeline_health/0`, `cross_repo_patterns/1`, `category_distribution/0`
+
+**Needs PAT:** Automated cross-repo dispatch requires a GitHub PAT with `repo` scope.
+See `verisimdb-data/INTEGRATION.md` for PAT setup instructions.
 
 ## User Preferences
 

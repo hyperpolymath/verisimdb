@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+
+= Known Issues and Honest Gaps
+:toc: left
+:toclevels: 2
+:sectnums:
+
+== Overview
+
+This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-02. Each entry describes the current state, why it matters, and what needs to happen to resolve it.
+
+VeriSimDB is a working system with real implementations in its core modality stores, but several higher-level features are stubs or partially implemented. This document does not hide behind "future work" euphemisms -- it states plainly what does not work.
+
+== Issues
+
+=== 1. Normalizer Regeneration Strategies Are Stubs
+
+**Location:** `rust-core/verisim-normalizer/`
+
+**Current state:** When drift is detected and self-normalization is triggered, the normalizer identifies the authoritative modality and calls a regeneration strategy for the drifted modality. Every regeneration strategy currently returns a hardcoded `[regenerated]` placeholder string instead of actually regenerating data.
+
+**Impact:** Self-normalization, VeriSimDB's core differentiator, does not actually normalize anything. Drift is detected but not repaired. Each of the six modalities (Graph, Vector, Tensor, Semantic, Document, Temporal) needs a real regeneration implementation that derives the drifted modality's data from the authoritative modality.
+
+**Resolution:** Implement per-modality regeneration strategies. Document regeneration (re-index text from graph and semantic data) is the most straightforward starting point.
+
+=== 2. Federation Executor Always Returns Empty
+
+**Location:** Elixir orchestration layer, `VeriSim.FederationExecutor`
+
+**Current state:** The federation executor receives a parsed `FEDERATION` query and should decompose it into per-peer sub-queries, dispatch them to registered peers, and merge results. Currently it always returns `{:ok, []}` regardless of the query content or the number of registered peers.
+
+**Impact:** Federated queries parse correctly and route correctly but produce no results. Federation is architecturally present but operationally inert.
+
+**Resolution:** Implement query decomposition, peer dispatch (via `FederationResolver.query_peer/3`), and result merging. See link:docs/federation-readiness.adoc[Federation Readiness Assessment] for the phased roadmap.
+
+=== 3. Federation Resolver Peer Queries Unimplemented
+
+**Location:** Elixir orchestration layer, `VeriSim.FederationResolver`
+
+**Current state:** Peers can be registered via the API (`POST /api/federation/peers`) and listed (`GET /api/federation/peers`), but the resolver cannot actually query a registered peer. The `query_peer/3` function returns `{:error, :not_implemented}`.
+
+**Impact:** Peer registration works, but the registered peers are never contacted during federated query execution. Federation is registration-only.
+
+**Resolution:** Implement `query_peer/3` to make HTTP requests to peer endpoints, parse responses, and return structured results to the federation executor.
+
+=== 4. Drift Auto-Trigger Missing
+
+**Location:** Elixir orchestration layer, `VeriSim.DriftMonitor`
+
+**Current state:** Drift detection works -- the `verisim-drift` Rust crate computes drift scores across modalities, and the Elixir `DriftMonitor` evaluates them against configurable thresholds. However, drift detection must be triggered manually via API call or direct Elixir function invocation. There is no scheduled or event-driven trigger.
+
+**Impact:** Drift can accumulate undetected between manual checks. In a production system, drift should be checked on a regular interval or triggered by write events. Without auto-trigger, data quality can degrade silently.
+
+**Resolution:** Add a GenServer timer to `DriftMonitor` that runs drift detection on a configurable interval. Optionally, hook into write events (Hexad API mutations) to trigger immediate drift checks on affected entities.
+
+=== 5. GQL-DT Not Connected to VQL PROOF Runtime
+
+**Location:** `gql-dt/` (Lean type definitions), VQL query router
+
+**Current state:** Lean type definitions exist in the `gql-dt/` directory specifying dependent type contracts for all six PROOF types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION). The VQL parser correctly parses `PROOF` clauses and the query router routes to the dependent-type execution path. However, the Lean type checker is not invoked at runtime. VQL-DT queries execute but do not generate real proof certificates.
+
+**Impact:** The `PROOF` clause is syntactically supported but semantically inert. Queries with `PROOF` clauses return data but the accompanying proof certificates are placeholders, not verifiable. This is the gap between the designed architecture and the current implementation.
+
+**Resolution:** Wire the Lean type checker into the VQL-DT execution path. This requires: (a) compiling Lean definitions to an executable checker, (b) generating proof obligations from the VQL AST, (c) invoking the checker and collecting proof witnesses from modality stores, (d) assembling and returning verifiable proof certificates. See link:docs/vql-vs-vql-dt.adoc[VQL Slipstream vs VQL-DT] for the phased roadmap.
+
+=== 6. ZKP / Proven Library Not Integrated
+
+**Location:** `docs/zkp-and-sanctify-integration.adoc` (design), `proven-coherence.md` (notes)
+
+**Current state:** The integration of zero-knowledge proofs via the sanctify library is documented as a consultation paper and design specification. The integration is not implemented. No ZKP circuits are generated, no proofs are created, and no verification occurs at runtime.
+
+**Impact:** Privacy-preserving proofs (where a query result can be verified without revealing the underlying data) are not available. This affects multi-tenant federation and compliance scenarios where data must remain private but provenance must be verifiable.
+
+**Resolution:** Implement sanctify integration after VQL-DT (issue 5) is resolved, since ZKP proof generation depends on the dependent type checking pipeline being functional.
+
+=== 7. ReScript Registry 60% Complete
+
+**Location:** ReScript source files (type definitions and registry bindings)
+
+**Current state:** Type definitions for the ReScript schema registry are complete. These define the types for hexad entities, modality metadata, drift scores, and federation configuration. Runtime bindings (the code that connects ReScript types to the Rust core and Elixir orchestration layer) are partially implemented.
+
+**Impact:** The schema registry cannot be fully managed from the ReScript layer. Some registry operations require direct Elixir or Rust API calls instead of going through the typed ReScript interface.
+
+**Resolution:** Complete the remaining runtime bindings for registry CRUD operations, drift policy management, and federation configuration.
+
+=== 8. `debugger/Cargo.toml` Had Wrong Author
+
+**Location:** `debugger/Cargo.toml`
+
+**Current state:** Fixed. The `debugger/Cargo.toml` previously listed an incorrect author. It now correctly reads `authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]`.
+
+**Impact:** None (resolved). Documented here for audit trail completeness.
+
+=== 9. HNSW Implementation Is Real
+
+**Location:** `rust-core/verisim-vector/src/hnsw.rs`
+
+**Current state:** The HNSW (Hierarchical Navigable Small World) implementation in `verisim-vector` is a genuine, functional implementation at approximately 670 lines of Rust. A previous audit incorrectly claimed this was brute-force search. This is **not** an issue -- it is a correction of a previous mischaracterization.
+
+**Impact:** None (this is a positive clarification). The vector modality store uses a real approximate nearest-neighbor algorithm, not a naive linear scan.
+
+**Note:** This entry exists to prevent future audits from repeating the same incorrect claim.
+
+=== 10. verisim-api Needs Bin Target Fix
+
+**Location:** `rust-core/verisim-api/Cargo.toml`
+
+**Current state:** Running `cargo run -p verisim-api` fails because the crate is missing a `[[bin]]` target definition or a `src/main.rs` entry point. The crate compiles as a library but cannot be executed as a standalone binary.
+
+**Impact:** The API server cannot be started directly with `cargo run`. Workarounds include running it through the workspace binary or the Elixir orchestration layer.
+
+**Resolution:** Add a `src/main.rs` (or `src/bin/verisim-api.rs`) with a `main()` function that initializes the HTTP server, and ensure `Cargo.toml` has the appropriate `[[bin]]` section.
+
+=== 11. No Performance Baselines Established
+
+**Location:** `benches/` (benchmark harness exists but is minimal)
+
+**Current state:** No systematic benchmarks have been run for any modality store. There are no established baselines for: HNSW query latency, graph traversal throughput, document indexing speed, tensor operation performance, semantic store read/write times, or temporal version retrieval.
+
+**Impact:** Without baselines, it is impossible to detect performance regressions, set SLOs, or make informed optimization decisions. Claims about VeriSimDB's performance are anecdotal, not measured.
+
+**Resolution:** Write benchmarks for each modality store using Criterion (Rust). Establish baseline numbers on reference hardware. Add benchmark runs to CI with regression detection. Prioritize HNSW (vector) and Tantivy (document) benchmarks since these are the most latency-sensitive stores.

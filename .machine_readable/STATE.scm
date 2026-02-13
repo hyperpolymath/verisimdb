@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: PMPL-1.0-or-later
 ;; VeriSimDB Project State
 ;; Media type: application/x-scheme
-;; Last updated: 2026-02-12
+;; Last updated: 2026-02-13
 
 (define-module (verisimdb state)
   #:version "1.0.0"
@@ -15,7 +15,7 @@
   '((version . "0.1.0-alpha")
     (schema-version . "1.0")
     (created . "2025-11-02")
-    (updated . "2026-02-12")
+    (updated . "2026-02-13")
     (project . "VeriSimDB")
     (repo . "https://github.com/hyperpolymath/verisimdb")
     (license . "PMPL-1.0-or-later")))
@@ -46,7 +46,7 @@
     (components
       ((architecture-design . 100)
        (vql-implementation . 85)
-       (documentation . 100)
+       (documentation . 90)
        (rust-modality-stores . 85)
        (elixir-orchestration . 70)
        (rescript-registry . 60)
@@ -83,10 +83,13 @@
        - Fixed 21 AGPL license headers to PMPL (2026-02-04)
        - Comprehensive integration tests (2026-02-04)")
     (blocked-on
-      "- HNSW vector indexing: hnsw_rs lifetime management
-       - Federation protocol: Not yet implemented
+      "- Normalizer regeneration strategies are stubs (return hardcoded [regenerated])
+       - Federation executor always returns {:ok, []} (unimplemented)
+       - Federation resolver peer queries unimplemented
+       - Drift auto-trigger missing (manual only)
+       - GQL-DT not connected to VQL PROOF clause
        - ZKP integration: proven library not yet integrated
-       - Real VQL parser integration in query router (Port/HTTP bridge needed)")))
+       - ReScript registry ~60% complete")))
 
 ;; ============================================================================
 ;; ROUTE TO MVP
@@ -266,6 +269,22 @@
 
 (define session-history
   '((session
+      (date . "2026-02-13")
+      (phase . "documentation-and-standards")
+      (accomplishments
+        "- Created docs/vql-vs-sql.adoc (VQL vs SQL comparison)
+         - Created docs/vql-vs-vql-dt.adoc (slipstream vs dependent-type modes)
+         - Created docs/federation-readiness.adoc (federation capability assessment)
+         - Created KNOWN-ISSUES.adoc at repo root (11 honest gaps)
+         - Fixed debugger/Cargo.toml author field
+         - Updated STATE.scm: corrected HNSW audit (IS real, 670 lines), added normalizer/federation blockers
+         - Updated CLAUDE.md: removed SQL reference, added Known Issues section")
+      (key-decisions
+        "- HNSW confirmed real (670 lines) — previous audit entry was incorrect
+         - Documentation completion set to 90% (not 100%)
+         - All known gaps honestly documented in KNOWN-ISSUES.adoc"))
+
+    (session
       (date . "2026-02-12b")
       (phase . "workflow-automation")
       (accomplishments
@@ -281,7 +300,7 @@
       (phase . "honest-audit-and-stub-fixes")
       (accomplishments
         "- Fixed tensor ReduceOp::Max/Min/Prod returning wrong results (was sum)
-         - Fixed HNSW vector store naming (brute-force, not HNSW)
+         - CORRECTION: HNSW IS real (670 lines in hnsw.rs) — previous audit was wrong
          - Implemented document search highlighting (Tantivy snippets)
          - Implemented L2/L3 cache layers (were stubs)
          - Implemented query condition decomposition (was empty map)
