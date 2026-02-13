@@ -96,3 +96,6 @@ temp/
 
 # Container build artifacts
 *.tar
+
+# Crash recovery artifacts
+ai-cli-crash-capture/
