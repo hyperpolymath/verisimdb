@@ -10,16 +10,17 @@
 # Stage 1: Build Rust
 FROM cgr.dev/chainguard/wolfi-base:latest AS rust-builder
 
-RUN apk add --no-cache rust cargo openssl-dev pkgconf build-base
+RUN apk add --no-cache rust openssl-dev pkgconf build-base
 
 WORKDIR /build
 
 # Copy Rust workspace
 COPY Cargo.toml ./
 COPY rust-core/ ./rust-core/
+COPY benches/ ./benches/
 
-# Build release
-RUN cargo build --release
+# Build only the API binary (skip benches)
+RUN cargo build --release -p verisim-api
 
 # Stage 2: Build Elixir
 FROM cgr.dev/chainguard/wolfi-base:latest AS elixir-builder
