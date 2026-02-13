@@ -4,13 +4,17 @@
 //! HTTP API server for VeriSimDB.
 //! Exposes all database functionality via REST endpoints.
 
+pub mod auth;
 pub mod federation;
 pub mod graphql;
 pub mod grpc;
+pub mod rbac;
+pub mod transaction;
 
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    middleware as axum_middleware,
     response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
@@ -27,8 +31,9 @@ use verisim_document::TantivyDocumentStore;
 use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
 use verisim_graph::OxiGraphStore;
 use verisim_planner::{
-    ExplainOutput, LogicalPlan, PhysicalPlan, Planner,
-    PlannerConfig, StatisticsCollector,
+    CacheConfig, ExplainOutput, ExplainAnalyzeOutput, LogicalPlan, ParamValue,
+    PhysicalPlan, PlanCache, Planner, PlannerConfig, PreparedId, PreparedStatement,
+    Profiler, SlowQueryLog, SlowQuerySummary, StatisticsCollector,
 };
 use verisim_hexad::{
     HexadConfig, HexadDocumentInput, HexadGraphInput, HexadId, HexadInput,
@@ -37,6 +42,8 @@ use verisim_hexad::{
 };
 use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
 use verisim_semantic::InMemorySemanticStore;
+use verisim_semantic::zkp_bridge::{self as zkp_api, PrivacyLevel, ZkpProofRequest as ZkpBridgeRequest};
+use verisim_semantic::circuit_registry::CircuitRegistry;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
 use verisim_vector::{DistanceMetric, BruteForceVectorStore};
@@ -354,7 +361,12 @@ pub struct AppState {
     pub drift_detector: Arc<DriftDetector>,
     pub normalizer: Arc<Normalizer>,
     pub planner: Arc<Mutex<Planner>>,
+    pub plan_cache: Arc<PlanCache>,
+    pub slow_query_log: Arc<SlowQueryLog>,
+    pub transaction_manager: Arc<transaction::TransactionManager>,
+    pub circuit_registry: Arc<CircuitRegistry>,
     pub federation: federation::FederationState,
+    pub auth: auth::AuthState,
     pub config: ApiConfig,
 }
 
@@ -394,6 +406,11 @@ impl AppState {
         let normalizer = Arc::new(create_default_normalizer(drift_detector.clone()).await);
 
         let planner = Arc::new(Mutex::new(Planner::new(PlannerConfig::default())));
+        let plan_cache = Arc::new(PlanCache::new(CacheConfig::default()));
+        let slow_query_log = Arc::new(SlowQueryLog::new(Default::default()));
+        let transaction_manager = Arc::new(
+            transaction::TransactionManager::new(transaction::TransactionConfig::default()),
+        );
 
         let self_endpoint = format!("http://{}:{}{}", config.host, config.port, config.version_prefix);
         let federation = federation::FederationState::new(
@@ -401,13 +418,21 @@ impl AppState {
             self_endpoint,
         );
 
+        let auth = auth::AuthState::default();
+        let circuit_registry = Arc::new(CircuitRegistry::new());
+
         Ok(Self {
             start_time: std::time::Instant::now(),
             hexad_store,
             drift_detector,
             normalizer,
             planner,
+            plan_cache,
+            slow_query_log,
+            transaction_manager,
+            circuit_registry,
             federation,
+            auth,
             config,
         })
     }
@@ -416,6 +441,7 @@ impl AppState {
 /// Build the API router
 pub fn build_router(state: AppState) -> Router {
     let federation_routes = federation::federation_router(state.federation.clone());
+    let auth_state = state.auth.clone();
 
     Router::new()
         // Health endpoints
@@ -436,12 +462,39 @@ pub fn build_router(state: AppState) -> Router {
         .route("/drift/entity/{id}", get(entity_drift_handler))
         .route("/normalizer/status", get(normalizer_status_handler))
         .route("/normalizer/trigger/{id}", post(trigger_normalization_handler))
+        // Meta-query store (homoiconicity: queries as hexads)
+        .route("/queries", post(store_query_handler))
+        .route("/queries/similar", post(similar_queries_handler))
+        .route("/queries/{id}/optimize", put(optimize_query_handler))
         // Query planner
         .route("/query/plan", post(query_plan_handler))
         .route("/query/explain", post(query_explain_handler))
         .route("/planner/config", get(get_planner_config_handler))
         .route("/planner/config", put(put_planner_config_handler))
         .route("/planner/stats", get(planner_stats_handler))
+        // EXPLAIN ANALYZE
+        .route("/query/explain-analyze", post(query_explain_analyze_handler))
+        // Prepared statements
+        .route("/prepared", post(prepared_create_handler))
+        .route("/prepared/{id}", get(prepared_get_handler))
+        .route("/prepared/{id}/execute", post(prepared_execute_handler))
+        .route("/prepared/stats", get(prepared_stats_handler))
+        // Slow query log
+        .route("/planner/slow-queries", get(slow_queries_handler))
+        // Transaction endpoints
+        .route("/transactions/begin", post(transaction_begin_handler))
+        .route("/transactions/{id}/commit", post(transaction_commit_handler))
+        .route("/transactions/{id}/rollback", post(transaction_rollback_handler))
+        .route("/transactions/{id}", get(transaction_status_handler))
+        // ZKP proof endpoints
+        .route("/proofs/generate", post(proof_generate_handler))
+        .route("/proofs/verify", post(proof_verify_handler))
+        .route("/proofs/generate-with-circuit", post(proof_generate_with_circuit_handler))
+        // Authentication middleware layer
+        .layer(axum_middleware::from_fn_with_state(
+            auth_state,
+            auth::auth_middleware,
+        ))
         .with_state(state.clone())
         // GraphQL endpoint
         .merge(graphql::graphql_router(state))
@@ -933,6 +986,552 @@ async fn planner_stats_handler(
 ) -> Result<Json<StatisticsCollector>, ApiError> {
     let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     Ok(Json(planner.stats().clone()))
+}
+
+// --- Meta-Query Store (Homoiconicity) ---
+
+/// Store query request body
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoreQueryRequest {
+    /// The VQL query text
+    pub query: String,
+    /// Optional embedding for the query
+    pub embedding: Option<Vec<f32>>,
+    /// Optional cost vector from the planner
+    pub cost_vector: Option<Vec<f64>>,
+    /// Optional proof obligations
+    pub proof_obligations: Option<Vec<String>>,
+}
+
+/// Store a VQL query as a hexad (homoiconicity)
+#[instrument(skip(state, request))]
+async fn store_query_handler(
+    State(state): State<AppState>,
+    Json(request): Json<StoreQueryRequest>,
+) -> Result<(StatusCode, Json<HexadResponse>), ApiError> {
+    use verisim_hexad::QueryHexadBuilder;
+
+    let mut builder = QueryHexadBuilder::new(&request.query);
+
+    if let Some(embedding) = request.embedding {
+        validate_vector(&embedding)?;
+        builder = builder.with_embedding(embedding);
+    }
+
+    if let Some(costs) = request.cost_vector {
+        builder = builder.with_cost_vector(costs);
+    }
+
+    if let Some(obligations) = request.proof_obligations {
+        builder = builder.with_proof_obligations(obligations);
+    }
+
+    builder = builder.with_metadata("stored_at", chrono::Utc::now().to_rfc3339());
+
+    let (_query_id, input) = builder.build();
+
+    let hexad = state
+        .hexad_store
+        .create(input)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    info!(hexad_id = %hexad.id, "Stored query as hexad");
+
+    Ok((StatusCode::CREATED, Json(HexadResponse::from(&hexad))))
+}
+
+/// Find similar past queries by vector similarity
+#[instrument(skip(state, request))]
+async fn similar_queries_handler(
+    State(state): State<AppState>,
+    Json(request): Json<VectorSearchRequest>,
+) -> Result<Json<Vec<SearchResultResponse>>, ApiError> {
+    let k = validate_limit(request.k.unwrap_or(10));
+
+    if request.vector.len() != state.config.vector_dimension {
+        return Err(ApiError::BadRequest(format!(
+            "Vector dimension mismatch: expected {}, got {}",
+            state.config.vector_dimension,
+            request.vector.len()
+        )));
+    }
+    validate_vector(&request.vector)?;
+
+    // Search for similar hexads (which includes query-hexads)
+    let hexads = state
+        .hexad_store
+        .search_similar(&request.vector, k)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    // Filter to only query hexads (those with "vql_query" type in document fields)
+    let results: Vec<SearchResultResponse> = hexads
+        .iter()
+        .filter(|h| {
+            h.document
+                .as_ref()
+                .map(|d| d.title.starts_with("VQL Query:"))
+                .unwrap_or(false)
+        })
+        .enumerate()
+        .map(|(i, h)| SearchResultResponse {
+            id: h.id.to_string(),
+            score: 1.0 - (i as f32 * 0.1),
+            title: h.document.as_ref().map(|d| d.title.clone()),
+        })
+        .collect();
+
+    Ok(Json(results))
+}
+
+/// Optimize a stored query — re-plan and update its tensor modality with new costs.
+/// This is reflection: the system modifying its own queries based on learned costs.
+/// Accepts an optional LogicalPlan body; if absent, uses existing tensor as baseline.
+#[instrument(skip(state))]
+async fn optimize_query_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    body: Option<Json<LogicalPlan>>,
+) -> Result<Json<HexadResponse>, ApiError> {
+    validate_hexad_id(&id)?;
+    let hexad_id = HexadId::new(&id);
+
+    // Get the existing query hexad
+    let hexad = state
+        .hexad_store
+        .get(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Query hexad {} not found", id)))?;
+
+    // Compute cost vector from the planner
+    let cost_vector = if let Some(Json(logical_plan)) = body {
+        // If a logical plan was provided, run the planner on it
+        let planner = state.planner.lock().map_err(|_| {
+            ApiError::Internal("Planner lock poisoned".to_string())
+        })?;
+
+        match planner.explain(&logical_plan) {
+            Ok(explain) => {
+                explain
+                    .steps
+                    .iter()
+                    .map(|s| s.estimated_cost_ms)
+                    .collect::<Vec<f64>>()
+            }
+            Err(_) => vec![1.0, 0.0, 0.0],
+        }
+    } else {
+        // No plan provided — use existing tensor data scaled by a learning factor,
+        // or default to [1.0] if no tensor exists
+        hexad
+            .tensor
+            .as_ref()
+            .map(|t| t.data.iter().map(|v| v * 0.95).collect())
+            .unwrap_or_else(|| vec![1.0])
+    };
+
+    // Update the hexad with new tensor data (cost vector)
+    let mut update_input = HexadInput::default();
+    update_input.tensor = Some(HexadTensorInput {
+        shape: vec![1, cost_vector.len()],
+        data: cost_vector,
+    });
+    update_input
+        .metadata
+        .insert("optimized_at".to_string(), chrono::Utc::now().to_rfc3339());
+
+    let updated = state
+        .hexad_store
+        .update(&hexad_id, update_input)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    info!(hexad_id = %id, "Optimized query hexad with new cost vector");
+
+    Ok(Json(HexadResponse::from(&updated)))
+}
+
+// --- EXPLAIN ANALYZE Handler ---
+
+/// EXPLAIN ANALYZE request — execute a plan and return actual timings
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExplainAnalyzeRequest {
+    /// The logical plan to analyze
+    pub plan: LogicalPlan,
+    /// Simulated step execution times (milliseconds) for profiling.
+    /// In a real execution engine, these would be measured; here they
+    /// can be provided for testing/simulation purposes.
+    pub simulated_timings: Option<Vec<f64>>,
+}
+
+/// EXPLAIN ANALYZE handler — produces plan estimates with simulated actual timings
+#[instrument(skip(state, request))]
+async fn query_explain_analyze_handler(
+    State(state): State<AppState>,
+    Json(request): Json<ExplainAnalyzeRequest>,
+) -> Result<Json<ExplainAnalyzeOutput>, ApiError> {
+    let mut planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let explain = planner
+        .explain(&request.plan)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let physical = planner
+        .optimize(&request.plan)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let plan_id = format!("analyze-{}", chrono::Utc::now().timestamp_millis());
+    let mut profiler = Profiler::new(&plan_id, &physical);
+
+    // Record simulated or default step timings
+    let now = chrono::Utc::now();
+    for (i, step) in physical.steps.iter().enumerate() {
+        let actual_ms = request.simulated_timings
+            .as_ref()
+            .and_then(|t| t.get(i).copied())
+            .unwrap_or(step.cost.time_ms * 1.1); // Default: 10% slower than estimate
+        profiler.record_step(i, actual_ms, step.cost.estimated_rows, now, now);
+    }
+
+    let profile = profiler.finish(planner.stats_mut());
+    let output = explain.with_profile(&profile);
+
+    Ok(Json(output))
+}
+
+// --- Prepared Statements Handlers ---
+
+/// Request to create a prepared statement
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PreparedCreateRequest {
+    /// The VQL query text
+    pub query: String,
+    /// The logical plan for the query
+    pub plan: LogicalPlan,
+}
+
+/// Create a prepared statement
+#[instrument(skip(state, request))]
+async fn prepared_create_handler(
+    State(state): State<AppState>,
+    Json(request): Json<PreparedCreateRequest>,
+) -> Result<(StatusCode, Json<PreparedStatement>), ApiError> {
+    let id = state.plan_cache.prepare(&request.query, request.plan).await;
+
+    let stmt = state.plan_cache.get(&id).await
+        .ok_or_else(|| ApiError::Internal("Failed to retrieve prepared statement after creation".to_string()))?;
+
+    Ok((StatusCode::CREATED, Json(stmt)))
+}
+
+/// Get a prepared statement by ID
+#[instrument(skip(state))]
+async fn prepared_get_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<PreparedStatement>, ApiError> {
+    let prep_id = PreparedId::new(&id);
+    let stmt = state.plan_cache.get(&prep_id).await
+        .ok_or_else(|| ApiError::NotFound(format!("Prepared statement '{}' not found", id)))?;
+    Ok(Json(stmt))
+}
+
+/// Execute a prepared statement with parameters
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PreparedExecuteRequest {
+    /// Parameter bindings
+    pub params: std::collections::HashMap<String, ParamValue>,
+}
+
+/// Execute a prepared statement
+#[instrument(skip(state, request))]
+async fn prepared_execute_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<PreparedExecuteRequest>,
+) -> Result<Json<PhysicalPlan>, ApiError> {
+    let prep_id = PreparedId::new(&id);
+
+    let stmt = state.plan_cache
+        .execute_prepared(&prep_id, &request.params)
+        .await
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    // Use cached physical plan if available, otherwise optimize
+    let physical = if let Some(cached) = stmt.cached_physical_plan {
+        cached
+    } else {
+        let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+        planner.optimize(&stmt.logical_plan).map_err(|e| ApiError::Internal(e.to_string()))?
+    };
+
+    // Cache the physical plan for future use
+    state.plan_cache.cache_plan(&prep_id, physical.clone()).await;
+
+    Ok(Json(physical))
+}
+
+/// Get prepared statement cache statistics
+#[instrument(skip(state))]
+async fn prepared_stats_handler(
+    State(state): State<AppState>,
+) -> Result<Json<verisim_planner::CacheStats>, ApiError> {
+    let stats = state.plan_cache.stats_async().await;
+    Ok(Json(stats))
+}
+
+/// Get slow query log summary
+#[instrument(skip(state))]
+async fn slow_queries_handler(
+    State(state): State<AppState>,
+) -> Result<Json<SlowQuerySummary>, ApiError> {
+    let summary = state.slow_query_log.summary();
+    Ok(Json(summary))
+}
+
+// --- Transaction Handlers ---
+
+/// Begin a new transaction
+#[instrument(skip(state))]
+async fn transaction_begin_handler(
+    State(state): State<AppState>,
+) -> Result<(StatusCode, Json<transaction::TransactionStatus>), ApiError> {
+    let txn_id = state.transaction_manager
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let status = state.transaction_manager
+        .status(&txn_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok((StatusCode::CREATED, Json(status)))
+}
+
+/// Commit a transaction
+#[instrument(skip(state))]
+async fn transaction_commit_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<transaction::TransactionStatus>, ApiError> {
+    let txn_id = transaction::TransactionId::from_str(&id);
+
+    let _ops = state.transaction_manager
+        .commit(&txn_id)
+        .await
+        .map_err(|e| match e {
+            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
+            _ => ApiError::BadRequest(e.to_string()),
+        })?;
+
+    // In a full implementation, ops would be applied to the hexad store here
+    let status = state.transaction_manager
+        .status(&txn_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(status))
+}
+
+/// Rollback a transaction
+#[instrument(skip(state))]
+async fn transaction_rollback_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<transaction::TransactionStatus>, ApiError> {
+    let txn_id = transaction::TransactionId::from_str(&id);
+
+    let _discarded = state.transaction_manager
+        .rollback(&txn_id)
+        .await
+        .map_err(|e| match e {
+            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
+            _ => ApiError::BadRequest(e.to_string()),
+        })?;
+
+    let status = state.transaction_manager
+        .status(&txn_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(status))
+}
+
+/// Get transaction status
+#[instrument(skip(state))]
+async fn transaction_status_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<transaction::TransactionStatus>, ApiError> {
+    let txn_id = transaction::TransactionId::from_str(&id);
+
+    let status = state.transaction_manager
+        .status(&txn_id)
+        .await
+        .map_err(|e| match e {
+            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
+            _ => ApiError::Internal(e.to_string()),
+        })?;
+
+    Ok(Json(status))
+}
+
+// --- ZKP Proof Handlers ---
+
+/// API request for proof generation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProofGenerateRequest {
+    /// The claim to prove (base64-encoded or plain text)
+    pub claim: String,
+    /// Privacy level: "public", "private", or "zero_knowledge"
+    pub privacy_level: Option<String>,
+    /// Optional membership set for Merkle inclusion proofs
+    pub membership_set: Option<Vec<String>>,
+    /// Index of the claim in the membership set
+    pub membership_index: Option<usize>,
+}
+
+/// API request for proof verification
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProofVerifyRequest {
+    /// The proof to verify (serialized)
+    pub proof: zkp_api::ZkpProof,
+    /// The claim the proof is for
+    pub claim: String,
+}
+
+/// API request for circuit-based proof generation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProofWithCircuitRequest {
+    /// The claim to prove
+    pub claim: String,
+    /// Privacy level
+    pub privacy_level: Option<String>,
+    /// Circuit name to verify against
+    pub circuit_name: String,
+    /// Witness data (private inputs)
+    pub witness: Option<Vec<f64>>,
+    /// Public inputs
+    pub public_inputs: Option<Vec<f64>>,
+}
+
+/// API response for proof operations
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProofResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof: Option<zkp_api::ZkpProof>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+fn parse_privacy_level(s: &str) -> Result<PrivacyLevel, ApiError> {
+    match s.to_lowercase().as_str() {
+        "public" => Ok(PrivacyLevel::Public),
+        "private" => Ok(PrivacyLevel::Private),
+        "zero_knowledge" | "zeroknowledge" | "zk" => Ok(PrivacyLevel::ZeroKnowledge),
+        other => Err(ApiError::BadRequest(format!(
+            "Unknown privacy level: '{}'. Use 'public', 'private', or 'zero_knowledge'",
+            other
+        ))),
+    }
+}
+
+/// Generate a privacy-aware ZKP proof
+#[instrument(skip(_state, request))]
+async fn proof_generate_handler(
+    State(_state): State<AppState>,
+    Json(request): Json<ProofGenerateRequest>,
+) -> Result<Json<ProofResponse>, ApiError> {
+    let privacy_level = match &request.privacy_level {
+        Some(level) => parse_privacy_level(level)?,
+        None => PrivacyLevel::Public,
+    };
+
+    let membership_set = request.membership_set.as_ref().map(|set| {
+        set.iter().map(|s| s.as_bytes().to_vec()).collect::<Vec<_>>()
+    });
+
+    let bridge_request = ZkpBridgeRequest {
+        claim: request.claim.as_bytes().to_vec(),
+        privacy_level,
+        circuit_name: None,
+        witness: None,
+        public_inputs: None,
+        membership_set,
+        membership_index: request.membership_index,
+    };
+
+    match zkp_api::generate_zkp(&bridge_request) {
+        Ok(proof) => Ok(Json(ProofResponse {
+            success: true,
+            proof: Some(proof),
+            verified: None,
+            error: None,
+        })),
+        Err(e) => Ok(Json(ProofResponse {
+            success: false,
+            proof: None,
+            verified: None,
+            error: Some(e.to_string()),
+        })),
+    }
+}
+
+/// Verify a previously generated ZKP proof
+#[instrument(skip(_state, request))]
+async fn proof_verify_handler(
+    State(_state): State<AppState>,
+    Json(request): Json<ProofVerifyRequest>,
+) -> Result<Json<ProofResponse>, ApiError> {
+    let verified = zkp_api::verify_zkp(&request.proof, request.claim.as_bytes());
+
+    Ok(Json(ProofResponse {
+        success: true,
+        proof: None,
+        verified: Some(verified),
+        error: None,
+    }))
+}
+
+/// Generate a proof with circuit verification
+#[instrument(skip(state, request))]
+async fn proof_generate_with_circuit_handler(
+    State(state): State<AppState>,
+    Json(request): Json<ProofWithCircuitRequest>,
+) -> Result<Json<ProofResponse>, ApiError> {
+    let privacy_level = match &request.privacy_level {
+        Some(level) => parse_privacy_level(level)?,
+        None => PrivacyLevel::Public,
+    };
+
+    let bridge_request = ZkpBridgeRequest {
+        claim: request.claim.as_bytes().to_vec(),
+        privacy_level,
+        circuit_name: Some(request.circuit_name),
+        witness: request.witness,
+        public_inputs: request.public_inputs,
+        membership_set: None,
+        membership_index: None,
+    };
+
+    match zkp_api::generate_zkp_with_circuit(&bridge_request, &state.circuit_registry) {
+        Ok(proof) => Ok(Json(ProofResponse {
+            success: true,
+            proof: Some(proof),
+            verified: None,
+            error: None,
+        })),
+        Err(e) => Ok(Json(ProofResponse {
+            success: false,
+            proof: None,
+            verified: None,
+            error: Some(e.to_string()),
+        })),
+    }
 }
 
 /// Start the API server (plain HTTP)

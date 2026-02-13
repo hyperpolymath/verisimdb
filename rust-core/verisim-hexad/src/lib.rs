@@ -23,6 +23,13 @@ pub use verisim_vector::{Embedding, VectorStore};
 mod store;
 pub use store::{HexadSnapshot, InMemoryHexadStore};
 
+// Homoiconicity: queries as hexads
+pub mod query_hexad;
+pub use query_hexad::{QueryHexadBuilder, QueryExecution};
+
+// ACID transaction manager for cross-modality atomicity
+pub mod transaction;
+
 /// Hexad errors
 #[derive(Error, Debug)]
 pub enum HexadError {

@@ -187,7 +187,7 @@ The exact overhead depends on:
 
 Specifically:
 
-* **GQL-DT Lean types are defined** in the `gql-dt/` directory. These specify the type-theoretic contracts for each proof type.
+* **VQL-DT Lean types are defined** in the `vql-dt/` directory. These specify the type-theoretic contracts for each proof type.
 * **The VQL parser correctly parses `PROOF` clauses** and produces AST nodes with the proof type and contract name.
 * **The query router detects `PROOF` clauses** and routes to the dependent-type path.
 * **The dependent-type execution path is a stub.** It does not currently invoke the Lean type checker. Queries with `PROOF` clauses execute but do not generate real proof certificates.
@@ -259,7 +259,7 @@ The key difference is that VQL-DT returns a tuple of `(data, proof_certificate)`
 
 |Phase 2
 |Lean type definitions for all six proof types with contract specifications.
-|Done (gql-dt/)
+|Done (vql-dt/)
 
 |Phase 3
 |Wire Lean type checker into the VQL-DT execution path. Proof obligations generated from AST, checked against Lean definitions.

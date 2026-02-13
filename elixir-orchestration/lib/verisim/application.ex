@@ -43,10 +43,13 @@ defmodule VeriSim.Application do
         peers: Application.get_env(:verisim, :kraft_peers, [])},
 
       # Federation resolver
-      VeriSim.Federation.Resolver
+      VeriSim.Federation.Resolver,
+
+      # Health checker (periodic liveness probing)
+      VeriSim.HealthChecker
     ]
 
-    opts = [strategy: :one_for_one, name: VeriSim.Supervisor]
+    opts = [strategy: :rest_for_one, name: VeriSim.Supervisor, max_restarts: 10, max_seconds: 60]
     Supervisor.start_link(children, opts)
   end
 end

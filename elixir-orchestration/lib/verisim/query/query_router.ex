@@ -110,15 +110,31 @@ defmodule VeriSim.QueryRouter do
   end
 
   defp execute_query(:semantic, %{types: types}, opts) do
-    # Type-based query - find all entities of given types
-    # This would be implemented via the semantic store
+    # Type-based query: search for entities matching a type IRI via text search
     limit = Keyword.get(opts, :limit, 10)
-    {:ok, []}  # Placeholder
+
+    types
+    |> List.wrap()
+    |> Enum.flat_map(fn type_iri ->
+      case RustClient.search_text("type:#{type_iri}", limit) do
+        {:ok, results} -> results
+        {:error, _} -> []
+      end
+    end)
+    |> Enum.uniq_by(& &1["id"])
+    |> Enum.take(limit)
+    |> then(&{:ok, &1})
   end
 
-  defp execute_query(:temporal, %{entity_id: entity_id, time: time}, _opts) do
-    # Get entity state at a specific time
-    {:ok, nil}  # Placeholder
+  defp execute_query(:temporal, %{entity_id: entity_id} = params, _opts) do
+    # Get entity version at a specific timestamp
+    query_params =
+      case Map.get(params, :time) do
+        nil -> []
+        time -> [at: to_string(time)]
+      end
+
+    RustClient.get("/hexads/#{entity_id}/versions", query_params)
   end
 
   defp execute_query(:multi, params, opts) do

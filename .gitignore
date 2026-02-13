@@ -47,6 +47,14 @@ erl_crash.dump
 # ReScript
 /lib/bs/
 /.bsb.lock
+*.res.mjs
+
+# Playground build artifacts
+/playground/node_modules/
+/playground/lib/
+/playground/public/app.js
+/playground/public/app.js.map
+/playground/deno.lock
 
 # Python (SaltStack only)
 __pycache__/

@@ -231,8 +231,12 @@ defmodule VeriSim.SchemaRegistry do
     end
   end
 
+  defp validate_constraint(_entity, %{kind: kind, message: _msg}) do
+    {:error, "Unknown constraint type: #{inspect(kind)}"}
+  end
+
   defp validate_constraint(_entity, _constraint) do
-    :ok
+    {:error, "Malformed constraint: missing kind or message"}
   end
 
   defp compute_hierarchy(iri, types, visited) do

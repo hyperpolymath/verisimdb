@@ -19,6 +19,7 @@ thiserror.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
+hex = "0.4"
 
 [features]
 default = ["regex"]

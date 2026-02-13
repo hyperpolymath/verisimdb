@@ -5,6 +5,12 @@
 //! Implements Marr's Computational Level: "What does this mean?"
 
 pub mod zkp;
+pub mod zkp_bridge;
+pub mod proven_bridge;
+pub mod sanctify_bridge;
+pub mod circuit_registry;
+pub mod circuit_compiler;
+pub mod verification_keys;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
