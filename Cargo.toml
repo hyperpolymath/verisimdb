@@ -16,6 +16,9 @@ members = [
     "rust-core/verisim-drift",
     "rust-core/verisim-planner",
     "rust-core/verisim-api",
+    "rust-core/verisim-repl",
+    "rust-core/verisim-wal",
+    "benches",
 ]
 
 [workspace.package]
@@ -87,6 +90,9 @@ uuid = { version = "1.11", features = ["v4"] }
 
 # Regex
 regex = "1.11"
+
+# CRC (WAL integrity)
+crc32fast = "1.4"
 
 # Cryptography (ZKP proofs in semantic store)
 sha2 = "0.10"

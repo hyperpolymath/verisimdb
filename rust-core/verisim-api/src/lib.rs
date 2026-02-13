@@ -4,6 +4,7 @@
 //! HTTP API server for VeriSimDB.
 //! Exposes all database functionality via REST endpoints.
 
+pub mod auth;
 pub mod federation;
 pub mod graphql;
 pub mod grpc;
@@ -11,6 +12,7 @@ pub mod grpc;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    middleware as axum_middleware,
     response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
@@ -355,6 +357,7 @@ pub struct AppState {
     pub normalizer: Arc<Normalizer>,
     pub planner: Arc<Mutex<Planner>>,
     pub federation: federation::FederationState,
+    pub auth: auth::AuthState,
     pub config: ApiConfig,
 }
 
@@ -401,6 +404,8 @@ impl AppState {
             self_endpoint,
         );
 
+        let auth = auth::AuthState::default();
+
         Ok(Self {
             start_time: std::time::Instant::now(),
             hexad_store,
@@ -408,6 +413,7 @@ impl AppState {
             normalizer,
             planner,
             federation,
+            auth,
             config,
         })
     }
@@ -416,6 +422,7 @@ impl AppState {
 /// Build the API router
 pub fn build_router(state: AppState) -> Router {
     let federation_routes = federation::federation_router(state.federation.clone());
+    let auth_state = state.auth.clone();
 
     Router::new()
         // Health endpoints
@@ -436,12 +443,20 @@ pub fn build_router(state: AppState) -> Router {
         .route("/drift/entity/{id}", get(entity_drift_handler))
         .route("/normalizer/status", get(normalizer_status_handler))
         .route("/normalizer/trigger/{id}", post(trigger_normalization_handler))
+        // Meta-query store (homoiconicity: queries as hexads)
+        .route("/queries", post(store_query_handler))
+        .route("/queries/similar", post(similar_queries_handler))
         // Query planner
         .route("/query/plan", post(query_plan_handler))
         .route("/query/explain", post(query_explain_handler))
         .route("/planner/config", get(get_planner_config_handler))
         .route("/planner/config", put(put_planner_config_handler))
         .route("/planner/stats", get(planner_stats_handler))
+        // Authentication middleware layer
+        .layer(axum_middleware::from_fn_with_state(
+            auth_state,
+            auth::auth_middleware,
+        ))
         .with_state(state.clone())
         // GraphQL endpoint
         .merge(graphql::graphql_router(state))

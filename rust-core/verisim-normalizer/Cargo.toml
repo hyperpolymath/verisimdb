@@ -25,3 +25,6 @@ prometheus.workspace = true
 proptest.workspace = true
 verisim-document = { path = "../verisim-document" }
 verisim-vector = { path = "../verisim-vector" }
+verisim-graph = { path = "../verisim-graph" }
+verisim-semantic = { path = "../verisim-semantic" }
+verisim-tensor = { path = "../verisim-tensor" }
