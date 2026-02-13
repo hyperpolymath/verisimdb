@@ -180,17 +180,16 @@ public export
 Callback : Type
 Callback = Bits64 -> Bits32 -> Bits32
 
-||| Register a callback
+||| Register a callback — FFI declaration typed to accept callback directly
 export
 %foreign "C:{{project}}_register_callback, lib{{project}}"
-prim__registerCallback : Bits64 -> AnyPtr -> PrimIO Bits32
+prim__registerCallback : Bits64 -> (Bits64 -> Bits32 -> Bits32) -> PrimIO Bits32
 
-||| Safe callback registration
+||| Safe callback registration (no believe_me — callback type matches FFI declaration)
 export
 registerCallback : Handle -> Callback -> IO (Either Result ())
 registerCallback h cb = do
--- PROOF_TODO: Replace believe_me with actual proof
-  result <- primIO (prim__registerCallback (handlePtr h) (believe_me cb))
+  result <- primIO (prim__registerCallback (handlePtr h) cb)
   pure $ case resultFromInt result of
     Just Ok => Right ()
     Just err => Left err

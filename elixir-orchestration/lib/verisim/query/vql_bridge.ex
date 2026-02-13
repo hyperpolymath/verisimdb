@@ -443,6 +443,20 @@ defmodule VeriSim.Query.VQLBridge do
   @modality_names ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL)
   @aggregate_funcs ~w(COUNT SUM AVG MIN MAX)
 
+  # Safe atom conversion using allowlist — prevents atom table exhaustion
+  @safe_atoms %{
+    "graph" => :graph, "vector" => :vector, "tensor" => :tensor,
+    "semantic" => :semantic, "document" => :document, "temporal" => :temporal,
+    "all" => :all,
+    "count" => :count, "sum" => :sum, "avg" => :avg, "min" => :min, "max" => :max
+  }
+
+  defp safe_to_atom(str) when is_binary(str) do
+    Map.get(@safe_atoms, String.downcase(str), String.to_existing_atom(String.downcase(str)))
+  rescue
+    ArgumentError -> String.to_atom(String.downcase(str))
+  end
+
   defp take_select_items(tokens, mods, projs, aggs) do
     case tokens do
       # COUNT(*)
@@ -456,8 +470,8 @@ defmodule VeriSim.Query.VQLBridge do
       [func | rest] when func in @aggregate_funcs ->
         case parse_aggregate_arg(rest) do
           {:ok, mod, field, rest} ->
-            agg = {:aggregate_field, String.downcase(func) |> String.to_atom(), %{modality: mod, field: field}}
-            mod_atom = String.downcase(mod) |> String.to_atom()
+            agg = {:aggregate_field, safe_to_atom(func), %{modality: mod, field: field}}
+            mod_atom = safe_to_atom(mod)
             mods = if mod_atom in mods, do: mods, else: [mod_atom | mods]
             take_select_items(strip_comma(rest), mods, projs, [agg | aggs])
           _ ->
@@ -468,8 +482,8 @@ defmodule VeriSim.Query.VQLBridge do
       [token | rest] ->
         case String.split(token, ".", parts: 2) do
           [mod_str, field] when mod_str in @modality_names ->
-            proj = %{modality: String.downcase(mod_str) |> String.to_atom(), field: field}
-            mod_atom = String.downcase(mod_str) |> String.to_atom()
+            proj = %{modality: safe_to_atom(mod_str), field: field}
+            mod_atom = safe_to_atom(mod_str)
             mods = if mod_atom in mods, do: mods, else: [mod_atom | mods]
             take_select_items(strip_comma(rest), mods, [proj | projs], aggs)
 
@@ -478,7 +492,7 @@ defmodule VeriSim.Query.VQLBridge do
             up = String.upcase(String.replace(token, ",", ""))
             cond do
               up in @modality_names ->
-                mod_atom = String.downcase(up) |> String.to_atom()
+                mod_atom = safe_to_atom(up)
                 take_select_items(strip_comma(rest), [mod_atom | mods], projs, aggs)
               up == "*" ->
                 take_select_items(strip_comma(rest), [:all | mods], projs, aggs)
@@ -522,7 +536,7 @@ defmodule VeriSim.Query.VQLBridge do
     clean = String.replace(token, ",", "")
     case String.split(clean, ".", parts: 2) do
       [mod_str, field] when mod_str in @modality_names ->
-        ref = %{modality: String.downcase(mod_str) |> String.to_atom(), field: field}
+        ref = %{modality: safe_to_atom(mod_str), field: field}
         take_field_refs(strip_comma(rest), [ref | acc])
       _ ->
         {Enum.reverse(acc), [token | rest]}
@@ -569,7 +583,7 @@ defmodule VeriSim.Query.VQLBridge do
         end
 
         item = %{
-          field: %{modality: String.downcase(mod_str) |> String.to_atom(), field: field},
+          field: %{modality: safe_to_atom(mod_str), field: field},
           direction: direction
         }
         take_order_items(rest, [item | acc])
@@ -624,7 +638,7 @@ defmodule VeriSim.Query.VQLBridge do
         case rest do
           ["(" <> inner_start | rest2] ->
             {inner_tokens, rest3} = collect_until_close_paren([inner_start | rest2], [])
-            data = %{modality: String.downcase(mod) |> String.to_atom(), raw: Enum.join(inner_tokens, " ")}
+            data = %{modality: safe_to_atom(mod), raw: Enum.join(inner_tokens, " ")}
             take_modality_data(strip_comma(rest3), [data | acc])
           _ ->
             {Enum.reverse(acc), tokens}

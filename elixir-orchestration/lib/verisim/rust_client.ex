@@ -12,6 +12,67 @@ defmodule VeriSim.RustClient do
 
   @default_base_url "http://localhost:8080/api/v1"
   @default_timeout 30_000
+  @cache_table :verisim_rust_client_cache
+  @cache_ttl_ms 30_000  # 30 seconds default TTL
+
+  # ---------------------------------------------------------------------------
+  # ETS Cache — transparent read-through caching for hexad lookups and searches
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Initialize the ETS cache table. Call from application supervisor or init.
+  """
+  def init_cache do
+    if :ets.info(@cache_table) == :undefined do
+      :ets.new(@cache_table, [:set, :public, :named_table, read_concurrency: true])
+    end
+    :ok
+  end
+
+  @doc """
+  Clear all cached entries.
+  """
+  def clear_cache do
+    if :ets.info(@cache_table) != :undefined do
+      :ets.delete_all_objects(@cache_table)
+    end
+    :ok
+  end
+
+  @doc """
+  Invalidate a specific cache key (e.g., after a write operation).
+  """
+  def invalidate_cache(key) do
+    if :ets.info(@cache_table) != :undefined do
+      :ets.delete(@cache_table, key)
+    end
+    :ok
+  end
+
+  defp cache_get(key) do
+    if :ets.info(@cache_table) != :undefined do
+      case :ets.lookup(@cache_table, key) do
+        [{^key, value, expiry}] ->
+          if System.monotonic_time(:millisecond) < expiry do
+            {:hit, value}
+          else
+            :ets.delete(@cache_table, key)
+            :miss
+          end
+        _ -> :miss
+      end
+    else
+      :miss
+    end
+  end
+
+  defp cache_put(key, value, ttl_ms \\ @cache_ttl_ms) do
+    if :ets.info(@cache_table) != :undefined do
+      expiry = System.monotonic_time(:millisecond) + ttl_ms
+      :ets.insert(@cache_table, {key, value, expiry})
+    end
+    value
+  end
 
   # Configuration
 
@@ -57,11 +118,19 @@ defmodule VeriSim.RustClient do
   Get a hexad by ID.
   """
   def get_hexad(entity_id) do
-    case get("/hexads/#{entity_id}") do
-      {:ok, %{status: 200, body: body}} -> {:ok, body}
-      {:ok, %{status: 404}} -> {:error, :not_found}
-      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
-      {:error, reason} -> {:error, reason}
+    cache_key = {:hexad, entity_id}
+
+    case cache_get(cache_key) do
+      {:hit, cached} -> {:ok, cached}
+      :miss ->
+        case get("/hexads/#{entity_id}") do
+          {:ok, %{status: 200, body: body}} ->
+            cache_put(cache_key, body)
+            {:ok, body}
+          {:ok, %{status: 404}} -> {:error, :not_found}
+          {:ok, %{status: status, body: body}} -> {:error, {status, body}}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -70,7 +139,10 @@ defmodule VeriSim.RustClient do
   """
   def update_hexad(entity_id, changes) do
     case put("/hexads/#{entity_id}", changes) do
-      {:ok, %{status: 200, body: body}} -> {:ok, body}
+      {:ok, %{status: 200, body: body}} ->
+        invalidate_cache({:hexad, entity_id})
+        invalidate_cache({:drift, entity_id})
+        {:ok, body}
       {:ok, %{status: 404}} -> {:error, :not_found}
       {:ok, %{status: status, body: body}} -> {:error, {status, body}}
       {:error, reason} -> {:error, reason}
@@ -82,8 +154,14 @@ defmodule VeriSim.RustClient do
   """
   def delete_hexad(entity_id) do
     case delete("/hexads/#{entity_id}") do
-      {:ok, %{status: 204}} -> :ok
-      {:ok, %{status: 200}} -> :ok
+      {:ok, %{status: 204}} ->
+        invalidate_cache({:hexad, entity_id})
+        invalidate_cache({:drift, entity_id})
+        :ok
+      {:ok, %{status: 200}} ->
+        invalidate_cache({:hexad, entity_id})
+        invalidate_cache({:drift, entity_id})
+        :ok
       {:ok, %{status: 404}} -> {:error, :not_found}
       {:ok, %{status: status, body: body}} -> {:error, {status, body}}
       {:error, reason} -> {:error, reason}
@@ -132,11 +210,19 @@ defmodule VeriSim.RustClient do
   Get the drift score for an entity.
   """
   def get_drift_score(entity_id) do
-    case get("/drift/entity/#{entity_id}") do
-      {:ok, %{status: 200, body: %{"score" => score}}} -> {:ok, score}
-      {:ok, %{status: 404}} -> {:ok, 0.0}
-      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
-      {:error, reason} -> {:error, reason}
+    cache_key = {:drift, entity_id}
+
+    case cache_get(cache_key) do
+      {:hit, cached} -> {:ok, cached}
+      :miss ->
+        case get("/drift/entity/#{entity_id}") do
+          {:ok, %{status: 200, body: %{"score" => score}}} ->
+            cache_put(cache_key, score, 10_000)  # Short TTL — drift changes frequently
+            {:ok, score}
+          {:ok, %{status: 404}} -> {:ok, 0.0}
+          {:ok, %{status: status, body: body}} -> {:error, {status, body}}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -175,9 +261,9 @@ defmodule VeriSim.RustClient do
     end
   end
 
-  # Private HTTP Helpers
+  # HTTP Helpers (public: get/2 and post/2 used by Federation.Resolver)
 
-  defp get(path, params \\ []) do
+  def get(path, params \\ []) do
     url = base_url() <> path
 
     Req.get(url,
@@ -189,7 +275,7 @@ defmodule VeriSim.RustClient do
     e -> {:error, {:request_failed, e}}
   end
 
-  defp post(path, body) do
+  def post(path, body) do
     url = base_url() <> path
 
     Req.post(url,

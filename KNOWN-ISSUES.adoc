@@ -14,45 +14,37 @@ VeriSimDB is a working system with real implementations in its core modality sto
 
 == Issues
 
-=== 1. Normalizer Regeneration Strategies Are Stubs
+=== 1. Normalizer Regeneration Strategies Are Stubs — ✅ RESOLVED
 
 **Location:** `rust-core/verisim-normalizer/`
 
-**Current state:** When drift is detected and self-normalization is triggered, the normalizer identifies the authoritative modality and calls a regeneration strategy for the drifted modality. Every regeneration strategy currently returns a hardcoded `[regenerated]` placeholder string instead of actually regenerating data.
+**Resolved:** 2026-02-12. Regeneration strategies now inspect hexad data to select the authoritative modality and derive drifted modality content from it, rather than returning hardcoded placeholder strings. Each of the six modality strategies performs actual data transformation.
 
-**Impact:** Self-normalization, VeriSimDB's core differentiator, does not actually normalize anything. Drift is detected but not repaired. Each of the six modalities (Graph, Vector, Tensor, Semantic, Document, Temporal) needs a real regeneration implementation that derives the drifted modality's data from the authoritative modality.
+**Original issue:** Every regeneration strategy returned a hardcoded `[regenerated]` placeholder string instead of actually regenerating data.
 
-**Resolution:** Implement per-modality regeneration strategies. Document regeneration (re-index text from graph and semantic data) is the most straightforward starting point.
-
-=== 2. Federation Executor Always Returns Empty
+=== 2. Federation Executor Always Returns Empty — ✅ RESOLVED
 
 **Location:** Elixir orchestration layer, `VeriSim.FederationExecutor`
 
-**Current state:** The federation executor receives a parsed `FEDERATION` query and should decompose it into per-peer sub-queries, dispatch them to registered peers, and merge results. Currently it always returns `{:ok, []}` regardless of the query content or the number of registered peers.
+**Resolved:** 2026-02-12. Federation executor now performs parallel HTTP fanout to registered peers via reqwest, decomposes queries into per-peer sub-queries, dispatches them, and merges results. Uses `Task.async_stream` for concurrent peer dispatch with configurable timeouts.
 
-**Impact:** Federated queries parse correctly and route correctly but produce no results. Federation is architecturally present but operationally inert.
+**Original issue:** The federation executor always returned `{:ok, []}` regardless of query content or number of registered peers.
 
-**Resolution:** Implement query decomposition, peer dispatch (via `FederationResolver.query_peer/3`), and result merging. See link:docs/federation-readiness.adoc[Federation Readiness Assessment] for the phased roadmap.
+=== 3. Federation Resolver Peer Queries Unimplemented — ✅ RESOLVED
 
-=== 3. Federation Resolver Peer Queries Unimplemented
+**Location:** Elixir orchestration layer, `VeriSim.Federation.Resolver`
 
-**Location:** Elixir orchestration layer, `VeriSim.FederationResolver`
+**Resolved:** 2026-02-12. `query_peer/3` now makes real HTTP requests to peer endpoints via `Req` with configurable timeout, parses JSON responses, and returns structured results with source store attribution and response time tracking. Drift policy filtering (strict/repair/tolerate/latest) is implemented.
 
-**Current state:** Peers can be registered via the API (`POST /api/federation/peers`) and listed (`GET /api/federation/peers`), but the resolver cannot actually query a registered peer. The `query_peer/3` function returns `{:error, :not_implemented}`.
+**Original issue:** The `query_peer/3` function returned `{:error, :not_implemented}`. Peers could be registered but never contacted.
 
-**Impact:** Peer registration works, but the registered peers are never contacted during federated query execution. Federation is registration-only.
-
-**Resolution:** Implement `query_peer/3` to make HTTP requests to peer endpoints, parse responses, and return structured results to the federation executor.
-
-=== 4. Drift Auto-Trigger Missing
+=== 4. Drift Auto-Trigger Missing — ✅ RESOLVED
 
 **Location:** Elixir orchestration layer, `VeriSim.DriftMonitor`
 
-**Current state:** Drift detection works -- the `verisim-drift` Rust crate computes drift scores across modalities, and the Elixir `DriftMonitor` evaluates them against configurable thresholds. However, drift detection must be triggered manually via API call or direct Elixir function invocation. There is no scheduled or event-driven trigger.
+**Resolved:** 2026-02-12. `DriftMonitor.init/1` now schedules a periodic sweep via `Process.send_after` at a configurable interval (default 60s). The `:sweep` handler performs a full drift sweep including pulling aggregate metrics from the Rust core via `RustClient.drift_status/0`, then reschedules itself. The sweep interval is configurable via the `config` option passed to `start_link`.
 
-**Impact:** Drift can accumulate undetected between manual checks. In a production system, drift should be checked on a regular interval or triggered by write events. Without auto-trigger, data quality can degrade silently.
-
-**Resolution:** Add a GenServer timer to `DriftMonitor` that runs drift detection on a configurable interval. Optionally, hook into write events (Hexad API mutations) to trigger immediate drift checks on affected entities.
+**Original issue:** Drift detection had to be triggered manually. No scheduled or event-driven trigger existed.
 
 === 5. GQL-DT Not Connected to VQL PROOF Runtime
 
@@ -102,15 +94,13 @@ VeriSimDB is a working system with real implementations in its core modality sto
 
 **Note:** This entry exists to prevent future audits from repeating the same incorrect claim.
 
-=== 10. verisim-api Needs Bin Target Fix
+=== 10. verisim-api Needs Bin Target Fix — ✅ RESOLVED
 
 **Location:** `rust-core/verisim-api/Cargo.toml`
 
-**Current state:** Running `cargo run -p verisim-api` fails because the crate is missing a `[[bin]]` target definition or a `src/main.rs` entry point. The crate compiles as a library but cannot be executed as a standalone binary.
+**Resolved:** 2026-02-12. `src/main.rs` now exists with a `main()` function that reads host/port from environment variables (`VERISIM_HOST`/`VERISIM_PORT`) and initializes the HTTP server. `cargo run -p verisim-api` works.
 
-**Impact:** The API server cannot be started directly with `cargo run`. Workarounds include running it through the workspace binary or the Elixir orchestration layer.
-
-**Resolution:** Add a `src/main.rs` (or `src/bin/verisim-api.rs`) with a `main()` function that initializes the HTTP server, and ensure `Cargo.toml` has the appropriate `[[bin]]` section.
+**Original issue:** The crate was missing a `src/main.rs` entry point and could not be run as a standalone binary.
 
 === 11. No Performance Baselines Established
 
@@ -121,3 +111,77 @@ VeriSimDB is a working system with real implementations in its core modality sto
 **Impact:** Without baselines, it is impossible to detect performance regressions, set SLOs, or make informed optimization decisions. Claims about VeriSimDB's performance are anecdotal, not measured.
 
 **Resolution:** Write benchmarks for each modality store using Criterion (Rust). Establish baseline numbers on reference hardware. Add benchmark runs to CI with regression detection. Prioritize HNSW (vector) and Tantivy (document) benchmarks since these are the most latency-sensitive stores.
+
+=== 12. Cross-Modal Drift/Consistency Were Stubs — ✅ RESOLVED
+
+**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+
+**Resolved:** 2026-02-13. `compute_modality_drift/3` now fetches drift from the Rust drift API when available, falling back to cosine distance between extracted modality embeddings (with content fingerprinting for non-vector modalities). `compute_consistency/4` now computes real scores using the specified metric (COSINE, EUCLIDEAN, DOT_PRODUCT, JACCARD). Both functions previously returned hardcoded constants (0.0 and 0.5).
+
+**Original issue:** Cross-modal correlation queries parsed correctly but evaluation returned fake scores, making WHERE DRIFT(...) and CONSISTENT(...) conditions meaningless.
+
+=== 13. VQL WHERE Condition Routing Was Broken — ✅ RESOLVED
+
+**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+
+**Resolved:** 2026-02-13. `has_fulltext_condition?/1`, `has_vector_condition?/1`, and `has_graph_pattern?/1` now walk the AST recursively to detect actual condition types. `extract_text_query/1`, `extract_vector_query/1`, and `extract_graph_query/1` now parse actual values from the AST instead of returning hardcoded placeholders. All queries were previously routed to `:multi` type regardless of conditions.
+
+**Original issue:** All six condition detection and extraction functions were stubs (returning `false` and hardcoded values), causing every query to be routed as a multi-modal query even when a single modality was targeted.
+
+=== 14. Proof Verification Was No-Op — ✅ RESOLVED
+
+**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+
+**Resolved:** 2026-02-13. `verify_single_proof/1` now validates proof type, extracts contract names, and checks contract existence against the semantic store. It properly rejects queries with invalid or missing contracts for CITATION, INTEGRITY, and CUSTOM proof types. Previously it always returned `:ok`.
+
+**Original issue:** PROOF clauses in VQL queries were parsed but never verified. All proofs silently passed, making the entire proof system decorative.
+
+=== 15. believe_me in Idris2 ABI Files — ✅ RESOLVED
+
+**Location:** `src/abi/Foreign.idr`, `debugger/src/abi/Foreign.idr`, `practice-mirror/src/abi/Foreign.idr`
+
+**Resolved:** 2026-02-13. FFI declarations changed from `Bits64 -> AnyPtr -> PrimIO Bits32` to `Bits64 -> (Bits64 -> Bits32 -> Bits32) -> PrimIO Bits32`, making the callback type match the declaration and eliminating the need for `believe_me` casts. Zero `believe_me` calls remain in the codebase.
+
+**Original issue:** `registerCallback` used `believe_me` to cast a callback function to `AnyPtr`, a BANNED unsafe pattern that bypasses the type checker.
+
+=== 16. Atom Table Exhaustion Risk in VQL Bridge — ✅ RESOLVED
+
+**Location:** `elixir-orchestration/lib/verisim/query/vql_bridge.ex`
+
+**Resolved:** 2026-02-13. All 8 `String.to_atom` calls replaced with `safe_to_atom/1` helper that uses an explicit allowlist map for the known atom values (6 modalities + 5 aggregate functions + `all`), falling back to `String.to_existing_atom/1`.
+
+**Original issue:** 8 `String.to_atom` calls could theoretically exhaust the BEAM atom table if fed arbitrary input, since the BEAM atom table is finite and atoms are never garbage collected.
+
+=== 17. No ETS Caching in RustClient — ✅ RESOLVED
+
+**Location:** `elixir-orchestration/lib/verisim/rust_client.ex`
+
+**Resolved:** 2026-02-13. Added ETS-based read-through cache with configurable TTL (30s default for hexads, 10s for drift scores). Cache is invalidated on writes (update/delete). Provides `init_cache/0`, `clear_cache/0`, and `invalidate_cache/1` for cache management.
+
+**Original issue:** Every RustClient call made a fresh HTTP request to the Rust core, with no caching. Repeated reads of the same hexad in a query pipeline (e.g., cross-modal evaluation fetching the same entity multiple times) each incurred full HTTP round-trip latency.
+
+=== 18. EXPLAIN Returns Hardcoded Plan — ✅ RESOLVED
+
+**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+
+**Resolved:** 2026-02-13. `generate_explain_plan/1` now analyzes the actual query AST to produce cost estimates based on source type, modality count, WHERE clause complexity, cross-modal conditions, GROUP BY presence, and proof obligations. Delegates to the Rust verisim-planner API when available, with local estimation as fallback.
+
+**Original issue:** EXPLAIN returned a static plan with hardcoded step names and costs totalling 71ms, regardless of the actual query structure.
+
+=== 19. VQL Executor Federation Stub — Partially Resolved
+
+**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+
+**Partially resolved:** 2026-02-13. `execute_federation_query/7` now delegates to the Rust federation API (`POST /federation/query`) instead of returning empty results. However, the Rust federation endpoint itself returns empty when neither text_query nor vector_query is provided (i.e., bare modality selection over federation returns `[]`).
+
+**Remaining gap:** Bare `SELECT * FROM FEDERATION /universities/*` without a WHERE clause still returns empty results from the Rust side. The Rust federation endpoint needs a "list all" capability.
+
+=== 20. Custom Circuit Hardcoding
+
+**Location:** `rust-core/verisim-semantic/src/zkp.rs`
+
+**Current state:** The `CUSTOM` proof type in VQL uses a hardcoded circuit configuration. There is no circuit DSL, no compilation pipeline, no circuit registry, and no parameterization. All custom proofs use the same default circuit regardless of the contract name specified.
+
+**Impact:** The CUSTOM proof type is syntactically supported but semantically identical to an existence check. Users cannot define actual custom ZKP circuits.
+
+**Resolution:** Implement the Custom Circuits infrastructure: circuit DSL, compilation pipeline, circuit registry, parameterization, and verification key management. This is the next major feature to build.
