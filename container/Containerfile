@@ -10,7 +10,10 @@
 # Stage 1: Build Rust
 FROM cgr.dev/chainguard/wolfi-base:latest AS rust-builder
 
-RUN apk add --no-cache rust openssl-dev pkgconf build-base
+RUN apk add --no-cache rust openssl-dev pkgconf build-base protoc clang-19
+
+ENV LIBCLANG_PATH=/usr/lib
+ENV PROTOC=/usr/bin/protoc
 
 WORKDIR /build
 
