@@ -89,11 +89,12 @@ regex = "1.11"
 sha2 = "0.10"
 
 # GraphQL
-async-graphql = "8.0.0-rc.2"
-async-graphql-axum = "8.0.0-rc.2"
+async-graphql = "7.2"
+async-graphql-axum = "7.2"
 
 # gRPC
 tonic = "0.14"
+tonic-prost = "0.14"
 prost = "0.14"
 prost-types = "0.14"
 

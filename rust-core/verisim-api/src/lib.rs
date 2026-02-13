@@ -5,6 +5,8 @@
 //! Exposes all database functionality via REST endpoints.
 
 pub mod federation;
+pub mod graphql;
+pub mod grpc;
 
 use axum::{
     extract::{Path, Query, State},
@@ -388,7 +390,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/planner/config", get(get_planner_config_handler))
         .route("/planner/config", put(put_planner_config_handler))
         .route("/planner/stats", get(planner_stats_handler))
-        .with_state(state)
+        .with_state(state.clone())
+        // GraphQL endpoint
+        .merge(graphql::graphql_router(state))
         // Federation endpoints (separate state)
         .merge(federation_routes)
 }

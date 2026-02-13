@@ -4,18 +4,21 @@
 //! Exposes planner, hexad, search, drift, and normalizer operations
 //! via a GraphQL schema at `/graphql`.
 
-use std::sync::Arc;
-use std::sync::Mutex;
-
 use async_graphql::{
     Context, EmptySubscription, InputObject, Object, Schema, SimpleObject,
+    http::GraphiQLSource,
 };
-use serde::{Deserialize, Serialize};
+use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
+use axum::{
+    extract::State as AxumState,
+    response::{Html, IntoResponse},
+    routing::{get, post},
+    Router,
+};
 
 use verisim_planner::{
     ExplainOutput as PlannerExplainOutput,
-    LogicalPlan, Planner, PlannerConfig,
-    StatisticsCollector,
+    LogicalPlan,
 };
 
 use crate::AppState;
@@ -442,6 +445,29 @@ pub fn build_schema(state: AppState) -> VeriSimSchema {
     Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(state)
         .finish()
+}
+
+/// GraphQL request handler.
+async fn graphql_handler(
+    AxumState(schema): AxumState<VeriSimSchema>,
+    req: GraphQLRequest,
+) -> GraphQLResponse {
+    schema.execute(req.into_inner()).await.into()
+}
+
+/// GraphiQL playground handler.
+async fn graphiql_handler() -> impl IntoResponse {
+    Html(GraphiQLSource::build().endpoint("/graphql").finish())
+}
+
+/// Build the GraphQL axum router.
+pub fn graphql_router(state: AppState) -> Router {
+    let schema = build_schema(state);
+
+    Router::new()
+        .route("/graphql", post(graphql_handler))
+        .route("/graphiql", get(graphiql_handler))
+        .with_state(schema)
 }
 
 // ============================================================================
