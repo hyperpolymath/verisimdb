@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::TcpListener;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use std::sync::Mutex;
 
@@ -69,15 +69,21 @@ pub enum ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
-        let (status, message) = match self {
-            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
-            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
-            ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            ApiError::Serialization(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+        let (status, client_message) = match &self {
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            ApiError::Internal(msg) => {
+                error!(error = %msg, "Internal server error");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+            }
+            ApiError::Serialization(msg) => {
+                error!(error = %msg, "Serialization error");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+            }
         };
 
         let body = Json(ErrorResponse {
-            error: message,
+            error: client_message,
             code: status.as_u16(),
         });
 
@@ -593,7 +599,8 @@ pub struct RelatedQuery {
 async fn drift_status_handler(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DriftStatusResponse>>, ApiError> {
-    let all_metrics = state.drift_detector.all_metrics();
+    let all_metrics = state.drift_detector.all_metrics()
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let responses: Vec<DriftStatusResponse> = all_metrics
         .iter()
@@ -629,7 +636,8 @@ async fn entity_drift_handler(
         .ok_or_else(|| ApiError::NotFound(format!("Hexad {} not found", id)))?;
 
     // Get aggregate health from drift detector
-    let all_metrics = state.drift_detector.all_metrics();
+    let all_metrics = state.drift_detector.all_metrics()
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     let (worst_type, worst_score) = all_metrics
         .iter()
         .max_by(|a, b| a.1.current_score.partial_cmp(&b.1.current_score).unwrap_or(std::cmp::Ordering::Equal))

@@ -9,6 +9,7 @@ use async_graphql::{
     http::GraphiQLSource,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
+use tracing::error;
 use axum::{
     extract::State as AxumState,
     response::{Html, IntoResponse},
@@ -203,7 +204,10 @@ impl QueryRoot {
                 version_count: h.version_count,
             })),
             Ok(None) => Ok(None),
-            Err(e) => Err(async_graphql::Error::new(e.to_string())),
+            Err(e) => {
+                error!(error = %e, "GraphQL hexad query failed");
+                Err(async_graphql::Error::new("Internal server error"))
+            }
         }
     }
 
@@ -222,7 +226,10 @@ impl QueryRoot {
             .hexad_store
             .search_text(&query, limit)
             .await
-            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+            .map_err(|e| {
+                error!(error = %e, "GraphQL text search failed");
+                async_graphql::Error::new("Internal server error")
+            })?;
 
         Ok(hexads
             .iter()
@@ -238,7 +245,8 @@ impl QueryRoot {
     /// Get drift status for all drift types.
     async fn drift_status(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<DriftStatus>> {
         let state = ctx.data::<AppState>()?;
-        let all_metrics = state.drift_detector.all_metrics();
+        let all_metrics = state.drift_detector.all_metrics()
+            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
         Ok(all_metrics
             .iter()

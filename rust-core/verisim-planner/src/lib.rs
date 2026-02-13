@@ -12,6 +12,7 @@ pub mod explain;
 pub mod optimizer;
 pub mod plan;
 pub mod stats;
+pub mod vql_bridge;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
