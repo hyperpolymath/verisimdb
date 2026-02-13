@@ -32,8 +32,8 @@ use serde::{Deserialize, Serialize};
 
 use super::circuit_registry::{CircuitError, CircuitRegistry};
 use super::zkp::{
-    self, commit, hash, merkle_proof, merkle_root, verify_commitment, verify_merkle_proof,
-    verify_proof, HashCommitment, MerkleProof, VerifiableProofData,
+    commit, hash, merkle_proof, merkle_root, verify_merkle_proof,
+    verify_proof, VerifiableProofData,
 };
 
 /// Privacy level for proof generation

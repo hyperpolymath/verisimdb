@@ -38,9 +38,9 @@ let highlightVql = (text: string, ~vqlDt: bool=false): string => {
       result := result.contents ++ `<span class="cmt">${slice}</span>`
     }
     // Words
-    else if Js.Re.test(ch, %re("/[a-zA-Z_]/")) {
+    else if Js.Re.test_(%re("/[a-zA-Z_]/"), ch) {
       let start = i.contents
-      while i.contents < len && Js.Re.test(chars[i.contents]->Option.getOr(""), %re("/[a-zA-Z0-9_]/")) {
+      while i.contents < len && Js.Re.test_(%re("/[a-zA-Z0-9_]/"), chars[i.contents]->Option.getOr("")) {
         i := i.contents + 1
       }
       let word = String.slice(text, ~start, ~end=i.contents)
@@ -57,9 +57,9 @@ let highlightVql = (text: string, ~vqlDt: bool=false): string => {
       }
     }
     // Numbers
-    else if Js.Re.test(ch, %re("/[0-9]/")) {
+    else if Js.Re.test_(%re("/[0-9]/"), ch) {
       let start = i.contents
-      while i.contents < len && Js.Re.test(chars[i.contents]->Option.getOr(""), %re("/[0-9.]/")) {
+      while i.contents < len && Js.Re.test_(%re("/[0-9.]/"), chars[i.contents]->Option.getOr("")) {
         i := i.contents + 1
       }
       let num = String.slice(text, ~start, ~end=i.contents)

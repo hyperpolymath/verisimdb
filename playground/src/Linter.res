@@ -19,7 +19,9 @@ let severityToString = s =>
 let lint = (query: string, ~vqlDt: bool=false): array<diagnostic> => {
   let diagnostics = []
   let upper = String.toUpperCase(query)
-  let tokens = String.split(String.trim(upper), %re("/\s+/"))
+  let tokens =
+    Js.String2.splitByRe(String.trim(upper), %re("/\s+/"))
+    ->Array.filterMap(x => x)
 
   let has = tok => tokens->Array.includes(tok)
 

@@ -16,7 +16,7 @@ let vqlDtMode = ref(false)
 
 // === Initialization ===
 
-let init = () => {
+let rec init = () => {
   let editor = getElementById("editor")
   let output = getElementById("output")
   let lintBar = getElementById("lint-bar")
@@ -29,23 +29,23 @@ let init = () => {
   // === VQL-DT Toggle ===
   let updateMode = () => {
     if vqlDtMode.contents {
-      toggle["classList"]["add"]("active")
+      toggle["classList"]["add"]("active")->ignore
       modeBadge["className"] = "mode-badge vql-dt"
       modeBadge["textContent"] = "VQL-DT"
       statusMode["textContent"] = "Mode: VQL-DT (Dependent Types)"
-      statusBar["classList"]["add"]("vql-dt")
+      statusBar["classList"]["add"]("vql-dt")->ignore
     } else {
-      toggle["classList"]["remove"]("active")
+      toggle["classList"]["remove"]("active")->ignore
       modeBadge["className"] = "mode-badge vql"
       modeBadge["textContent"] = "VQL"
       statusMode["textContent"] = "Mode: VQL"
-      statusBar["classList"]["remove"]("vql-dt")
+      statusBar["classList"]["remove"]("vql-dt")->ignore
     }
   }
 
   addEventListener(toggle, "click", _ => {
     vqlDtMode := !vqlDtMode.contents
-    updateMode()
+    updateMode()->ignore
     // Re-lint current query
     let query = editor["value"]
     if String.trim(query) !== "" {
@@ -143,8 +143,8 @@ let init = () => {
       editor["value"] = Formatter.formatVql(query)
       // Trigger input event to update char count
       let inputEvent = document["createEvent"]("Event")
-      inputEvent["initEvent"]("input", true, true)
-      editor["dispatchEvent"](inputEvent)
+      inputEvent["initEvent"]("input", true, true)->ignore
+      editor["dispatchEvent"](inputEvent)->ignore
     }
   })
 
@@ -173,13 +173,13 @@ let init = () => {
     let len: int = exampleEls["length"]
     let i = ref(0)
     while i.contents < len {
-      let el = exampleEls[i.contents]
+      let el = exampleEls[i.contents]->Option.getExn
       addEventListener(el, "click", _ => {
         let q: string = el["getAttribute"]("data-query")
         editor["value"] = q
         let inputEvent = document["createEvent"]("Event")
-        inputEvent["initEvent"]("input", true, true)
-        editor["dispatchEvent"](inputEvent)
+        inputEvent["initEvent"]("input", true, true)->ignore
+        editor["dispatchEvent"](inputEvent)->ignore
       })
       i := i.contents + 1
     }

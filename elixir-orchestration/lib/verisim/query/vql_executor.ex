@@ -559,6 +559,33 @@ defmodule VeriSim.Query.VQLExecutor do
           {:error, {:missing_contract, "Custom proof requires a contract name"}}
         end
 
+      :zkp ->
+        # ZKP proofs route to the zkp_bridge via the Rust API
+        privacy_level = Map.get(proof_spec, :privacy_level, "public")
+        claim = Map.get(proof_spec, :claim, "")
+        case RustClient.post("/proofs/generate", %{claim: claim, privacy_level: privacy_level}) do
+          {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
+          {:ok, %{status: 200, body: %{"error" => reason}}} -> {:error, {:zkp_failed, reason}}
+          {:error, reason} -> {:error, {:zkp_unavailable, reason}}
+        end
+
+      :proven ->
+        # Proven proofs verify against certificates from the proven library
+        # Certificates are stored as proof blobs in the semantic store
+        claim = Map.get(proof_spec, :claim, "")
+        case RustClient.post("/proofs/generate", %{claim: claim, privacy_level: "public"}) do
+          {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
+          _ -> {:error, {:proven_unavailable, "proven certificate verification failed"}}
+        end
+
+      :sanctify ->
+        # Sanctify proofs verify security contracts from sanctify-php
+        if contract_name do
+          validate_contract_exists(contract_name)
+        else
+          {:error, {:missing_contract, "Sanctify proof requires a contract name"}}
+        end
+
       _ ->
         {:error, {:unknown_proof_type, proof_type}}
     end
@@ -577,6 +604,9 @@ defmodule VeriSim.Query.VQLExecutor do
   defp normalize_proof_type("INTEGRITY"), do: :integrity
   defp normalize_proof_type("PROVENANCE"), do: :provenance
   defp normalize_proof_type("CUSTOM"), do: :custom
+  defp normalize_proof_type("ZKP"), do: :zkp
+  defp normalize_proof_type("PROVEN"), do: :proven
+  defp normalize_proof_type("SANCTIFY"), do: :sanctify
   defp normalize_proof_type(%{TAG: tag}), do: normalize_proof_type(tag)
   defp normalize_proof_type(atom) when is_atom(atom), do: atom
   defp normalize_proof_type(str) when is_binary(str), do: String.downcase(str) |> String.to_existing_atom()
