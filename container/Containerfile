@@ -32,7 +32,7 @@ RUN cargo build --release -p verisim-api
 FROM cgr.dev/chainguard/wolfi-base:latest AS elixir-builder
 
 # Pin to OTP 27: mint 1.7.1 uses pkix_verify_hostname/3 removed in OTP 28
-RUN apk add --no-cache erl27-elixir-1.18 erlang-27 git build-base
+RUN apk add --no-cache erl27-elixir-1.18 erlang-27 erlang-27-dev git build-base
 
 WORKDIR /build
 
