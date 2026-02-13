@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-// VQL Type Checker - Dependent Type Verification
+// VQL Type Checker — Thin facade over VQLBidir bidirectional type inference
 //
-// Validates queries that use the PROOF clause require dependent-type
-// verification to ensure correctness before execution.
+// Maintains backward-compatible public API (checkQuery, planProofGeneration)
+// while delegating to the real type system in VQLBidir.
 
 module AST = VQLParser.AST
 module Error = VQLError
+module Types = VQLTypes
+module Ctx = VQLContext
+module Bidir = VQLBidir
+module ProofObl = VQLProofObligation
 
 // ============================================================================
-// Type Context
+// Type Context (backward-compatible)
 // ============================================================================
 
 type contractInfo = {
@@ -31,7 +35,7 @@ and primitiveType =
   | TFloat
   | TBool
   | TArray(primitiveType)
-  | TVector(int) // Fixed-size vector
+  | TVector(int)
   | TUuid
 
 type typeContext = {
@@ -41,12 +45,16 @@ type typeContext = {
 }
 
 // ============================================================================
-// Type Checking
+// Context construction
 // ============================================================================
 
 type typeCheckResult = Result<unit, Error.typeError>
 
-let makeTypeContext = (~contracts: Js.Dict.t<contractInfo>=Js.Dict.empty(), ~strictMode=true, ()): typeContext => {
+let makeTypeContext = (
+  ~contracts: Js.Dict.t<contractInfo>=Js.Dict.empty(),
+  ~strictMode=true,
+  (),
+): typeContext => {
   {
     contracts: contracts,
     availableModalities: [Graph, Vector, Tensor, Semantic, Document, Temporal],
@@ -54,150 +62,68 @@ let makeTypeContext = (~contracts: Js.Dict.t<contractInfo>=Js.Dict.empty(), ~str
   }
 }
 
+let createDefaultContext = (): typeContext => {
+  makeTypeContext(~strictMode=true, ())
+}
+
+// Convert old-style context to new bidirectional context
+let toBidirContext = (ctx: typeContext): Ctx.context => {
+  let bidirCtx = Ctx.defaultContext()
+
+  // Register contracts from old context
+  Js.Dict.entries(ctx.contracts)->Js.Array2.forEach(((name, info)) => {
+    let proofKind = Types.proofKindOfAstProofType(info.proofType)
+    let requiredMods = info.constraints->Belt.Array.keepMap(c => {
+      switch c {
+      | ModalityRequired(m) => Types.modalityTypeOfAstModality(m)
+      | _ => None
+      }
+    })
+    let spec: Ctx.contractSpec = {
+      name: name,
+      proofKind: proofKind,
+      requiredModalities: requiredMods,
+      requiredFields: [],
+      composableWith: [
+        Types.ExistenceProof,
+        Types.CitationProof,
+        Types.AccessProof,
+        Types.IntegrityProof,
+        Types.ProvenanceProof,
+        Types.CustomProof,
+      ],
+    }
+    Js.Dict.set(bidirCtx.contracts, name, spec)
+  })
+
+  bidirCtx
+}
+
+// ============================================================================
+// Public API (backward-compatible)
+// ============================================================================
+
 let checkQuery = (query: AST.query, context: typeContext): typeCheckResult => {
-  // Check if PROOF clause is present
-  switch query.proof {
-  | None => Ok() // No proof clause, no dependent-type checking needed
-  | Some(proofSpec) => {
-      // Verify contract exists
-      switch Js.Dict.get(context.contracts, proofSpec.contractName) {
-      | None =>
-        Error({
-          kind: Error.ContractNotFound(proofSpec.contractName),
-          hexad_id: None,
-          modality: None,
-          context: `Contract '${proofSpec.contractName}' not found in registry`,
-        })
-      | Some(contractInfo) => {
-          // Verify proof type matches
-          if contractInfo.proofType != proofSpec.proofType {
-            Error({
-              kind: Error.TypeMismatch({
-                expected: proofTypeToString(contractInfo.proofType),
-                found: proofTypeToString(proofSpec.proofType),
-              }),
-              hexad_id: None,
-              modality: None,
-              context: `Contract '${proofSpec.contractName}' expects ${proofTypeToString(contractInfo.proofType)} proof`,
-            })
-          } else {
-            // Verify constraints
-            checkConstraints(query, contractInfo, context)
-          }
-        }
-      }
+  // First: SQL-compat validation (HAVING requires GROUP BY, etc.)
+  switch checkSqlCompat(query) {
+  | Error(e) => Error(e)
+  | Ok() =>
+    // Delegate to bidirectional type checker
+    let bidirCtx = toBidirContext(context)
+    switch Bidir.synthesizeQuery(bidirCtx, query) {
+    | Ok(_type) => Ok()
+    | Error(typeErr) =>
+      // Convert Bidir.typeError to VQLError.typeError
+      Error({
+        kind: Error.TypeMismatch({
+          expected: "well-typed query",
+          found: Bidir.formatTypeError(typeErr),
+        }),
+        hexad_id: None,
+        modality: None,
+        context: Bidir.formatTypeError(typeErr),
+      })
     }
-  }
-}
-
-let checkConstraints = (
-  query: AST.query,
-  contractInfo: contractInfo,
-  _context: typeContext,
-): typeCheckResult => {
-  // Check each constraint
-  let results = contractInfo.constraints->Belt.Array.map(constraint => {
-    switch constraint {
-    | FieldMustExist(field) => checkFieldExists(query, field)
-    | FieldMustBeType(field, expectedType) => checkFieldType(query, field, expectedType)
-    | ModalityRequired(modality) => checkModalityRequired(query, modality)
-    | MinimumSelectivity(threshold) => checkSelectivity(query, threshold)
-    | MaxDriftThreshold(threshold) => checkDriftThreshold(query, threshold)
-    }
-  })
-
-  // Aggregate results - fail if any constraint fails
-  results->Belt.Array.reduce(Ok(), (acc, result) => {
-    switch (acc, result) {
-    | (Ok(), Ok()) => Ok()
-    | (Error(e), _) => Error(e)
-    | (_, Error(e)) => Error(e)
-    }
-  })
-}
-
-let checkFieldExists = (query: AST.query, field: string): typeCheckResult => {
-  // This is simplified - in real implementation, would analyze WHERE clause
-  // to see if field is referenced
-  switch query.where {
-  | None =>
-    Error({
-      kind: Error.MissingTypeAnnotation(field),
-      hexad_id: None,
-      modality: None,
-      context: `Required field '${field}' not found in query`,
-    })
-  | Some(_condition) =>
-    // In real implementation: analyze condition tree for field reference
-    Ok()
-  }
-}
-
-let checkFieldType = (
-  _query: AST.query,
-  _field: string,
-  _expectedType: primitiveType,
-): typeCheckResult => {
-  // Simplified - would analyze condition to infer field type
-  Ok()
-}
-
-let checkModalityRequired = (query: AST.query, modality: AST.modality): typeCheckResult => {
-  let hasModality = query.modalities->Belt.Array.some(m => m == modality || m == All)
-
-  if hasModality {
-    Ok()
-  } else {
-    Error({
-      kind: Error.ContractViolation({
-        contract: "modality-requirement",
-        reason: `Contract requires ${modalityToString(modality)} modality`,
-      }),
-      hexad_id: None,
-      modality: Some(modalityToString(modality)),
-      context: `Query must include ${modalityToString(modality)} modality`,
-    })
-  }
-}
-
-let checkSelectivity = (_query: AST.query, _threshold: float): typeCheckResult => {
-  // Simplified - would estimate query selectivity
-  Ok()
-}
-
-let checkDriftThreshold = (query: AST.query, threshold: float): typeCheckResult => {
-  // Check if drift policy allows threshold
-  switch query.source {
-  | Federation(_pattern, Some(driftPolicy)) => {
-      switch driftPolicy {
-      | Strict => Ok() // Strict always satisfies low drift
-      | Repair => Ok() // Repair ensures low drift
-      | Tolerate =>
-        // Tolerate might exceed threshold
-        Error({
-          kind: Error.ContractViolation({
-            contract: "drift-threshold",
-            reason: `Drift policy TOLERATE may exceed threshold ${Belt.Float.toString(threshold)}`,
-          }),
-          hexad_id: None,
-          modality: None,
-          context: "Use STRICT or REPAIR drift policy for low-drift guarantees",
-        })
-      | Latest => Ok() // Latest gets most recent, drift irrelevant
-      }
-    }
-  | Federation(_pattern, None) =>
-    // No drift policy specified, might violate threshold
-    Error({
-      kind: Error.ContractViolation({
-        contract: "drift-threshold",
-        reason: "No drift policy specified",
-      }),
-      hexad_id: None,
-      modality: None,
-      context: "Specify STRICT or REPAIR drift policy",
-    })
-  | Hexad(_) | Store(_) => Ok() // Single source, no drift
   }
 }
 
@@ -211,11 +137,11 @@ and proofPlan = {
   contract: string,
   proofType: AST.proofType,
   witnessFields: array<string>,
-  circuit: string, // ZKP circuit identifier
+  circuit: string,
   estimatedTimeMs: int,
 }
 
-let planProofGeneration = (query: AST.query, _context: typeContext): proofGenerationResult => {
+let planProofGeneration = (query: AST.query, context: typeContext): proofGenerationResult => {
   switch query.proof {
   | None =>
     Error({
@@ -224,67 +150,135 @@ let planProofGeneration = (query: AST.query, _context: typeContext): proofGenera
       modality: None,
       context: "No PROOF clause in query",
     })
-  | Some(proofSpec) => {
-      // Plan proof generation
-      let plan = {
-        contract: proofSpec.contractName,
-        proofType: proofSpec.proofType,
-        witnessFields: extractWitnessFields(query),
-        circuit: proofTypeToCircuit(proofSpec.proofType),
-        estimatedTimeMs: estimateProofTime(proofSpec.proofType),
+  | Some(proofSpecs) => {
+      let bidirCtx = toBidirContext(context)
+      let resolvedMods = Types.resolveModalities(query.modalities)
+      let resultInfo: Types.queryResultInfo = {
+        modalities: resolvedMods,
+        projections: [],
+        aggregates: [],
       }
-      Ok(plan)
+      switch ProofObl.generateObligations(bidirCtx, proofSpecs, resultInfo) {
+      | Error(msg) =>
+        Error({
+          kind: Error.ProofGenerationFailed({
+            contract: switch proofSpecs[0] {
+            | Some(s) => s.contractName
+            | None => "unknown"
+            },
+            error: msg,
+          }),
+          hexad_id: None,
+          modality: None,
+          context: msg,
+        })
+      | Ok(plan) =>
+        // Return the first obligation as the primary plan (backward compat)
+        switch plan.obligations[0] {
+        | Some(obl) =>
+          Ok({
+            contract: obl.contractName,
+            proofType: switch proofSpecs[0] {
+            | Some(s) => s.proofType
+            | None => Existence
+            },
+            witnessFields: obl.witnessFields,
+            circuit: obl.circuit,
+            estimatedTimeMs: plan.totalEstimatedTimeMs,
+          })
+        | None =>
+          Error({
+            kind: Error.MissingTypeAnnotation("proof"),
+            hexad_id: None,
+            modality: None,
+            context: "No proof obligations generated",
+          })
+        }
+      }
     }
   }
 }
 
-let extractWitnessFields = (query: AST.query): array<string> => {
-  // Extract fields from WHERE clause that will be part of ZKP witness
-  switch query.where {
-  | None => []
-  | Some(condition) => extractFieldsFromCondition(condition)
+// ============================================================================
+// SQL-Compat Validation
+// ============================================================================
+
+let validateAggregates = (query: AST.query): typeCheckResult => {
+  switch (query.having, query.groupBy) {
+  | (Some(_), None) =>
+    Error({
+      kind: Error.ContractViolation({
+        contract: "sql-compat",
+        reason: "HAVING clause requires GROUP BY",
+      }),
+      hexad_id: None,
+      modality: None,
+      context: "Add a GROUP BY clause or remove the HAVING clause",
+    })
+  | _ => Ok()
   }
 }
 
-let rec extractFieldsFromCondition = (condition: AST.condition): array<string> => {
-  switch condition {
-  | Simple(simpleCondition) => {
-      switch simpleCondition {
-      | FieldCondition(field, _, _) => [field]
-      | FulltextContains(_) => ["fulltext"]
-      | FulltextMatches(_) => ["fulltext"]
-      | VectorSimilar(_, _) => ["embedding"]
-      | GraphPattern(_) => ["graph_pattern"]
+let validateOrderByModalities = (query: AST.query): typeCheckResult => {
+  switch query.orderBy {
+  | None => Ok()
+  | Some(items) => {
+      let invalidField = items->Belt.Array.getBy(item => {
+        !(query.modalities->Belt.Array.some(m => m == item.field.modality || m == All))
+      })
+      switch invalidField {
+      | None => Ok()
+      | Some(item) => {
+          let modStr = modalityToString(item.field.modality)
+          Error({
+            kind: Error.ContractViolation({
+              contract: "order-by-validation",
+              reason: `ORDER BY references modality ${modStr} which is not in SELECT`,
+            }),
+            hexad_id: None,
+            modality: Some(modStr),
+            context: `Add ${modStr} to your SELECT clause or remove it from ORDER BY`,
+          })
+        }
       }
     }
-  | And(left, right) =>
-    extractFieldsFromCondition(left)->Js.Array2.concat(extractFieldsFromCondition(right))
-  | Or(left, right) =>
-    extractFieldsFromCondition(left)->Js.Array2.concat(extractFieldsFromCondition(right))
-  | Not(cond) => extractFieldsFromCondition(cond)
   }
 }
 
-let proofTypeToCircuit = (proofType: AST.proofType): string => {
-  switch proofType {
-  | Existence => "existence-proof-v1"
-  | Citation => "citation-proof-v1"
-  | Access => "access-control-v1"
-  | Integrity => "integrity-check-v1"
-  | Provenance => "provenance-chain-v1"
-  | Custom => "custom-circuit"
+let validateGroupByModalities = (query: AST.query): typeCheckResult => {
+  switch query.groupBy {
+  | None => Ok()
+  | Some(fields) => {
+      let invalidField = fields->Belt.Array.getBy(f => {
+        !(query.modalities->Belt.Array.some(m => m == f.modality || m == All))
+      })
+      switch invalidField {
+      | None => Ok()
+      | Some(field) => {
+          let modStr = modalityToString(field.modality)
+          Error({
+            kind: Error.ContractViolation({
+              contract: "group-by-validation",
+              reason: `GROUP BY references modality ${modStr} which is not in SELECT`,
+            }),
+            hexad_id: None,
+            modality: Some(modStr),
+            context: `Add ${modStr} to your SELECT clause or remove it from GROUP BY`,
+          })
+        }
+      }
+    }
   }
 }
 
-let estimateProofTime = (proofType: AST.proofType): int => {
-  // Rough estimates in milliseconds
-  switch proofType {
-  | Existence => 50
-  | Citation => 100
-  | Access => 150
-  | Integrity => 200
-  | Provenance => 300
-  | Custom => 500
+let checkSqlCompat = (query: AST.query): typeCheckResult => {
+  switch validateAggregates(query) {
+  | Error(e) => Error(e)
+  | Ok() =>
+    switch validateOrderByModalities(query) {
+    | Error(e) => Error(e)
+    | Ok() => validateGroupByModalities(query)
+    }
   }
 }
 
@@ -328,12 +322,8 @@ let primitiveTypeToString = (pt: primitiveType): string => {
 }
 
 // ============================================================================
-// Public API
+// Registration (backward-compatible)
 // ============================================================================
-
-let createDefaultContext = (): typeContext => {
-  makeTypeContext(~strictMode=true, ())
-}
 
 let registerContract = (
   context: typeContext,

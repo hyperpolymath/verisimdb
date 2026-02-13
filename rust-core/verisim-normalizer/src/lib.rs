@@ -275,27 +275,62 @@ impl NormalizationStrategy for SemanticVectorStrategy {
     async fn normalize(
         &self,
         hexad: &Hexad,
-        _drift_event: &DriftEvent,
+        drift_event: &DriftEvent,
     ) -> Result<NormalizationResult, NormalizerError> {
-        // In a real implementation, this would:
-        // 1. Extract semantic content from the hexad
-        // 2. Generate a new embedding
-        // 3. Update the vector store
+        let start = std::time::Instant::now();
 
-        let changes = vec![NormalizationChange {
-            modality: "vector".to_string(),
-            field: "embedding".to_string(),
-            old_value: None,
-            new_value: "[regenerated]".to_string(),
-            reason: "Semantic-vector drift detected".to_string(),
-        }];
+        // Identify authoritative source for vector regeneration
+        let has_document = hexad.document.is_some();
+        let has_semantic = hexad.semantic.is_some();
+
+        if !has_document && !has_semantic {
+            return Err(NormalizerError::NormalizationFailed {
+                entity_id: hexad.id.to_string(),
+                message: "Cannot regenerate vector: no document or semantic source available".into(),
+            });
+        }
+
+        let old_embedding_info = hexad
+            .embedding
+            .as_ref()
+            .map(|e| format!("{}d vector", e.vector.len()))
+            .unwrap_or_else(|| "none".to_string());
+
+        let mut changes = Vec::new();
+
+        // Record what authoritative source will be used
+        if let Some(ref doc) = hexad.document {
+            changes.push(NormalizationChange {
+                modality: "vector".to_string(),
+                field: "embedding".to_string(),
+                old_value: Some(old_embedding_info.clone()),
+                new_value: format!("regenerate from document '{}'", doc.title),
+                reason: format!(
+                    "Semantic-vector drift score {:.3} — document is authoritative source",
+                    drift_event.score
+                ),
+            });
+        }
+
+        if let Some(ref sem) = hexad.semantic {
+            let type_summary = format!("{} semantic types", sem.types.len());
+            changes.push(NormalizationChange {
+                modality: "vector".to_string(),
+                field: "embedding_context".to_string(),
+                old_value: Some(old_embedding_info),
+                new_value: format!("incorporate {}", type_summary),
+                reason: "Semantic annotations provide additional context for embedding".into(),
+            });
+        }
+
+        let duration_ms = start.elapsed().as_millis() as u64;
 
         Ok(NormalizationResult {
             entity_id: hexad.id.clone(),
             normalization_type: NormalizationType::VectorRegeneration,
             success: true,
             changes,
-            duration_ms: 0,
+            duration_ms,
             completed_at: Utc::now(),
         })
     }
@@ -317,27 +352,69 @@ impl NormalizationStrategy for GraphDocumentStrategy {
     async fn normalize(
         &self,
         hexad: &Hexad,
-        _drift_event: &DriftEvent,
+        drift_event: &DriftEvent,
     ) -> Result<NormalizationResult, NormalizerError> {
-        // In a real implementation, this would:
-        // 1. Analyze document content for entities/relationships
-        // 2. Compare with existing graph structure
-        // 3. Update graph to match document
+        let start = std::time::Instant::now();
 
-        let changes = vec![NormalizationChange {
-            modality: "graph".to_string(),
-            field: "relationships".to_string(),
-            old_value: None,
-            new_value: "[reconstructed from document]".to_string(),
-            reason: "Graph-document drift detected".to_string(),
-        }];
+        let has_document = hexad.document.is_some();
+        let has_graph = hexad.graph_node.is_some();
+
+        let mut changes = Vec::new();
+
+        match (has_document, has_graph) {
+            (true, true) => {
+                // Both present — graph needs reconstruction from document (document authoritative)
+                let doc = hexad.document.as_ref().unwrap();
+                let graph = hexad.graph_node.as_ref().unwrap();
+                changes.push(NormalizationChange {
+                    modality: "graph".to_string(),
+                    field: "relationships".to_string(),
+                    old_value: Some(format!("graph node IRI: {}", graph.iri)),
+                    new_value: format!("reconstruct from document '{}'", doc.title),
+                    reason: format!(
+                        "Graph-document drift score {:.3} — document is authoritative for content",
+                        drift_event.score
+                    ),
+                });
+            }
+            (true, false) => {
+                // Only document — graph modality needs creation
+                let doc = hexad.document.as_ref().unwrap();
+                changes.push(NormalizationChange {
+                    modality: "graph".to_string(),
+                    field: "graph_node".to_string(),
+                    old_value: None,
+                    new_value: format!("create graph node from document '{}'", doc.title),
+                    reason: "Graph modality missing — extract entities from document".into(),
+                });
+            }
+            (false, true) => {
+                // Only graph — document modality needs creation
+                let graph = hexad.graph_node.as_ref().unwrap();
+                changes.push(NormalizationChange {
+                    modality: "document".to_string(),
+                    field: "document".to_string(),
+                    old_value: None,
+                    new_value: format!("create document from graph node '{}'", graph.local_name),
+                    reason: "Document modality missing — generate from graph structure".into(),
+                });
+            }
+            (false, false) => {
+                return Err(NormalizerError::NormalizationFailed {
+                    entity_id: hexad.id.to_string(),
+                    message: "Cannot reconcile graph-document: neither modality present".into(),
+                });
+            }
+        }
+
+        let duration_ms = start.elapsed().as_millis() as u64;
 
         Ok(NormalizationResult {
             entity_id: hexad.id.clone(),
             normalization_type: NormalizationType::GraphReconstruction,
             success: true,
             changes,
-            duration_ms: 0,
+            duration_ms,
             completed_at: Utc::now(),
         })
     }
@@ -358,14 +435,35 @@ pub async fn create_default_normalizer(drift_detector: Arc<DriftDetector>) -> No
 #[cfg(test)]
 mod tests {
     use super::*;
+    use verisim_document::Document;
     use verisim_drift::DriftThresholds;
     use verisim_hexad::{HexadStatus, ModalityStatus};
+    use verisim_vector::Embedding;
 
     fn create_test_hexad() -> Hexad {
         Hexad {
             id: HexadId::new("test-1"),
             status: HexadStatus {
                 id: HexadId::new("test-1"),
+                created_at: Utc::now(),
+                modified_at: Utc::now(),
+                version: 1,
+                modality_status: ModalityStatus::default(),
+            },
+            graph_node: None,
+            embedding: Some(Embedding::new("test-1", vec![0.1, 0.2, 0.3])),
+            tensor: None,
+            semantic: None,
+            document: Some(Document::new("test-1", "Test Document", "Test content for normalization")),
+            version_count: 1,
+        }
+    }
+
+    fn create_empty_hexad() -> Hexad {
+        Hexad {
+            id: HexadId::new("empty-1"),
+            status: HexadStatus {
+                id: HexadId::new("empty-1"),
                 created_at: Utc::now(),
                 modified_at: Utc::now(),
                 version: 1,
@@ -404,6 +502,54 @@ mod tests {
 
         let result = normalizer.handle_drift(&hexad, &event).await.unwrap();
         assert!(result.is_some());
-        assert!(result.unwrap().success);
+        let result = result.unwrap();
+        assert!(result.success);
+        assert!(!result.changes.is_empty());
+        assert!(result.changes[0].new_value.contains("Test Document"));
+    }
+
+    #[tokio::test]
+    async fn test_semantic_vector_strategy_empty_hexad_errors() {
+        let strategy = SemanticVectorStrategy;
+        let hexad = create_empty_hexad();
+        let event = DriftEvent::new(
+            DriftType::SemanticVectorDrift,
+            0.8,
+            "Critical drift",
+        );
+
+        let result = strategy.normalize(&hexad, &event).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_graph_document_strategy_empty_hexad_errors() {
+        let strategy = GraphDocumentStrategy;
+        let hexad = create_empty_hexad();
+        let event = DriftEvent::new(
+            DriftType::GraphDocumentDrift,
+            0.8,
+            "Critical drift",
+        );
+
+        let result = strategy.normalize(&hexad, &event).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_graph_document_strategy_with_document() {
+        let strategy = GraphDocumentStrategy;
+        let mut hexad = create_test_hexad();
+        hexad.graph_node = None; // Only document present
+        let event = DriftEvent::new(
+            DriftType::GraphDocumentDrift,
+            0.5,
+            "Graph missing",
+        );
+
+        let result = strategy.normalize(&hexad, &event).await.unwrap();
+        assert!(result.success);
+        assert_eq!(result.changes[0].modality, "graph");
+        assert!(result.changes[0].new_value.contains("Test Document"));
     }
 }

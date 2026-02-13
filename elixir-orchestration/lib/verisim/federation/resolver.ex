@@ -233,25 +233,61 @@ defmodule VeriSim.Federation.Resolver do
     {peers, []}
   end
 
-  defp query_peer(peer, _modalities, _limit) do
-    # In production: HTTP request to peer.endpoint
-    # For now, return empty results
-    {:ok, []}
+  defp query_peer(peer, _modalities, limit) do
+    url = "#{peer.endpoint}/search/text"
+    start = System.monotonic_time(:millisecond)
+
+    case Req.get(url, params: [limit: limit], receive_timeout: @default_timeout) do
+      {:ok, %Req.Response{status: status, body: body}} when status in 200..299 ->
+        elapsed = System.monotonic_time(:millisecond) - start
+
+        results =
+          body
+          |> List.wrap()
+          |> Enum.map(fn item ->
+            %{
+              source_store: peer.store_id,
+              hexad_id: item["id"] || "unknown",
+              score: item["score"] || 0.0,
+              drifted: false,
+              data: item,
+              response_time_ms: elapsed
+            }
+          end)
+
+        {:ok, results}
+
+      {:ok, %Req.Response{status: status}} ->
+        Logger.warning("Federation: peer #{peer.store_id} returned status #{status}")
+        {:error, {:http_error, status}}
+
+      {:error, reason} ->
+        Logger.warning("Federation: failed to query peer #{peer.store_id}: #{inspect(reason)}")
+        {:error, reason}
+    end
+  rescue
+    e ->
+      Logger.warning("Federation: exception querying peer #{peer.store_id}: #{inspect(e)}")
+      {:error, {:exception, e}}
   end
 
   defp health_check_peer(peer) do
+    url = "#{peer.endpoint}/health"
     start = System.monotonic_time(:millisecond)
 
-    # In production: HTTP GET to peer.endpoint/health
-    # For now, simulate
-    case peer.endpoint do
-      "http://" <> _ ->
+    case Req.get(url, receive_timeout: 5_000) do
+      {:ok, %Req.Response{status: 200}} ->
         elapsed = System.monotonic_time(:millisecond) - start
         {:ok, elapsed}
 
-      _ ->
-        {:error, :invalid_endpoint}
+      {:ok, %Req.Response{status: status}} ->
+        {:error, {:unhealthy, status}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
+  rescue
+    e -> {:error, {:exception, e}}
   end
 
   defp schedule_health_check do

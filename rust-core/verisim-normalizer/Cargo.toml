@@ -23,3 +23,5 @@ prometheus.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+verisim-document = { path = "../verisim-document" }
+verisim-vector = { path = "../verisim-vector" }

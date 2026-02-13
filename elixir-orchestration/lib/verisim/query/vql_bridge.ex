@@ -66,12 +66,36 @@ defmodule VeriSim.Query.VQLBridge do
   end
 
   @doc """
+  Parse a VQL mutation (INSERT / UPDATE / DELETE).
+  """
+  def parse_mutation(query_string, timeout \\ @default_timeout) do
+    GenServer.call(__MODULE__, {:parse_mutation, query_string}, timeout)
+  end
+
+  @doc """
+  Parse a VQL statement (query or mutation).
+  """
+  def parse_statement(query_string, timeout \\ @default_timeout) do
+    GenServer.call(__MODULE__, {:parse_statement, query_string}, timeout)
+  end
+
+  @doc """
   Parse and execute a VQL query string in one call.
   Combines VQLBridge.parse/1 with VQLExecutor.execute/2.
   """
   def parse_and_execute(query_string, opts \\ []) do
     case parse(query_string) do
       {:ok, ast} -> VeriSim.Query.VQLExecutor.execute(ast, opts)
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
+  Parse and execute a VQL statement (query or mutation).
+  """
+  def parse_and_execute_statement(query_string, opts \\ []) do
+    case parse_statement(query_string) do
+      {:ok, ast} -> VeriSim.Query.VQLExecutor.execute_statement(ast, opts)
       {:error, _} = error -> error
     end
   end
@@ -105,8 +129,9 @@ defmodule VeriSim.Query.VQLBridge do
   end
 
   @impl true
-  def handle_call({action, query_string}, from, %{port: nil} = state)
-      when action in [:parse, :parse_slipstream, :parse_dependent] do
+  def handle_call({action, query_string}, _from, %{port: nil} = state)
+      when action in [:parse, :parse_slipstream, :parse_dependent,
+                      :parse_mutation, :parse_statement] do
     # Fallback: no external parser available, use built-in Elixir parser
     result = builtin_parse(query_string, action)
     {:reply, result, state}
@@ -114,7 +139,8 @@ defmodule VeriSim.Query.VQLBridge do
 
   @impl true
   def handle_call({action, query_string}, from, state)
-      when action in [:parse, :parse_slipstream, :parse_dependent] do
+      when action in [:parse, :parse_slipstream, :parse_dependent,
+                      :parse_mutation, :parse_statement] do
     id = state.next_id
     message = Jason.encode!(%{
       "id" => id,
@@ -239,16 +265,40 @@ defmodule VeriSim.Query.VQLBridge do
   defp builtin_parse(query_string, action) do
     query_string = String.trim(query_string)
 
-    with {:ok, tokens} <- tokenize(query_string),
-         {:ok, ast} <- parse_tokens(tokens) do
-      case action do
-        :parse_slipstream ->
-          if ast[:proof], do: {:error, "Slipstream queries cannot have PROOF clause"}, else: {:ok, ast}
-        :parse_dependent ->
-          if ast[:proof], do: {:ok, ast}, else: {:error, "Dependent-type queries require PROOF clause"}
-        :parse ->
-          {:ok, ast}
-      end
+    case action do
+      :parse_mutation ->
+        with {:ok, tokens} <- tokenize(query_string),
+             {:ok, mutation} <- parse_mutation_tokens(tokens) do
+          {:ok, mutation}
+        end
+
+      :parse_statement ->
+        with {:ok, tokens} <- tokenize(query_string) do
+          first = tokens |> List.first() |> to_string() |> String.upcase()
+          case first do
+            cmd when cmd in ["INSERT", "UPDATE", "DELETE"] ->
+              with {:ok, mutation} <- parse_mutation_tokens(tokens) do
+                {:ok, %{TAG: "Mutation", _0: mutation}}
+              end
+            _ ->
+              with {:ok, ast} <- parse_tokens(tokens) do
+                {:ok, %{TAG: "Query", _0: ast}}
+              end
+          end
+        end
+
+      _ ->
+        with {:ok, tokens} <- tokenize(query_string),
+             {:ok, ast} <- parse_tokens(tokens) do
+          case action do
+            :parse_slipstream ->
+              if ast[:proof], do: {:error, "Slipstream queries cannot have PROOF clause"}, else: {:ok, ast}
+            :parse_dependent ->
+              if ast[:proof], do: {:ok, ast}, else: {:error, "Dependent-type queries require PROOF clause"}
+            :parse ->
+              {:ok, ast}
+          end
+        end
     end
   end
 
@@ -263,17 +313,25 @@ defmodule VeriSim.Query.VQLBridge do
   end
 
   defp parse_tokens(tokens) do
-    with {:ok, modalities, rest} <- parse_select(tokens),
+    with {:ok, modalities, projections, aggregates, rest} <- parse_select_extended(tokens),
          {:ok, source, rest} <- parse_from(rest),
          {:ok, where_clause, rest} <- parse_where(rest),
+         {:ok, group_by, rest} <- parse_group_by(rest),
+         {:ok, having, rest} <- parse_having(rest),
          {:ok, proof, rest} <- parse_proof(rest),
+         {:ok, order_by, rest} <- parse_order_by(rest),
          {:ok, limit, rest} <- parse_limit(rest),
          {:ok, offset, _rest} <- parse_offset(rest) do
       {:ok, %{
         modalities: modalities,
+        projections: projections,
+        aggregates: aggregates,
         source: source,
         where: where_clause,
+        groupBy: group_by,
+        having: having,
         proof: proof,
+        orderBy: order_by,
         limit: limit,
         offset: offset
       }}
@@ -373,4 +431,227 @@ defmodule VeriSim.Query.VQLBridge do
   end
 
   defp parse_offset(rest), do: {:ok, nil, rest}
+
+  # Extended SELECT parser: handles MODALITY.field projections and aggregates
+  defp parse_select_extended(["SELECT" | rest]) do
+    {items, rest} = take_select_items(rest, [], [], [])
+    {:ok, elem(items, 0), elem(items, 1), elem(items, 2), rest}
+  end
+
+  defp parse_select_extended(_), do: {:error, "Expected SELECT"}
+
+  @modality_names ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL)
+  @aggregate_funcs ~w(COUNT SUM AVG MIN MAX)
+
+  defp take_select_items(tokens, mods, projs, aggs) do
+    case tokens do
+      # COUNT(*)
+      [func, "(*)" | rest] when func in @aggregate_funcs ->
+        take_select_items(strip_comma(rest), mods, projs, [:count_all | aggs])
+
+      [func, "(", "*", ")" | rest] when func in @aggregate_funcs ->
+        take_select_items(strip_comma(rest), mods, projs, [:count_all | aggs])
+
+      # FUNC(MODALITY.field)
+      [func | rest] when func in @aggregate_funcs ->
+        case parse_aggregate_arg(rest) do
+          {:ok, mod, field, rest} ->
+            agg = {:aggregate_field, String.downcase(func) |> String.to_atom(), %{modality: mod, field: field}}
+            mod_atom = String.downcase(mod) |> String.to_atom()
+            mods = if mod_atom in mods, do: mods, else: [mod_atom | mods]
+            take_select_items(strip_comma(rest), mods, projs, [agg | aggs])
+          _ ->
+            {{Enum.reverse(mods), nilify(projs), nilify(aggs)}, tokens}
+        end
+
+      # MODALITY.field (column projection)
+      [token | rest] ->
+        case String.split(token, ".", parts: 2) do
+          [mod_str, field] when mod_str in @modality_names ->
+            proj = %{modality: String.downcase(mod_str) |> String.to_atom(), field: field}
+            mod_atom = String.downcase(mod_str) |> String.to_atom()
+            mods = if mod_atom in mods, do: mods, else: [mod_atom | mods]
+            take_select_items(strip_comma(rest), mods, [proj | projs], aggs)
+
+          _ ->
+            # Try as bare modality
+            up = String.upcase(String.replace(token, ",", ""))
+            cond do
+              up in @modality_names ->
+                mod_atom = String.downcase(up) |> String.to_atom()
+                take_select_items(strip_comma(rest), [mod_atom | mods], projs, aggs)
+              up == "*" ->
+                take_select_items(strip_comma(rest), [:all | mods], projs, aggs)
+              true ->
+                {{Enum.reverse(mods), nilify(projs), nilify(aggs)}, tokens}
+            end
+        end
+
+      [] ->
+        {{Enum.reverse(mods), nilify(projs), nilify(aggs)}, []}
+    end
+  end
+
+  defp parse_aggregate_arg(["(" <> rest_token | rest]) do
+    # Handle "(MODALITY.field)" — may be split across tokens
+    inner = String.trim_trailing(rest_token, ")")
+    case String.split(inner, ".", parts: 2) do
+      [mod, field] when mod in @modality_names ->
+        rest = case rest do
+          [")" | r] -> r
+          _ -> rest
+        end
+        {:ok, mod, field, rest}
+      _ -> :error
+    end
+  end
+  defp parse_aggregate_arg(_), do: :error
+
+  defp nilify([]), do: nil
+  defp nilify(list), do: Enum.reverse(list)
+
+  # GROUP BY parser
+  defp parse_group_by(["GROUP", "BY" | rest]) do
+    {fields, rest} = take_field_refs(rest, [])
+    {:ok, if(fields == [], do: nil, else: fields), rest}
+  end
+
+  defp parse_group_by(rest), do: {:ok, nil, rest}
+
+  defp take_field_refs([token | rest], acc) do
+    clean = String.replace(token, ",", "")
+    case String.split(clean, ".", parts: 2) do
+      [mod_str, field] when mod_str in @modality_names ->
+        ref = %{modality: String.downcase(mod_str) |> String.to_atom(), field: field}
+        take_field_refs(strip_comma(rest), [ref | acc])
+      _ ->
+        {Enum.reverse(acc), [token | rest]}
+    end
+  end
+
+  defp take_field_refs([], acc), do: {Enum.reverse(acc), []}
+
+  # HAVING parser (collects tokens until ORDER/PROOF/LIMIT/OFFSET/end)
+  defp parse_having(["HAVING" | rest]) do
+    {condition_tokens, rest} = Enum.split_while(rest, fn token ->
+      String.upcase(token) not in ["ORDER", "PROOF", "LIMIT", "OFFSET"]
+    end)
+
+    condition = if condition_tokens == [] do
+      nil
+    else
+      %{raw: Enum.join(condition_tokens, " ")}
+    end
+
+    {:ok, condition, rest}
+  end
+
+  defp parse_having(rest), do: {:ok, nil, rest}
+
+  # ORDER BY parser
+  defp parse_order_by(["ORDER", "BY" | rest]) do
+    {items, rest} = take_order_items(rest, [])
+    {:ok, if(items == [], do: nil, else: items), rest}
+  end
+
+  defp parse_order_by(rest), do: {:ok, nil, rest}
+
+  defp take_order_items([token | rest], acc) do
+    clean = String.replace(token, ",", "")
+    case String.split(clean, ".", parts: 2) do
+      [mod_str, field] when mod_str in @modality_names ->
+        {direction, rest} = case rest do
+          ["ASC" | r] -> {:asc, strip_comma(r)}
+          ["DESC" | r] -> {:desc, strip_comma(r)}
+          ["ASC," <> _ | _] -> {:asc, strip_comma(rest)}
+          ["DESC," <> _ | _] -> {:desc, strip_comma(rest)}
+          _ -> {:asc, strip_comma(rest)}
+        end
+
+        item = %{
+          field: %{modality: String.downcase(mod_str) |> String.to_atom(), field: field},
+          direction: direction
+        }
+        take_order_items(rest, [item | acc])
+
+      _ ->
+        {Enum.reverse(acc), [token | rest]}
+    end
+  end
+
+  defp take_order_items([], acc), do: {Enum.reverse(acc), []}
+
+  # ---------------------------------------------------------------------------
+  # Mutation Parser (INSERT / UPDATE / DELETE)
+  # ---------------------------------------------------------------------------
+
+  defp parse_mutation_tokens(["INSERT", "HEXAD", "WITH" | rest]) do
+    {modality_data, rest} = take_modality_data(rest, [])
+    {:ok, proof, _rest} = parse_proof(rest)
+    {:ok, %{
+      TAG: "Insert",
+      modalities: modality_data,
+      proof: proof
+    }}
+  end
+
+  defp parse_mutation_tokens(["UPDATE", "HEXAD", uuid, "SET" | rest]) do
+    {sets, rest} = take_set_assignments(rest, [])
+    {:ok, proof, _rest} = parse_proof(rest)
+    {:ok, %{
+      TAG: "Update",
+      hexadId: uuid,
+      sets: sets,
+      proof: proof
+    }}
+  end
+
+  defp parse_mutation_tokens(["DELETE", "HEXAD", uuid | rest]) do
+    {:ok, proof, _rest} = parse_proof(rest)
+    {:ok, %{
+      TAG: "Delete",
+      hexadId: uuid,
+      proof: proof
+    }}
+  end
+
+  defp parse_mutation_tokens(_), do: {:error, "Expected INSERT, UPDATE, or DELETE"}
+
+  # Parse modality data for INSERT: DOCUMENT(field=value, ...), VECTOR([...]), etc.
+  defp take_modality_data(tokens, acc) do
+    case tokens do
+      [mod | rest] when mod in @modality_names ->
+        case rest do
+          ["(" <> inner_start | rest2] ->
+            {inner_tokens, rest3} = collect_until_close_paren([inner_start | rest2], [])
+            data = %{modality: String.downcase(mod) |> String.to_atom(), raw: Enum.join(inner_tokens, " ")}
+            take_modality_data(strip_comma(rest3), [data | acc])
+          _ ->
+            {Enum.reverse(acc), tokens}
+        end
+      _ ->
+        {Enum.reverse(acc), tokens}
+    end
+  end
+
+  defp collect_until_close_paren([], acc), do: {Enum.reverse(acc), []}
+  defp collect_until_close_paren([token | rest], acc) do
+    if String.ends_with?(token, ")") do
+      cleaned = String.trim_trailing(token, ")")
+      if cleaned != "", do: {Enum.reverse([cleaned | acc]), rest}, else: {Enum.reverse(acc), rest}
+    else
+      collect_until_close_paren(rest, [token | acc])
+    end
+  end
+
+  # Parse SET assignments for UPDATE: field = value, field = value
+  defp take_set_assignments(tokens, acc) do
+    case tokens do
+      [field, "=", value | rest] ->
+        assignment = %{field: field, value: value}
+        take_set_assignments(strip_comma(rest), [assignment | acc])
+      _ ->
+        {Enum.reverse(acc), tokens}
+    end
+  end
 end

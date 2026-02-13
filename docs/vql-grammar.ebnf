@@ -1,26 +1,47 @@
 (* SPDX-License-Identifier: PMPL-1.0-or-later *)
 (* VeriSim Query Language (VQL) Grammar *)
 (* Format: Extended Backus-Naur Form (EBNF) *)
-(* Version: 1.0 *)
-(* Date: 2026-01-22 *)
+(* Version: 2.0 — Dependent types, cross-modal correlation, write path *)
+(* Date: 2026-02-13 *)
 
 (* ============================================================================
-   1. TOP-LEVEL QUERY STRUCTURE
+   1. TOP-LEVEL STRUCTURE
    ============================================================================ *)
+statement = query | mutation ;
+
 query = select_clause,
+        from_clause,
         [where_clause],
+        [group_by_clause],
+        [having_clause],
         [proof_clause],
+        [order_by_clause],
         [limit_clause],
         [offset_clause] ;
 
 (* ============================================================================
-   2. SELECT CLAUSE - Modality Selection
+   2. SELECT CLAUSE - Modality Selection, Column Projections & Aggregates
    ============================================================================ *)
-select_clause = 'SELECT', modality_list ;
+select_clause = 'SELECT', select_item_list ;
 
-modality_list = modality_spec, { ',', modality_spec } ;
+select_item_list = select_item, { ',', select_item } ;
 
+(* A select item can be an aggregate, a column projection, or a full modality *)
+select_item = aggregate_expr | field_ref | modality_spec ;
+
+(* Column projection: MODALITY.field_name *)
+field_ref = modality_name, '.', identifier ;
+
+(* Aggregate functions *)
+aggregate_expr = count_all | aggregate_field ;
+count_all = 'COUNT', '(', '*', ')' ;
+aggregate_field = aggregate_func, '(', field_ref, ')' ;
+aggregate_func = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' ;
+
+(* Bare modality selection *)
 modality_spec = 'GRAPH', [graph_projection] | 'VECTOR', [vector_projection] | 'TENSOR', [tensor_projection] | 'SEMANTIC', [semantic_projection] | 'DOCUMENT', [document_projection] | 'TEMPORAL', [temporal_projection] | '*'  (* All available modalities *) ;
+
+modality_name = 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' ;
 
 (* Projection specifics per modality *)
 graph_projection = '(', sparql_pattern, ')' ;
@@ -58,7 +79,26 @@ where_clause = 'WHERE', condition ;
 
 condition = simple_condition | compound_condition | '(', condition, ')' ;
 
-simple_condition = graph_condition | vector_condition | tensor_condition | semantic_condition | document_condition | temporal_condition ;
+simple_condition = graph_condition | vector_condition | tensor_condition | semantic_condition | document_condition | temporal_condition | cross_modal_condition ;
+
+(* 4.7. Cross-Modal Conditions — relationships BETWEEN modalities *)
+cross_modal_condition = cross_modal_field_compare | drift_condition | consistency_condition | exists_condition | not_exists_condition ;
+
+(* Compare fields across modalities: WHERE DOCUMENT.severity > GRAPH.centrality *)
+cross_modal_field_compare = field_ref, comparison_op, field_ref ;
+
+(* Drift between modalities: WHERE DRIFT(VECTOR, DOCUMENT) > 0.3 *)
+drift_condition = 'DRIFT', '(', modality_name, ',', modality_name, ')', comparison_op, float ;
+
+(* Consistency check: WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE *)
+consistency_condition = 'CONSISTENT', '(', modality_name, ',', modality_name, ')', 'USING', metric_name ;
+metric_name = 'COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT' | 'JACCARD' ;
+
+(* Modality existence: WHERE VECTOR EXISTS *)
+exists_condition = modality_name, 'EXISTS' ;
+
+(* Modality absence: WHERE TENSOR NOT EXISTS *)
+not_exists_condition = modality_name, 'NOT', 'EXISTS' ;
 
 compound_condition = condition, 'AND', condition | condition, 'OR', condition | 'NOT', condition ;
 
@@ -102,9 +142,11 @@ comparison_op = '==' | '!=' | '>' | '<' | '>=' | '<=' | 'LIKE' ;
 temporal_condition = 'AS', 'OF', timestamp | 'BETWEEN', timestamp, 'AND', timestamp | 'VERSION', version_id | 'MODIFIED', 'BY', actor_id ;
 
 (* ============================================================================
-   5. PROOF CLAUSE - Dependent-Type Safety
+   5. PROOF CLAUSE - Dependent-Type Safety (Multi-Proof Composition)
    ============================================================================ *)
-proof_clause = 'PROOF', proof_spec ;
+proof_clause = 'PROOF', proof_spec_list ;
+
+proof_spec_list = proof_spec, { 'AND', proof_spec } ;
 
 proof_spec = proof_type, '(', contract_name, ')', [proof_params] ;
 
@@ -113,13 +155,60 @@ proof_type = 'EXISTENCE'    (* Hexad exists and is accessible *) | 'CITATION'   
 proof_params = 'WITH', param_list ;
 
 (* ============================================================================
-   6. PAGINATION CLAUSES,
+   6. GROUP BY / HAVING CLAUSES - Aggregation
+   ============================================================================ *)
+group_by_clause = 'GROUP', 'BY', field_ref_list ;
+field_ref_list = field_ref, { ',', field_ref } ;
+
+having_clause = 'HAVING', condition ;
+
+(* ============================================================================
+   7. ORDER BY CLAUSE - Sorting
+   ============================================================================ *)
+order_by_clause = 'ORDER', 'BY', order_by_list ;
+order_by_list = order_by_item, { ',', order_by_item } ;
+order_by_item = field_ref, [sort_direction] ;
+sort_direction = 'ASC' | 'DESC' ;
+
+(* ============================================================================
+   8. PAGINATION CLAUSES
    ============================================================================ *)
 limit_clause = 'LIMIT', integer ;
 offset_clause = 'OFFSET', integer ;
 
 (* ============================================================================
-   7. LEXICAL ELEMENTS,
+   9. MUTATIONS - Write Path (INSERT / UPDATE / DELETE)
+   ============================================================================ *)
+mutation = insert_mutation | update_mutation | delete_mutation ;
+
+(* INSERT: Create a new hexad with modality data *)
+insert_mutation = 'INSERT', 'HEXAD', 'WITH', modality_data_list, [proof_clause] ;
+
+modality_data_list = modality_data, { ',', modality_data } ;
+
+modality_data = document_data | vector_data | graph_data | tensor_data | semantic_data | temporal_data ;
+
+document_data = 'DOCUMENT', '(', field_assignment_list, ')' ;
+vector_data = 'VECTOR', '(', vector_literal, ')' ;
+graph_data = 'GRAPH', '(', identifier, ',', identifier, ')' ;  (* edge_type, target_hexad_id *)
+tensor_data = 'TENSOR', '(', array_literal, ')' ;
+semantic_data = 'SEMANTIC', '(', identifier, ')' ;  (* contract name *)
+temporal_data = 'TEMPORAL', '(', timestamp, ')' ;
+
+field_assignment_list = field_assignment, { ',', field_assignment } ;
+field_assignment = identifier, '=', literal ;
+
+(* UPDATE: Modify fields of an existing hexad *)
+update_mutation = 'UPDATE', 'HEXAD', uuid, 'SET', set_list, [proof_clause] ;
+
+set_list = set_assignment, { ',', set_assignment } ;
+set_assignment = field_ref, '=', literal ;
+
+(* DELETE: Remove a hexad *)
+delete_mutation = 'DELETE', 'HEXAD', uuid, [proof_clause] ;
+
+(* ============================================================================
+   10. LEXICAL ELEMENTS
    ============================================================================ *)
 uuid = hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, hex_digit, '-',
        hex_digit, hex_digit, hex_digit, hex_digit, '-',
@@ -154,16 +243,31 @@ boolean = 'true' | 'false' ;
 literal = scalar_literal | array_literal ;
 
 (* ============================================================================
-   8. COMMENTS,
+   11. COMMENTS
    ============================================================================ *)
 comment = '--', { ? any character except newline ? }, '\n'  (* Line comment *)
         | '/*', ? any characters ?, '*/'  (* Block comment *) ;
 
 (* ============================================================================
-   9. RESERVED KEYWORDS
+   12. RESERVED KEYWORDS
    ============================================================================ *)
 (* Keywords are case-insensitive in VQL *)
-keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET' | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' | 'HEXAD' | 'FEDERATION' | 'STORE' | 'WITH' | 'DRIFT' | 'STRICT' | 'REPAIR' | 'TOLERATE' | 'LATEST' | 'AND' | 'OR' | 'NOT' | 'SIMILAR' | 'TO' | 'WITHIN' | 'NEAREST' | 'USING' | 'SATISFIES' | 'HAS' | 'VERIFIED' | 'BY' | 'FULLTEXT' | 'CONTAINS' | 'MATCHES' | 'FIELD' | 'LIKE' | 'AS' | 'OF' | 'BETWEEN' | 'VERSION' | 'MODIFIED' | 'EXISTENCE' | 'CITATION' | 'ACCESS' | 'INTEGRITY' | 'PROVENANCE' | 'CUSTOM' | 'COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT' | 'SHAPE' | 'RANK' | 'true' | 'false' ;
+keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
+         | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL'
+         | 'HEXAD' | 'FEDERATION' | 'STORE'
+         | 'WITH' | 'DRIFT' | 'STRICT' | 'REPAIR' | 'TOLERATE' | 'LATEST'
+         | 'AND' | 'OR' | 'NOT'
+         | 'SIMILAR' | 'TO' | 'WITHIN' | 'NEAREST' | 'USING'
+         | 'SATISFIES' | 'HAS' | 'VERIFIED' | 'BY'
+         | 'FULLTEXT' | 'CONTAINS' | 'MATCHES' | 'FIELD' | 'LIKE'
+         | 'AS' | 'OF' | 'BETWEEN' | 'VERSION' | 'MODIFIED'
+         | 'EXISTENCE' | 'CITATION' | 'ACCESS' | 'INTEGRITY' | 'PROVENANCE' | 'CUSTOM'
+         | 'COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT' | 'JACCARD' | 'SHAPE' | 'RANK'
+         | 'ORDER' | 'GROUP' | 'HAVING' | 'ASC' | 'DESC'
+         | 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'
+         | 'INSERT' | 'UPDATE' | 'DELETE' | 'SET'
+         | 'EXISTS' | 'CONSISTENT'
+         | 'true' | 'false' ;
 
 (* ============================================================================
    END OF GRAMMAR

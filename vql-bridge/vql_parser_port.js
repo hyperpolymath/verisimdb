@@ -38,14 +38,64 @@ function fallbackParse(query) {
     return got;
   }
 
-  // SELECT clause
+  // SELECT clause (extended: supports MODALITY.field projections and aggregates)
   expect("SELECT");
   const modalities = [];
+  const projections = [];
+  const aggregates = [];
+  const MODALITY_NAMES = ["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL"];
+  const AGG_FUNCS = ["COUNT","SUM","AVG","MIN","MAX"];
+
   while (peek() && peek().toUpperCase() !== "FROM") {
-    const tok = advance().replace(/,/g, "").toUpperCase();
-    if (tok === "*") modalities.push("All");
-    else if (["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL"].includes(tok)) {
-      modalities.push(tok.charAt(0) + tok.slice(1).toLowerCase());
+    const tok = peek()?.replace(/,/g, "");
+    const tokUp = tok?.toUpperCase();
+
+    // Aggregate: COUNT(*) or FUNC(MODALITY.field)
+    if (AGG_FUNCS.includes(tokUp)) {
+      const func = advance().replace(/,/g, "").toUpperCase();
+      if (peek() === "(" || peek()?.startsWith("(")) {
+        let inner = advance().replace(/[()]/g, "");
+        if (!inner && peek()) inner = advance().replace(/[()]/g, "");
+        // consume closing ) if separate token
+        if (peek() === ")") advance();
+
+        if (inner === "*") {
+          aggregates.push({ TAG: "CountAll" });
+        } else if (inner.includes(".")) {
+          const [mod, field] = inner.split(".", 2);
+          aggregates.push({
+            TAG: "AggregateField",
+            func: func.charAt(0) + func.slice(1).toLowerCase(),
+            modality: mod.charAt(0) + mod.slice(1).toLowerCase(),
+            field: field
+          });
+          const modName = mod.charAt(0) + mod.slice(1).toLowerCase();
+          if (!modalities.includes(modName)) modalities.push(modName);
+        }
+      }
+      continue;
+    }
+
+    // MODALITY.field projection
+    if (tok?.includes(".")) {
+      const [mod, field] = tok.split(".", 2);
+      if (MODALITY_NAMES.includes(mod.toUpperCase())) {
+        advance(); // consume the token
+        projections.push({
+          modality: mod.charAt(0).toUpperCase() + mod.slice(1).toLowerCase(),
+          field: field
+        });
+        const modName = mod.charAt(0).toUpperCase() + mod.slice(1).toLowerCase();
+        if (!modalities.includes(modName)) modalities.push(modName);
+        continue;
+      }
+    }
+
+    // Bare modality or wildcard
+    advance();
+    if (tokUp === "*") modalities.push("All");
+    else if (MODALITY_NAMES.includes(tokUp)) {
+      modalities.push(tokUp.charAt(0) + tokUp.slice(1).toLowerCase());
     }
   }
 
@@ -82,15 +132,76 @@ function fallbackParse(query) {
     whereClause = { TAG: "Raw", _0: condTokens.join(" ") };
   }
 
-  // PROOF clause
+  // GROUP BY clause
+  let groupBy = null;
+  if (peek()?.toUpperCase() === "GROUP") {
+    advance(); // GROUP
+    expect("BY");
+    groupBy = [];
+    while (peek() && !["HAVING","PROOF","ORDER","LIMIT","OFFSET"].includes(peek()?.toUpperCase())) {
+      const tok = advance().replace(/,/g, "");
+      if (tok.includes(".")) {
+        const [mod, field] = tok.split(".", 2);
+        groupBy.push({
+          modality: mod.charAt(0).toUpperCase() + mod.slice(1).toLowerCase(),
+          field: field
+        });
+      }
+    }
+  }
+
+  // HAVING clause
+  let having = null;
+  if (peek()?.toUpperCase() === "HAVING") {
+    advance(); // HAVING
+    const havingTokens = [];
+    while (peek() && !["PROOF","ORDER","LIMIT","OFFSET"].includes(peek()?.toUpperCase())) {
+      havingTokens.push(advance());
+    }
+    having = { TAG: "Raw", _0: havingTokens.join(" ") };
+  }
+
+  // PROOF clause (multi-proof: PROOF spec AND spec AND spec)
   let proof = null;
   if (peek()?.toUpperCase() === "PROOF") {
     advance(); // PROOF
-    const proofTokens = [];
-    while (peek() && !["LIMIT","OFFSET"].includes(peek()?.toUpperCase())) {
-      proofTokens.push(advance());
+    const proofSpecs = [];
+    while (peek() && !["ORDER","LIMIT","OFFSET"].includes(peek()?.toUpperCase())) {
+      const proofType = advance();
+      const contractRaw = advance()?.replace(/[()]/g, "") || "";
+      proofSpecs.push({ proofType, contractName: contractRaw });
+      // Check for AND to chain multiple proofs
+      if (peek()?.toUpperCase() === "AND") {
+        advance(); // AND
+      } else {
+        break;
+      }
     }
-    proof = { proofType: proofTokens[0], contractName: proofTokens[1]?.replace(/[()]/g, "") };
+    proof = proofSpecs.length > 0 ? proofSpecs : null;
+  }
+
+  // ORDER BY clause
+  let orderBy = null;
+  if (peek()?.toUpperCase() === "ORDER") {
+    advance(); // ORDER
+    expect("BY");
+    orderBy = [];
+    while (peek() && !["LIMIT","OFFSET"].includes(peek()?.toUpperCase())) {
+      const tok = advance().replace(/,/g, "");
+      if (tok.includes(".")) {
+        const [mod, field] = tok.split(".", 2);
+        let direction = "Asc";
+        if (peek()?.toUpperCase() === "ASC") { advance(); direction = "Asc"; }
+        else if (peek()?.toUpperCase() === "DESC") { advance(); direction = "Desc"; }
+        orderBy.push({
+          field: {
+            modality: mod.charAt(0).toUpperCase() + mod.slice(1).toLowerCase(),
+            field: field
+          },
+          direction: direction
+        });
+      }
+    }
   }
 
   // LIMIT
@@ -109,12 +220,146 @@ function fallbackParse(query) {
 
   return {
     modalities,
+    projections: projections.length > 0 ? projections : null,
+    aggregates: aggregates.length > 0 ? aggregates : null,
     source,
     where: whereClause,
+    groupBy,
+    having,
     proof,
+    orderBy,
     limit,
     offset,
   };
+}
+
+/**
+ * Minimal VQL mutation parser fallback (INSERT / UPDATE / DELETE).
+ * Produces AST compatible with VQLParser.res mutation types.
+ */
+function fallbackParseMutation(input) {
+  const tokens = input.trim().split(/\s+/);
+  let pos = 0;
+
+  function peek() { return tokens[pos] || null; }
+  function advance() { return tokens[pos++] || null; }
+  function expect(t) {
+    const got = advance();
+    if (got?.toUpperCase() !== t.toUpperCase()) {
+      throw new Error(`Expected "${t}", got "${got}" at position ${pos}`);
+    }
+    return got;
+  }
+
+  const cmd = advance()?.toUpperCase();
+
+  if (cmd === "INSERT") {
+    expect("HEXAD");
+    expect("WITH");
+
+    const MODALITY_NAMES = ["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL"];
+    const modalityData = [];
+
+    while (peek() && MODALITY_NAMES.includes(peek()?.toUpperCase())) {
+      const mod = advance().toUpperCase();
+      // Collect everything in parens
+      if (peek()?.startsWith("(")) {
+        let raw = advance();
+        // Collect until closing paren
+        while (raw && !raw.endsWith(")")) {
+          raw += " " + advance();
+        }
+        raw = raw.replace(/^\(/, "").replace(/\)$/, "");
+        modalityData.push({ modality: mod, raw });
+      }
+      // Skip comma between modality data
+      if (peek() === ",") advance();
+    }
+
+    // Optional PROOF
+    let proof = null;
+    if (peek()?.toUpperCase() === "PROOF") {
+      advance();
+      const proofSpecs = [];
+      while (peek()) {
+        const proofType = advance();
+        const contractRaw = advance()?.replace(/[()]/g, "") || "";
+        proofSpecs.push({ proofType, contractName: contractRaw });
+        if (peek()?.toUpperCase() === "AND") { advance(); } else { break; }
+      }
+      proof = proofSpecs.length > 0 ? proofSpecs : null;
+    }
+
+    return { TAG: "Insert", modalities: modalityData, proof };
+
+  } else if (cmd === "UPDATE") {
+    expect("HEXAD");
+    const hexadId = advance();
+    expect("SET");
+
+    const sets = [];
+    while (peek() && peek()?.toUpperCase() !== "PROOF") {
+      const field = advance()?.replace(/,/g, "");
+      if (peek() === "=") {
+        advance(); // =
+        const value = advance()?.replace(/,/g, "");
+        sets.push({ field, value });
+      } else {
+        break;
+      }
+    }
+
+    let proof = null;
+    if (peek()?.toUpperCase() === "PROOF") {
+      advance();
+      const proofSpecs = [];
+      while (peek()) {
+        const proofType = advance();
+        const contractRaw = advance()?.replace(/[()]/g, "") || "";
+        proofSpecs.push({ proofType, contractName: contractRaw });
+        if (peek()?.toUpperCase() === "AND") { advance(); } else { break; }
+      }
+      proof = proofSpecs.length > 0 ? proofSpecs : null;
+    }
+
+    return { TAG: "Update", hexadId, sets, proof };
+
+  } else if (cmd === "DELETE") {
+    expect("HEXAD");
+    const hexadId = advance();
+
+    let proof = null;
+    if (peek()?.toUpperCase() === "PROOF") {
+      advance();
+      const proofSpecs = [];
+      while (peek()) {
+        const proofType = advance();
+        const contractRaw = advance()?.replace(/[()]/g, "") || "";
+        proofSpecs.push({ proofType, contractName: contractRaw });
+        if (peek()?.toUpperCase() === "AND") { advance(); } else { break; }
+      }
+      proof = proofSpecs.length > 0 ? proofSpecs : null;
+    }
+
+    return { TAG: "Delete", hexadId, proof };
+
+  } else {
+    throw new Error(`Expected INSERT, UPDATE, or DELETE, got "${cmd}"`);
+  }
+}
+
+/**
+ * Parse a VQL statement (query or mutation) using fallback parser.
+ */
+function fallbackParseStatement(input) {
+  const trimmed = input.trim();
+  const firstWord = trimmed.split(/\s+/)[0]?.toUpperCase();
+
+  if (["INSERT", "UPDATE", "DELETE"].includes(firstWord)) {
+    return { TAG: "Mutation", _0: fallbackParseMutation(trimmed) };
+  } else {
+    return { TAG: "Query", _0: fallbackParse(trimmed) };
+  }
 }
 
 /**
@@ -130,6 +375,12 @@ function parseQuery(query, action) {
       case "parse_dependent":
         result = VQLParser.parseDependentType(query);
         break;
+      case "parse_mutation":
+        result = VQLParser.parseMutation(query);
+        break;
+      case "parse_statement":
+        result = VQLParser.parseStatement(query);
+        break;
       default:
         result = VQLParser.parse(query);
     }
@@ -139,7 +390,14 @@ function parseQuery(query, action) {
   }
 
   // Fallback parser
-  return { ok: fallbackParse(query) };
+  switch (action) {
+    case "parse_mutation":
+      return { ok: fallbackParseMutation(query) };
+    case "parse_statement":
+      return { ok: fallbackParseStatement(query) };
+    default:
+      return { ok: fallbackParse(query) };
+  }
 }
 
 // ---------------------------------------------------------------------------

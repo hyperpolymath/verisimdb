@@ -7,7 +7,7 @@
 
 == Overview
 
-This document provides **42 comprehensive examples** of VQL queries for both **dependent-type** (formally verified) and **slipstream** (fast, unverified) paths, including backwards compatibility (VERSION) and drift handling (DRIFT REPAIR) features.
+This document provides **63 comprehensive examples** of VQL queries and mutations for both **dependent-type** (formally verified) and **slipstream** (fast, unverified) paths, including backwards compatibility (VERSION), drift handling (DRIFT REPAIR), SQL-compatible extensions (ORDER BY, GROUP BY, HAVING, aggregates, column projections), multi-proof composition, cross-modal correlation conditions, and write path mutations (INSERT/UPDATE/DELETE).
 
 == Basic Queries
 
@@ -735,6 +735,337 @@ WITH DRIFT REPAIR  -- Auto-repair detected drift
 WHERE hexad.types INCLUDES "Paper"
 LIMIT 100;
 ----
+
+== SQL-Compatible Extensions
+
+=== Example 43: Column Selection within Modality
+
+**Select specific fields from a modality (slipstream):**
+[source,vql]
+----
+SELECT DOCUMENT.name, DOCUMENT.severity
+FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+----
+
+**Mixed modalities and column projections:**
+[source,vql]
+----
+SELECT GRAPH, DOCUMENT.name, DOCUMENT.severity
+FROM FEDERATION /universities/*
+LIMIT 50
+----
+
+=== Example 44: ORDER BY — Sort Results
+
+**Sort by severity descending:**
+[source,vql]
+----
+SELECT DOCUMENT
+FROM STORE archive-1
+WHERE FULLTEXT CONTAINS "security"
+ORDER BY DOCUMENT.severity DESC
+LIMIT 50
+----
+
+**Multi-field sort:**
+[source,vql]
+----
+SELECT DOCUMENT.name, DOCUMENT.severity
+FROM FEDERATION /archives/*
+ORDER BY DOCUMENT.severity DESC, DOCUMENT.name ASC
+LIMIT 100
+----
+
+=== Example 45: COUNT(*), SUM, AVG — Aggregate Functions
+
+**Count all matching hexads:**
+[source,vql]
+----
+SELECT COUNT(*)
+FROM FEDERATION /archives/*
+WHERE FULLTEXT CONTAINS "vulnerability"
+----
+
+**Aggregate with field reference:**
+[source,vql]
+----
+SELECT AVG(DOCUMENT.severity), MIN(DOCUMENT.severity), MAX(DOCUMENT.severity)
+FROM FEDERATION /scans/*
+----
+
+**Sum and count together:**
+[source,vql]
+----
+SELECT COUNT(*), SUM(DOCUMENT.severity)
+FROM STORE tantivy-node-1
+WHERE FIELD severity > 3
+----
+
+=== Example 46: GROUP BY / HAVING — Grouping with Filters
+
+**Group results by field:**
+[source,vql]
+----
+SELECT DOCUMENT.name, COUNT(*), AVG(DOCUMENT.severity)
+FROM FEDERATION /universities/*
+GROUP BY DOCUMENT.name
+LIMIT 100
+----
+
+**GROUP BY with HAVING filter:**
+[source,vql]
+----
+SELECT DOCUMENT.name, COUNT(*)
+FROM FEDERATION /archives/*
+GROUP BY DOCUMENT.name
+HAVING FIELD count > 3
+ORDER BY DOCUMENT.name ASC
+LIMIT 50
+----
+
+=== Example 47: Full SQL-Compatible Query
+
+**Combining all SQL-compatible features with VQL's model:**
+[source,vql]
+----
+SELECT DOCUMENT.name, DOCUMENT.severity, COUNT(*), SUM(DOCUMENT.severity), AVG(DOCUMENT.severity)
+FROM FEDERATION /universities/* WITH DRIFT REPAIR
+WHERE FIELD severity > 3
+GROUP BY DOCUMENT.name, DOCUMENT.severity
+HAVING FIELD total > 10
+ORDER BY DOCUMENT.severity DESC, DOCUMENT.name ASC
+LIMIT 100
+OFFSET 20
+----
+
+=== Example 48: SQL-Compatible with Dependent-Type Verification
+
+**Combining aggregates with formal verification (VQL-dt path):**
+[source,vql]
+----
+SELECT DOCUMENT.name, COUNT(*)
+FROM FEDERATION /universities/* WITH DRIFT STRICT
+GROUP BY DOCUMENT.name
+PROOF INTEGRITY(DataIntegrityContract)
+ORDER BY DOCUMENT.name ASC
+LIMIT 50
+----
+
+NOTE: In the dependent-type path, aggregation results are also covered by the proof
+guarantee — the ZKP witnesses include the aggregate computation, ensuring verified totals.
+
+== Multi-Proof Composition (v2.0)
+
+=== Example 49: Dual Proof — Existence and Integrity
+
+**Dependent-Type:**
+[source,vql]
+----
+SELECT *
+FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+PROOF EXISTENCE(ExistenceContract) AND INTEGRITY(DataIntegrityContract)
+----
+
+Both proofs must pass before results are returned. The ZKP witnesses for each proof
+are generated independently and composed into a single proof bundle.
+
+=== Example 50: Triple Proof — Access, Provenance, and Integrity
+
+**Dependent-Type:**
+[source,vql]
+----
+SELECT SEMANTIC, TEMPORAL, DOCUMENT
+FROM FEDERATION /hospitals/* WITH DRIFT STRICT
+WHERE SATISFIES HIPAAContract(anonymized=true)
+PROOF ACCESS(InstitutionalAccessContract) AND PROVENANCE(ClinicalTrialContract) AND INTEGRITY(DataIntegrityContract)
+LIMIT 100
+----
+
+Multi-proof composition validates that the user has access, the data lineage
+is verifiable, and the data has not been tampered with — all three conditions
+must hold simultaneously.
+
+=== Example 51: Citation and Custom Proof
+
+**Dependent-Type:**
+[source,vql]
+----
+SELECT GRAPH, DOCUMENT
+FROM FEDERATION /journals/* WITH DRIFT REPAIR
+WHERE (h)-[:CITES]->(target)
+  AND FULLTEXT CONTAINS "reproducibility crisis"
+PROOF CITATION(CitationChainContract) AND CUSTOM(ReproducibilityContract)
+LIMIT 50
+----
+
+== Cross-Modal Correlation Queries (v2.0)
+
+=== Example 52: Cross-Modal Field Compare
+
+**Compare fields across modalities:**
+[source,vql]
+----
+SELECT DOCUMENT, GRAPH
+FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+WHERE DOCUMENT.severity > GRAPH.centrality
+----
+
+Evaluates after both modalities are fetched, comparing the document severity
+field against the graph centrality field on the same hexad.
+
+=== Example 53: Drift Between Modalities
+
+**Detect embedding drift:**
+[source,vql]
+----
+SELECT VECTOR, DOCUMENT
+FROM FEDERATION /research-papers/*
+WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
+LIMIT 50
+----
+
+Returns hexads where the vector embedding has drifted more than 0.3 from the
+document representation. Useful for identifying stale embeddings.
+
+=== Example 54: Consistency Check
+
+**Verify cross-modal consistency:**
+[source,vql]
+----
+SELECT VECTOR, SEMANTIC
+FROM HEXAD suspicious-entry-uuid
+WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE
+PROOF INTEGRITY(CrossModalContract)
+----
+
+Checks that the vector representation and semantic annotation are consistent
+using cosine similarity as the metric.
+
+=== Example 55: Modality Existence Check
+
+**Filter by available modalities:**
+[source,vql]
+----
+SELECT *
+FROM FEDERATION /archives/*
+WHERE VECTOR EXISTS
+  AND TENSOR NOT EXISTS
+LIMIT 100
+----
+
+Returns hexads that have vector embeddings but lack tensor data. Useful for
+identifying hexads that need tensor representations generated.
+
+=== Example 56: Combined Cross-Modal and Standard Conditions
+
+**Mix cross-modal with single-modality conditions:**
+[source,vql]
+----
+SELECT GRAPH, VECTOR, DOCUMENT
+FROM FEDERATION /research-db/* WITH DRIFT REPAIR
+WHERE FULLTEXT CONTAINS "neural networks"
+  AND DRIFT(VECTOR, DOCUMENT) < 0.2
+  AND VECTOR EXISTS
+  AND GRAPH EXISTS
+PROOF CITATION(NeuralNetworkContract) AND INTEGRITY(DataIntegrityContract)
+LIMIT 50
+----
+
+Pushdown conditions (FULLTEXT CONTAINS) are sent to individual stores,
+while cross-modal conditions (DRIFT, EXISTS) are evaluated post-fetch
+on full hexad data.
+
+== Write Path: INSERT / UPDATE / DELETE (v2.0)
+
+=== Example 57: Insert a New Hexad
+
+**Insert with document and vector data:**
+[source,vql]
+----
+INSERT HEXAD WITH
+  DOCUMENT(title = "New Research Paper", author = "Jane Doe", severity = 3),
+  VECTOR([0.12, 0.45, 0.78, 0.23, 0.91])
+----
+
+Creates a new hexad with document and vector modalities populated.
+The hexad ID is auto-generated and returned in the result.
+
+=== Example 58: Insert with Graph Relationship
+
+**Insert with cross-modal data:**
+[source,vql]
+----
+INSERT HEXAD WITH
+  DOCUMENT(title = "Follow-Up Study", year = 2026),
+  VECTOR([0.5, 0.3, 0.2, 0.8]),
+  GRAPH(CITES, 550e8400-e29b-41d4-a716-446655440000)
+----
+
+Creates a hexad with document content, embedding, and a graph edge
+(CITES relationship to an existing hexad).
+
+=== Example 59: Verified Insert with Proof
+
+**Insert with integrity verification:**
+[source,vql]
+----
+INSERT HEXAD WITH
+  DOCUMENT(title = "Clinical Trial Result", status = "verified"),
+  SEMANTIC(ClinicalTrialContract),
+  TEMPORAL(2026-02-13T10:30:00Z)
+PROOF INTEGRITY(WriteContract) AND PROVENANCE(AuditTrailContract)
+----
+
+The ZKP proofs are generated for the write operation itself, ensuring the
+insert is verified and auditable.
+
+=== Example 60: Update Hexad Fields
+
+**Update specific fields:**
+[source,vql]
+----
+UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+SET DOCUMENT.title = "Corrected Title", DOCUMENT.severity = 5
+----
+
+Updates the document modality fields without affecting other modalities.
+Drift detection will fire if the change creates cross-modal inconsistency.
+
+=== Example 61: Verified Update with Proof
+
+**Update with access proof:**
+[source,vql]
+----
+UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+SET DOCUMENT.status = "retracted", DOCUMENT.retraction_reason = "Data fabrication"
+PROOF ACCESS(EditAccessContract) AND PROVENANCE(RetractionContract)
+----
+
+The update requires proof of edit access and creates a provenance record
+of the retraction in the audit trail.
+
+=== Example 62: Delete a Hexad
+
+**Simple deletion:**
+[source,vql]
+----
+DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+----
+
+Removes the hexad and all its modality data. This operation is logged
+in verisim-temporal for auditability.
+
+=== Example 63: Verified Delete with Proof
+
+**Delete with access and provenance proof:**
+[source,vql]
+----
+DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+PROOF ACCESS(AdminAccessContract) AND PROVENANCE(DeletionAuditContract)
+----
+
+Requires proof of admin access before deletion. The provenance proof
+ensures the deletion is recorded in the audit chain.
 
 == References
 

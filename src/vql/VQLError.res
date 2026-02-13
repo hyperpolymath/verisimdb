@@ -38,6 +38,11 @@ type parseErrorKind =
   | InvalidGraphPattern(string)
   | InvalidVectorExpression(string)
   | InvalidSemanticContract(string)
+  | InvalidAggregateExpression(string)
+  | InvalidOrderByField(string)
+  | InvalidGroupByField(string)
+  | HavingWithoutGroupBy
+  | AggregateWithoutGroupBy(string)
 
 type parseError = {
   kind: parseErrorKind,
@@ -58,6 +63,26 @@ type typeErrorKind =
   | TypeMismatch({expected: string, found: string})
   | MissingTypeAnnotation(string)
   | CircularDependency(array<string>)
+  // Phase 1: Dependent type errors
+  | SubtypingFailed({expected: string, got: string})
+  | FieldTypeMismatch({field: string, expected: string, got: string})
+  | OperatorTypeMismatch({op: string, leftType: string, rightType: string})
+  | VectorDimensionMismatch({expected: int, got: int})
+  | ProofObligationFailed({proofType: string, reason: string})
+  | AggregateTypeMismatch({func: string, fieldType: string})
+  | MultiProofConflict({proof1: string, proof2: string, reason: string})
+  | UnknownField({modality: string, fieldName: string})
+  // Phase 2: Cross-modal errors
+  | CrossModalTypeMismatch({mod1: string, field1: string, mod2: string, field2: string, reason: string})
+  | DriftRequiresNumeric({mod1: string, mod2: string})
+  | ConsistencyMetricInvalid({mod1: string, mod2: string, metric: string})
+  // Phase 3: Write path errors
+  | InsertConflict(string)
+  | UpdateNotFound(string)
+  | DeleteNotFound(string)
+  | ConstraintViolation({field: string, constraint: string, value: string})
+  | WriteProofFailed({proofType: string, reason: string})
+  | ReadOnlyStore(string)
 
 type typeError = {
   kind: typeErrorKind,
@@ -191,6 +216,11 @@ let formatParseError = (err: parseError): string => {
   | InvalidGraphPattern(pattern) => `Invalid graph pattern: '${pattern}'`
   | InvalidVectorExpression(expr) => `Invalid vector expression: '${expr}'`
   | InvalidSemanticContract(contract) => `Invalid semantic contract: '${contract}'`
+  | InvalidAggregateExpression(expr) => `Invalid aggregate expression: '${expr}'. Valid: COUNT(*), SUM(M.field), AVG(M.field), MIN(M.field), MAX(M.field)`
+  | InvalidOrderByField(field) => `Invalid ORDER BY field: '${field}'. Use MODALITY.field format`
+  | InvalidGroupByField(field) => `Invalid GROUP BY field: '${field}'. Use MODALITY.field format`
+  | HavingWithoutGroupBy => "HAVING clause requires GROUP BY"
+  | AggregateWithoutGroupBy(func) => `Aggregate function ${func} used without GROUP BY clause`
   }
 
   let hintStr = switch err.hint {
@@ -210,6 +240,39 @@ let formatTypeError = (err: typeError): string => {
   | TypeMismatch({expected, found}) => `Type mismatch: expected ${expected}, found ${found}`
   | MissingTypeAnnotation(field) => `Missing type annotation for field: '${field}'`
   | CircularDependency(cycle) => `Circular dependency detected: ${cycle->Array.joinWith(" → ", x => x)}`
+  // Phase 1
+  | SubtypingFailed({expected, got}) =>
+    `Subtyping failed: expected ${expected}, got ${got}`
+  | FieldTypeMismatch({field, expected, got}) =>
+    `Field '${field}' type mismatch: expected ${expected}, got ${got}`
+  | OperatorTypeMismatch({op, leftType, rightType}) =>
+    `Operator '${op}' cannot compare ${leftType} with ${rightType}`
+  | VectorDimensionMismatch({expected, got}) =>
+    `Vector dimension mismatch: expected ${expected->Int.toString}, got ${got->Int.toString}`
+  | ProofObligationFailed({proofType, reason}) =>
+    `Proof obligation '${proofType}' failed: ${reason}`
+  | AggregateTypeMismatch({func, fieldType}) =>
+    `Aggregate function ${func} cannot operate on ${fieldType}`
+  | MultiProofConflict({proof1, proof2, reason}) =>
+    `Proofs '${proof1}' and '${proof2}' conflict: ${reason}`
+  | UnknownField({modality, fieldName}) =>
+    `Unknown field '${fieldName}' for modality ${modality}`
+  // Phase 2
+  | CrossModalTypeMismatch({mod1, field1, mod2, field2, reason}) =>
+    `Cross-modal type mismatch: ${mod1}.${field1} vs ${mod2}.${field2}: ${reason}`
+  | DriftRequiresNumeric({mod1, mod2}) =>
+    `DRIFT requires numeric/vector modalities: ${mod1}, ${mod2}`
+  | ConsistencyMetricInvalid({mod1, mod2, metric}) =>
+    `Metric '${metric}' not supported for ${mod1} and ${mod2}`
+  // Phase 3
+  | InsertConflict(hexadId) => `INSERT conflict: hexad '${hexadId}' already exists`
+  | UpdateNotFound(hexadId) => `UPDATE failed: hexad '${hexadId}' not found`
+  | DeleteNotFound(hexadId) => `DELETE failed: hexad '${hexadId}' not found`
+  | ConstraintViolation({field, constraint, value}) =>
+    `Constraint violation on '${field}': ${constraint} (value: ${value})`
+  | WriteProofFailed({proofType, reason}) =>
+    `Write proof '${proofType}' failed: ${reason}`
+  | ReadOnlyStore(storeId) => `Store '${storeId}' is read-only`
   }
 
   let contextStr = switch (err.hexad_id, err.modality) {

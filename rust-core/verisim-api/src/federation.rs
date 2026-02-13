@@ -21,14 +21,13 @@
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-
     routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use tracing::{info, instrument};
+use tracing::{info, warn, instrument};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -269,61 +268,180 @@ async fn federation_query(
     State(state): State<FederationState>,
     Json(request): Json<FederationQueryRequest>,
 ) -> Json<FederationQueryResponse> {
-    let peers = state.peers.read().expect("peers RwLock poisoned");
+    let limit = request.limit.unwrap_or(100);
 
-    // Resolve pattern to matching stores
-    let matching_stores: Vec<&PeerStore> = peers
-        .values()
-        .filter(|p| pattern_matches(&request.pattern, &p.store_id))
-        .filter(|p| {
-            // Filter by required modalities
-            request
-                .modalities
-                .iter()
-                .all(|m| p.modalities.iter().any(|pm| pm == m))
+    // Collect matching stores and apply drift policy (hold lock briefly)
+    let (stores_to_query, stores_excluded) = {
+        let peers = state.peers.read().expect("peers RwLock poisoned");
+
+        let matching: Vec<PeerStore> = peers
+            .values()
+            .filter(|p| pattern_matches(&request.pattern, &p.store_id))
+            .filter(|p| {
+                request
+                    .modalities
+                    .iter()
+                    .all(|m| p.modalities.iter().any(|pm| pm == m))
+            })
+            .cloned()
+            .collect();
+
+        let mut included = Vec::new();
+        let mut excluded = Vec::new();
+
+        for store in matching {
+            // Skip self to prevent infinite recursion
+            if store.store_id == state.self_store_id {
+                continue;
+            }
+
+            let include = match request.drift_policy {
+                DriftPolicy::Strict => {
+                    store.trust_level >= (1.0 - state.strict_drift_threshold)
+                }
+                DriftPolicy::Repair | DriftPolicy::Tolerate | DriftPolicy::Latest => true,
+            };
+
+            if include {
+                included.push(store);
+            } else {
+                info!(
+                    store_id = %store.store_id,
+                    trust = store.trust_level,
+                    "Excluded store due to Strict drift policy"
+                );
+                excluded.push(store.store_id.clone());
+            }
+        }
+
+        (included, excluded)
+    };
+    // RwLock dropped here — safe to make async HTTP calls
+
+    let stores_queried: Vec<String> = stores_to_query
+        .iter()
+        .map(|s| s.store_id.clone())
+        .collect();
+
+    let client = reqwest::Client::new();
+    let text_query = request.text_query.clone();
+    let vector_query = request.vector_query.clone();
+    let drift_policy = request.drift_policy;
+
+    // Fan out parallel queries
+    let mut handles = Vec::new();
+    for store in stores_to_query {
+        let client = client.clone();
+        let text_q = text_query.clone();
+        let vector_q = vector_query.clone();
+
+        let handle = tokio::spawn(async move {
+            let timeout = std::time::Duration::from_secs(10);
+            match tokio::time::timeout(
+                timeout,
+                query_single_peer(&client, &store, text_q.as_deref(), vector_q.as_deref(), limit),
+            )
+            .await
+            {
+                Ok(Ok(results)) => results,
+                Ok(Err(e)) => {
+                    warn!(store_id = %store.store_id, error = %e, "Peer query failed");
+                    Vec::new()
+                }
+                Err(_) => {
+                    warn!(store_id = %store.store_id, "Peer query timed out after 10s");
+                    Vec::new()
+                }
+            }
+        });
+        handles.push(handle);
+    }
+
+    // Collect results from all peers
+    let mut all_results: Vec<FederationResult> = Vec::new();
+    for handle in handles {
+        match handle.await {
+            Ok(mut results) => all_results.append(&mut results),
+            Err(e) => warn!(error = %e, "Peer query task panicked"),
+        }
+    }
+
+    // Sort by score descending and apply global limit
+    all_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    all_results.truncate(limit);
+
+    Json(FederationQueryResponse {
+        results: all_results,
+        stores_queried,
+        stores_excluded,
+        drift_policy,
+    })
+}
+
+/// Query a single peer store via HTTP.
+async fn query_single_peer(
+    client: &reqwest::Client,
+    store: &PeerStore,
+    text_query: Option<&str>,
+    vector_query: Option<&[f32]>,
+    limit: usize,
+) -> Result<Vec<FederationResult>, String> {
+    let endpoint = &store.endpoint;
+    let store_id = &store.store_id;
+
+    let response_items: Vec<serde_json::Value> = if let Some(q) = text_query {
+        // Text search
+        let url = format!("{}/search/text", endpoint);
+        let resp = client
+            .get(&url)
+            .query(&[("q", q), ("limit", &limit.to_string())])
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request to {} failed: {}", store_id, e))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Peer {} returned status {}", store_id, resp.status()));
+        }
+
+        resp.json()
+            .await
+            .map_err(|e| format!("Failed to parse response from {}: {}", store_id, e))?
+    } else if let Some(vec) = vector_query {
+        // Vector search
+        let url = format!("{}/search/vector", endpoint);
+        let body = serde_json::json!({ "vector": vec, "k": limit });
+        let resp = client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request to {} failed: {}", store_id, e))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Peer {} returned status {}", store_id, resp.status()));
+        }
+
+        resp.json()
+            .await
+            .map_err(|e| format!("Failed to parse response from {}: {}", store_id, e))?
+    } else {
+        // No specific query — return empty (list-all not supported via federation)
+        return Ok(Vec::new());
+    };
+
+    // Map response items to FederationResult
+    let results = response_items
+        .into_iter()
+        .map(|item| FederationResult {
+            source_store: store_id.clone(),
+            hexad_id: item["id"].as_str().unwrap_or("unknown").to_string(),
+            score: item["score"].as_f64().unwrap_or(0.0),
+            drifted: false,
+            data: item,
         })
         .collect();
 
-    let mut stores_queried = Vec::new();
-    let mut stores_excluded = Vec::new();
-    let results: Vec<FederationResult> = Vec::new();
-
-    for store in &matching_stores {
-        // Apply drift policy filtering
-        let include = match request.drift_policy {
-            DriftPolicy::Strict => store.trust_level >= (1.0 - state.strict_drift_threshold),
-            DriftPolicy::Repair | DriftPolicy::Tolerate | DriftPolicy::Latest => true,
-        };
-
-        if !include {
-            stores_excluded.push(store.store_id.clone());
-            info!(
-                store_id = %store.store_id,
-                trust = store.trust_level,
-                "Excluded store due to Strict drift policy"
-            );
-            continue;
-        }
-
-        stores_queried.push(store.store_id.clone());
-
-        // In production: make HTTP request to store.endpoint using reqwest/hyper:
-        //   POST {store.endpoint}/search/text   (for text queries)
-        //   POST {store.endpoint}/search/vector  (for vector queries)
-        //   GET  {store.endpoint}/hexads/{id}    (for specific hexad)
-        info!(
-            store_id = %store.store_id,
-            endpoint = %store.endpoint,
-            "Would query federated store"
-        );
-    }
-
-    Json(FederationQueryResponse {
-        results,
-        stores_queried,
-        stores_excluded,
-        drift_policy: request.drift_policy,
-    })
+    Ok(results)
 }
 
 // ---------------------------------------------------------------------------

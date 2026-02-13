@@ -13,12 +13,20 @@ type planNode = {
   pushedPredicates: array<string>,
 }
 
+type proofPlanNode = {
+  proofType: string,
+  contractName: string,
+  circuit: string,
+  estimatedTimeMs: int,
+}
+
 type executionPlan = {
   strategy: [#Sequential | #Parallel],
   totalCost: int,
   optimizationMode: string,
   nodes: array<planNode>,
   bidirectionalOptimization: bool,
+  proofObligations: array<proofPlanNode>,
 }
 
 // Parse EXPLAIN query
@@ -97,6 +105,15 @@ let formatPlan = (plan: executionPlan): string => {
   })
 
   lines->Js.Array2.push("")
+
+  // Proof obligations
+  if Js.Array2.length(plan.proofObligations) > 0 {
+    lines->Js.Array2.push("Proof Obligations:")
+    plan.proofObligations->Js.Array2.forEach(proof => {
+      lines->Js.Array2.push(`  ${proof.proofType}(${proof.contractName}) circuit=${proof.circuit} est=${Belt.Int.toString(proof.estimatedTimeMs)}ms`)
+    })
+    lines->Js.Array2.push("")
+  }
 
   // Performance hints
   lines->Js.Array2.push("Performance Hints:")
@@ -223,6 +240,81 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
     }
   })
 
+  // Add GROUP BY / Aggregate step if present
+  let aggregateNode = switch (ast.groupBy, ast.aggregates) {
+  | (Some(groupFields), Some(_aggs)) => {
+      let groupFieldStrs = groupFields->Belt.Array.map(f => {
+        let modStr = switch f.modality {
+        | Graph => "GRAPH"
+        | Vector => "VECTOR"
+        | Tensor => "TENSOR"
+        | Semantic => "SEMANTIC"
+        | Document => "DOCUMENT"
+        | Temporal => "TEMPORAL"
+        | All => "ALL"
+        }
+        `${modStr}.${f.field}`
+      })
+      Some({
+        step: Js.Array2.length(nodes) + 1,
+        operation: "Group & Aggregate",
+        modality: "AGGREGATE",
+        estimatedCost: 20,
+        estimatedSelectivity: 0.3,
+        optimizationHint: Some(`Group by: ${groupFieldStrs->Js.Array2.joinWith(", ")}`),
+        pushedPredicates: [],
+      })
+    }
+  | (None, Some(_aggs)) =>
+    Some({
+      step: Js.Array2.length(nodes) + 1,
+      operation: "Aggregate (no grouping)",
+      modality: "AGGREGATE",
+      estimatedCost: 10,
+      estimatedSelectivity: 1.0,
+      optimizationHint: Some("Full-result aggregation — single output row"),
+      pushedPredicates: [],
+    })
+  | _ => None
+  }
+
+  switch aggregateNode {
+  | Some(node) => nodes->Js.Array2.push(node)->ignore
+  | None => ()
+  }
+
+  // Add ORDER BY / Sort step if present
+  switch ast.orderBy {
+  | Some(orderItems) => {
+      let orderStrs = orderItems->Belt.Array.map(item => {
+        let modStr = switch item.field.modality {
+        | Graph => "GRAPH"
+        | Vector => "VECTOR"
+        | Tensor => "TENSOR"
+        | Semantic => "SEMANTIC"
+        | Document => "DOCUMENT"
+        | Temporal => "TEMPORAL"
+        | All => "ALL"
+        }
+        let dirStr = switch item.direction {
+        | Asc => "ASC"
+        | Desc => "DESC"
+        }
+        `${modStr}.${item.field.field} ${dirStr}`
+      })
+      nodes->Js.Array2.push({
+        step: Js.Array2.length(nodes) + 1,
+        operation: "Sort",
+        modality: "SORT",
+        estimatedCost: 15,
+        estimatedSelectivity: 1.0,
+        optimizationHint: Some(`Order by: ${orderStrs->Js.Array2.joinWith(", ")}`),
+        pushedPredicates: [],
+      })->ignore
+    }
+  | None => ()
+  }
+
   // Determine strategy
   let strategy = if Js.Array2.length(nodes) > 1 {
     #Parallel
@@ -232,12 +324,53 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
 
   let totalCost = nodes->Belt.Array.reduce(0, (acc, node) => acc + node.estimatedCost)
 
+  // Generate proof obligation nodes from PROOF clause
+  let proofNodes = switch ast.proof {
+  | None => []
+  | Some(proofSpecs) =>
+    proofSpecs->Belt.Array.map(spec => {
+      let typeStr = switch spec.proofType {
+      | Existence => "EXISTENCE"
+      | Citation => "CITATION"
+      | Access => "ACCESS"
+      | Integrity => "INTEGRITY"
+      | Provenance => "PROVENANCE"
+      | Custom => "CUSTOM"
+      }
+      let circuit = switch spec.proofType {
+      | Existence => "existence-proof-v1"
+      | Citation => "citation-proof-v1"
+      | Access => "access-control-v1"
+      | Integrity => "integrity-check-v1"
+      | Provenance => "provenance-chain-v1"
+      | Custom => "custom-circuit"
+      }
+      let est = switch spec.proofType {
+      | Existence => 50
+      | Citation => 100
+      | Access => 150
+      | Integrity => 200
+      | Provenance => 300
+      | Custom => 500
+      }
+      {
+        proofType: typeStr,
+        contractName: spec.contractName,
+        circuit: circuit,
+        estimatedTimeMs: est,
+      }
+    })
+  }
+
+  let proofCost = proofNodes->Belt.Array.reduce(0, (acc, p) => acc + p.estimatedTimeMs)
+
   {
     strategy: strategy,
-    totalCost: totalCost,
+    totalCost: totalCost + proofCost,
     optimizationMode: "Balanced (client-side estimate)",
     nodes: nodes,
     bidirectionalOptimization: false,
+    proofObligations: proofNodes,
   }
 }
 
@@ -271,6 +404,7 @@ let generateMockPlan = (ast: VQLParser.query): executionPlan => {
     optimizationMode: "Balanced",
     nodes: nodes,
     bidirectionalOptimization: true,
+    proofObligations: [],
   }
 }
 

@@ -1,22 +1,18 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # VeriSimDB Container Image
 #
-# Build with Podman (preferred):
+# Build with Podman:
 #   podman build -t verisimdb:latest -f container/Containerfile .
 #
-# Or Docker:
-#   docker build -t verisimdb:latest -f container/Containerfile .
+# Run:
+#   podman run -p 8080:8080 verisimdb:latest
 
 # Stage 1: Build Rust
-FROM docker.io/rust:1.83-slim-bookworm AS rust-builder
+FROM cgr.dev/chainguard/wolfi-base:latest AS rust-builder
+
+RUN apk add --no-cache rust cargo openssl-dev pkgconf build-base
 
 WORKDIR /build
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy Rust workspace
 COPY Cargo.toml ./
@@ -26,53 +22,51 @@ COPY rust-core/ ./rust-core/
 RUN cargo build --release
 
 # Stage 2: Build Elixir
-FROM docker.io/elixir:1.17-slim AS elixir-builder
+FROM cgr.dev/chainguard/wolfi-base:latest AS elixir-builder
+
+RUN apk add --no-cache elixir erlang git build-base
 
 WORKDIR /build
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy Elixir project
 COPY elixir-orchestration/ ./
 
-# Install deps and compile
+# Install deps, compile, and build release
 ENV MIX_ENV=prod
 RUN mix local.hex --force && \
     mix local.rebar --force && \
     mix deps.get --only prod && \
-    mix compile
+    mix compile && \
+    mix release verisim
 
 # Stage 3: Runtime
-FROM docker.io/debian:bookworm-slim
+FROM cgr.dev/chainguard/wolfi-base:latest
+
+RUN apk add --no-cache libssl3 ca-certificates curl libstdc++ ncurses-libs
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libssl3 \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy Rust binary
-COPY --from=rust-builder /build/target/release/verisim-api /app/
+COPY --from=rust-builder /build/target/release/verisim-api /app/verisim-api
 
-# Copy Elixir release (when we have releases configured)
-# COPY --from=elixir-builder /build/_build/prod/rel/verisim /app/elixir/
+# Copy Elixir release
+COPY --from=elixir-builder /build/_build/prod/rel/verisim /app/elixir/
+
+# Copy entrypoint
+COPY container/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Environment
 ENV RUST_LOG=info
 ENV VERISIM_HOST=0.0.0.0
 ENV VERISIM_PORT=8080
+ENV VERISIM_RUST_CORE_URL=http://127.0.0.1:8080/api/v1
 
 # Expose API port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -sf http://localhost:8080/health || exit 1
 
-# Run
-CMD ["/app/verisim-api"]
+ENTRYPOINT ["/app/entrypoint.sh"]

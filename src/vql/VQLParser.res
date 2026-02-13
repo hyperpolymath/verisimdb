@@ -50,6 +50,17 @@ module AST = {
     | FieldCondition(string, operator, literal)
     | VectorSimilar(array<float>, option<float>)  // embedding, threshold
     | GraphPattern(string)  // SPARQL-like pattern (simplified)
+    // Phase 2: Cross-modal conditions
+    | CrossModalFieldCompare(modality, string, operator, modality, string)
+      // e.g., WHERE DOCUMENT.severity > GRAPH.centrality
+    | ModalityDrift(modality, modality, float)
+      // e.g., WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
+    | ModalityExists(modality)
+      // e.g., WHERE VECTOR EXISTS
+    | ModalityNotExists(modality)
+      // e.g., WHERE TENSOR NOT EXISTS
+    | ModalityConsistency(modality, modality, string)
+      // e.g., WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE
 
   and literal =
     | String(string)
@@ -58,11 +69,46 @@ module AST = {
     | Bool(bool)
     | Array(array<literal>)
 
+  // Field reference: DOCUMENT.name, GRAPH.predicate, etc.
+  type fieldRef = {
+    modality: modality,
+    field: string,
+  }
+
+  // Aggregate functions (SQL-compatible)
+  type aggregateFunc =
+    | Count
+    | Sum
+    | Avg
+    | Min
+    | Max
+
+  // Aggregate expression in SELECT
+  type aggregateExpr =
+    | CountAll                              // COUNT(*)
+    | AggregateField(aggregateFunc, fieldRef) // AVG(DOCUMENT.severity)
+
+  // Sort direction for ORDER BY
+  type sortDirection =
+    | Asc
+    | Desc
+
+  // ORDER BY item
+  type orderByItem = {
+    field: fieldRef,
+    direction: sortDirection,
+  }
+
   type query = {
     modalities: array<modality>,
+    projections: option<array<fieldRef>>,       // Column selection: DOCUMENT.name, DOCUMENT.severity
+    aggregates: option<array<aggregateExpr>>,   // COUNT(*), SUM(DOCUMENT.severity)
     source: source,
     where: option<condition>,
-    proof: option<proofSpec>,
+    groupBy: option<array<fieldRef>>,           // GROUP BY DOCUMENT.name
+    having: option<condition>,                  // HAVING COUNT(*) > 5
+    proof: option<array<proofSpec>>,
+    orderBy: option<array<orderByItem>>,        // ORDER BY DOCUMENT.severity DESC
     limit: option<int>,
     offset: option<int>,
   }
@@ -79,6 +125,34 @@ module AST = {
     | Integrity
     | Provenance
     | Custom
+
+  // Phase 3: Mutation types (INSERT / UPDATE / DELETE)
+  type modalityData =
+    | DocumentData(array<(string, literal)>) // field-value pairs
+    | VectorData(array<float>) // embedding
+    | GraphData(string, string) // edge_type, target_hexad_id
+    | TensorData(array<literal>) // tensor values
+    | SemanticData(string) // contract name
+    | TemporalData(string) // timestamp
+
+  type mutation =
+    | Insert({
+        modalities: array<modalityData>,
+        proof: option<array<proofSpec>>,
+      })
+    | Update({
+        hexadId: string,
+        sets: array<(fieldRef, literal)>,
+        proof: option<array<proofSpec>>,
+      })
+    | Delete({
+        hexadId: string,
+        proof: option<array<proofSpec>>,
+      })
+
+  type statement =
+    | Query(query)
+    | Mutation(mutation)
 }
 
 // ============================================================================
@@ -295,9 +369,116 @@ module Grammar = {
 
   let modalityList: parser<array<modality>> = sepBy(modality, keyword(","))
 
-  // SELECT clause
-  let selectClause: parser<array<modality>> = {
-    bind(keyword("SELECT"), _ => modalityList)
+  // Field reference parser: DOCUMENT.name, GRAPH.predicate, etc.
+  let fieldRef: parser<AST.fieldRef> = {
+    bind(modality, mod =>
+      bind(keyword("."), _ =>
+        map(identifier, field => {
+          AST.modality: mod,
+          field: field,
+        })
+      )
+    )
+  }
+
+  // Aggregate function name parser
+  let aggregateFunc: parser<AST.aggregateFunc> = {
+    let count = map(keyword("COUNT"), _ => AST.Count)
+    let sum = map(keyword("SUM"), _ => AST.Sum)
+    let avg = map(keyword("AVG"), _ => AST.Avg)
+    let min_ = map(keyword("MIN"), _ => AST.Min)
+    let max_ = map(keyword("MAX"), _ => AST.Max)
+
+    count <|> sum <|> avg <|> min_ <|> max_
+  }
+
+  // Aggregate expression parser: COUNT(*) or AVG(DOCUMENT.severity)
+  let aggregateExpr: parser<AST.aggregateExpr> = {
+    let countAll = {
+      bind(keyword("COUNT"), _ =>
+        bind(keyword("("), _ =>
+          bind(keyword("*"), _ =>
+            map(keyword(")"), _ => AST.CountAll)
+          )
+        )
+      )
+    }
+
+    let aggregateField = {
+      bind(aggregateFunc, func =>
+        bind(keyword("("), _ =>
+          bind(fieldRef, ref =>
+            map(keyword(")"), _ => AST.AggregateField(func, ref))
+          )
+        )
+      )
+    }
+
+    countAll <|> aggregateField
+  }
+
+  // Extended select item: aggregate | field projection | bare modality
+  type selectItem =
+    | SelectAggregate(AST.aggregateExpr)
+    | SelectField(AST.fieldRef)
+    | SelectModality(AST.modality)
+
+  let selectItem: parser<selectItem> = {
+    let agg = map(aggregateExpr, a => SelectAggregate(a))
+    let field = map(fieldRef, f => SelectField(f))
+    let mod = map(modality, m => SelectModality(m))
+
+    agg <|> field <|> mod
+  }
+
+  let selectItemList: parser<array<selectItem>> = sepBy(selectItem, keyword(","))
+
+  // Classify select items into modalities, projections, and aggregates
+  type classifiedSelect = {
+    modalities: array<AST.modality>,
+    projections: option<array<AST.fieldRef>>,
+    aggregates: option<array<AST.aggregateExpr>>,
+  }
+
+  let classifySelect = (items: array<selectItem>): classifiedSelect => {
+    let mods = []
+    let projs = []
+    let aggs = []
+
+    items->Js.Array2.forEach(item => {
+      switch item {
+      | SelectModality(m) => mods->Js.Array2.push(m)->ignore
+      | SelectField(f) => {
+          projs->Js.Array2.push(f)->ignore
+          // Also add the modality if not already present
+          if !(mods->Js.Array2.some(m => m == f.modality)) {
+            mods->Js.Array2.push(f.modality)->ignore
+          }
+        }
+      | SelectAggregate(a) => {
+          aggs->Js.Array2.push(a)->ignore
+          // Add modality from aggregate field ref if present
+          switch a {
+          | AggregateField(_, ref) =>
+            if !(mods->Js.Array2.some(m => m == ref.modality)) {
+              mods->Js.Array2.push(ref.modality)->ignore
+            }
+          | CountAll => ()
+          }
+        }
+      }
+    })
+
+    {
+      modalities: mods,
+      projections: if Js.Array2.length(projs) > 0 { Some(projs) } else { None },
+      aggregates: if Js.Array2.length(aggs) > 0 { Some(aggs) } else { None },
+    }
+  }
+
+  // SELECT clause (extended to support projections and aggregates)
+  let selectClause: parser<classifiedSelect> = {
+    map(bind(keyword("SELECT"), _ => selectItemList), items => classifySelect(items))
   }
 
   // Drift policy
@@ -444,7 +625,85 @@ module Grammar = {
       map(stringLiteral, pattern => GraphPattern(pattern))
     }
 
-    fulltextContains <|> fulltextMatches <|> fieldCondition <|> vectorSimilar <|> graphPattern
+    // Phase 2: Cross-modal conditions
+    let driftCondition = {
+      bind(keyword("DRIFT"), _ =>
+        bind(keyword("("), _ =>
+          bind(modality, mod1 =>
+            bind(keyword(","), _ =>
+              bind(modality, mod2 =>
+                bind(keyword(")"), _ =>
+                  bind(operator, _op =>
+                    map(float, threshold =>
+                      ModalityDrift(mod1, mod2, threshold)
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
+    let consistencyCondition = {
+      bind(keyword("CONSISTENT"), _ =>
+        bind(keyword("("), _ =>
+          bind(modality, mod1 =>
+            bind(keyword(","), _ =>
+              bind(modality, mod2 =>
+                bind(keyword(")"), _ =>
+                  bind(keyword("USING"), _ =>
+                    map(identifier, metric =>
+                      ModalityConsistency(mod1, mod2, metric)
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
+    let existsCondition = {
+      bind(modality, mod =>
+        map(keyword("EXISTS"), _ =>
+          ModalityExists(mod)
+        )
+      )
+    }
+
+    let notExistsCondition = {
+      bind(modality, mod =>
+        bind(keyword("NOT"), _ =>
+          map(keyword("EXISTS"), _ =>
+            ModalityNotExists(mod)
+          )
+        )
+      )
+    }
+
+    // Cross-modal field compare: MODALITY1.field op MODALITY2.field
+    let crossModalFieldCompare = {
+      bind(modality, mod1 =>
+        bind(keyword("."), _ =>
+          bind(identifier, field1 =>
+            bind(operator, op =>
+              bind(modality, mod2 =>
+                bind(keyword("."), _ =>
+                  map(identifier, field2 =>
+                    CrossModalFieldCompare(mod1, field1, op, mod2, field2)
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
+    driftCondition <|> consistencyCondition <|> notExistsCondition <|> existsCondition <|> crossModalFieldCompare <|> fulltextContains <|> fulltextMatches <|> fieldCondition <|> vectorSimilar <|> graphPattern
   }
 
   // Compound conditions
@@ -509,8 +768,11 @@ module Grammar = {
     )
   }
 
-  let proofClause: parser<proofSpec> = {
-    bind(keyword("PROOF"), _ => proofSpec)
+  // Multi-proof: PROOF spec1 AND spec2 AND spec3
+  let proofClause: parser<array<proofSpec>> = {
+    bind(keyword("PROOF"), _ =>
+      sepBy(proofSpec, keyword("AND"))
+    )
   }
 
   // LIMIT clause
@@ -523,25 +785,82 @@ module Grammar = {
     bind(keyword("OFFSET"), _ => integer)
   }
 
+  // GROUP BY clause
+  let groupByClause: parser<array<AST.fieldRef>> = {
+    bind(keyword("GROUP"), _ =>
+      bind(keyword("BY"), _ =>
+        sepBy(fieldRef, keyword(","))
+      )
+    )
+  }
+
+  // HAVING clause (reuses condition parser — conditions on aggregates)
+  let havingClause: parser<AST.condition> = {
+    bind(keyword("HAVING"), _ => condition)
+  }
+
+  // Sort direction parser
+  let sortDirection: parser<AST.sortDirection> = {
+    let asc = map(keyword("ASC"), _ => AST.Asc)
+    let desc = map(keyword("DESC"), _ => AST.Desc)
+
+    asc <|> desc
+  }
+
+  // ORDER BY item: DOCUMENT.severity DESC | DOCUMENT.name (defaults to ASC)
+  let orderByItem: parser<AST.orderByItem> = {
+    bind(fieldRef, ref =>
+      map(optional(sortDirection), dir => {
+        AST.field: ref,
+        direction: switch dir {
+        | Some(d) => d
+        | None => Asc
+        },
+      })
+    )
+  }
+
+  // ORDER BY clause
+  let orderByClause: parser<array<AST.orderByItem>> = {
+    bind(keyword("ORDER"), _ =>
+      bind(keyword("BY"), _ =>
+        sepBy(orderByItem, keyword(","))
+      )
+    )
+  }
+
   // Full query parser
   let query: parser<query> = {
     input => {
-      // Parse in sequence
+      // Parse in sequence:
+      // SELECT ... FROM ... [WHERE ...] [GROUP BY ...] [HAVING ...]
+      // [PROOF ...] [ORDER BY ...] [LIMIT ...] [OFFSET ...]
       let parseQuery = {
         bind(ws, _ =>
-          bind(selectClause, modalities =>
+          bind(selectClause, classified =>
             bind(fromClause, src =>
               bind(optional(whereClause), whereCond =>
-                bind(optional(proofClause), proof =>
-                  bind(optional(limitClause), lim =>
-                    map(optional(offsetClause), off => {
-                      modalities: modalities,
-                      source: src,
-                      where: whereCond,
-                      proof: proof,
-                      limit: lim,
-                      offset: off,
-                    })
+                bind(optional(groupByClause), groupBy =>
+                  bind(optional(havingClause), having =>
+                    bind(optional(proofClause), proof =>
+                      bind(optional(orderByClause), orderBy =>
+                        bind(optional(limitClause), lim =>
+                          map(optional(offsetClause), off => {
+                            modalities: classified.modalities,
+                            projections: classified.projections,
+                            aggregates: classified.aggregates,
+                            source: src,
+                            where: whereCond,
+                            groupBy: groupBy,
+                            having: having,
+                            proof: proof,
+                            orderBy: orderBy,
+                            limit: lim,
+                            offset: off,
+                          })
+                        )
+                      )
+                    )
                   )
                 )
               )
@@ -573,10 +892,10 @@ let parseSlipstream = (input: string): Result<query, parseError> => {
   // Slipstream path: no proof clause allowed
   switch parse(input) {
   | Ok(query) => {
-      if query.proof->Belt.Option.isSome {
+      switch query.proof {
+      | Some(proofs) if Js.Array2.length(proofs) > 0 =>
         Error({message: "Slipstream queries cannot have PROOF clause", position: 0})
-      } else {
-        Ok(query)
+      | _ => Ok(query)
       }
     }
   | Error(e) => Error(e)
@@ -593,6 +912,186 @@ let parseDependentType = (input: string): Result<query, parseError> => {
         Ok(query)
       }
     }
+  | Error(e) => Error(e)
+  }
+}
+
+// ============================================================================
+// Phase 3: Mutation Parsers
+// ============================================================================
+
+type mutation = AST.mutation
+type modalityData = AST.modalityData
+type statement = AST.statement
+
+module MutationParser = {
+  open Parser
+  open AST
+
+  // Parse a single modality data entry
+  let documentData: parser<modalityData> = {
+    bind(keyword("DOCUMENT"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(
+          bind(Grammar.identifier, field =>
+            bind(keyword("="), _ =>
+              map(Grammar.literal, value => (field, value))
+            )
+          ),
+          keyword(","),
+        ), fields =>
+          map(keyword(")"), _ => DocumentData(fields))
+        )
+      )
+    )
+  }
+
+  let vectorData: parser<modalityData> = {
+    bind(keyword("VECTOR"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(Grammar.float, keyword(",")), values =>
+          map(keyword(")"), _ => VectorData(values))
+        )
+      )
+    )
+  }
+
+  let graphData: parser<modalityData> = {
+    bind(keyword("GRAPH"), _ =>
+      bind(keyword("("), _ =>
+        bind(Grammar.identifier, edgeType =>
+          bind(keyword(","), _ =>
+            bind(Grammar.identifier, targetId =>
+              map(keyword(")"), _ => GraphData(edgeType, targetId))
+            )
+          )
+        )
+      )
+    )
+  }
+
+  let tensorData: parser<modalityData> = {
+    bind(keyword("TENSOR"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(Grammar.literal, keyword(",")), values =>
+          map(keyword(")"), _ => TensorData(values))
+        )
+      )
+    )
+  }
+
+  let semanticData: parser<modalityData> = {
+    bind(keyword("SEMANTIC"), _ =>
+      bind(keyword("("), _ =>
+        bind(Grammar.identifier, contractName =>
+          map(keyword(")"), _ => SemanticData(contractName))
+        )
+      )
+    )
+  }
+
+  let temporalData: parser<modalityData> = {
+    bind(keyword("TEMPORAL"), _ =>
+      bind(keyword("("), _ =>
+        bind(Grammar.stringLiteral, timestamp =>
+          map(keyword(")"), _ => TemporalData(timestamp))
+        )
+      )
+    )
+  }
+
+  let modalityData: parser<modalityData> = {
+    documentData <|> vectorData <|> graphData <|> tensorData <|> semanticData <|> temporalData
+  }
+
+  // INSERT HEXAD WITH modalityData [, modalityData]* [PROOF ...]
+  let insertMutation: parser<mutation> = {
+    bind(keyword("INSERT"), _ =>
+      bind(keyword("HEXAD"), _ =>
+        bind(keyword("WITH"), _ =>
+          bind(sepBy(modalityData, keyword(",")), data =>
+            map(optional(Grammar.proofClause), proof =>
+              Insert({
+                modalities: data,
+                proof: proof,
+              })
+            )
+          )
+        )
+      )
+    )
+  }
+
+  // UPDATE HEXAD uuid SET field = value [, field = value]* [PROOF ...]
+  let updateMutation: parser<mutation> = {
+    bind(keyword("UPDATE"), _ =>
+      bind(keyword("HEXAD"), _ =>
+        bind(uuid, id =>
+          bind(keyword("SET"), _ =>
+            bind(sepBy(
+              bind(Grammar.fieldRef, field =>
+                bind(keyword("="), _ =>
+                  map(Grammar.literal, value => (field, value))
+                )
+              ),
+              keyword(","),
+            ), sets =>
+              map(optional(Grammar.proofClause), proof =>
+                Update({
+                  hexadId: id,
+                  sets: sets,
+                  proof: proof,
+                })
+              )
+            )
+          )
+        )
+      )
+    )
+  }
+
+  // DELETE HEXAD uuid [PROOF ...]
+  let deleteMutation: parser<mutation> = {
+    bind(keyword("DELETE"), _ =>
+      bind(keyword("HEXAD"), _ =>
+        bind(uuid, id =>
+          map(optional(Grammar.proofClause), proof =>
+            Delete({
+              hexadId: id,
+              proof: proof,
+            })
+          )
+        )
+      )
+    )
+  }
+
+  let mutation: parser<mutation> = {
+    insertMutation <|> updateMutation <|> deleteMutation
+  }
+
+  // Top-level statement: query or mutation
+  let statement: parser<statement> = {
+    input => {
+      let queryP = map(Grammar.query, q => Query(q))
+      let mutationP = map(mutation, m => Mutation(m))
+
+      let p = bind(ws, _ => mutationP <|> queryP)
+      p(input)
+    }
+  }
+}
+
+let parseMutation = (input: string): Result<AST.mutation, parseError> => {
+  switch MutationParser.mutation(input) {
+  | Ok((m, _consumed)) => Ok(m)
+  | Error(e) => Error(e)
+  }
+}
+
+let parseStatement = (input: string): Result<AST.statement, parseError> => {
+  switch MutationParser.statement(input) {
+  | Ok((s, _consumed)) => Ok(s)
   | Error(e) => Error(e)
   }
 }
@@ -626,6 +1125,22 @@ let dependentQuery = `
 `
 
 switch parseDependentType(dependentQuery) {
+| Ok(query) => Js.Console.log(query)
+| Error(e) => Js.Console.error(e.message)
+}
+
+// SQL-compatible query with column projections, aggregates, ORDER BY, GROUP BY
+let sqlCompatQuery = `
+  SELECT DOCUMENT.name, DOCUMENT.severity, COUNT(*), AVG(DOCUMENT.severity)
+  FROM FEDERATION /universities/*
+  WHERE FIELD severity > 5
+  GROUP BY DOCUMENT.name, DOCUMENT.severity
+  HAVING FIELD count > 3
+  ORDER BY DOCUMENT.severity DESC
+  LIMIT 50
+`
+
+switch parseSlipstream(sqlCompatQuery) {
 | Ok(query) => Js.Console.log(query)
 | Error(e) => Js.Console.error(e.message)
 }

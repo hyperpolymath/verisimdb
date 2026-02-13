@@ -219,9 +219,39 @@ defmodule VeriSim.DriftMonitor do
         end)
       end)
 
-    # TODO: Query Rust core when get_drift_summary HTTP endpoint is ready
-    # Future: Add RustClient.get_drift_summary() call here to query /api/drift/summary
-    # and update entity_drift map with latest metrics from Rust core
+    # Pull aggregate drift metrics from Rust core
+    new_state =
+      case RustClient.drift_status() do
+        {:ok, rust_metrics} when is_list(rust_metrics) ->
+          updated_scores =
+            Enum.reduce(rust_metrics, new_state.drift_scores, fn metric, acc ->
+              drift_type =
+                case metric["drift_type"] do
+                  "SemanticVectorDrift" -> :semantic_vector
+                  "GraphDocumentDrift" -> :graph_document
+                  "TemporalConsistencyDrift" -> :temporal_consistency
+                  "TensorDrift" -> :tensor
+                  "SchemaDrift" -> :schema
+                  "QualityDrift" -> :quality
+                  other ->
+                    Logger.debug("Unknown drift type from Rust core: #{inspect(other)}")
+                    nil
+                end
+
+              if drift_type do
+                score = metric["current_score"] || 0.0
+                Map.update(acc, drift_type, [score], &[score | Enum.take(&1, 99)])
+              else
+                acc
+              end
+            end)
+
+          %{new_state | drift_scores: updated_scores}
+
+        {:error, reason} ->
+          Logger.warning("DriftMonitor: failed to fetch Rust core drift status: #{inspect(reason)}")
+          new_state
+      end
 
     %{new_state | last_sweep: DateTime.utc_now()}
   end

@@ -11,6 +11,12 @@ defmodule VeriSim.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      releases: [
+        verisim: [
+          include_executables_for: [:unix],
+          applications: [runtime_tools: :permanent]
+        ]
+      ],
 
       # Docs
       name: "VeriSim Orchestration",

@@ -184,6 +184,324 @@ assertOk(parseSlipstream(test17c), "Test 17c: DRIFT TOLERATE")
 let test17d = `SELECT * FROM FEDERATION /nodes/* WITH DRIFT LATEST`
 assertOk(parseSlipstream(test17d), "Test 17d: DRIFT LATEST")
 
+// ============================================================================
+// SQL Compatibility Tests
+// ============================================================================
+
+Js.Console.log("\n=== SQL Compatibility Tests ===\n")
+
+// Test 18: ORDER BY single field
+let test18 = `
+  SELECT DOCUMENT
+  FROM STORE archive-1
+  WHERE FULLTEXT CONTAINS "security"
+  ORDER BY DOCUMENT.severity DESC
+  LIMIT 50
+`
+
+assertOk(parseSlipstream(test18), "Test 18: ORDER BY single field DESC")
+
+// Test 19: ORDER BY multiple fields
+let test19 = `
+  SELECT DOCUMENT
+  FROM FEDERATION /archives/*
+  ORDER BY DOCUMENT.severity DESC, DOCUMENT.name ASC
+  LIMIT 100
+`
+
+assertOk(parseSlipstream(test19), "Test 19: ORDER BY multiple fields")
+
+// Test 20: ORDER BY default direction (ASC)
+let test20 = `
+  SELECT DOCUMENT
+  FROM STORE archive-1
+  ORDER BY DOCUMENT.name
+  LIMIT 10
+`
+
+assertOk(parseSlipstream(test20), "Test 20: ORDER BY default ASC direction")
+
+// Test 21: Column projection (DOCUMENT.name, DOCUMENT.severity)
+let test21 = `
+  SELECT DOCUMENT.name, DOCUMENT.severity
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+`
+
+assertOk(parseSlipstream(test21), "Test 21: Column projection within modality")
+
+// Test 22: Mixed modalities and column projections
+let test22 = `
+  SELECT GRAPH, DOCUMENT.name, DOCUMENT.severity
+  FROM FEDERATION /universities/*
+  LIMIT 50
+`
+
+assertOk(parseSlipstream(test22), "Test 22: Mixed modalities and column projections")
+
+// Test 23: COUNT(*) aggregate
+let test23 = `
+  SELECT COUNT(*)
+  FROM FEDERATION /archives/*
+  WHERE FULLTEXT CONTAINS "vulnerability"
+`
+
+assertOk(parseSlipstream(test23), "Test 23: COUNT(*) aggregate")
+
+// Test 24: AVG aggregate with field ref
+let test24 = `
+  SELECT AVG(DOCUMENT.severity)
+  FROM FEDERATION /scans/*
+`
+
+assertOk(parseSlipstream(test24), "Test 24: AVG(DOCUMENT.severity) aggregate")
+
+// Test 25: GROUP BY with aggregate
+let test25 = `
+  SELECT DOCUMENT.name, COUNT(*), AVG(DOCUMENT.severity)
+  FROM FEDERATION /universities/*
+  GROUP BY DOCUMENT.name
+  LIMIT 100
+`
+
+assertOk(parseSlipstream(test25), "Test 25: GROUP BY with aggregates")
+
+// Test 26: GROUP BY + HAVING
+let test26 = `
+  SELECT DOCUMENT.name, COUNT(*)
+  FROM FEDERATION /archives/*
+  GROUP BY DOCUMENT.name
+  HAVING FIELD count > 3
+  ORDER BY DOCUMENT.name ASC
+  LIMIT 50
+`
+
+assertOk(parseSlipstream(test26), "Test 26: GROUP BY + HAVING + ORDER BY")
+
+// Test 27: Full SQL-compat query (all features combined)
+let test27 = `
+  SELECT DOCUMENT.name, DOCUMENT.severity, COUNT(*), SUM(DOCUMENT.severity), AVG(DOCUMENT.severity)
+  FROM FEDERATION /universities/* WITH DRIFT REPAIR
+  WHERE FIELD severity > 3
+  GROUP BY DOCUMENT.name, DOCUMENT.severity
+  HAVING FIELD total > 10
+  ORDER BY DOCUMENT.severity DESC, DOCUMENT.name ASC
+  LIMIT 100
+  OFFSET 20
+`
+
+assertOk(parseSlipstream(test27), "Test 27: Full SQL-compat query (all features)")
+
+// Test 28: MIN/MAX aggregates
+let test28 = `
+  SELECT MIN(DOCUMENT.severity), MAX(DOCUMENT.severity)
+  FROM STORE tantivy-node-1
+`
+
+assertOk(parseSlipstream(test28), "Test 28: MIN/MAX aggregates")
+
+// Test 29: SQL-compat with PROOF (dependent-type path)
+let test29 = `
+  SELECT DOCUMENT.name, COUNT(*)
+  FROM FEDERATION /universities/* WITH DRIFT STRICT
+  GROUP BY DOCUMENT.name
+  PROOF INTEGRITY(DataIntegrityContract)
+  ORDER BY DOCUMENT.name ASC
+  LIMIT 50
+`
+
+assertOk(parseDependentType(test29), "Test 29: SQL-compat with PROOF clause")
+
+// Test 30: Verify parsed projections are populated
+switch parse(test21) {
+| Ok(query) => {
+    let hasProjections = query.projections->Belt.Option.isSome
+    if hasProjections {
+      Js.Console.log("✓ Test 30: Projections populated correctly")
+    } else {
+      Js.Console.error("✗ Test 30: Projections should be Some but got None")
+    }
+  }
+| Error(e) => Js.Console.error(`✗ Test 30: Parse failed: ${e.message}`)
+}
+
+// Test 31: Verify ORDER BY parsed correctly
+switch parse(test18) {
+| Ok(query) => {
+    let hasOrderBy = query.orderBy->Belt.Option.isSome
+    if hasOrderBy {
+      Js.Console.log("✓ Test 31: ORDER BY parsed correctly")
+    } else {
+      Js.Console.error("✗ Test 31: orderBy should be Some but got None")
+    }
+  }
+| Error(e) => Js.Console.error(`✗ Test 31: Parse failed: ${e.message}`)
+}
+
+// Test 32: Verify GROUP BY parsed correctly
+switch parse(test25) {
+| Ok(query) => {
+    let hasGroupBy = query.groupBy->Belt.Option.isSome
+    let hasAggregates = query.aggregates->Belt.Option.isSome
+    if hasGroupBy && hasAggregates {
+      Js.Console.log("✓ Test 32: GROUP BY and aggregates parsed correctly")
+    } else {
+      Js.Console.error(`✗ Test 32: groupBy=${hasGroupBy->Belt.Bool.toString}, aggregates=${hasAggregates->Belt.Bool.toString}`)
+    }
+  }
+| Error(e) => Js.Console.error(`✗ Test 32: Parse failed: ${e.message}`)
+}
+
+Js.Console.log("\n=== Multi-Proof Tests ===\n")
+
+// Test 33: Multi-proof composition (AND separated)
+let test33 = `
+  SELECT GRAPH, SEMANTIC
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  PROOF EXISTENCE(ExistenceContract) AND INTEGRITY(IntegrityContract)
+`
+
+assertOk(parseDependentType(test33), "Test 33: Multi-proof (EXISTENCE AND INTEGRITY)")
+
+// Test 34: Triple proof composition
+let test34 = `
+  SELECT *
+  FROM FEDERATION /hospitals/* WITH DRIFT STRICT
+  PROOF ACCESS(AccessContract) AND PROVENANCE(ProvenanceContract) AND INTEGRITY(IntegrityContract)
+`
+
+assertOk(parseDependentType(test34), "Test 34: Triple proof composition")
+
+// Test 35: Verify multi-proof parsed as array
+switch parse(test33) {
+| Ok(query) => {
+    switch query.proof {
+    | Some(proofs) =>
+      if Js.Array2.length(proofs) == 2 {
+        Js.Console.log("✓ Test 35: Multi-proof parsed as array of 2")
+      } else {
+        Js.Console.error(`✗ Test 35: Expected 2 proofs, got ${Belt.Int.toString(Js.Array2.length(proofs))}`)
+      }
+    | None => Js.Console.error("✗ Test 35: Proof should be Some but got None")
+    }
+  }
+| Error(e) => Js.Console.error(`✗ Test 35: Parse failed: ${e.message}`)
+}
+
+Js.Console.log("\n=== Cross-Modal Condition Tests ===\n")
+
+// Test 36: DRIFT condition
+let test36 = `
+  SELECT VECTOR, DOCUMENT
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
+`
+
+assertOk(parseSlipstream(test36), "Test 36: DRIFT(VECTOR, DOCUMENT) condition")
+
+// Test 37: CONSISTENT condition
+let test37 = `
+  SELECT VECTOR, SEMANTIC
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE
+`
+
+assertOk(parseSlipstream(test37), "Test 37: CONSISTENT(VECTOR, SEMANTIC) USING COSINE")
+
+// Test 38: EXISTS condition
+let test38 = `
+  SELECT *
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  WHERE VECTOR EXISTS
+`
+
+assertOk(parseSlipstream(test38), "Test 38: VECTOR EXISTS condition")
+
+// Test 39: NOT EXISTS condition
+let test39 = `
+  SELECT *
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  WHERE TENSOR NOT EXISTS
+`
+
+assertOk(parseSlipstream(test39), "Test 39: TENSOR NOT EXISTS condition")
+
+// Test 40: Cross-modal field compare
+let test40 = `
+  SELECT DOCUMENT, GRAPH
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  WHERE DOCUMENT.severity > GRAPH.centrality
+`
+
+assertOk(parseSlipstream(test40), "Test 40: Cross-modal field compare")
+
+Js.Console.log("\n=== Mutation Tests ===\n")
+
+// Test 41: INSERT mutation
+let test41 = `
+  INSERT HEXAD WITH
+    DOCUMENT(title = "New Paper", author = "Jane Doe"),
+    VECTOR([0.1, 0.2, 0.3, 0.4])
+`
+
+assertOk(parseMutation(test41), "Test 41: INSERT HEXAD with DOCUMENT and VECTOR")
+
+// Test 42: UPDATE mutation
+let test42 = `
+  UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+  SET DOCUMENT.title = "Updated Title", DOCUMENT.severity = 5
+`
+
+assertOk(parseMutation(test42), "Test 42: UPDATE HEXAD with SET")
+
+// Test 43: DELETE mutation
+let test43 = `
+  DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+`
+
+assertOk(parseMutation(test43), "Test 43: DELETE HEXAD")
+
+// Test 44: INSERT with PROOF
+let test44 = `
+  INSERT HEXAD WITH
+    DOCUMENT(title = "Verified Entry")
+  PROOF INTEGRITY(WriteContract)
+`
+
+assertOk(parseMutation(test44), "Test 44: INSERT with PROOF clause")
+
+// Test 45: DELETE with multi-proof
+let test45 = `
+  DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+  PROOF ACCESS(AccessContract) AND PROVENANCE(AuditContract)
+`
+
+assertOk(parseMutation(test45), "Test 45: DELETE with multi-proof")
+
+Js.Console.log("\n=== Statement Tests ===\n")
+
+// Test 46: parseStatement with query
+let test46 = `
+  SELECT GRAPH
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  LIMIT 10
+`
+
+assertOk(parseStatement(test46), "Test 46: parseStatement dispatches to query")
+
+// Test 47: parseStatement with mutation
+let test47 = `
+  DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+`
+
+assertOk(parseStatement(test47), "Test 47: parseStatement dispatches to mutation")
+
+// Test 48: parseStatement with INSERT
+let test48 = `
+  INSERT HEXAD WITH DOCUMENT(title = "Test")
+`
+
+assertOk(parseStatement(test48), "Test 48: parseStatement dispatches INSERT to mutation")
+
 Js.Console.log("\n=== Tests Complete ===\n")
 
 // ============================================================================
@@ -221,7 +539,10 @@ switch parseDependentType(exampleQuery) {
     Js.Console.log(`  Has WHERE: ${query.where->Belt.Option.isSome->Belt.Bool.toString}`)
     Js.Console.log(`  Has PROOF: ${query.proof->Belt.Option.isSome->Belt.Bool.toString}`)
     switch query.proof {
-    | Some(proof) => Js.Console.log(`    Proof contract: ${proof.contractName}`)
+    | Some(proofs) =>
+      proofs->Js.Array2.forEach(proof => {
+        Js.Console.log(`    Proof contract: ${proof.contractName}`)
+      })
     | None => ()
     }
     Js.Console.log(`  Limit: ${switch query.limit {
