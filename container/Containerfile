@@ -42,7 +42,19 @@ RUN mix local.hex --force && \
 # Stage 3: Runtime
 FROM cgr.dev/chainguard/wolfi-base:latest
 
+# OCI image labels
+LABEL org.opencontainers.image.title="VeriSimDB" \
+      org.opencontainers.image.description="6-core multimodal database with self-normalization" \
+      org.opencontainers.image.url="https://github.com/hyperpolymath/verisimdb" \
+      org.opencontainers.image.source="https://github.com/hyperpolymath/verisimdb" \
+      org.opencontainers.image.vendor="hyperpolymath" \
+      org.opencontainers.image.licenses="PMPL-1.0-or-later" \
+      org.opencontainers.image.authors="Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"
+
 RUN apk add --no-cache libssl3 ca-certificates curl libstdc++ ncurses-libs
+
+# Create non-root user
+RUN addgroup -S verisim && adduser -S verisim -G verisim
 
 WORKDIR /app
 
@@ -56,16 +68,23 @@ COPY --from=elixir-builder /build/_build/prod/rel/verisim /app/elixir/
 COPY container/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Environment
+# Set ownership
+RUN chown -R verisim:verisim /app
+
+# Environment — IPv6-only by default
 ENV RUST_LOG=info
-ENV VERISIM_HOST=0.0.0.0
+ENV VERISIM_HOST=[::]
 ENV VERISIM_PORT=8080
-ENV VERISIM_RUST_CORE_URL=http://127.0.0.1:8080/api/v1
+ENV VERISIM_RUST_CORE_URL=http://[::1]:8080/api/v1
+ENV VERISIM_LOG_FORMAT=json
+
+# Run as non-root
+USER verisim
 
 # Expose API port
 EXPOSE 8080
 
-# Health check
+# Health check (as non-root, curl still works)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -sf http://localhost:8080/health || exit 1
 

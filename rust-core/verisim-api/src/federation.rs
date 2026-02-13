@@ -20,14 +20,15 @@
 
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use tracing::{info, warn, instrument};
+use tracing::{error, info, warn, instrument};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +65,9 @@ pub struct PeerStore {
     pub last_seen: Option<String>,
     /// Average response time in milliseconds.
     pub response_time_ms: Option<u64>,
+    /// SHA-256 hash of the peer's secret (not serialized to clients).
+    #[serde(skip)]
+    pub secret_hash: Option<String>,
 }
 
 /// A federation query request.
@@ -118,6 +122,8 @@ pub struct RegisterRequest {
     pub store_id: String,
     pub endpoint: String,
     pub modalities: Vec<String>,
+    /// Pre-shared key for this peer (sent once at registration, stored as SHA-256 hash).
+    pub secret: Option<String>,
 }
 
 /// Health check from a peer.
@@ -145,17 +151,94 @@ pub struct FederationState {
     pub self_endpoint: String,
     /// Drift threshold for Strict policy.
     pub strict_drift_threshold: f64,
+    /// Pre-shared keys for federation peers (store_id → key).
+    /// Parsed from `VERISIM_FEDERATION_KEYS` env var (comma-separated `store_id:key`).
+    /// When empty, federation registration is disabled (closed by default).
+    federation_keys: Arc<HashMap<String, String>>,
 }
 
 impl FederationState {
     pub fn new(self_store_id: String, self_endpoint: String) -> Self {
+        let keys = Self::load_federation_keys();
         Self {
             peers: Arc::new(RwLock::new(HashMap::new())),
             self_store_id,
             self_endpoint,
             strict_drift_threshold: 0.3,
+            federation_keys: Arc::new(keys),
         }
     }
+
+    /// Load federation keys from `VERISIM_FEDERATION_KEYS` env var.
+    /// Format: `store_id1:key1,store_id2:key2,...`
+    fn load_federation_keys() -> HashMap<String, String> {
+        match std::env::var("VERISIM_FEDERATION_KEYS") {
+            Ok(val) if !val.is_empty() => {
+                val.split(',')
+                    .filter_map(|pair| {
+                        let parts: Vec<&str> = pair.splitn(2, ':').collect();
+                        if parts.len() == 2 {
+                            Some((parts[0].trim().to_string(), parts[1].trim().to_string()))
+                        } else {
+                            warn!(entry = %pair, "Invalid federation key entry (expected store_id:key)");
+                            None
+                        }
+                    })
+                    .collect()
+            }
+            _ => HashMap::new(),
+        }
+    }
+
+    /// Check if federation registration is enabled (requires keys to be configured).
+    pub fn registration_enabled(&self) -> bool {
+        !self.federation_keys.is_empty()
+    }
+
+    /// Validate a PSK for a given store_id.
+    fn validate_psk(&self, store_id: &str, provided_secret: &str) -> bool {
+        if let Some(expected_key) = self.federation_keys.get(store_id) {
+            expected_key == provided_secret
+        } else {
+            false
+        }
+    }
+
+    /// Validate the X-Federation-PSK header for an existing peer.
+    fn validate_peer_header(&self, store_id: &str, headers: &HeaderMap) -> Result<(), StatusCode> {
+        let psk = headers
+            .get("X-Federation-PSK")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        if psk.is_empty() {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+
+        // Check against stored hash
+        let peers = self.peers.read().map_err(|_| {
+            error!("Federation peers RwLock poisoned");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        if let Some(peer) = peers.get(store_id) {
+            if let Some(ref stored_hash) = peer.secret_hash {
+                let provided_hash = sha256_hex(psk);
+                if stored_hash == &provided_hash {
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(StatusCode::UNAUTHORIZED)
+    }
+}
+
+/// Compute SHA-256 hex digest of a string.
+fn sha256_hex(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 // ---------------------------------------------------------------------------
@@ -182,8 +265,11 @@ pub fn federation_router(state: FederationState) -> Router {
 async fn list_peers(
     State(state): State<FederationState>,
     Query(params): Query<PeerQueryParams>,
-) -> Json<Vec<PeerStore>> {
-    let peers = state.peers.read().expect("peers RwLock poisoned");
+) -> Result<Json<Vec<PeerStore>>, StatusCode> {
+    let peers = state.peers.read().map_err(|_| {
+        tracing::error!("Federation peers RwLock poisoned");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let result: Vec<PeerStore> = peers
         .values()
@@ -197,15 +283,41 @@ async fn list_peers(
         .cloned()
         .collect();
 
-    Json(result)
+    Ok(Json(result))
 }
 
 /// Register a new peer store in the federation.
+///
+/// Requires `VERISIM_FEDERATION_KEYS` to be set with the store_id:key pair.
+/// Federation registration is disabled (403) when no keys are configured.
 #[instrument(skip(state))]
 async fn register_peer(
     State(state): State<FederationState>,
     Json(request): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<PeerStore>), StatusCode> {
+    // Reject if federation registration is disabled
+    if !state.registration_enabled() {
+        warn!("Federation registration rejected: VERISIM_FEDERATION_KEYS not configured");
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Validate store_id format (alphanumeric + dash + underscore, max 128)
+    if request.store_id.is_empty()
+        || request.store_id.len() > 128
+        || !request.store_id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '/')
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // Validate PSK
+    let secret = request.secret.as_deref().unwrap_or("");
+    if !state.validate_psk(&request.store_id, secret) {
+        warn!(store_id = %request.store_id, "Federation registration rejected: invalid PSK");
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let secret_hash = Some(sha256_hex(secret));
+
     let peer = PeerStore {
         store_id: request.store_id.clone(),
         endpoint: request.endpoint,
@@ -213,6 +325,7 @@ async fn register_peer(
         trust_level: 1.0,
         last_seen: Some(chrono::Utc::now().to_rfc3339()),
         response_time_ms: None,
+        secret_hash,
     };
 
     info!(store_id = %request.store_id, "Registered peer store");
@@ -220,25 +333,36 @@ async fn register_peer(
     state
         .peers
         .write()
-        .expect("peers RwLock poisoned")
+        .map_err(|_| {
+            error!("Federation peers RwLock poisoned");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .insert(request.store_id, peer.clone());
 
     Ok((StatusCode::CREATED, Json(peer)))
 }
 
 /// Receive a heartbeat from a peer.
-#[instrument(skip(state))]
+///
+/// Requires `X-Federation-PSK` header matching the stored peer secret.
+#[instrument(skip(state, headers))]
 async fn heartbeat(
     State(state): State<FederationState>,
+    headers: HeaderMap,
     Json(request): Json<HeartbeatRequest>,
-) -> StatusCode {
-    let mut peers = state.peers.write().expect("peers RwLock poisoned");
+) -> Result<StatusCode, StatusCode> {
+    state.validate_peer_header(&request.store_id, &headers)?;
+
+    let mut peers = state.peers.write().map_err(|_| {
+        error!("Federation peers RwLock poisoned");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     if let Some(peer) = peers.get_mut(&request.store_id) {
         peer.last_seen = Some(chrono::Utc::now().to_rfc3339());
-        StatusCode::OK
+        Ok(StatusCode::OK)
     } else {
-        StatusCode::NOT_FOUND
+        Ok(StatusCode::NOT_FOUND)
     }
 }
 
@@ -247,18 +371,21 @@ async fn heartbeat(
 async fn deregister_peer(
     State(state): State<FederationState>,
     axum::extract::Path(store_id): axum::extract::Path<String>,
-) -> StatusCode {
+) -> Result<StatusCode, StatusCode> {
     let removed = state
         .peers
         .write()
-        .expect("peers RwLock poisoned")
+        .map_err(|_| {
+            tracing::error!("Federation peers RwLock poisoned");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .remove(&store_id);
 
     if removed.is_some() {
         info!(store_id = %store_id, "Deregistered peer store");
-        StatusCode::OK
+        Ok(StatusCode::OK)
     } else {
-        StatusCode::NOT_FOUND
+        Ok(StatusCode::NOT_FOUND)
     }
 }
 
@@ -267,12 +394,15 @@ async fn deregister_peer(
 async fn federation_query(
     State(state): State<FederationState>,
     Json(request): Json<FederationQueryRequest>,
-) -> Json<FederationQueryResponse> {
-    let limit = request.limit.unwrap_or(100);
+) -> Result<Json<FederationQueryResponse>, StatusCode> {
+    let limit = request.limit.unwrap_or(100).min(1000);
 
     // Collect matching stores and apply drift policy (hold lock briefly)
     let (stores_to_query, stores_excluded) = {
-        let peers = state.peers.read().expect("peers RwLock poisoned");
+        let peers = state.peers.read().map_err(|_| {
+            tracing::error!("Federation peers RwLock poisoned");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
         let matching: Vec<PeerStore> = peers
             .values()
@@ -370,12 +500,12 @@ async fn federation_query(
     all_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     all_results.truncate(limit);
 
-    Json(FederationQueryResponse {
+    Ok(Json(FederationQueryResponse {
         results: all_results,
         stores_queried,
         stores_excluded,
         drift_policy,
-    })
+    }))
 }
 
 /// Query a single peer store via HTTP.
@@ -425,8 +555,22 @@ async fn query_single_peer(
             .await
             .map_err(|e| format!("Failed to parse response from {}: {}", store_id, e))?
     } else {
-        // No specific query — return empty (list-all not supported via federation)
-        return Ok(Vec::new());
+        // No specific query — list hexads from the peer's /hexads endpoint
+        let url = format!("{}/hexads", endpoint);
+        let resp = client
+            .get(&url)
+            .query(&[("limit", &limit.to_string())])
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request to {} failed: {}", store_id, e))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Peer {} returned status {}", store_id, resp.status()));
+        }
+
+        resp.json()
+            .await
+            .map_err(|e| format!("Failed to parse response from {}: {}", store_id, e))?
     };
 
     // Map response items to FederationResult
@@ -487,6 +631,7 @@ mod tests {
             trust_level: 0.95,
             last_seen: None,
             response_time_ms: None,
+            secret_hash: None,
         };
 
         state
@@ -498,5 +643,18 @@ mod tests {
         let peers = state.peers.read().unwrap();
         assert_eq!(peers.len(), 1);
         assert_eq!(peers["peer-1"].trust_level, 0.95);
+    }
+
+    #[test]
+    fn test_registration_disabled_by_default() {
+        let state = FederationState::new("self".to_string(), "http://localhost:8080".to_string());
+        // Without VERISIM_FEDERATION_KEYS, registration should be disabled
+        assert!(!state.registration_enabled());
+    }
+
+    #[test]
+    fn test_sha256_hex() {
+        let hash = sha256_hex("test-secret");
+        assert_eq!(hash.len(), 64); // SHA-256 produces 64 hex chars
     }
 }

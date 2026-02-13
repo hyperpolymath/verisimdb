@@ -561,6 +561,25 @@ where
         Ok(hexads)
     }
 
+    async fn list(&self, limit: usize, offset: usize) -> Result<Vec<Hexad>, HexadError> {
+        let hexads = self.hexads.read().await;
+        let ids: Vec<String> = hexads
+            .keys()
+            .skip(offset)
+            .take(limit)
+            .cloned()
+            .collect();
+        drop(hexads);
+
+        let mut result = Vec::with_capacity(ids.len());
+        for id_str in ids {
+            if let Some(hexad) = self.load_hexad(&HexadId::new(&id_str)).await? {
+                result.push(hexad);
+            }
+        }
+        Ok(result)
+    }
+
     async fn at_time(&self, id: &HexadId, time: DateTime<Utc>) -> Result<Option<Hexad>, HexadError> {
         let version = self
             .temporal

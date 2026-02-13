@@ -25,6 +25,9 @@ pub enum TensorError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Lock poisoned: internal concurrency error")]
+    LockPoisoned,
 }
 
 /// Data type for tensor elements
@@ -187,25 +190,25 @@ impl Default for InMemoryTensorStore {
 #[async_trait]
 impl TensorStore for InMemoryTensorStore {
     async fn put(&self, tensor: &Tensor) -> Result<(), TensorError> {
-        self.tensors.write().expect("tensors RwLock poisoned").insert(tensor.id.clone(), tensor.clone());
+        self.tensors.write().map_err(|_| TensorError::LockPoisoned)?.insert(tensor.id.clone(), tensor.clone());
         Ok(())
     }
 
     async fn get(&self, id: &str) -> Result<Option<Tensor>, TensorError> {
-        Ok(self.tensors.read().expect("tensors RwLock poisoned").get(id).cloned())
+        Ok(self.tensors.read().map_err(|_| TensorError::LockPoisoned)?.get(id).cloned())
     }
 
     async fn delete(&self, id: &str) -> Result<(), TensorError> {
-        self.tensors.write().expect("tensors RwLock poisoned").remove(id);
+        self.tensors.write().map_err(|_| TensorError::LockPoisoned)?.remove(id);
         Ok(())
     }
 
     async fn list(&self) -> Result<Vec<String>, TensorError> {
-        Ok(self.tensors.read().expect("tensors RwLock poisoned").keys().cloned().collect())
+        Ok(self.tensors.read().map_err(|_| TensorError::LockPoisoned)?.keys().cloned().collect())
     }
 
     async fn map(&self, id: &str, op: fn(f64) -> f64) -> Result<Tensor, TensorError> {
-        let tensor = self.tensors.read().expect("tensors RwLock poisoned")
+        let tensor = self.tensors.read().map_err(|_| TensorError::LockPoisoned)?
             .get(id)
             .cloned()
             .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
@@ -221,7 +224,7 @@ impl TensorStore for InMemoryTensorStore {
     }
 
     async fn reduce(&self, id: &str, axis: usize, op: ReduceOp) -> Result<Tensor, TensorError> {
-        let tensor = self.tensors.read().expect("tensors RwLock poisoned")
+        let tensor = self.tensors.read().map_err(|_| TensorError::LockPoisoned)?
             .get(id)
             .cloned()
             .ok_or_else(|| TensorError::NotFound(id.to_string()))?;

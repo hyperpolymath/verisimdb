@@ -168,13 +168,11 @@ VeriSimDB is a working system with real implementations in its core modality sto
 
 **Original issue:** EXPLAIN returned a static plan with hardcoded step names and costs totalling 71ms, regardless of the actual query structure.
 
-=== 19. VQL Executor Federation Stub — Partially Resolved
+=== 19. VQL Executor Federation Stub — ✅ RESOLVED
 
-**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+**Location:** `elixir-orchestration/lib/verisim/query/vql_executor.ex`, `rust-core/verisim-api/src/federation.rs`
 
-**Partially resolved:** 2026-02-13. `execute_federation_query/7` now delegates to the Rust federation API (`POST /federation/query`) instead of returning empty results. However, the Rust federation endpoint itself returns empty when neither text_query nor vector_query is provided (i.e., bare modality selection over federation returns `[]`).
-
-**Remaining gap:** Bare `SELECT * FROM FEDERATION /universities/*` without a WHERE clause still returns empty results from the Rust side. The Rust federation endpoint needs a "list all" capability.
+**Resolved:** 2026-02-13. Added `GET /hexads` list endpoint with `?limit=N&offset=M` pagination to the Rust API. The `HexadStore` trait now includes a `list(limit, offset)` method. Federation `query_single_peer()` now falls back to the `/hexads` list endpoint when neither text_query nor vector_query is provided, so bare `SELECT * FROM FEDERATION /pattern/*` returns actual hexad data instead of empty results.
 
 === 20. Custom Circuit Hardcoding
 

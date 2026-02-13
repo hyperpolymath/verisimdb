@@ -4,6 +4,7 @@
 //! Exposes planner and hexad operations via gRPC on a separate port (50051).
 
 use tonic::{Request, Response, Status};
+use tracing::error;
 
 use verisim_planner::LogicalPlan;
 
@@ -42,7 +43,7 @@ impl VeriSimPlanner for PlannerService {
             .map_err(|e| Status::invalid_argument(format!("Invalid plan JSON: {}", e)))?;
 
         let planner = self.state.planner.lock()
-            .map_err(|_| Status::internal("Planner lock poisoned"))?;
+            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
         let physical = planner
             .optimize(&logical)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
@@ -79,7 +80,7 @@ impl VeriSimPlanner for PlannerService {
             .map_err(|e| Status::invalid_argument(format!("Invalid plan JSON: {}", e)))?;
 
         let planner = self.state.planner.lock()
-            .map_err(|_| Status::internal("Planner lock poisoned"))?;
+            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
         let explain = planner
             .explain(&logical)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
@@ -132,7 +133,7 @@ impl VeriSimPlanner for PlannerService {
         _request: Request<proto::Empty>,
     ) -> Result<Response<proto::PlannerConfigResponse>, Status> {
         let planner = self.state.planner.lock()
-            .map_err(|_| Status::internal("Planner lock poisoned"))?;
+            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
         let cfg = planner.config();
 
         Ok(Response::new(proto::PlannerConfigResponse {
@@ -149,7 +150,7 @@ impl VeriSimPlanner for PlannerService {
     ) -> Result<Response<proto::PlannerConfigResponse>, Status> {
         let req = request.into_inner();
         let mut planner = self.state.planner.lock()
-            .map_err(|_| Status::internal("Planner lock poisoned"))?;
+            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
 
         let mut cfg = planner.config().clone();
         if !req.global_mode.is_empty() {
@@ -182,7 +183,7 @@ impl VeriSimPlanner for PlannerService {
         _request: Request<proto::Empty>,
     ) -> Result<Response<proto::StatsResponse>, Status> {
         let planner = self.state.planner.lock()
-            .map_err(|_| Status::internal("Planner lock poisoned"))?;
+            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
 
         let stores: Vec<proto::StoreStatsMsg> = verisim_planner::Modality::ALL
             .iter()
@@ -250,7 +251,10 @@ impl VeriSimHexad for HexadService {
             .hexad_store
             .create(input)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                error!(error = %e, "gRPC hexad creation failed");
+                Status::internal("Internal server error")
+            })?;
 
         Ok(Response::new(hexad_to_proto(&h)))
     }
@@ -268,7 +272,10 @@ impl VeriSimHexad for HexadService {
             .hexad_store
             .get(&hexad_id)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?
+            .map_err(|e| {
+                error!(error = %e, "gRPC hexad get failed");
+                Status::internal("Internal server error")
+            })?
             .ok_or_else(|| Status::not_found(format!("Hexad {} not found", id)))?;
 
         Ok(Response::new(hexad_to_proto(&h)))
@@ -308,7 +315,10 @@ impl VeriSimHexad for HexadService {
             .hexad_store
             .update(&hexad_id, input)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                error!(error = %e, "gRPC hexad update failed");
+                Status::internal("Internal server error")
+            })?;
 
         Ok(Response::new(hexad_to_proto(&h)))
     }
@@ -325,7 +335,10 @@ impl VeriSimHexad for HexadService {
             .hexad_store
             .delete(&hexad_id)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                error!(error = %e, "gRPC hexad deletion failed");
+                Status::internal("Internal server error")
+            })?;
 
         Ok(Response::new(proto::Empty {}))
     }
@@ -343,7 +356,10 @@ impl VeriSimHexad for HexadService {
             .hexad_store
             .search_text(&req.query, limit)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                error!(error = %e, "gRPC text search failed");
+                Status::internal("Internal server error")
+            })?;
 
         let results: Vec<proto::SearchResultMsg> = hexads
             .iter()
@@ -375,7 +391,10 @@ impl VeriSimHexad for HexadService {
             .hexad_store
             .search_similar(&req.vector, k)
             .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                error!(error = %e, "gRPC vector search failed");
+                Status::internal("Internal server error")
+            })?;
 
         let results: Vec<proto::SearchResultMsg> = hexads
             .iter()

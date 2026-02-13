@@ -26,6 +26,9 @@ pub enum SemanticError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Lock poisoned: internal concurrency error")]
+    LockPoisoned,
 }
 
 /// A semantic type in the ontology
@@ -280,12 +283,12 @@ impl Default for InMemorySemanticStore {
 #[async_trait]
 impl SemanticStore for InMemorySemanticStore {
     async fn register_type(&self, typ: &SemanticType) -> Result<(), SemanticError> {
-        self.types.write().expect("types RwLock poisoned").insert(typ.iri.clone(), typ.clone());
+        self.types.write().map_err(|_| SemanticError::LockPoisoned)?.insert(typ.iri.clone(), typ.clone());
         Ok(())
     }
 
     async fn get_type(&self, iri: &str) -> Result<Option<SemanticType>, SemanticError> {
-        Ok(self.types.read().expect("types RwLock poisoned").get(iri).cloned())
+        Ok(self.types.read().map_err(|_| SemanticError::LockPoisoned)?.get(iri).cloned())
     }
 
     async fn annotate(&self, annotation: &SemanticAnnotation) -> Result<(), SemanticError> {
@@ -294,16 +297,16 @@ impl SemanticStore for InMemorySemanticStore {
         if !violations.is_empty() {
             return Err(SemanticError::ConstraintViolation(violations.join("; ")));
         }
-        self.annotations.write().expect("annotations RwLock poisoned").insert(annotation.entity_id.clone(), annotation.clone());
+        self.annotations.write().map_err(|_| SemanticError::LockPoisoned)?.insert(annotation.entity_id.clone(), annotation.clone());
         Ok(())
     }
 
     async fn get_annotations(&self, entity_id: &str) -> Result<Option<SemanticAnnotation>, SemanticError> {
-        Ok(self.annotations.read().expect("annotations RwLock poisoned").get(entity_id).cloned())
+        Ok(self.annotations.read().map_err(|_| SemanticError::LockPoisoned)?.get(entity_id).cloned())
     }
 
     async fn validate(&self, annotation: &SemanticAnnotation) -> Result<Vec<String>, SemanticError> {
-        let types = self.types.read().expect("types RwLock poisoned");
+        let types = self.types.read().map_err(|_| SemanticError::LockPoisoned)?;
         let mut violations = Vec::new();
 
         for type_iri in &annotation.types {
@@ -335,7 +338,7 @@ impl SemanticStore for InMemorySemanticStore {
     }
 
     async fn store_proof(&self, proof: &ProofBlob) -> Result<(), SemanticError> {
-        self.proofs.write().expect("proofs RwLock poisoned")
+        self.proofs.write().map_err(|_| SemanticError::LockPoisoned)?
             .entry(proof.claim.clone())
             .or_default()
             .push(proof.clone());
@@ -343,7 +346,7 @@ impl SemanticStore for InMemorySemanticStore {
     }
 
     async fn get_proofs(&self, claim: &str) -> Result<Vec<ProofBlob>, SemanticError> {
-        Ok(self.proofs.read().expect("proofs RwLock poisoned").get(claim).cloned().unwrap_or_default())
+        Ok(self.proofs.read().map_err(|_| SemanticError::LockPoisoned)?.get(claim).cloned().unwrap_or_default())
     }
 }
 

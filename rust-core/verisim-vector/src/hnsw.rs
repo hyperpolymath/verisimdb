@@ -421,7 +421,7 @@ impl HnswVectorStore {
 
     /// Get the number of non-deleted vectors in the index.
     pub fn len(&self) -> usize {
-        let graph = self.graph.read().expect("graph RwLock poisoned");
+        let graph = self.graph.read().unwrap_or_else(|e| e.into_inner());
         graph.nodes.iter().filter(|n| !n.deleted).count()
     }
 
@@ -446,7 +446,7 @@ impl VectorStore for HnswVectorStore {
             });
         }
 
-        let mut graph = self.graph.write().expect("graph RwLock poisoned");
+        let mut graph = self.graph.write().map_err(|_| VectorError::LockPoisoned)?;
         graph.insert(
             embedding.id.clone(),
             embedding.vector.clone(),
@@ -465,7 +465,7 @@ impl VectorStore for HnswVectorStore {
             });
         }
 
-        let graph = self.graph.read().expect("graph RwLock poisoned");
+        let graph = self.graph.read().map_err(|_| VectorError::LockPoisoned)?;
         let results = graph.search(query, k, self.config.ef_search, self.metric);
 
         Ok(results
@@ -478,7 +478,7 @@ impl VectorStore for HnswVectorStore {
     }
 
     async fn get(&self, id: &str) -> Result<Option<Embedding>, VectorError> {
-        let graph = self.graph.read().expect("graph RwLock poisoned");
+        let graph = self.graph.read().map_err(|_| VectorError::LockPoisoned)?;
         Ok(graph.id_map.get(id).and_then(|&idx| {
             let node = &graph.nodes[idx];
             if node.deleted {
@@ -494,7 +494,7 @@ impl VectorStore for HnswVectorStore {
     }
 
     async fn delete(&self, id: &str) -> Result<(), VectorError> {
-        let mut graph = self.graph.write().expect("graph RwLock poisoned");
+        let mut graph = self.graph.write().map_err(|_| VectorError::LockPoisoned)?;
         if let Some(&idx) = graph.id_map.get(id) {
             graph.nodes[idx].deleted = true;
         }

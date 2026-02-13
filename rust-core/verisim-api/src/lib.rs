@@ -116,7 +116,7 @@ pub struct ApiConfig {
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
-            host: "0.0.0.0".to_string(),
+            host: "[::1]".to_string(),
             port: 8080,
             enable_cors: true,
             version_prefix: "/api/v1".to_string(),
@@ -125,12 +125,48 @@ impl Default for ApiConfig {
     }
 }
 
+/// Maximum number of results allowed in any search/list endpoint.
+const MAX_RESULT_LIMIT: usize = 1000;
+
+/// Validate and cap a limit parameter.
+fn validate_limit(limit: usize) -> usize {
+    limit.min(MAX_RESULT_LIMIT)
+}
+
+/// Validate a hexad ID: max 128 chars, alphanumeric + dash + underscore only.
+fn validate_hexad_id(id: &str) -> Result<(), ApiError> {
+    if id.is_empty() {
+        return Err(ApiError::BadRequest("Hexad ID must not be empty".to_string()));
+    }
+    if id.len() > 128 {
+        return Err(ApiError::BadRequest("Hexad ID must be at most 128 characters".to_string()));
+    }
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        return Err(ApiError::BadRequest(
+            "Hexad ID must contain only alphanumeric characters, dashes, and underscores".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Validate that all vector components are finite (no NaN/Inf).
+fn validate_vector(v: &[f32]) -> Result<(), ApiError> {
+    if !v.iter().all(|x| x.is_finite()) {
+        return Err(ApiError::BadRequest(
+            "Vector contains NaN or Inf values".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Health check response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
     pub uptime_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degraded_reason: Option<String>,
 }
 
 /// Hexad create/update request
@@ -251,6 +287,15 @@ impl From<&verisim_hexad::Hexad> for HexadResponse {
             version_count: h.version_count,
         }
     }
+}
+
+/// Pagination query parameters for list endpoints
+#[derive(Debug, Deserialize)]
+pub struct ListQuery {
+    /// Maximum number of results (default 100, max 1000)
+    pub limit: Option<usize>,
+    /// Offset for pagination (default 0)
+    pub offset: Option<usize>,
 }
 
 /// Search query parameters
@@ -376,8 +421,9 @@ pub fn build_router(state: AppState) -> Router {
         // Health endpoints
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
+        .route("/metrics", get(metrics_handler))
         // Hexad CRUD
-        .route("/hexads", post(create_hexad_handler))
+        .route("/hexads", get(list_hexads_handler).post(create_hexad_handler))
         .route("/hexads/{id}", get(get_hexad_handler))
         .route("/hexads/{id}", put(update_hexad_handler))
         .route("/hexads/{id}", delete(delete_hexad_handler))
@@ -403,20 +449,154 @@ pub fn build_router(state: AppState) -> Router {
         .merge(federation_routes)
 }
 
-/// Health check handler
+/// Health check handler — verifies drift detector status and reports degraded when critical
 #[instrument(skip(state))]
-async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
-    Json(HealthResponse {
-        status: "healthy".to_string(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        uptime_seconds: state.start_time.elapsed().as_secs(),
-    })
+async fn health_handler(State(state): State<AppState>) -> (StatusCode, Json<HealthResponse>) {
+    let uptime = state.start_time.elapsed().as_secs();
+    let version = env!("CARGO_PKG_VERSION").to_string();
+
+    // Check drift detector health
+    match state.drift_detector.health_check() {
+        Ok(health) => {
+            use verisim_drift::HealthStatus;
+            let (status_str, reason) = match health.status {
+                HealthStatus::Critical => (
+                    "degraded",
+                    Some(format!(
+                        "Critical drift on {:?}: score {:.3}",
+                        health.worst_drift_type, health.worst_score
+                    )),
+                ),
+                HealthStatus::Degraded => (
+                    "degraded",
+                    Some(format!(
+                        "Degraded drift on {:?}: score {:.3}",
+                        health.worst_drift_type, health.worst_score
+                    )),
+                ),
+                HealthStatus::Warning => ("healthy", None),
+                HealthStatus::Healthy => ("healthy", None),
+            };
+
+            (
+                StatusCode::OK,
+                Json(HealthResponse {
+                    status: status_str.to_string(),
+                    version,
+                    uptime_seconds: uptime,
+                    degraded_reason: reason,
+                }),
+            )
+        }
+        Err(_) => (
+            StatusCode::OK,
+            Json(HealthResponse {
+                status: "degraded".to_string(),
+                version,
+                uptime_seconds: uptime,
+                degraded_reason: Some("Drift detector unavailable".to_string()),
+            }),
+        ),
+    }
 }
 
-/// Readiness check handler
-#[instrument]
-async fn ready_handler() -> StatusCode {
+/// Prometheus metrics handler — exposes drift and query metrics for scraping
+#[instrument(skip(state))]
+async fn metrics_handler(
+    State(state): State<AppState>,
+) -> Result<(StatusCode, [(axum::http::header::HeaderName, &'static str); 1], String), ApiError> {
+    use prometheus::{Encoder, TextEncoder, GaugeVec, Opts, Registry};
+
+    let registry = Registry::new();
+
+    // Drift gauges
+    let drift_gauge = GaugeVec::new(
+        Opts::new("verisimdb_drift_score", "Current drift score by type"),
+        &["drift_type"],
+    )
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let drift_avg_gauge = GaugeVec::new(
+        Opts::new("verisimdb_drift_moving_average", "Drift moving average by type"),
+        &["drift_type"],
+    )
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let drift_count_gauge = GaugeVec::new(
+        Opts::new("verisimdb_drift_measurement_count", "Drift measurement count by type"),
+        &["drift_type"],
+    )
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    registry.register(Box::new(drift_gauge.clone())).map_err(|e| ApiError::Internal(e.to_string()))?;
+    registry.register(Box::new(drift_avg_gauge.clone())).map_err(|e| ApiError::Internal(e.to_string()))?;
+    registry.register(Box::new(drift_count_gauge.clone())).map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    // Populate drift metrics
+    if let Ok(all_metrics) = state.drift_detector.all_metrics() {
+        for (drift_type, metrics) in &all_metrics {
+            let label = drift_type.to_string();
+            drift_gauge.with_label_values(&[&label]).set(metrics.current_score);
+            drift_avg_gauge.with_label_values(&[&label]).set(metrics.moving_average);
+            drift_count_gauge.with_label_values(&[&label]).set(metrics.measurement_count as f64);
+        }
+    }
+
+    // Uptime gauge
+    let uptime = prometheus::Gauge::new("verisimdb_uptime_seconds", "Server uptime in seconds")
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    uptime.set(state.start_time.elapsed().as_secs() as f64);
+    registry.register(Box::new(uptime)).map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    // Encode
+    let encoder = TextEncoder::new();
+    let mut buffer = Vec::new();
+    encoder.encode(&registry.gather(), &mut buffer)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let output = String::from_utf8(buffer)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok((
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        output,
+    ))
+}
+
+/// Readiness check handler — checks hexad store accessibility and drift detector health
+#[instrument(skip(state))]
+async fn ready_handler(State(state): State<AppState>) -> StatusCode {
+    // Check hexad store is accessible (try a list with limit 0)
+    if state.hexad_store.list(1, 0).await.is_err() {
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+
+    // Check drift detector is responsive
+    if state.drift_detector.health_check().is_err() {
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+
     StatusCode::OK
+}
+
+/// List hexads handler with pagination
+#[instrument(skip(state))]
+async fn list_hexads_handler(
+    State(state): State<AppState>,
+    Query(params): Query<ListQuery>,
+) -> Result<Json<Vec<HexadResponse>>, ApiError> {
+    let limit = validate_limit(params.limit.unwrap_or(100));
+    let offset = params.offset.unwrap_or(0);
+
+    let hexads = state
+        .hexad_store
+        .list(limit, offset)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let responses: Vec<HexadResponse> = hexads.iter().map(HexadResponse::from).collect();
+    Ok(Json(responses))
 }
 
 /// Create hexad handler
@@ -442,6 +622,7 @@ async fn get_hexad_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<HexadResponse>, ApiError> {
+    validate_hexad_id(&id)?;
     let hexad_id = HexadId::new(&id);
 
     let hexad = state
@@ -461,6 +642,7 @@ async fn update_hexad_handler(
     Path(id): Path<String>,
     Json(request): Json<HexadRequest>,
 ) -> Result<Json<HexadResponse>, ApiError> {
+    validate_hexad_id(&id)?;
     let hexad_id = HexadId::new(&id);
     let input = request.to_hexad_input();
 
@@ -484,6 +666,7 @@ async fn delete_hexad_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
+    validate_hexad_id(&id)?;
     let hexad_id = HexadId::new(&id);
 
     state
@@ -506,12 +689,11 @@ async fn text_search_handler(
     State(state): State<AppState>,
     Query(query): Query<SearchQuery>,
 ) -> Result<Json<Vec<SearchResultResponse>>, ApiError> {
-    let q = query.q.unwrap_or_default();
-    let limit = query.limit.unwrap_or(10);
-
-    if q.is_empty() {
-        return Ok(Json(vec![]));
-    }
+    let q = match query.q {
+        Some(q) if !q.is_empty() => q,
+        _ => return Err(ApiError::BadRequest("Query parameter 'q' must not be empty".to_string())),
+    };
+    let limit = validate_limit(query.limit.unwrap_or(10));
 
     let hexads = state
         .hexad_store
@@ -538,7 +720,7 @@ async fn vector_search_handler(
     State(state): State<AppState>,
     Json(request): Json<VectorSearchRequest>,
 ) -> Result<Json<Vec<SearchResultResponse>>, ApiError> {
-    let k = request.k.unwrap_or(10);
+    let k = validate_limit(request.k.unwrap_or(10));
 
     if request.vector.len() != state.config.vector_dimension {
         return Err(ApiError::BadRequest(format!(
@@ -547,6 +729,7 @@ async fn vector_search_handler(
             request.vector.len()
         )));
     }
+    validate_vector(&request.vector)?;
 
     let hexads = state
         .hexad_store
@@ -574,6 +757,7 @@ async fn related_search_handler(
     Path(id): Path<String>,
     Query(query): Query<RelatedQuery>,
 ) -> Result<Json<Vec<HexadResponse>>, ApiError> {
+    validate_hexad_id(&id)?;
     let hexad_id = HexadId::new(&id);
     let predicate = query.predicate.unwrap_or_else(|| "related".to_string());
 
@@ -625,6 +809,7 @@ async fn entity_drift_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<EntityDriftResponse>, ApiError> {
+    validate_hexad_id(&id)?;
     let hexad_id = HexadId::new(&id);
 
     // Verify hexad exists
@@ -675,6 +860,7 @@ async fn trigger_normalization_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
+    validate_hexad_id(&id)?;
     let hexad_id = HexadId::new(&id);
 
     // Check if hexad exists
@@ -749,7 +935,7 @@ async fn planner_stats_handler(
     Ok(Json(planner.stats().clone()))
 }
 
-/// Start the API server
+/// Start the API server (plain HTTP)
 pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
     let state = AppState::new_async(config.clone())
         .await
@@ -761,6 +947,37 @@ pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
 
     let listener = TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
+
+    Ok(())
+}
+
+/// Start the API server with TLS (HTTPS)
+pub async fn serve_tls(
+    config: ApiConfig,
+    cert_path: &str,
+    key_path: &str,
+) -> Result<(), std::io::Error> {
+    use axum_server::tls_rustls::RustlsConfig;
+
+    let state = AppState::new_async(config.clone())
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    let app = build_router(state);
+
+    let addr = format!("{}:{}", config.host, config.port);
+    info!(addr = %addr, cert = %cert_path, "Starting VeriSimDB API server with TLS");
+
+    let tls_config = RustlsConfig::from_pem_file(cert_path, key_path)
+        .await
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+    let addr: std::net::SocketAddr = addr
+        .parse()
+        .map_err(|e: std::net::AddrParseError| std::io::Error::other(e.to_string()))?;
+
+    axum_server::bind_rustls(addr, tls_config)
+        .serve(app.into_make_service())
+        .await?;
 
     Ok(())
 }

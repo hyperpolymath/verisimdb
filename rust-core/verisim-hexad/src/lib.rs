@@ -241,6 +241,9 @@ pub trait HexadStore: Send + Sync {
 
     /// Get version at a specific point in time
     async fn at_time(&self, id: &HexadId, time: DateTime<Utc>) -> Result<Option<Hexad>, HexadError>;
+
+    /// List hexads with pagination
+    async fn list(&self, limit: usize, offset: usize) -> Result<Vec<Hexad>, HexadError>;
 }
 
 /// Configuration for Hexad store

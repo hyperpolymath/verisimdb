@@ -29,6 +29,9 @@ pub enum VectorError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Lock poisoned: internal concurrency error")]
+    LockPoisoned,
 }
 
 /// A vector embedding with metadata
@@ -167,7 +170,7 @@ impl VectorStore for BruteForceVectorStore {
 
         self.embeddings
             .write()
-            .expect("embeddings RwLock poisoned")
+            .map_err(|_| VectorError::LockPoisoned)?
             .insert(embedding.id.clone(), embedding.clone());
 
         Ok(())
@@ -181,7 +184,7 @@ impl VectorStore for BruteForceVectorStore {
             });
         }
 
-        let embeddings = self.embeddings.read().expect("embeddings RwLock poisoned");
+        let embeddings = self.embeddings.read().map_err(|_| VectorError::LockPoisoned)?;
 
         // Compute similarities for all embeddings (brute-force)
         let mut scored: Vec<_> = embeddings
@@ -204,11 +207,11 @@ impl VectorStore for BruteForceVectorStore {
     }
 
     async fn get(&self, id: &str) -> Result<Option<Embedding>, VectorError> {
-        Ok(self.embeddings.read().expect("embeddings RwLock poisoned").get(id).cloned())
+        Ok(self.embeddings.read().map_err(|_| VectorError::LockPoisoned)?.get(id).cloned())
     }
 
     async fn delete(&self, id: &str) -> Result<(), VectorError> {
-        self.embeddings.write().expect("embeddings RwLock poisoned").remove(id);
+        self.embeddings.write().map_err(|_| VectorError::LockPoisoned)?.remove(id);
         Ok(())
     }
 

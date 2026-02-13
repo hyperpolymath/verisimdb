@@ -27,6 +27,9 @@ pub enum DriftError {
 
     #[error("Channel error: {0}")]
     ChannelError(String),
+
+    #[error("Lock poisoned: internal concurrency error")]
+    LockPoisoned,
 }
 
 /// Types of drift that can be detected
@@ -322,7 +325,7 @@ impl DriftDetector {
     pub async fn record(&self, drift_type: DriftType, score: f64, entities: Vec<String>) -> Result<Option<DriftEvent>, DriftError> {
         // Update metrics
         {
-            let mut metrics = self.metrics.write().expect("metrics RwLock poisoned");
+            let mut metrics = self.metrics.write().map_err(|_| DriftError::LockPoisoned)?;
             if let Some(m) = metrics.get_mut(&drift_type) {
                 m.record(score);
             }
@@ -378,18 +381,20 @@ impl DriftDetector {
     }
 
     /// Get current metrics for a drift type
-    pub fn get_metrics(&self, drift_type: DriftType) -> Option<DriftMetrics> {
-        self.metrics.read().expect("metrics RwLock poisoned").get(&drift_type).cloned()
+    pub fn get_metrics(&self, drift_type: DriftType) -> Result<Option<DriftMetrics>, DriftError> {
+        let metrics = self.metrics.read().map_err(|_| DriftError::LockPoisoned)?;
+        Ok(metrics.get(&drift_type).cloned())
     }
 
     /// Get all metrics
-    pub fn all_metrics(&self) -> HashMap<DriftType, DriftMetrics> {
-        self.metrics.read().expect("metrics RwLock poisoned").clone()
+    pub fn all_metrics(&self) -> Result<HashMap<DriftType, DriftMetrics>, DriftError> {
+        let metrics = self.metrics.read().map_err(|_| DriftError::LockPoisoned)?;
+        Ok(metrics.clone())
     }
 
     /// Check overall health
-    pub fn health_check(&self) -> DriftHealthStatus {
-        let metrics = self.metrics.read().expect("metrics RwLock poisoned");
+    pub fn health_check(&self) -> Result<DriftHealthStatus, DriftError> {
+        let metrics = self.metrics.read().map_err(|_| DriftError::LockPoisoned)?;
         let mut worst_score = 0.0;
         let mut worst_type = DriftType::QualityDrift;
 
@@ -410,12 +415,12 @@ impl DriftDetector {
             HealthStatus::Healthy
         };
 
-        DriftHealthStatus {
+        Ok(DriftHealthStatus {
             status,
             worst_drift_type: worst_type,
             worst_score,
             checked_at: Utc::now(),
-        }
+        })
     }
 }
 
@@ -478,7 +483,7 @@ mod tests {
     #[test]
     fn test_health_check() {
         let detector = DriftDetector::with_defaults();
-        let status = detector.health_check();
+        let status = detector.health_check().unwrap();
         assert_eq!(status.status, HealthStatus::Healthy);
     }
 }

@@ -27,6 +27,9 @@ pub enum TemporalError {
 
     #[error("Conflict: {0}")]
     Conflict(String),
+
+    #[error("Lock poisoned: internal concurrency error")]
+    LockPoisoned,
 }
 
 /// A timestamped version of an entity
@@ -212,7 +215,7 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
     type Data = T;
 
     async fn append(&self, entity_id: &str, data: Self::Data, author: &str, message: Option<&str>) -> Result<u64, TemporalError> {
-        let mut store = self.versions.write().expect("versions RwLock poisoned");
+        let mut store = self.versions.write().map_err(|_| TemporalError::LockPoisoned)?;
         let versions = store.entry(entity_id.to_string()).or_default();
 
         let next_version = versions.keys().last().map(|v| v + 1).unwrap_or(1);
@@ -226,21 +229,21 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
     }
 
     async fn latest(&self, entity_id: &str) -> Result<Option<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().expect("versions RwLock poisoned");
+        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .and_then(|versions| versions.values().last().cloned()))
     }
 
     async fn at_version(&self, entity_id: &str, version: u64) -> Result<Option<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().expect("versions RwLock poisoned");
+        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .and_then(|versions| versions.get(&version).cloned()))
     }
 
     async fn at_time(&self, entity_id: &str, time: DateTime<Utc>) -> Result<Option<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().expect("versions RwLock poisoned");
+        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store.get(entity_id).and_then(|versions| {
             versions
                 .values()
@@ -251,7 +254,7 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
     }
 
     async fn in_range(&self, entity_id: &str, range: &TimeRange) -> Result<Vec<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().expect("versions RwLock poisoned");
+        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .map(|versions| {
@@ -265,7 +268,7 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
     }
 
     async fn history(&self, entity_id: &str, limit: usize) -> Result<Vec<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().expect("versions RwLock poisoned");
+        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .map(|versions| {
@@ -319,13 +322,13 @@ impl<T: Clone + Send + Sync + 'static> TimeSeriesStore for InMemoryTimeSeriesSto
     type Value = T;
 
     async fn append(&self, series_id: &str, point: TimePoint<Self::Value>) -> Result<(), TemporalError> {
-        let mut store = self.series.write().expect("series RwLock poisoned");
+        let mut store = self.series.write().map_err(|_| TemporalError::LockPoisoned)?;
         store.entry(series_id.to_string()).or_default().push(point);
         Ok(())
     }
 
     async fn query(&self, series_id: &str, range: &TimeRange) -> Result<Vec<TimePoint<Self::Value>>, TemporalError> {
-        let store = self.series.read().expect("series RwLock poisoned");
+        let store = self.series.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(series_id)
             .map(|points| {
@@ -339,7 +342,7 @@ impl<T: Clone + Send + Sync + 'static> TimeSeriesStore for InMemoryTimeSeriesSto
     }
 
     async fn latest(&self, series_id: &str) -> Result<Option<TimePoint<Self::Value>>, TemporalError> {
-        let store = self.series.read().expect("series RwLock poisoned");
+        let store = self.series.read().map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store.get(series_id).and_then(|points| points.last().cloned()))
     }
 }
