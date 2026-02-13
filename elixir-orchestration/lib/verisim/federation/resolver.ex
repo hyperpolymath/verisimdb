@@ -56,10 +56,14 @@ defmodule VeriSim.Federation.Resolver do
   - `:timeout` — query timeout in ms
   """
   def query(pattern, modalities, opts \\ []) do
+    internal_timeout = Keyword.get(opts, :timeout, @default_timeout)
+
+    # GenServer.call timeout must exceed the internal Task.yield_many timeout
+    # to allow the handler to finish processing (shutdown stale tasks, build response).
     GenServer.call(
       __MODULE__,
       {:query, pattern, modalities, opts},
-      Keyword.get(opts, :timeout, @default_timeout)
+      internal_timeout + 5_000
     )
   end
 

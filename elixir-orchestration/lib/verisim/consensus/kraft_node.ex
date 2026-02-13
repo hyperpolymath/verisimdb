@@ -160,8 +160,14 @@ defmodule VeriSim.Consensus.KRaftNode do
 
     state = %{state | log: new_log, pending_requests: pending}
 
-    # Immediately replicate to followers
+    # Replicate to followers
     send_append_entries(state)
+
+    # Try to advance commit immediately (handles single-node clusters where
+    # no AppendEntries responses will arrive but we already have quorum of 1)
+    state = maybe_advance_commit(state)
+    state = apply_committed(state)
+    state = reply_to_pending(state)
 
     {:noreply, state}
   end
@@ -284,7 +290,14 @@ defmodule VeriSim.Consensus.KRaftNode do
       end)
     end
 
-    state
+    # Check if we already have quorum (e.g., single-node cluster with 0 peers)
+    quorum = div(length(state.peers) + 1, 2) + 1
+
+    if MapSet.size(state.votes_received) >= quorum do
+      become_leader(state)
+    else
+      state
+    end
   end
 
   defp handle_vote_request(state, request) do

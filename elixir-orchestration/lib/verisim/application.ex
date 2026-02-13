@@ -32,7 +32,18 @@ defmodule VeriSim.Application do
       VeriSim.QueryRouter,
 
       # Schema registry
-      VeriSim.SchemaRegistry
+      VeriSim.SchemaRegistry,
+
+      # Consensus registry (must start before KRaftNode)
+      {Registry, keys: :unique, name: VeriSim.Consensus.Registry},
+
+      # KRaft consensus node (single-node bootstrap by default)
+      {VeriSim.Consensus.KRaftNode,
+        node_id: Application.get_env(:verisim, :kraft_node_id, "local"),
+        peers: Application.get_env(:verisim, :kraft_peers, [])},
+
+      # Federation resolver
+      VeriSim.Federation.Resolver
     ]
 
     opts = [strategy: :one_for_one, name: VeriSim.Supervisor]
