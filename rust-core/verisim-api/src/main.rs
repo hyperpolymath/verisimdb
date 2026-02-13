@@ -9,6 +9,11 @@ use verisim_api::ApiConfig;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Install ring as the default crypto provider (pure Rust, no OpenSSL/aws-lc-sys)
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install ring crypto provider");
+
     // Initialize tracing with structured JSON output
     let json_logging = std::env::var("VERISIM_LOG_FORMAT")
         .map(|v| v == "json")

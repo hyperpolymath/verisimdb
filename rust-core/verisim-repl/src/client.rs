@@ -57,6 +57,9 @@ impl VqlClient {
     /// The URL should include the scheme and port but no trailing slash.
     /// Example: `http://localhost:8080`
     pub fn new(base_url: &str) -> Self {
+        // Install ring as the default crypto provider (pure Rust, no OpenSSL/aws-lc-sys)
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
         let base_url = base_url.trim_end_matches('/').to_string();
         let http = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
