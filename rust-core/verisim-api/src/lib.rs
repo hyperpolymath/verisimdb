@@ -19,9 +19,15 @@ use thiserror::Error;
 use tokio::net::TcpListener;
 use tracing::{info, instrument};
 
+use std::sync::Mutex;
+
 use verisim_document::TantivyDocumentStore;
 use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
 use verisim_graph::OxiGraphStore;
+use verisim_planner::{
+    ExplainOutput, LogicalPlan, PhysicalPlan, Planner,
+    PlannerConfig, StatisticsCollector,
+};
 use verisim_hexad::{
     HexadConfig, HexadDocumentInput, HexadGraphInput, HexadId, HexadInput,
     HexadSemanticInput, HexadSnapshot, HexadStore, HexadTensorInput,
@@ -294,6 +300,7 @@ pub struct AppState {
     pub hexad_store: Arc<ConcreteHexadStore>,
     pub drift_detector: Arc<DriftDetector>,
     pub normalizer: Arc<Normalizer>,
+    pub planner: Arc<Mutex<Planner>>,
     pub federation: federation::FederationState,
     pub config: ApiConfig,
 }
@@ -333,6 +340,8 @@ impl AppState {
         let drift_detector = Arc::new(DriftDetector::new(DriftThresholds::default()));
         let normalizer = Arc::new(create_default_normalizer(drift_detector.clone()).await);
 
+        let planner = Arc::new(Mutex::new(Planner::new(PlannerConfig::default())));
+
         let self_endpoint = format!("http://{}:{}{}", config.host, config.port, config.version_prefix);
         let federation = federation::FederationState::new(
             "self".to_string(),
@@ -344,6 +353,7 @@ impl AppState {
             hexad_store,
             drift_detector,
             normalizer,
+            planner,
             federation,
             config,
         })
@@ -369,8 +379,15 @@ pub fn build_router(state: AppState) -> Router {
         .route("/search/related/{id}", get(related_search_handler))
         // Drift and normalization
         .route("/drift/status", get(drift_status_handler))
+        .route("/drift/entity/{id}", get(entity_drift_handler))
         .route("/normalizer/status", get(normalizer_status_handler))
         .route("/normalizer/trigger/{id}", post(trigger_normalization_handler))
+        // Query planner
+        .route("/query/plan", post(query_plan_handler))
+        .route("/query/explain", post(query_explain_handler))
+        .route("/planner/config", get(get_planner_config_handler))
+        .route("/planner/config", put(put_planner_config_handler))
+        .route("/planner/stats", get(planner_stats_handler))
         .with_state(state)
         // Federation endpoints (separate state)
         .merge(federation_routes)
@@ -582,6 +599,55 @@ async fn drift_status_handler(
     Ok(Json(responses))
 }
 
+/// Entity drift response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EntityDriftResponse {
+    pub entity_id: String,
+    pub score: f64,
+    pub drift_type: String,
+    pub status: String,
+}
+
+/// Entity drift handler — get drift info for a single entity
+#[instrument(skip(state))]
+async fn entity_drift_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<EntityDriftResponse>, ApiError> {
+    let hexad_id = HexadId::new(&id);
+
+    // Verify hexad exists
+    let _hexad = state
+        .hexad_store
+        .get(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Hexad {} not found", id)))?;
+
+    // Get aggregate health from drift detector
+    let all_metrics = state.drift_detector.all_metrics();
+    let (worst_type, worst_score) = all_metrics
+        .iter()
+        .max_by(|a, b| a.1.current_score.partial_cmp(&b.1.current_score).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(dt, m)| (dt.to_string(), m.current_score))
+        .unwrap_or_else(|| ("none".to_string(), 0.0));
+
+    let status = if worst_score >= 0.7 {
+        "critical"
+    } else if worst_score >= 0.3 {
+        "warning"
+    } else {
+        "healthy"
+    };
+
+    Ok(Json(EntityDriftResponse {
+        entity_id: id,
+        score: worst_score,
+        drift_type: worst_type,
+        status: status.to_string(),
+    }))
+}
+
 /// Normalizer status handler
 #[instrument(skip(state))]
 async fn normalizer_status_handler(
@@ -612,6 +678,63 @@ async fn trigger_normalization_handler(
     info!(id = %id, "Normalization triggered for hexad");
 
     Ok(StatusCode::ACCEPTED)
+}
+
+// --- Query Planner Handlers ---
+
+/// Query plan handler — optimize a logical plan into a physical plan
+#[instrument(skip(state, plan))]
+async fn query_plan_handler(
+    State(state): State<AppState>,
+    Json(plan): Json<LogicalPlan>,
+) -> Result<Json<PhysicalPlan>, ApiError> {
+    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let physical = planner
+        .optimize(&plan)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    Ok(Json(physical))
+}
+
+/// Query explain handler — generate EXPLAIN output for a logical plan
+#[instrument(skip(state, plan))]
+async fn query_explain_handler(
+    State(state): State<AppState>,
+    Json(plan): Json<LogicalPlan>,
+) -> Result<Json<ExplainOutput>, ApiError> {
+    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let explain = planner
+        .explain(&plan)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    Ok(Json(explain))
+}
+
+/// Get planner configuration
+#[instrument(skip(state))]
+async fn get_planner_config_handler(
+    State(state): State<AppState>,
+) -> Result<Json<PlannerConfig>, ApiError> {
+    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    Ok(Json(planner.config().clone()))
+}
+
+/// Update planner configuration
+#[instrument(skip(state, config))]
+async fn put_planner_config_handler(
+    State(state): State<AppState>,
+    Json(config): Json<PlannerConfig>,
+) -> Result<Json<PlannerConfig>, ApiError> {
+    let mut planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    planner.set_config(config);
+    Ok(Json(planner.config().clone()))
+}
+
+/// Planner statistics snapshot
+#[instrument(skip(state))]
+async fn planner_stats_handler(
+    State(state): State<AppState>,
+) -> Result<Json<StatisticsCollector>, ApiError> {
+    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    Ok(Json(planner.stats().clone()))
 }
 
 /// Start the API server

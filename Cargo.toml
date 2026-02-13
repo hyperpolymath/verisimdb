@@ -14,6 +14,7 @@ members = [
     "rust-core/verisim-hexad",
     "rust-core/verisim-normalizer",
     "rust-core/verisim-drift",
+    "rust-core/verisim-planner",
     "rust-core/verisim-api",
 ]
 
@@ -52,6 +53,7 @@ axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 hyper = "1.0"
+reqwest = { version = "0.12", features = ["json"] }
 
 # Serialization
 # bincode removed — not used in codebase. Use postcard or ciborium for future serialization needs.
@@ -85,6 +87,15 @@ regex = "1.11"
 
 # Cryptography (ZKP proofs in semantic store)
 sha2 = "0.10"
+
+# GraphQL
+async-graphql = "8.0.0-rc.2"
+async-graphql-axum = "8.0.0-rc.2"
+
+# gRPC
+tonic = "0.14"
+prost = "0.14"
+prost-types = "0.14"
 
 [profile.release]
 lto = true
