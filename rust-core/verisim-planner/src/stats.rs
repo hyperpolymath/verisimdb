@@ -106,6 +106,115 @@ impl Default for StatisticsCollector {
     }
 }
 
+/// Adaptive tuner that adjusts planner configuration based on actual
+/// execution performance vs estimated costs.
+///
+/// When enabled, the tuner compares actual query latencies against
+/// the planner's estimates and adjusts per-modality optimization modes:
+/// - If actual >> estimated → switch to Conservative (underestimating)
+/// - If actual << estimated → switch to Aggressive (overestimating)
+/// - Otherwise → keep Balanced
+pub struct AdaptiveTuner {
+    /// Ratio of actual/estimated below which we go Aggressive.
+    aggressive_threshold: f64,
+    /// Ratio of actual/estimated above which we go Conservative.
+    conservative_threshold: f64,
+    /// Minimum number of samples before making adjustments.
+    min_samples: u64,
+}
+
+impl AdaptiveTuner {
+    /// Create a new adaptive tuner with default thresholds.
+    pub fn new() -> Self {
+        Self {
+            aggressive_threshold: 0.5,    // Actual < 50% of estimate → overestimating
+            conservative_threshold: 2.0,  // Actual > 200% of estimate → underestimating
+            min_samples: 10,
+        }
+    }
+
+    /// Create a tuner with custom thresholds.
+    pub fn with_thresholds(aggressive: f64, conservative: f64, min_samples: u64) -> Self {
+        Self {
+            aggressive_threshold: aggressive,
+            conservative_threshold: conservative,
+            min_samples,
+        }
+    }
+
+    /// Evaluate the collector's statistics and suggest config adjustments.
+    ///
+    /// Returns a list of (Modality, suggested OptimizationMode) pairs
+    /// for modalities that should be tuned.
+    pub fn suggest_adjustments(
+        &self,
+        collector: &StatisticsCollector,
+        config: &crate::config::PlannerConfig,
+    ) -> Vec<(crate::Modality, crate::config::OptimizationMode)> {
+        let mut adjustments = Vec::new();
+
+        for modality in crate::Modality::ALL {
+            if let Some(stats) = collector.get(modality) {
+                if stats.query_count < self.min_samples {
+                    continue; // Not enough data
+                }
+
+                let base_cost = crate::cost::BaseCost::for_modality(modality);
+                let current_mode = config.mode_for(modality);
+                let estimated_ms = base_cost.time_ms * current_mode.cost_multiplier();
+
+                if estimated_ms <= 0.0 {
+                    continue;
+                }
+
+                let ratio = stats.avg_latency_ms / estimated_ms;
+
+                let suggested = if ratio < self.aggressive_threshold {
+                    crate::config::OptimizationMode::Aggressive
+                } else if ratio > self.conservative_threshold {
+                    crate::config::OptimizationMode::Conservative
+                } else {
+                    crate::config::OptimizationMode::Balanced
+                };
+
+                if suggested != current_mode {
+                    adjustments.push((modality, suggested));
+                }
+            }
+        }
+
+        adjustments
+    }
+
+    /// Apply suggested adjustments to a config, returning the updated config.
+    pub fn apply(
+        &self,
+        collector: &StatisticsCollector,
+        config: &crate::config::PlannerConfig,
+    ) -> crate::config::PlannerConfig {
+        if !config.enable_adaptive {
+            return config.clone();
+        }
+
+        let adjustments = self.suggest_adjustments(collector, config);
+        if adjustments.is_empty() {
+            return config.clone();
+        }
+
+        let mut new_config = config.clone();
+        for (modality, mode) in adjustments {
+            new_config.modality_overrides.insert(modality, mode);
+        }
+        new_config
+    }
+}
+
+impl Default for AdaptiveTuner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +269,114 @@ mod tests {
         let collector = StatisticsCollector::new();
         let snap = collector.snapshot();
         assert_eq!(snap.len(), 6);
+    }
+
+    // ====================================================================
+    // Task #8: Adaptive tuning tests
+    // ====================================================================
+
+    #[test]
+    fn test_adaptive_tuner_no_data_no_adjustments() {
+        let tuner = AdaptiveTuner::new();
+        let collector = StatisticsCollector::new();
+        let config = crate::config::PlannerConfig::default();
+        let adjustments = tuner.suggest_adjustments(&collector, &config);
+        assert!(adjustments.is_empty(), "No data → no adjustments");
+    }
+
+    #[test]
+    fn test_adaptive_tuner_below_min_samples() {
+        let tuner = AdaptiveTuner::new(); // min_samples = 10
+        let mut collector = StatisticsCollector::new();
+        // Record only 5 executions (below threshold)
+        for _ in 0..5 {
+            collector.record_execution(Modality::Vector, 10.0, 5);
+        }
+        let config = crate::config::PlannerConfig::default();
+        let adjustments = tuner.suggest_adjustments(&collector, &config);
+        assert!(adjustments.is_empty(), "Below min_samples → no adjustments");
+    }
+
+    #[test]
+    fn test_adaptive_tuner_suggests_aggressive_when_overestimating() {
+        let tuner = AdaptiveTuner::new();
+        let mut collector = StatisticsCollector::new();
+        // Vector base = 50ms, aggressive mode = 0.8x = 40ms estimated
+        // Record actual latency of 10ms (ratio = 10/40 = 0.25 < 0.5) → Aggressive
+        for _ in 0..15 {
+            collector.record_execution(Modality::Vector, 10.0, 5);
+        }
+        let config = crate::config::PlannerConfig::default();
+        let adjustments = tuner.suggest_adjustments(&collector, &config);
+        // Vector already has Aggressive override, so if actual confirms it, no change.
+        // But ratio 0.25 < 0.5, already aggressive, stays aggressive → no adjustment.
+        // Let's test Graph instead where it's Conservative
+        let mut collector2 = StatisticsCollector::new();
+        // Graph base = 150ms, conservative mode = 1.5x = 225ms estimated
+        // Record actual latency of 50ms (ratio = 50/225 = 0.22 < 0.5) → Aggressive
+        for _ in 0..15 {
+            collector2.record_execution(Modality::Graph, 50.0, 10);
+        }
+        let adjustments2 = tuner.suggest_adjustments(&collector2, &config);
+        let graph_adj = adjustments2.iter().find(|(m, _)| *m == Modality::Graph);
+        assert!(graph_adj.is_some(), "Graph should have adjustment");
+        assert_eq!(
+            graph_adj.unwrap().1,
+            crate::config::OptimizationMode::Aggressive,
+            "Actual << estimated → Aggressive"
+        );
+    }
+
+    #[test]
+    fn test_adaptive_tuner_suggests_conservative_when_underestimating() {
+        let tuner = AdaptiveTuner::new();
+        let mut collector = StatisticsCollector::new();
+        // Document base = 80ms, balanced mode = 1.0x = 80ms estimated
+        // Record actual latency of 200ms (ratio = 200/80 = 2.5 > 2.0) → Conservative
+        for _ in 0..15 {
+            collector.record_execution(Modality::Document, 200.0, 50);
+        }
+        let config = crate::config::PlannerConfig::default();
+        let adjustments = tuner.suggest_adjustments(&collector, &config);
+        let doc_adj = adjustments.iter().find(|(m, _)| *m == Modality::Document);
+        assert!(doc_adj.is_some(), "Document should have adjustment");
+        assert_eq!(
+            doc_adj.unwrap().1,
+            crate::config::OptimizationMode::Conservative,
+            "Actual >> estimated → Conservative"
+        );
+    }
+
+    #[test]
+    fn test_adaptive_tuner_apply_updates_config() {
+        let tuner = AdaptiveTuner::new();
+        let mut collector = StatisticsCollector::new();
+        // Make Document wildly underestimated
+        for _ in 0..15 {
+            collector.record_execution(Modality::Document, 200.0, 50);
+        }
+        let config = crate::config::PlannerConfig::default();
+        let new_config = tuner.apply(&collector, &config);
+        assert_eq!(
+            new_config.mode_for(Modality::Document),
+            crate::config::OptimizationMode::Conservative,
+        );
+    }
+
+    #[test]
+    fn test_adaptive_tuner_disabled() {
+        let tuner = AdaptiveTuner::new();
+        let mut collector = StatisticsCollector::new();
+        for _ in 0..15 {
+            collector.record_execution(Modality::Document, 200.0, 50);
+        }
+        let mut config = crate::config::PlannerConfig::default();
+        config.enable_adaptive = false;
+        let new_config = tuner.apply(&collector, &config);
+        // Should not change when adaptive is disabled
+        assert_eq!(
+            new_config.mode_for(Modality::Document),
+            config.mode_for(Modality::Document),
+        );
     }
 }

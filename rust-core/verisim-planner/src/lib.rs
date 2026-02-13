@@ -19,12 +19,12 @@ use std::fmt;
 use std::str::FromStr;
 
 pub use config::{OptimizationMode, PlannerConfig};
-pub use cost::{CostEstimate, CostModel};
+pub use cost::{CostEstimate, CostModel, CrossModalCost, PostProcessingCost, ProofCost};
 pub use error::PlannerError;
 pub use explain::ExplainOutput;
 pub use optimizer::Planner;
 pub use plan::{LogicalPlan, PhysicalPlan};
-pub use stats::{StatisticsCollector, StoreStatistics};
+pub use stats::{AdaptiveTuner, StatisticsCollector, StoreStatistics};
 
 /// The six modalities of VeriSimDB.
 ///

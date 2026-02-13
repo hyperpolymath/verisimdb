@@ -134,9 +134,13 @@ impl Planner {
             cost_estimates.push(cost.clone());
         }
 
-        // 5. Combine total cost
+        // 5. Combine total cost (modality queries + post-processing)
         let is_parallel = strategy == ExecutionStrategy::Parallel;
-        let total_cost = CostEstimate::combine(&cost_estimates, is_parallel);
+        let modality_cost = CostEstimate::combine(&cost_estimates, is_parallel);
+        let total_cost = CostModel::estimate_with_post_processing(
+            &modality_cost,
+            &logical.post_processing,
+        );
 
         // 6. Generate optimization notes
         if is_parallel {
