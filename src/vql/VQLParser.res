@@ -949,8 +949,12 @@ module MutationParser = {
   let vectorData: parser<modalityData> = {
     bind(keyword("VECTOR"), _ =>
       bind(keyword("("), _ =>
-        bind(sepBy(Grammar.float, keyword(",")), values =>
-          map(keyword(")"), _ => VectorData(values))
+        bind(keyword("["), _ =>
+          bind(sepBy(Grammar.float, keyword(",")), values =>
+            bind(keyword("]"), _ =>
+              map(keyword(")"), _ => VectorData(values))
+            )
+          )
         )
       )
     )

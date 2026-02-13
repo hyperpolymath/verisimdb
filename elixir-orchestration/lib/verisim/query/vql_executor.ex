@@ -116,39 +116,44 @@ defmodule VeriSim.Query.VQLExecutor do
     projections = extract_projections(query_ast)
 
     # Verify proofs if required (multi-proof support)
-    if proof_specs do
-      case verify_multi_proof(query_ast, proof_specs) do
-        :ok -> :continue
-        {:error, reason} -> {:error, {:proof_verification_failed, reason}}
-      end
+    proof_result = if proof_specs do
+      verify_multi_proof(query_ast, proof_specs)
+    else
+      :ok
     end
 
-    # Phase 2: Classify conditions into pushdown vs cross-modal
-    {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
+    case proof_result do
+      {:error, reason} ->
+        {:error, {:proof_verification_failed, reason}}
 
-    # Execute based on source type (with pushdown conditions only)
-    result = case source do
-      {:hexad, entity_id} ->
-        execute_hexad_query(entity_id, modalities, pushdown_conditions, limit, offset, timeout)
+      :ok ->
+        # Phase 2: Classify conditions into pushdown vs cross-modal
+        {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
 
-      {:federation, pattern, drift_policy} ->
-        execute_federation_query(pattern, drift_policy, modalities, pushdown_conditions, limit, offset, timeout)
+        # Execute based on source type (with pushdown conditions only)
+        result = case source do
+          {:hexad, entity_id} ->
+            execute_hexad_query(entity_id, modalities, pushdown_conditions, limit, offset, timeout)
 
-      {:store, store_id} ->
-        execute_store_query(store_id, modalities, pushdown_conditions, limit, offset, timeout)
-    end
+          {:federation, pattern, drift_policy} ->
+            execute_federation_query(pattern, drift_policy, modalities, pushdown_conditions, limit, offset, timeout)
 
-    # Post-process
-    case result do
-      {:ok, rows} ->
-        rows
-        |> maybe_evaluate_cross_modal(cross_modal_conditions)
-        |> maybe_group_and_aggregate(group_by, aggregates)
-        |> maybe_order_by(order_by)
-        |> maybe_project_columns(projections)
-        |> then(&{:ok, &1})
+          {:store, store_id} ->
+            execute_store_query(store_id, modalities, pushdown_conditions, limit, offset, timeout)
+        end
 
-      error -> error
+        # Post-process
+        case result do
+          {:ok, rows} ->
+            rows
+            |> maybe_evaluate_cross_modal(cross_modal_conditions)
+            |> maybe_group_and_aggregate(group_by, aggregates)
+            |> maybe_order_by(order_by)
+            |> maybe_project_columns(projections)
+            |> then(&{:ok, &1})
+
+          error -> error
+        end
     end
   end
 
@@ -300,55 +305,55 @@ defmodule VeriSim.Query.VQLExecutor do
   # ===========================================================================
 
   defp execute_insert(modality_data, proof, _timeout) do
-    # Verify write proof if present
-    if proof do
-      case verify_multi_proof(nil, proof) do
-        :ok -> :continue
-        {:error, reason} -> {:error, {:write_proof_failed, reason}}
-      end
-    end
+    proof_result = if proof, do: verify_multi_proof(nil, proof), else: :ok
 
-    # Call Rust HexadStore.create via RustClient
-    case RustClient.create_hexad(modality_data) do
-      {:ok, hexad_id} -> {:ok, %{hexad_id: hexad_id, operation: :insert}}
-      {:error, reason} -> {:error, {:insert_failed, reason}}
+    case proof_result do
+      {:error, reason} ->
+        {:error, {:write_proof_failed, reason}}
+
+      :ok ->
+        case RustClient.create_hexad(modality_data) do
+          {:ok, hexad_id} -> {:ok, %{hexad_id: hexad_id, operation: :insert}}
+          {:error, reason} -> {:error, {:insert_failed, reason}}
+        end
     end
   rescue
     e -> {:error, {:insert_failed, Exception.message(e)}}
   end
 
   defp execute_update(hexad_id, sets, proof, _timeout) do
-    if proof do
-      case verify_multi_proof(nil, proof) do
-        :ok -> :continue
-        {:error, reason} -> {:error, {:write_proof_failed, reason}}
-      end
-    end
+    proof_result = if proof, do: verify_multi_proof(nil, proof), else: :ok
 
-    # Convert SET assignments to field updates
-    field_updates = Enum.map(sets, fn {field_ref, value} ->
-      {field_ref, value}
-    end)
+    case proof_result do
+      {:error, reason} ->
+        {:error, {:write_proof_failed, reason}}
 
-    case RustClient.update_hexad(hexad_id, field_updates) do
-      {:ok, _} -> {:ok, %{hexad_id: hexad_id, operation: :update, fields_updated: length(sets)}}
-      {:error, reason} -> {:error, {:update_failed, reason}}
+      :ok ->
+        field_updates = Enum.map(sets, fn {field_ref, value} ->
+          {field_ref, value}
+        end)
+
+        case RustClient.update_hexad(hexad_id, field_updates) do
+          {:ok, _} -> {:ok, %{hexad_id: hexad_id, operation: :update, fields_updated: length(sets)}}
+          {:error, reason} -> {:error, {:update_failed, reason}}
+        end
     end
   rescue
     e -> {:error, {:update_failed, Exception.message(e)}}
   end
 
   defp execute_delete(hexad_id, proof, _timeout) do
-    if proof do
-      case verify_multi_proof(nil, proof) do
-        :ok -> :continue
-        {:error, reason} -> {:error, {:write_proof_failed, reason}}
-      end
-    end
+    proof_result = if proof, do: verify_multi_proof(nil, proof), else: :ok
 
-    case RustClient.delete_hexad(hexad_id) do
-      {:ok, _} -> {:ok, %{hexad_id: hexad_id, operation: :delete}}
-      {:error, reason} -> {:error, {:delete_failed, reason}}
+    case proof_result do
+      {:error, reason} ->
+        {:error, {:write_proof_failed, reason}}
+
+      :ok ->
+        case RustClient.delete_hexad(hexad_id) do
+          {:ok, _} -> {:ok, %{hexad_id: hexad_id, operation: :delete}}
+          {:error, reason} -> {:error, {:delete_failed, reason}}
+        end
     end
   rescue
     e -> {:error, {:delete_failed, Exception.message(e)}}
