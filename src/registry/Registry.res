@@ -17,6 +17,8 @@ type modalityType =
   | Semantic
   | Document
   | Temporal
+  | Provenance
+  | Spatial
 
 type storeLocation = {
   storeId: storeId,
@@ -577,6 +579,8 @@ let modalityToString = (m: modalityType): string => {
   | Semantic => "semantic"
   | Document => "document"
   | Temporal => "temporal"
+  | Provenance => "provenance"
+  | Spatial => "spatial"
   }
 }
 
@@ -588,6 +592,8 @@ let modalityFromString = (s: string): option<modalityType> => {
   | "semantic" => Some(Semantic)
   | "document" => Some(Document)
   | "temporal" => Some(Temporal)
+  | "provenance" => Some(Provenance)
+  | "spatial" => Some(Spatial)
   | _ => None
   }
 }

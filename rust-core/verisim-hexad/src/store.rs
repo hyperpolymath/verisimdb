@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 //! In-memory HexadStore implementation
 //!
-//! Coordinates all six modality stores for unified entity management.
+//! Coordinates all eight modality stores (octad) for unified entity management.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -12,11 +12,12 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    Document, DocumentStore, Embedding, GraphEdge, GraphNode, GraphObject, GraphStore, Hexad,
-    HexadConfig, HexadDocumentInput, HexadError, HexadGraphInput, HexadId, HexadInput,
-    HexadSemanticInput, HexadStatus, HexadStore, HexadTensorInput, HexadVectorInput,
-    ModalityStatus, Provenance, SemanticAnnotation, SemanticStore, SemanticValue, Tensor,
-    TensorStore, TemporalStore, VectorStore,
+    Coordinates, Document, DocumentStore, Embedding, GeometryType, GraphEdge, GraphNode,
+    GraphObject, GraphStore, Hexad, HexadConfig, HexadDocumentInput, HexadError, HexadGraphInput,
+    HexadId, HexadInput, HexadProvenanceInput, HexadSemanticInput, HexadSpatialInput,
+    HexadStatus, HexadStore, HexadTensorInput, HexadVectorInput, ModalityStatus, Provenance,
+    ProvenanceEventType, ProvenanceStore, SemanticAnnotation, SemanticStore, SemanticValue,
+    SpatialData, SpatialStore, Tensor, TensorStore, TemporalStore, VectorStore,
 };
 
 /// Snapshot of a Hexad for versioning
@@ -30,9 +31,9 @@ pub struct HexadSnapshot {
 
 /// In-memory implementation of HexadStore
 ///
-/// This store coordinates all six modality stores, ensuring cross-modal
-/// consistency when entities are created, updated, or deleted.
-pub struct InMemoryHexadStore<G, V, D, T, S, R>
+/// This store coordinates all eight modality stores (octad), ensuring
+/// cross-modal consistency when entities are created, updated, or deleted.
+pub struct InMemoryHexadStore<G, V, D, T, S, R, P, L>
 where
     G: GraphStore,
     V: VectorStore,
@@ -40,6 +41,8 @@ where
     T: TensorStore,
     S: SemanticStore,
     R: TemporalStore<Data = HexadSnapshot>,
+    P: ProvenanceStore,
+    L: SpatialStore,
 {
     config: HexadConfig,
     /// Hexad status registry
@@ -56,9 +59,13 @@ where
     semantic: Arc<S>,
     /// Temporal (versioning) store
     temporal: Arc<R>,
+    /// Provenance (lineage tracking) store
+    provenance: Arc<P>,
+    /// Spatial (geospatial) store
+    spatial: Arc<L>,
 }
 
-impl<G, V, D, T, S, R> InMemoryHexadStore<G, V, D, T, S, R>
+impl<G, V, D, T, S, R, P, L> InMemoryHexadStore<G, V, D, T, S, R, P, L>
 where
     G: GraphStore,
     V: VectorStore,
@@ -66,8 +73,10 @@ where
     T: TensorStore,
     S: SemanticStore,
     R: TemporalStore<Data = HexadSnapshot>,
+    P: ProvenanceStore,
+    L: SpatialStore,
 {
-    /// Create a new in-memory hexad store
+    /// Create a new in-memory hexad store with all eight modality stores
     pub fn new(
         config: HexadConfig,
         graph: Arc<G>,
@@ -76,6 +85,8 @@ where
         tensor: Arc<T>,
         semantic: Arc<S>,
         temporal: Arc<R>,
+        provenance: Arc<P>,
+        spatial: Arc<L>,
     ) -> Self {
         Self {
             config,
@@ -86,7 +97,19 @@ where
             tensor,
             semantic,
             temporal,
+            provenance,
+            spatial,
         }
+    }
+
+    /// Access the provenance store for direct queries.
+    pub fn provenance_store(&self) -> &Arc<P> {
+        &self.provenance
+    }
+
+    /// Access the spatial store for direct queries.
+    pub fn spatial_store(&self) -> &Arc<L> {
+        &self.spatial
     }
 
     /// Process graph input for a hexad
@@ -219,6 +242,78 @@ where
         Ok(annotation)
     }
 
+    /// Process provenance input for a hexad — records a lineage event
+    async fn process_provenance(
+        &self,
+        id: &HexadId,
+        input: &HexadProvenanceInput,
+    ) -> Result<u64, HexadError> {
+        let event_type = match input.event_type.to_lowercase().as_str() {
+            "created" => ProvenanceEventType::Created,
+            "modified" => ProvenanceEventType::Modified,
+            "imported" => ProvenanceEventType::Imported,
+            "normalized" => ProvenanceEventType::Normalized,
+            "drift_repaired" => ProvenanceEventType::DriftRepaired,
+            "deleted" => ProvenanceEventType::Deleted,
+            "merged" => ProvenanceEventType::Merged,
+            other => ProvenanceEventType::Custom(other.to_string()),
+        };
+
+        self.provenance
+            .record_event(id.as_str(), event_type, &input.actor, input.source.clone(), &input.description)
+            .await
+            .map_err(|e| HexadError::ModalityError {
+                modality: "provenance".to_string(),
+                message: e.to_string(),
+            })?;
+
+        let chain = self
+            .provenance
+            .get_chain(id.as_str())
+            .await
+            .map_err(|e| HexadError::ModalityError {
+                modality: "provenance".to_string(),
+                message: e.to_string(),
+            })?;
+
+        debug!(id = %id, chain_length = chain.len(), "Provenance modality populated");
+        Ok(chain.len() as u64)
+    }
+
+    /// Process spatial input for a hexad — indexes geospatial data
+    async fn process_spatial(
+        &self,
+        id: &HexadId,
+        input: &HexadSpatialInput,
+    ) -> Result<SpatialData, HexadError> {
+        let coordinates = Coordinates::new(input.latitude, input.longitude, input.altitude)
+            .map_err(|e| HexadError::ValidationError(e.to_string()))?;
+
+        let geometry_type = match input.geometry_type.as_deref() {
+            Some("LineString") => GeometryType::LineString,
+            Some("Polygon") => GeometryType::Polygon,
+            Some("MultiPoint") => GeometryType::MultiPoint,
+            Some("MultiPolygon") => GeometryType::MultiPolygon,
+            _ => GeometryType::Point,
+        };
+
+        let srid = input.srid.unwrap_or(4326);
+
+        let mut data = SpatialData::with_geometry(coordinates, geometry_type, srid);
+        data.properties = input.properties.clone();
+
+        self.spatial
+            .index(id.as_str(), data.clone())
+            .await
+            .map_err(|e| HexadError::ModalityError {
+                modality: "spatial".to_string(),
+                message: e.to_string(),
+            })?;
+
+        debug!(id = %id, lat = input.latitude, lon = input.longitude, "Spatial modality populated");
+        Ok(data)
+    }
+
     /// Create a snapshot for versioning
     fn create_snapshot(&self, id: &HexadId, input: &HexadInput, status: &ModalityStatus) -> HexadSnapshot {
         HexadSnapshot {
@@ -288,6 +383,27 @@ where
             .map(|h| h.len() as u64)
             .unwrap_or(0);
 
+        // Load provenance chain length
+        let provenance_chain_length = if status.modality_status.provenance {
+            self.provenance
+                .get_chain(id.as_str())
+                .await
+                .map(|c| c.len() as u64)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        // Load spatial data
+        let spatial_data = if status.modality_status.spatial {
+            self.spatial.get(id.as_str()).await.map_err(|e| HexadError::ModalityError {
+                modality: "spatial".to_string(),
+                message: e.to_string(),
+            })?
+        } else {
+            None
+        };
+
         Ok(Some(Hexad {
             id: id.clone(),
             status,
@@ -297,12 +413,14 @@ where
             semantic,
             document,
             version_count,
+            provenance_chain_length,
+            spatial_data,
         }))
     }
 }
 
 #[async_trait]
-impl<G, V, D, T, S, R> HexadStore for InMemoryHexadStore<G, V, D, T, S, R>
+impl<G, V, D, T, S, R, P, L> HexadStore for InMemoryHexadStore<G, V, D, T, S, R, P, L>
 where
     G: GraphStore + 'static,
     V: VectorStore + 'static,
@@ -310,6 +428,8 @@ where
     T: TensorStore + 'static,
     S: SemanticStore + 'static,
     R: TemporalStore<Data = HexadSnapshot> + 'static,
+    P: ProvenanceStore + 'static,
+    L: SpatialStore + 'static,
 {
     #[instrument(skip(self, input))]
     async fn create(&self, input: HexadInput) -> Result<Hexad, HexadError> {
@@ -349,6 +469,20 @@ where
             modality_status.semantic = true;
         }
 
+        // Process provenance
+        let mut provenance_chain_length = 0;
+        if let Some(ref prov_input) = input.provenance {
+            provenance_chain_length = self.process_provenance(&id, prov_input).await?;
+            modality_status.provenance = true;
+        }
+
+        // Process spatial
+        let mut spatial_data = None;
+        if let Some(ref spatial_input) = input.spatial {
+            spatial_data = Some(self.process_spatial(&id, spatial_input).await?);
+            modality_status.spatial = true;
+        }
+
         // Create version snapshot
         let snapshot = self.create_snapshot(&id, &input, &modality_status);
         let version = self
@@ -384,6 +518,8 @@ where
             semantic,
             document,
             version_count: 1,
+            provenance_chain_length,
+            spatial_data,
         })
     }
 
@@ -431,6 +567,20 @@ where
             modality_status.semantic = true;
         }
 
+        // Update provenance
+        let mut provenance_chain_length = 0;
+        if let Some(ref prov_input) = input.provenance {
+            provenance_chain_length = self.process_provenance(id, prov_input).await?;
+            modality_status.provenance = true;
+        }
+
+        // Update spatial
+        let mut spatial_data = None;
+        if let Some(ref spatial_input) = input.spatial {
+            spatial_data = Some(self.process_spatial(id, spatial_input).await?);
+            modality_status.spatial = true;
+        }
+
         // Create new version snapshot
         let snapshot = self.create_snapshot(id, &input, &modality_status);
         let version = self
@@ -465,6 +615,8 @@ where
             semantic,
             document,
             version_count: version,
+            provenance_chain_length,
+            spatial_data,
         })
     }
 
@@ -613,7 +765,9 @@ mod tests {
     use crate::HexadBuilder;
     use verisim_document::TantivyDocumentStore;
     use verisim_graph::OxiGraphStore;
+    use verisim_provenance::InMemoryProvenanceStore;
     use verisim_semantic::InMemorySemanticStore;
+    use verisim_spatial::InMemorySpatialStore;
     use verisim_temporal::InMemoryVersionStore;
     use verisim_tensor::InMemoryTensorStore;
     use verisim_vector::{DistanceMetric, BruteForceVectorStore};
@@ -625,6 +779,8 @@ mod tests {
         InMemoryTensorStore,
         InMemorySemanticStore,
         InMemoryVersionStore<HexadSnapshot>,
+        InMemoryProvenanceStore,
+        InMemorySpatialStore,
     > {
         let config = HexadConfig {
             vector_dimension: 3,
@@ -639,6 +795,8 @@ mod tests {
             Arc::new(InMemoryTensorStore::new()),
             Arc::new(InMemorySemanticStore::new()),
             Arc::new(InMemoryVersionStore::new()),
+            Arc::new(InMemoryProvenanceStore::new()),
+            Arc::new(InMemorySpatialStore::new()),
         )
     }
 

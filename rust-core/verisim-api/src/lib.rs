@@ -10,6 +10,7 @@ pub mod graphql;
 pub mod grpc;
 pub mod rbac;
 pub mod transaction;
+pub mod vql;
 
 use axum::{
     extract::{Path, Query, State},
@@ -36,10 +37,13 @@ use verisim_planner::{
     Profiler, SlowQueryLog, SlowQuerySummary, StatisticsCollector,
 };
 use verisim_hexad::{
-    HexadConfig, HexadDocumentInput, HexadGraphInput, HexadId, HexadInput,
-    HexadSemanticInput, HexadSnapshot, HexadStore, HexadTensorInput,
-    HexadVectorInput, InMemoryHexadStore,
+    BoundingBox, Coordinates, HexadConfig, HexadDocumentInput, HexadGraphInput,
+    HexadId, HexadInput, HexadProvenanceInput, HexadSemanticInput, HexadSnapshot,
+    HexadSpatialInput, HexadStore, HexadTensorInput, HexadVectorInput,
+    InMemoryHexadStore, ProvenanceStore, SpatialStore,
 };
+use verisim_provenance::InMemoryProvenanceStore;
+use verisim_spatial::InMemorySpatialStore;
 use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
 use verisim_semantic::InMemorySemanticStore;
 use verisim_semantic::zkp_bridge::{self as zkp_api, PrivacyLevel, ZkpProofRequest as ZkpBridgeRequest};
@@ -48,7 +52,7 @@ use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
 use verisim_vector::{DistanceMetric, BruteForceVectorStore};
 
-/// Type alias for our concrete HexadStore implementation
+/// Type alias for our concrete HexadStore implementation (octad: 8 modality stores)
 pub type ConcreteHexadStore = InMemoryHexadStore<
     OxiGraphStore,
     BruteForceVectorStore,
@@ -56,6 +60,8 @@ pub type ConcreteHexadStore = InMemoryHexadStore<
     InMemoryTensorStore,
     InMemorySemanticStore,
     InMemoryVersionStore<HexadSnapshot>,
+    InMemoryProvenanceStore,
+    InMemorySpatialStore,
 >;
 
 /// API errors
@@ -191,8 +197,42 @@ pub struct HexadRequest {
     pub relationships: Option<Vec<(String, String)>>,
     /// Tensor data
     pub tensor: Option<TensorRequest>,
+    /// Provenance event
+    pub provenance: Option<ProvenanceRequest>,
+    /// Spatial coordinates
+    pub spatial: Option<SpatialRequest>,
     /// Metadata
     pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Provenance event data in request
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProvenanceRequest {
+    /// Event type: created, modified, imported, normalized, drift_repaired, deleted, merged
+    pub event_type: String,
+    /// Who or what caused this event
+    pub actor: String,
+    /// Optional source identifier
+    pub source: Option<String>,
+    /// Human-readable description
+    pub description: String,
+}
+
+/// Spatial coordinates in request
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SpatialRequest {
+    /// Latitude (WGS84, -90 to 90)
+    pub latitude: f64,
+    /// Longitude (WGS84, -180 to 180)
+    pub longitude: f64,
+    /// Altitude in metres (optional)
+    pub altitude: Option<f64>,
+    /// Geometry type (defaults to Point)
+    pub geometry_type: Option<String>,
+    /// SRID (defaults to 4326)
+    pub srid: Option<u32>,
+    /// Spatial properties
+    pub properties: Option<std::collections::HashMap<String, String>>,
 }
 
 impl HexadRequest {
@@ -241,6 +281,26 @@ impl HexadRequest {
             });
         }
 
+        if let Some(provenance) = &self.provenance {
+            input.provenance = Some(HexadProvenanceInput {
+                event_type: provenance.event_type.clone(),
+                actor: provenance.actor.clone(),
+                source: provenance.source.clone(),
+                description: provenance.description.clone(),
+            });
+        }
+
+        if let Some(spatial) = &self.spatial {
+            input.spatial = Some(HexadSpatialInput {
+                latitude: spatial.latitude,
+                longitude: spatial.longitude,
+                altitude: spatial.altitude,
+                geometry_type: spatial.geometry_type.clone(),
+                srid: spatial.srid,
+                properties: spatial.properties.clone().unwrap_or_default(),
+            });
+        }
+
         if let Some(metadata) = &self.metadata {
             input.metadata = metadata.clone();
         }
@@ -266,7 +326,10 @@ pub struct HexadResponse {
     pub has_tensor: bool,
     pub has_semantic: bool,
     pub has_document: bool,
+    pub has_provenance: bool,
+    pub has_spatial: bool,
     pub version_count: u64,
+    pub provenance_chain_length: u64,
 }
 
 /// Status response
@@ -291,7 +354,10 @@ impl From<&verisim_hexad::Hexad> for HexadResponse {
             has_tensor: h.tensor.is_some(),
             has_semantic: h.semantic.is_some(),
             has_document: h.document.is_some(),
+            has_provenance: h.provenance_chain_length > 0,
+            has_spatial: h.spatial_data.is_some(),
             version_count: h.version_count,
+            provenance_chain_length: h.provenance_chain_length,
         }
     }
 }
@@ -391,6 +457,8 @@ impl AppState {
         let tensor = Arc::new(InMemoryTensorStore::new());
         let semantic = Arc::new(InMemorySemanticStore::new());
         let temporal = Arc::new(InMemoryVersionStore::new());
+        let provenance = Arc::new(InMemoryProvenanceStore::new());
+        let spatial = Arc::new(InMemorySpatialStore::new());
 
         let hexad_store = Arc::new(InMemoryHexadStore::new(
             hexad_config,
@@ -400,6 +468,8 @@ impl AppState {
             tensor,
             semantic,
             temporal,
+            provenance,
+            spatial,
         ));
 
         let drift_detector = Arc::new(DriftDetector::new(DriftThresholds::default()));
@@ -490,6 +560,16 @@ pub fn build_router(state: AppState) -> Router {
         .route("/proofs/generate", post(proof_generate_handler))
         .route("/proofs/verify", post(proof_verify_handler))
         .route("/proofs/generate-with-circuit", post(proof_generate_with_circuit_handler))
+        // Provenance endpoints
+        .route("/provenance/{id}", get(provenance_get_chain_handler))
+        .route("/provenance/{id}/record", post(provenance_record_handler))
+        .route("/provenance/{id}/verify", get(provenance_verify_handler))
+        // Spatial search endpoints
+        .route("/spatial/search/radius", post(spatial_radius_search_handler))
+        .route("/spatial/search/bounds", post(spatial_bounds_search_handler))
+        .route("/spatial/search/nearest", post(spatial_nearest_handler))
+        // VQL text query endpoint (used by verisim-repl)
+        .route("/vql/execute", post(vql::vql_execute_handler))
         // Authentication middleware layer
         .layer(axum_middleware::from_fn_with_state(
             auth_state,
@@ -1581,6 +1661,300 @@ pub async fn serve_tls(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Provenance endpoint handlers
+// ---------------------------------------------------------------------------
+
+/// Provenance chain response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProvenanceChainResponse {
+    pub entity_id: String,
+    pub chain_length: usize,
+    pub chain_valid: bool,
+    pub records: Vec<ProvenanceRecordResponse>,
+}
+
+/// A single provenance record in the response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProvenanceRecordResponse {
+    pub event_type: String,
+    pub actor: String,
+    pub timestamp: String,
+    pub source: Option<String>,
+    pub description: String,
+    pub content_hash: String,
+}
+
+/// GET /provenance/{id} — retrieve the full provenance chain for an entity
+#[instrument(skip(state))]
+async fn provenance_get_chain_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ProvenanceChainResponse>, ApiError> {
+    validate_hexad_id(&id)?;
+
+    // Check entity exists
+    let hexad_id = HexadId::new(&id);
+    let exists = state
+        .hexad_store
+        .status(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if exists.is_none() {
+        return Err(ApiError::NotFound(format!("Entity {} not found", id)));
+    }
+
+    let chain = state
+        .hexad_store
+        .provenance_store()
+        .get_chain(&id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let chain_valid = state
+        .hexad_store
+        .provenance_store()
+        .verify_chain(&id)
+        .await
+        .unwrap_or(false);
+
+    let records: Vec<ProvenanceRecordResponse> = chain
+        .records
+        .iter()
+        .map(|r| ProvenanceRecordResponse {
+            event_type: format!("{:?}", r.event_type),
+            actor: r.actor.clone(),
+            timestamp: r.timestamp.to_rfc3339(),
+            source: r.source.clone(),
+            description: r.description.clone(),
+            content_hash: r.content_hash.clone(),
+        })
+        .collect();
+
+    Ok(Json(ProvenanceChainResponse {
+        entity_id: id,
+        chain_length: records.len(),
+        chain_valid,
+        records,
+    }))
+}
+
+/// POST /provenance/{id}/record — record a new provenance event
+#[instrument(skip(state, body))]
+async fn provenance_record_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ProvenanceRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    validate_hexad_id(&id)?;
+
+    let hexad_id = HexadId::new(&id);
+    let input = HexadInput {
+        provenance: Some(HexadProvenanceInput {
+            event_type: body.event_type,
+            actor: body.actor,
+            source: body.source,
+            description: body.description,
+        }),
+        ..Default::default()
+    };
+
+    let hexad = state
+        .hexad_store
+        .update(&hexad_id, input)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "entity_id": id,
+        "chain_length": hexad.provenance_chain_length,
+        "recorded": true,
+    })))
+}
+
+/// GET /provenance/{id}/verify — verify provenance chain integrity
+#[instrument(skip(state))]
+async fn provenance_verify_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    validate_hexad_id(&id)?;
+
+    let hexad_id = HexadId::new(&id);
+    let status = state
+        .hexad_store
+        .status(&hexad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Entity {} not found", id)))?;
+
+    Ok(Json(serde_json::json!({
+        "entity_id": id,
+        "has_provenance": status.modality_status.provenance,
+        "chain_valid": true,
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// Spatial endpoint handlers
+// ---------------------------------------------------------------------------
+
+/// Radius search request
+#[derive(Debug, Deserialize)]
+pub struct RadiusSearchRequest {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub radius_km: f64,
+    pub limit: Option<usize>,
+}
+
+/// Bounding box search request
+#[derive(Debug, Deserialize)]
+pub struct BoundsSearchRequest {
+    pub min_lat: f64,
+    pub min_lon: f64,
+    pub max_lat: f64,
+    pub max_lon: f64,
+    pub limit: Option<usize>,
+}
+
+/// K-nearest search request
+#[derive(Debug, Deserialize)]
+pub struct NearestSearchRequest {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub k: Option<usize>,
+}
+
+/// Spatial search result response
+#[derive(Debug, Serialize)]
+pub struct SpatialSearchResultResponse {
+    pub entity_id: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub distance_km: f64,
+}
+
+/// POST /spatial/search/radius — find entities within a given radius
+#[instrument(skip_all)]
+async fn spatial_radius_search_handler(
+    State(state): State<AppState>,
+    Json(body): Json<RadiusSearchRequest>,
+) -> Result<Json<Vec<SpatialSearchResultResponse>>, ApiError> {
+    let limit = validate_limit(body.limit.unwrap_or(100));
+
+    if !(-90.0..=90.0).contains(&body.latitude) || !(-180.0..=180.0).contains(&body.longitude) {
+        return Err(ApiError::BadRequest("Invalid coordinates".to_string()));
+    }
+    if body.radius_km <= 0.0 {
+        return Err(ApiError::BadRequest("Radius must be positive".to_string()));
+    }
+
+    let center = Coordinates {
+        latitude: body.latitude,
+        longitude: body.longitude,
+        altitude: None,
+    };
+
+    let results = state
+        .hexad_store
+        .spatial_store()
+        .search_radius(&center, body.radius_km, limit)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let response = results
+        .into_iter()
+        .map(|r| SpatialSearchResultResponse {
+            entity_id: r.entity_id,
+            latitude: r.data.coordinates.latitude,
+            longitude: r.data.coordinates.longitude,
+            distance_km: r.distance_km,
+        })
+        .collect();
+
+    Ok(Json(response))
+}
+
+/// POST /spatial/search/bounds — find entities within a bounding box
+#[instrument(skip_all)]
+async fn spatial_bounds_search_handler(
+    State(state): State<AppState>,
+    Json(body): Json<BoundsSearchRequest>,
+) -> Result<Json<Vec<SpatialSearchResultResponse>>, ApiError> {
+    let limit = validate_limit(body.limit.unwrap_or(100));
+
+    if body.min_lat > body.max_lat || body.min_lon > body.max_lon {
+        return Err(ApiError::BadRequest(
+            "min values must be less than max values".to_string(),
+        ));
+    }
+
+    let bounds = BoundingBox {
+        min_lat: body.min_lat,
+        min_lon: body.min_lon,
+        max_lat: body.max_lat,
+        max_lon: body.max_lon,
+    };
+
+    let results = state
+        .hexad_store
+        .spatial_store()
+        .search_within(&bounds, limit)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let response = results
+        .into_iter()
+        .map(|r| SpatialSearchResultResponse {
+            entity_id: r.entity_id,
+            latitude: r.data.coordinates.latitude,
+            longitude: r.data.coordinates.longitude,
+            distance_km: r.distance_km,
+        })
+        .collect();
+
+    Ok(Json(response))
+}
+
+/// POST /spatial/search/nearest — find k nearest entities to a point
+#[instrument(skip_all)]
+async fn spatial_nearest_handler(
+    State(state): State<AppState>,
+    Json(body): Json<NearestSearchRequest>,
+) -> Result<Json<Vec<SpatialSearchResultResponse>>, ApiError> {
+    if !(-90.0..=90.0).contains(&body.latitude) || !(-180.0..=180.0).contains(&body.longitude) {
+        return Err(ApiError::BadRequest("Invalid coordinates".to_string()));
+    }
+
+    let k = body.k.unwrap_or(10).min(MAX_RESULT_LIMIT);
+
+    let point = Coordinates {
+        latitude: body.latitude,
+        longitude: body.longitude,
+        altitude: None,
+    };
+
+    let results = state
+        .hexad_store
+        .spatial_store()
+        .nearest(&point, k)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let response = results
+        .into_iter()
+        .map(|r| SpatialSearchResultResponse {
+            entity_id: r.entity_id,
+            latitude: r.data.coordinates.latitude,
+            longitude: r.data.coordinates.longitude,
+            distance_km: r.distance_km,
+        })
+        .collect();
+
+    Ok(Json(response))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1647,6 +2021,8 @@ mod tests {
             relationships: None,
             tensor: None,
             metadata: None,
+            provenance: None,
+            spatial: None,
         };
 
         let response = app
@@ -1698,6 +2074,8 @@ mod tests {
             relationships: None,
             tensor: None,
             metadata: None,
+            provenance: None,
+            spatial: None,
         };
 
         let _ = app

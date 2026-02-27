@@ -100,6 +100,29 @@ defmodule VeriSim.Query.VQLBridge do
     end
   end
 
+  @doc """
+  Type-check a parsed VQL-DT AST.
+
+  Sends the AST to the ReScript type checker (VQLBidir.synthesizeQuery)
+  via the Deno/Node subprocess. Returns inferred types, proof obligations,
+  and composition strategy.
+
+  Falls back to `{:error, :type_checker_unavailable}` if the subprocess is
+  not running — callers MUST NOT silently bypass this.
+
+  ## Returns
+
+  - `{:ok, type_info}` where type_info contains:
+    - `:proof_obligations` — list of proof specs from the type checker
+    - `:composition_strategy` — how proofs should be composed (:conjunction, :disjunction, etc.)
+    - `:inferred_types` — map of modality → field → type
+  - `{:error, :type_checker_unavailable}` — subprocess not running
+  - `{:error, reason}` — type checking failed (invalid query, type mismatch, etc.)
+  """
+  def typecheck(ast, timeout \\ @default_timeout) do
+    GenServer.call(__MODULE__, {:typecheck, ast}, timeout)
+  end
+
   # ---------------------------------------------------------------------------
   # GenServer callbacks
   # ---------------------------------------------------------------------------
@@ -126,6 +149,27 @@ defmodule VeriSim.Query.VQLBridge do
         Logger.warning("VQLBridge: parser process unavailable (#{reason}), falling back to built-in parser")
         {:ok, state}
     end
+  end
+
+  @impl true
+  def handle_call({:typecheck, _ast}, _from, %{port: nil} = state) do
+    # Type checking requires the ReScript subprocess — no fallback.
+    # Callers MUST handle this error; silently passing would defeat VQL-DT.
+    {:reply, {:error, :type_checker_unavailable}, state}
+  end
+
+  @impl true
+  def handle_call({:typecheck, ast}, from, state) do
+    id = state.next_id
+    message = Jason.encode!(%{
+      "id" => id,
+      "action" => "typecheck",
+      "ast" => ast
+    })
+
+    send_to_port(state.port, message)
+    pending = Map.put(state.pending, id, from)
+    {:noreply, %{state | pending: pending, next_id: id + 1}}
   end
 
   @impl true
@@ -351,6 +395,8 @@ defmodule VeriSim.Query.VQLBridge do
   defp take_modalities(["SEMANTIC" | rest], acc), do: take_modalities(strip_comma(rest), [:semantic | acc])
   defp take_modalities(["DOCUMENT" | rest], acc), do: take_modalities(strip_comma(rest), [:document | acc])
   defp take_modalities(["TEMPORAL" | rest], acc), do: take_modalities(strip_comma(rest), [:temporal | acc])
+  defp take_modalities(["PROVENANCE" | rest], acc), do: take_modalities(strip_comma(rest), [:provenance | acc])
+  defp take_modalities(["SPATIAL" | rest], acc), do: take_modalities(strip_comma(rest), [:spatial | acc])
   defp take_modalities(["*" | rest], acc), do: take_modalities(strip_comma(rest), [:all | acc])
   defp take_modalities(rest, acc), do: {Enum.reverse(acc), rest}
 
@@ -440,21 +486,29 @@ defmodule VeriSim.Query.VQLBridge do
 
   defp parse_select_extended(_), do: {:error, "Expected SELECT"}
 
-  @modality_names ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL)
+  @modality_names ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL PROVENANCE SPATIAL)
   @aggregate_funcs ~w(COUNT SUM AVG MIN MAX)
 
   # Safe atom conversion using allowlist — prevents atom table exhaustion
   @safe_atoms %{
     "graph" => :graph, "vector" => :vector, "tensor" => :tensor,
     "semantic" => :semantic, "document" => :document, "temporal" => :temporal,
+    "provenance" => :provenance, "spatial" => :spatial,
     "all" => :all,
     "count" => :count, "sum" => :sum, "avg" => :avg, "min" => :min, "max" => :max
   }
 
   defp safe_to_atom(str) when is_binary(str) do
-    Map.get(@safe_atoms, String.downcase(str), String.to_existing_atom(String.downcase(str)))
-  rescue
-    ArgumentError -> String.to_atom(String.downcase(str))
+    downcased = String.downcase(str)
+
+    case Map.fetch(@safe_atoms, downcased) do
+      {:ok, atom} ->
+        atom
+
+      :error ->
+        raise ArgumentError,
+              "Unknown VQL token #{inspect(str)} — not in @safe_atoms allowlist"
+    end
   end
 
   defp take_select_items(tokens, mods, projs, aggs) do

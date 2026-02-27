@@ -166,10 +166,11 @@ pub trait TemporalStore: Send + Sync {
         let version1 = self.at_version(entity_id, v1).await?;
         let version2 = self.at_version(entity_id, v2).await?;
 
-        Ok(diff::compare_values(
+        diff::compare_values(
             version1.as_ref().map(|v| &v.data),
             version2.as_ref().map(|v| &v.data),
-        ))
+        )
+        .map_err(|_| TemporalError::NotFound(format!("No versions to compare for entity {}", entity_id)))
     }
 
     /// Diff two timestamps
@@ -180,10 +181,11 @@ pub trait TemporalStore: Send + Sync {
         let version1 = self.at_time(entity_id, t1).await?;
         let version2 = self.at_time(entity_id, t2).await?;
 
-        Ok(diff::compare_values(
+        diff::compare_values(
             version1.as_ref().map(|v| &v.data),
             version2.as_ref().map(|v| &v.data),
-        ))
+        )
+        .map_err(|_| TemporalError::NotFound(format!("No versions to compare for entity {}", entity_id)))
     }
 }
 

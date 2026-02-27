@@ -84,19 +84,41 @@ impl<T: fmt::Display> fmt::Display for Diff<T> {
     }
 }
 
-/// Compare two optional values and produce a diff
-pub fn compare_values<T: Clone + PartialEq>(old: Option<&T>, new: Option<&T>) -> Diff<T> {
+/// Error type for diff comparison failures
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffError {
+    /// Both old and new values are absent — nothing to compare.
+    IncomparableValues,
+}
+
+impl fmt::Display for DiffError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiffError::IncomparableValues => write!(f, "Cannot compare two None values"),
+        }
+    }
+}
+
+impl std::error::Error for DiffError {}
+
+/// Compare two optional values and produce a diff.
+///
+/// Returns `Err(DiffError::IncomparableValues)` when both values are `None`.
+pub fn compare_values<T: Clone + PartialEq>(
+    old: Option<&T>,
+    new: Option<&T>,
+) -> Result<Diff<T>, DiffError> {
     match (old, new) {
         (Some(old_val), Some(new_val)) => {
             if old_val == new_val {
-                Diff::no_change(old_val.clone())
+                Ok(Diff::no_change(old_val.clone()))
             } else {
-                Diff::changed(old_val.clone(), new_val.clone())
+                Ok(Diff::changed(old_val.clone(), new_val.clone()))
             }
         }
-        (Some(old_val), None) => Diff::removed(old_val.clone()),
-        (None, Some(new_val)) => Diff::added(new_val.clone()),
-        (None, None) => panic!("Cannot compare two None values"),
+        (Some(old_val), None) => Ok(Diff::removed(old_val.clone())),
+        (None, Some(new_val)) => Ok(Diff::added(new_val.clone())),
+        (None, None) => Err(DiffError::IncomparableValues),
     }
 }
 
@@ -140,7 +162,7 @@ mod tests {
     fn test_compare_values_same() {
         let old_val = "value".to_string();
         let new_val = "value".to_string();
-        let diff = compare_values(Some(&old_val), Some(&new_val));
+        let diff = compare_values(Some(&old_val), Some(&new_val)).unwrap();
         assert!(!diff.has_change());
     }
 
@@ -148,7 +170,7 @@ mod tests {
     fn test_compare_values_changed() {
         let old_val = "old".to_string();
         let new_val = "new".to_string();
-        let diff = compare_values(Some(&old_val), Some(&new_val));
+        let diff = compare_values(Some(&old_val), Some(&new_val)).unwrap();
         assert!(diff.has_change());
         assert_eq!(diff, Diff::Changed { old: "old".to_string(), new: "new".to_string() });
     }
@@ -156,14 +178,20 @@ mod tests {
     #[test]
     fn test_compare_values_added() {
         let new_val = "new".to_string();
-        let diff = compare_values(None, Some(&new_val));
+        let diff = compare_values(None, Some(&new_val)).unwrap();
         assert_eq!(diff, Diff::Added { value: "new".to_string() });
     }
 
     #[test]
     fn test_compare_values_removed() {
         let old_val = "old".to_string();
-        let diff = compare_values(Some(&old_val), None);
+        let diff = compare_values(Some(&old_val), None).unwrap();
         assert_eq!(diff, Diff::Removed { value: "old".to_string() });
+    }
+
+    #[test]
+    fn test_compare_values_both_none() {
+        let result = compare_values::<String>(None, None);
+        assert_eq!(result, Err(DiffError::IncomparableValues));
     }
 }

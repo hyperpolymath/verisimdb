@@ -29,8 +29,8 @@ The following files in `.machine_readable/` contain structured project metadata:
 │    ├── verisim-semantic (CBOR proof blobs)                  │
 │    ├── verisim-document (Tantivy full-text)                 │
 │    ├── verisim-temporal (versioning/time-series)            │
-│    ├── verisim-provenance (origin/lineage tracking) [planned]│
-│    ├── verisim-spatial (geospatial/R-tree) [planned]        │
+│    ├── verisim-provenance (origin/lineage tracking)          │
+│    ├── verisim-spatial (geospatial/R-tree)                   │
 │    ├── verisim-hexad (unified entity → octad evolution)     │
 │    ├── verisim-drift (drift detection)                      │
 │    └── verisim-normalizer (self-normalization)              │
@@ -40,12 +40,12 @@ The following files in `.machine_readable/` contain structured project metadata:
 ## Design Philosophy (Marr's Three Levels)
 
 1. **Computational Level**: What problem are we solving?
-   - Maintain cross-modal consistency across 6 representations of the same entity
+   - Maintain cross-modal consistency across 8 representations of the same entity (octad)
    - Detect and repair drift before it causes data quality issues
    - Provide unified querying across all modalities
 
 2. **Algorithmic Level**: How do we solve it?
-   - Hexad entities: one ID, six synchronized stores
+   - Octad entities: one ID, eight synchronized stores
    - Drift detection with configurable thresholds
    - Self-normalization triggered by drift events
    - OTP supervision for fault tolerance
@@ -114,8 +114,8 @@ An Octad is one entity with 8 synchronized representations:
 - **Semantic**: Type annotations and proof blobs
 - **Document**: Full-text searchable content
 - **Temporal**: Version history and time-series
-- **Provenance**: Origin tracking, transformation chain, actor trail (CRITICAL — planned)
-- **Spatial**: Geospatial coordinates, geometries, proximity queries (planned)
+- **Provenance**: Origin tracking, transformation chain, actor trail (implemented — hash-chain integrity, actor search)
+- **Spatial**: Geospatial coordinates, geometries, proximity queries (implemented — R-tree index, radius/bounds/nearest search)
 
 ### Drift Detection
 Drift is measured as divergence between modalities:

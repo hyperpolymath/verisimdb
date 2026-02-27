@@ -114,7 +114,7 @@ defmodule VeriSim.HealthChecker do
   end
 
   defp check_ets_cache do
-    case :ets.info(:verisim_cache) do
+    case :ets.info(:verisim_rust_client_cache) do
       :undefined -> :unavailable
       info when is_list(info) -> :healthy
       _ -> :degraded

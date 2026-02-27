@@ -207,6 +207,8 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
     | Semantic => "SEMANTIC"
     | Document => "DOCUMENT"
     | Temporal => "TEMPORAL"
+    | Provenance => "PROVENANCE"
+    | Spatial => "SPATIAL"
     | All => "ALL"
     }
 
@@ -218,6 +220,8 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
     | Semantic => (300, 0.8, Some("ZKP verification — expensive"))
     | Document => (80, 0.05, Some("Tantivy inverted index lookup"))
     | Temporal => (30, 0.1, Some("Version tree lookup — cached"))
+    | Provenance => (60, 0.3, Some("Hash-chain traversal — O(n) chain length"))
+    | Spatial => (70, 0.1, Some("R-tree spatial index lookup"))
     | All => (500, 1.0, Some("Full hexad scan across all modalities"))
     }
 
@@ -251,6 +255,8 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
         | Semantic => "SEMANTIC"
         | Document => "DOCUMENT"
         | Temporal => "TEMPORAL"
+        | Provenance => "PROVENANCE"
+        | Spatial => "SPATIAL"
         | All => "ALL"
         }
         `${modStr}.${f.field}`
@@ -294,6 +300,8 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
         | Semantic => "SEMANTIC"
         | Document => "DOCUMENT"
         | Temporal => "TEMPORAL"
+        | Provenance => "PROVENANCE"
+        | Spatial => "SPATIAL"
         | All => "ALL"
         }
         let dirStr = switch item.direction {
@@ -384,6 +392,8 @@ let generateMockPlan = (ast: VQLParser.query): executionPlan => {
     | Semantic => "SEMANTIC"
     | Document => "DOCUMENT"
     | Temporal => "TEMPORAL"
+    | Provenance => "PROVENANCE"
+    | Spatial => "SPATIAL"
     | All => "ALL"
     }
 

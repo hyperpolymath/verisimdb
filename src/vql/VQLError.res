@@ -152,6 +152,16 @@ type temporalError =
   | MerkleVerificationFailed(string)
   | TemporalConflict(string)
 
+type provenanceError =
+  | ChainCorrupted({hexad_id: string, broken_at: int})
+  | ChainNotFound(string)
+  | InvalidProvenanceEvent(string)
+
+type spatialError =
+  | InvalidCoordinates({latitude: float, longitude: float})
+  | InvalidBounds(string)
+  | SpatialIndexError(string)
+
 type modalityError =
   | GraphError(graphError)
   | VectorError(vectorError)
@@ -159,6 +169,8 @@ type modalityError =
   | SemanticError(semanticError)
   | DocumentError(documentError)
   | TemporalError(temporalError)
+  | ProvenanceError(provenanceError)
+  | SpatialError(spatialError)
 
 // ============================================================================
 // Federation Errors
