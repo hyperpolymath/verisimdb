@@ -14,6 +14,8 @@ module AST = {
     | Semantic
     | Document
     | Temporal
+    | Provenance
+    | Spatial
     | All
 
   type source =
@@ -136,6 +138,8 @@ module AST = {
     | TensorData(array<literal>) // tensor values
     | SemanticData(string) // contract name
     | TemporalData(string) // timestamp
+    | ProvenanceData(array<(string, literal)>) // event_type, actor, description, source
+    | SpatialData(array<(string, literal)>) // latitude, longitude, altitude, geometry_type
 
   type mutation =
     | Insert({
@@ -356,7 +360,7 @@ module Grammar = {
   open Parser
   open AST
 
-  // Modality parser
+  // Modality parser (octad: 8 modalities + All)
   let modality: parser<modality> = {
     let graph = map(keyword("GRAPH"), _ => Graph)
     let vector = map(keyword("VECTOR"), _ => Vector)
@@ -364,9 +368,11 @@ module Grammar = {
     let semantic = map(keyword("SEMANTIC"), _ => Semantic)
     let document = map(keyword("DOCUMENT"), _ => Document)
     let temporal = map(keyword("TEMPORAL"), _ => Temporal)
+    let provenance = map(keyword("PROVENANCE"), _ => Provenance)
+    let spatial = map(keyword("SPATIAL"), _ => Spatial)
     let all = map(keyword("*"), _ => All)
 
-    graph <|> vector <|> tensor <|> semantic <|> document <|> temporal <|> all
+    graph <|> vector <|> tensor <|> semantic <|> document <|> temporal <|> provenance <|> spatial <|> all
   }
 
   let modalityList: parser<array<modality>> = sepBy(modality, keyword(","))
@@ -1006,8 +1012,44 @@ module MutationParser = {
     )
   }
 
+  // PROVENANCE(field=value, ...)
+  let provenanceData: parser<modalityData> = {
+    bind(keyword("PROVENANCE"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(
+          bind(Grammar.identifier, key =>
+            bind(keyword("="), _ =>
+              map(Grammar.literal, value => (key, value))
+            )
+          ),
+          keyword(",")
+        ), fields =>
+          map(keyword(")"), _ => ProvenanceData(fields))
+        )
+      )
+    )
+  }
+
+  // SPATIAL(field=value, ...)
+  let spatialData: parser<modalityData> = {
+    bind(keyword("SPATIAL"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(
+          bind(Grammar.identifier, key =>
+            bind(keyword("="), _ =>
+              map(Grammar.literal, value => (key, value))
+            )
+          ),
+          keyword(",")
+        ), fields =>
+          map(keyword(")"), _ => SpatialData(fields))
+        )
+      )
+    )
+  }
+
   let modalityData: parser<modalityData> = {
-    documentData <|> vectorData <|> graphData <|> tensorData <|> semanticData <|> temporalData
+    documentData <|> vectorData <|> graphData <|> tensorData <|> semanticData <|> temporalData <|> provenanceData <|> spatialData
   }
 
   // INSERT HEXAD WITH modalityData [, modalityData]* [PROOF ...]

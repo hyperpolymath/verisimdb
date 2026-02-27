@@ -22,6 +22,8 @@ type modalityType =
   | SemanticModality
   | DocumentModality
   | TemporalModality
+  | ProvenanceModality
+  | SpatialModality
 
 // ============================================================================
 // Primitive Types
@@ -114,6 +116,8 @@ let modalityTypeOfAstModality = (m: AST.modality): option<modalityType> => {
   | Semantic => Some(SemanticModality)
   | Document => Some(DocumentModality)
   | Temporal => Some(TemporalModality)
+  | Provenance => Some(ProvenanceModality)
+  | Spatial => Some(SpatialModality)
   | All => None // 'All' expands to all modalities, not a single type
   }
 }
@@ -126,6 +130,8 @@ let astModalityOfModalityType = (m: modalityType): AST.modality => {
   | SemanticModality => Semantic
   | DocumentModality => Document
   | TemporalModality => Temporal
+  | ProvenanceModality => Provenance
+  | SpatialModality => Spatial
   }
 }
 
@@ -136,6 +142,8 @@ let allModalityTypes: array<modalityType> = [
   SemanticModality,
   DocumentModality,
   TemporalModality,
+  ProvenanceModality,
+  SpatialModality,
 ]
 
 let resolveModalities = (mods: array<AST.modality>): array<modalityType> => {
@@ -158,6 +166,8 @@ let modalityTypeToString = (m: modalityType): string => {
   | SemanticModality => "SEMANTIC"
   | DocumentModality => "DOCUMENT"
   | TemporalModality => "TEMPORAL"
+  | ProvenanceModality => "PROVENANCE"
+  | SpatialModality => "SPATIAL"
   }
 }
 

@@ -115,48 +115,121 @@ defmodule VeriSim.Query.VQLExecutor do
     aggregates = extract_aggregates(query_ast)
     projections = extract_projections(query_ast)
 
-    # Verify proofs if required (multi-proof support)
-    proof_result = if proof_specs do
-      verify_multi_proof(query_ast, proof_specs)
+    if proof_specs do
+      # VQL-DT path: type-check → execute → verify proofs → bundle certificate
+      execute_dt_query(query_ast, proof_specs, modalities, source, where_clause,
+                       limit, offset, order_by, group_by, aggregates, projections, timeout)
     else
-      :ok
+      # Slipstream path: no proofs, no type checking
+      execute_slipstream_query(modalities, source, where_clause,
+                               limit, offset, order_by, group_by, aggregates, projections, timeout)
+    end
+  end
+
+  # Slipstream execution — fast path, no proofs
+  defp execute_slipstream_query(modalities, source, where_clause,
+                                 limit, offset, order_by, group_by, aggregates, projections, timeout) do
+    {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
+
+    result = execute_by_source(source, modalities, pushdown_conditions, limit, offset, timeout)
+
+    case result do
+      {:ok, rows} ->
+        rows
+        |> maybe_evaluate_cross_modal(cross_modal_conditions)
+        |> maybe_group_and_aggregate(group_by, aggregates)
+        |> maybe_order_by(order_by)
+        |> maybe_project_columns(projections)
+        |> then(&{:ok, &1})
+
+      error -> error
+    end
+  end
+
+  # VQL-DT execution — type check, execute, verify proofs, bundle certificate
+  defp execute_dt_query(query_ast, proof_specs, modalities, source, where_clause,
+                         limit, offset, order_by, group_by, aggregates, projections, timeout) do
+    alias VeriSim.Query.VQLBridge
+
+    # Step 1: Type-check the query to get proof obligations and composition strategy
+    type_info = case VQLBridge.typecheck(query_ast) do
+      {:ok, info} ->
+        info
+
+      {:error, :type_checker_unavailable} ->
+        # Fall back to extracting obligations from the AST directly
+        Logger.warning("VQL-DT: Type checker unavailable, extracting proof obligations from AST")
+        %{
+          proof_obligations: proof_specs,
+          composition_strategy: :conjunction,
+          inferred_types: %{}
+        }
+
+      {:error, reason} ->
+        Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
+        nil
     end
 
-    case proof_result do
-      {:error, reason} ->
-        {:error, {:proof_verification_failed, reason}}
+    if is_nil(type_info) do
+      {:error, {:type_check_failed, "VQL-DT query type checking failed"}}
+    else
+      # Step 2: Execute the query (get data)
+      {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
+      data_result = execute_by_source(source, modalities, pushdown_conditions, limit, offset, timeout)
 
-      :ok ->
-        # Phase 2: Classify conditions into pushdown vs cross-modal
-        {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
-
-        # Execute based on source type (with pushdown conditions only)
-        result = case source do
-          {:hexad, entity_id} ->
-            execute_hexad_query(entity_id, modalities, pushdown_conditions, limit, offset, timeout)
-
-          {:federation, pattern, drift_policy} ->
-            execute_federation_query(pattern, drift_policy, modalities, pushdown_conditions, limit, offset, timeout)
-
-          {:store, store_id} ->
-            execute_store_query(store_id, modalities, pushdown_conditions, limit, offset, timeout)
-
-          :reflect ->
-            execute_reflect_query(modalities, pushdown_conditions, limit, offset, timeout)
-        end
-
-        # Post-process
-        case result do
-          {:ok, rows} ->
+      case data_result do
+        {:ok, rows} ->
+          processed_rows =
             rows
             |> maybe_evaluate_cross_modal(cross_modal_conditions)
             |> maybe_group_and_aggregate(group_by, aggregates)
             |> maybe_order_by(order_by)
             |> maybe_project_columns(projections)
-            |> then(&{:ok, &1})
 
-          error -> error
-        end
+          # Step 3: Verify all proof obligations
+          obligations = type_info[:proof_obligations] || type_info["proof_obligations"] || proof_specs
+          proof_result = verify_multi_proof(query_ast, obligations)
+
+          case proof_result do
+            :ok ->
+              # Step 4: Bundle data + proof certificate as ProvedResult
+              query_text = Map.get(query_ast, :raw, "") || ""
+              composition = type_info[:composition_strategy] || type_info["composition_strategy"] || :conjunction
+
+              proved_result = %{
+                data: processed_rows,
+                proof_certificate: %{
+                  proofs: obligations,
+                  composition: composition,
+                  verified_at: DateTime.utc_now(),
+                  query_hash: :crypto.hash(:sha256, to_string(query_text)) |> Base.encode16(case: :lower)
+                }
+              }
+              {:ok, proved_result}
+
+            {:error, reason} ->
+              {:error, {:proof_verification_failed, reason}}
+          end
+
+        error -> error
+      end
+    end
+  end
+
+  # Shared: route query to the appropriate source
+  defp execute_by_source(source, modalities, pushdown_conditions, limit, offset, timeout) do
+    case source do
+      {:hexad, entity_id} ->
+        execute_hexad_query(entity_id, modalities, pushdown_conditions, limit, offset, timeout)
+
+      {:federation, pattern, drift_policy} ->
+        execute_federation_query(pattern, drift_policy, modalities, pushdown_conditions, limit, offset, timeout)
+
+      {:store, store_id} ->
+        execute_store_query(store_id, modalities, pushdown_conditions, limit, offset, timeout)
+
+      :reflect ->
+        execute_reflect_query(modalities, pushdown_conditions, limit, offset, timeout)
     end
   end
 
@@ -520,8 +593,19 @@ defmodule VeriSim.Query.VQLExecutor do
 
     case proof_type do
       :existence ->
-        # Existence proofs verify the hexad exists and is accessible
-        :ok
+        # Existence proofs verify the hexad exists and is accessible.
+        # Extract entity ID from proof spec or contract name.
+        entity_id = contract_name || extract_entity_from_proof(proof_spec)
+
+        if entity_id do
+          case RustClient.get_hexad(entity_id) do
+            {:ok, _hexad} -> :ok
+            {:error, :not_found} -> {:error, {:existence_failed, "Entity '#{entity_id}' does not exist"}}
+            {:error, reason} -> {:error, {:existence_check_failed, reason}}
+          end
+        else
+          {:error, {:missing_entity, "Existence proof requires an entity ID or contract name"}}
+        end
 
       :citation ->
         # Citation proofs verify the citation chain is valid
@@ -532,31 +616,86 @@ defmodule VeriSim.Query.VQLExecutor do
         end
 
       :access ->
-        # Access proofs verify the user has rights (delegates to semantic store)
-        :ok
+        # Access proofs verify the user has rights via the Rust RBAC module.
+        # Extract resource and check authorization through the auth endpoint.
+        entity_id = contract_name || extract_entity_from_proof(proof_spec)
+
+        if entity_id do
+          case RustClient.get("/auth/check/#{entity_id}") do
+            {:ok, %{status: 200, body: %{"authorized" => true}}} -> :ok
+            {:ok, %{status: 200, body: %{"authorized" => false}}} ->
+              {:error, {:access_denied, "Not authorized to access '#{entity_id}'"}}
+            {:ok, %{status: 403}} ->
+              {:error, {:access_denied, "Not authorized to access '#{entity_id}'"}}
+            {:error, reason} ->
+              {:error, {:access_check_failed, reason}}
+          end
+        else
+          # No specific entity — access proof passes (global query)
+          :ok
+        end
 
       :integrity ->
-        # Integrity proofs verify data has not been tampered with
-        # Delegates to the Rust semantic store's CBOR proof blob verification
+        # Integrity proofs verify data has not been tampered with.
+        # Route to the Rust proofs/generate endpoint for Merkle proof generation.
         if contract_name do
-          case RustClient.post("/search/text", %{q: "contract:#{contract_name}", limit: 1}) do
-            {:ok, %{status: 200}} -> :ok
-            _ -> {:error, {:contract_not_found, contract_name}}
+          case RustClient.post("/proofs/generate", %{
+                 type: "integrity",
+                 contract: contract_name,
+                 privacy_level: "public"
+               }) do
+            {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
+            {:ok, %{status: 200, body: %{"success" => false, "error" => reason}}} ->
+              {:error, {:integrity_failed, reason}}
+            {:ok, %{status: 200, body: %{"error" => reason}}} ->
+              {:error, {:integrity_failed, reason}}
+            {:error, reason} -> {:error, {:integrity_check_failed, reason}}
+          end
+        else
+          {:error, {:missing_contract, "Integrity proof requires a contract name"}}
+        end
+
+      :provenance ->
+        # Provenance proofs verify lineage is verifiable via the provenance store.
+        # Checks chain integrity if a contract/entity reference is provided.
+        if contract_name do
+          case RustClient.verify_provenance(contract_name) do
+            {:ok, %{"has_provenance" => true, "chain_valid" => true}} ->
+              :ok
+
+            {:ok, %{"has_provenance" => true, "chain_valid" => false}} ->
+              {:error, {:provenance_chain_broken, contract_name}}
+
+            {:ok, %{"has_provenance" => false}} ->
+              {:error, {:no_provenance, "Entity '#{contract_name}' has no provenance chain"}}
+
+            {:error, :not_found} ->
+              {:error, {:entity_not_found, contract_name}}
+
+            {:error, reason} ->
+              {:error, {:provenance_verify_failed, reason}}
           end
         else
           :ok
         end
 
-      :provenance ->
-        # Provenance proofs verify lineage is verifiable
-        :ok
-
       :custom ->
-        # Custom ZKP proofs require the contract to exist in the semantic store
+        # Custom ZKP proofs route to the circuit-specific proof generation endpoint
         if contract_name do
-          validate_contract_exists(contract_name)
+          claim = Map.get(proof_spec, :claim, "")
+
+          case RustClient.post("/proofs/generate-with-circuit", %{
+                 circuit: contract_name,
+                 claim: claim,
+                 privacy_level: Map.get(proof_spec, :privacy_level, "public")
+               }) do
+            {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
+            {:ok, %{status: 200, body: %{"error" => reason}}} ->
+              {:error, {:custom_proof_failed, reason}}
+            {:error, reason} -> {:error, {:custom_proof_failed, reason}}
+          end
         else
-          {:error, {:missing_contract, "Custom proof requires a contract name"}}
+          {:error, {:missing_contract, "Custom proof requires a circuit/contract name"}}
         end
 
       :zkp ->
@@ -624,18 +763,22 @@ defmodule VeriSim.Query.VQLExecutor do
   defp extract_contract_name(_), do: nil
 
   defp validate_contract_exists(contract_name) do
-    # Check if the contract exists in the semantic store via search
+    # Check if the contract exists in the semantic store via search.
+    # If the store is unreachable, the proof MUST fail — silently passing
+    # would defeat the purpose of verified queries.
     case RustClient.search_text("contract:#{contract_name}", 1) do
       {:ok, results} when is_list(results) and length(results) > 0 -> :ok
       {:ok, %{"results" => [_ | _]}} -> :ok
       {:ok, _} -> {:error, {:contract_not_found, contract_name}}
-      {:error, _} ->
-        # If search fails (e.g., Rust core unavailable), allow proof to pass
-        # with a warning — this prevents query failures during development
-        Logger.warning("Cannot verify contract '#{contract_name}': semantic store unreachable")
-        :ok
+      {:error, reason} -> {:error, {:contract_verification_failed, reason}}
     end
   end
+
+  defp extract_entity_from_proof(%{entity_id: id}), do: id
+  defp extract_entity_from_proof(%{entityId: id}), do: id
+  defp extract_entity_from_proof(%{hexad_id: id}), do: id
+  defp extract_entity_from_proof(%{hexadId: id}), do: id
+  defp extract_entity_from_proof(_), do: nil
 
   # ===========================================================================
   # Query execution by source type
@@ -723,6 +866,14 @@ defmodule VeriSim.Query.VQLExecutor do
         graph_params = extract_graph_query(where_clause)
         QueryRouter.query(:graph, graph_params)
 
+      :provenance ->
+        provenance_params = extract_provenance_query(where_clause)
+        execute_provenance_query(provenance_params, limit)
+
+      :spatial ->
+        spatial_params = extract_spatial_query(where_clause)
+        execute_spatial_query(spatial_params, limit)
+
       :multi ->
         params = extract_multi_modal_params(modalities, where_clause)
         QueryRouter.query(:multi, params, limit: limit || 10)
@@ -808,6 +959,8 @@ defmodule VeriSim.Query.VQLExecutor do
       has_fulltext_condition?(where_clause) -> :text
       has_vector_condition?(where_clause) -> :vector
       has_graph_pattern?(where_clause) -> :graph
+      has_provenance_condition?(where_clause) -> :provenance
+      has_spatial_condition?(where_clause) -> :spatial
       length(modalities) > 1 -> :multi
       true -> :multi
     end
@@ -848,6 +1001,40 @@ defmodule VeriSim.Query.VQLExecutor do
   defp has_graph_pattern?(%{TAG: "Or", _0: left, _1: right}), do: has_graph_pattern?(left) or has_graph_pattern?(right)
   defp has_graph_pattern?(%{TAG: "Not", _0: inner}), do: has_graph_pattern?(inner)
   defp has_graph_pattern?(_), do: false
+
+  # Provenance condition detection: actor, origin, chain_valid, event_type queries
+  defp has_provenance_condition?(nil), do: false
+  defp has_provenance_condition?(%{raw: raw}) when is_binary(raw) do
+    upper = String.upcase(raw)
+    String.contains?(upper, "PROVENANCE.") or String.contains?(upper, "CHAIN_VALID") or
+    String.contains?(upper, "CHAIN_LENGTH")
+  end
+  defp has_provenance_condition?(%{TAG: tag}) when tag in [
+    "ProvenanceActor", "ProvenanceOrigin", "ProvenanceChainValid",
+    "ProvenanceEventType", "ProvenanceCondition"
+  ], do: true
+  defp has_provenance_condition?(%{TAG: "And", _0: left, _1: right}), do: has_provenance_condition?(left) or has_provenance_condition?(right)
+  defp has_provenance_condition?(%{TAG: "Or", _0: left, _1: right}), do: has_provenance_condition?(left) or has_provenance_condition?(right)
+  defp has_provenance_condition?(%{TAG: "Not", _0: inner}), do: has_provenance_condition?(inner)
+  defp has_provenance_condition?(%{modality: mod}) when mod in [:provenance, "PROVENANCE", "provenance"], do: true
+  defp has_provenance_condition?(_), do: false
+
+  # Spatial condition detection: radius, bounding box, nearest queries
+  defp has_spatial_condition?(nil), do: false
+  defp has_spatial_condition?(%{raw: raw}) when is_binary(raw) do
+    upper = String.upcase(raw)
+    String.contains?(upper, "WITHIN RADIUS") or String.contains?(upper, "WITHIN BOUNDS") or
+    String.contains?(upper, "SPATIAL.") or String.contains?(upper, "NEAREST")
+  end
+  defp has_spatial_condition?(%{TAG: tag}) when tag in [
+    "SpatialRadius", "SpatialBounds", "SpatialNearest",
+    "SpatialCondition", "WithinRadius", "WithinBounds"
+  ], do: true
+  defp has_spatial_condition?(%{TAG: "And", _0: left, _1: right}), do: has_spatial_condition?(left) or has_spatial_condition?(right)
+  defp has_spatial_condition?(%{TAG: "Or", _0: left, _1: right}), do: has_spatial_condition?(left) or has_spatial_condition?(right)
+  defp has_spatial_condition?(%{TAG: "Not", _0: inner}), do: has_spatial_condition?(inner)
+  defp has_spatial_condition?(%{modality: mod}) when mod in [:spatial, "SPATIAL", "spatial"], do: true
+  defp has_spatial_condition?(_), do: false
 
   # AST-walking query extractors: pull actual values from parsed conditions
 
@@ -937,6 +1124,245 @@ defmodule VeriSim.Query.VQLExecutor do
     end
   end
   defp extract_graph_query(_), do: %{}
+
+  # ---------------------------------------------------------------------------
+  # Provenance query extraction and execution
+  # ---------------------------------------------------------------------------
+
+  defp extract_provenance_query(nil), do: %{}
+  defp extract_provenance_query(%{raw: raw}) when is_binary(raw) do
+    params = %{}
+
+    # Extract actor filter: PROVENANCE.actor = 'someone'
+    params = case Regex.run(~r/(?:PROVENANCE\.)?actor\s*=\s*'([^']+)'/i, raw) do
+      [_, actor] -> Map.put(params, :actor, actor)
+      _ -> params
+    end
+
+    # Extract origin filter: PROVENANCE.origin = 'source'
+    params = case Regex.run(~r/(?:PROVENANCE\.)?origin\s*=\s*'([^']+)'/i, raw) do
+      [_, origin] -> Map.put(params, :origin, origin)
+      _ -> params
+    end
+
+    # Extract chain_valid filter: PROVENANCE.chain_valid = true
+    params = case Regex.run(~r/(?:PROVENANCE\.)?chain_valid\s*=\s*(true|false)/i, raw) do
+      [_, val] -> Map.put(params, :chain_valid, String.downcase(val) == "true")
+      _ -> params
+    end
+
+    # Extract event_type filter: PROVENANCE.event_type = 'Modified'
+    params = case Regex.run(~r/(?:PROVENANCE\.)?event_type\s*=\s*'([^']+)'/i, raw) do
+      [_, et] -> Map.put(params, :event_type, et)
+      _ -> params
+    end
+
+    params
+  end
+  defp extract_provenance_query(%{TAG: "ProvenanceActor", _0: actor}), do: %{actor: actor}
+  defp extract_provenance_query(%{TAG: "ProvenanceOrigin", _0: origin}), do: %{origin: origin}
+  defp extract_provenance_query(%{TAG: "ProvenanceChainValid", _0: valid}), do: %{chain_valid: valid}
+  defp extract_provenance_query(%{TAG: "ProvenanceEventType", _0: event_type}), do: %{event_type: event_type}
+  defp extract_provenance_query(%{TAG: "And", _0: left, _1: right}) do
+    Map.merge(extract_provenance_query(left), extract_provenance_query(right))
+  end
+  defp extract_provenance_query(%{modality: mod, field: field, value: value})
+    when mod in [:provenance, "PROVENANCE", "provenance"] do
+    %{String.to_existing_atom(field) => value}
+  end
+  defp extract_provenance_query(_), do: %{}
+
+  defp execute_provenance_query(params, limit) do
+    # Route to dedicated RustClient provenance methods for caching and telemetry
+    cond do
+      Map.has_key?(params, :entity_id) ->
+        # Get the full provenance chain for a specific entity
+        case RustClient.get_provenance_chain(params.entity_id) do
+          {:ok, body} -> {:ok, wrap_provenance_results(body)}
+          {:error, :not_found} -> {:ok, []}
+          {:error, reason} -> {:error, {:provenance_query_failed, reason}}
+        end
+
+      Map.has_key?(params, :verify_entity_id) ->
+        # Verify chain integrity for a specific entity
+        case RustClient.verify_provenance(params.verify_entity_id) do
+          {:ok, body} -> {:ok, wrap_provenance_results([body])}
+          {:error, :not_found} -> {:ok, []}
+          {:error, reason} -> {:error, {:provenance_query_failed, reason}}
+        end
+
+      Map.has_key?(params, :actor) ->
+        # Search by actor — uses the provenance search-by-actor endpoint
+        case RustClient.post("/provenance/search", %{actor: params.actor, limit: limit || 50}) do
+          {:ok, %{status: 200, body: body}} -> {:ok, wrap_provenance_results(body)}
+          {:error, reason} -> {:error, {:provenance_query_failed, reason}}
+          _ -> {:ok, []}
+        end
+
+      Map.has_key?(params, :chain_valid) ->
+        # Verify chain integrity across all provenance chains
+        case RustClient.get("/provenance/verify-all") do
+          {:ok, %{status: 200, body: body}} when is_list(body) ->
+            filtered = if params.chain_valid do
+              Enum.filter(body, &(&1["chain_valid"] == true))
+            else
+              Enum.filter(body, &(&1["chain_valid"] == false))
+            end
+            {:ok, wrap_provenance_results(filtered)}
+          {:ok, %{status: 200, body: body}} when is_map(body) ->
+            {:ok, wrap_provenance_results(Map.get(body, "results", []))}
+          {:error, reason} -> {:error, {:provenance_query_failed, reason}}
+          _ -> {:ok, []}
+        end
+
+      true ->
+        # Generic provenance search with all params
+        case RustClient.post("/provenance/search", Map.put(params, :limit, limit || 50)) do
+          {:ok, %{status: 200, body: body}} -> {:ok, wrap_provenance_results(body)}
+          {:error, reason} -> {:error, {:provenance_query_failed, reason}}
+          _ -> {:ok, []}
+        end
+    end
+  end
+
+  defp wrap_provenance_results(body) when is_list(body) do
+    Enum.map(body, fn item ->
+      %{"provenance" => item, "_source" => "provenance"}
+    end)
+  end
+  defp wrap_provenance_results(body) when is_map(body) do
+    results = Map.get(body, "results", [body])
+    wrap_provenance_results(results)
+  end
+  defp wrap_provenance_results(_), do: []
+
+  # ---------------------------------------------------------------------------
+  # Spatial query extraction and execution
+  # ---------------------------------------------------------------------------
+
+  defp extract_spatial_query(nil), do: %{}
+  defp extract_spatial_query(%{raw: raw}) when is_binary(raw) do
+    upper = String.upcase(raw)
+
+    cond do
+      # WITHIN RADIUS(lat, lon, radius_km)
+      String.contains?(upper, "WITHIN RADIUS") ->
+        case Regex.run(~r/WITHIN\s+RADIUS\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.]+)\s*\)/i, raw) do
+          [_, lat, lon, radius] ->
+            %{type: :radius,
+              latitude: parse_float_safe(lat),
+              longitude: parse_float_safe(lon),
+              radius_km: parse_float_safe(radius)}
+          _ -> %{}
+        end
+
+      # WITHIN BOUNDS(min_lat, min_lon, max_lat, max_lon)
+      String.contains?(upper, "WITHIN BOUNDS") ->
+        case Regex.run(~r/WITHIN\s+BOUNDS\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*\)/i, raw) do
+          [_, min_lat, min_lon, max_lat, max_lon] ->
+            %{type: :bounds,
+              min_lat: parse_float_safe(min_lat),
+              min_lon: parse_float_safe(min_lon),
+              max_lat: parse_float_safe(max_lat),
+              max_lon: parse_float_safe(max_lon)}
+          _ -> %{}
+        end
+
+      # NEAREST(lat, lon, k)
+      String.contains?(upper, "NEAREST") ->
+        case Regex.run(~r/NEAREST\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9]+)\s*\)/i, raw) do
+          [_, lat, lon, k] ->
+            %{type: :nearest,
+              latitude: parse_float_safe(lat),
+              longitude: parse_float_safe(lon),
+              k: String.to_integer(k)}
+          _ -> %{}
+        end
+
+      true -> %{}
+    end
+  end
+  defp extract_spatial_query(%{TAG: "SpatialRadius", _0: lat, _1: lon, _2: radius}) do
+    %{type: :radius, latitude: lat, longitude: lon, radius_km: radius}
+  end
+  defp extract_spatial_query(%{TAG: "SpatialBounds", _0: min_lat, _1: min_lon, _2: max_lat, _3: max_lon}) do
+    %{type: :bounds, min_lat: min_lat, min_lon: min_lon, max_lat: max_lat, max_lon: max_lon}
+  end
+  defp extract_spatial_query(%{TAG: "SpatialNearest", _0: lat, _1: lon, _2: k}) do
+    %{type: :nearest, latitude: lat, longitude: lon, k: k}
+  end
+  defp extract_spatial_query(%{TAG: "And", _0: left, _1: right}) do
+    case {has_spatial_condition?(left), has_spatial_condition?(right)} do
+      {true, _} -> extract_spatial_query(left)
+      {_, true} -> extract_spatial_query(right)
+      _ -> %{}
+    end
+  end
+  defp extract_spatial_query(_), do: %{}
+
+  defp execute_spatial_query(params, limit) do
+    # Route to dedicated RustClient spatial methods for caching and telemetry
+    case Map.get(params, :type) do
+      :radius ->
+        case RustClient.search_spatial_radius(
+               params.latitude,
+               params.longitude,
+               params.radius_km,
+               limit: limit || 50
+             ) do
+          {:ok, results} -> {:ok, wrap_spatial_results(results)}
+          {:error, reason} -> {:error, {:spatial_query_failed, reason}}
+        end
+
+      :bounds ->
+        case RustClient.search_spatial_bounds(
+               params.min_lat,
+               params.min_lon,
+               params.max_lat,
+               params.max_lon,
+               limit: limit || 50
+             ) do
+          {:ok, results} -> {:ok, wrap_spatial_results(results)}
+          {:error, reason} -> {:error, {:spatial_query_failed, reason}}
+        end
+
+      :nearest ->
+        k = params[:k] || limit || 10
+
+        case RustClient.search_spatial_nearest(
+               params.latitude,
+               params.longitude,
+               k
+             ) do
+          {:ok, results} -> {:ok, wrap_spatial_results(results)}
+          {:error, reason} -> {:error, {:spatial_query_failed, reason}}
+        end
+
+      _ ->
+        {:error, {:invalid_spatial_query, "Missing spatial query type (radius, bounds, or nearest)"}}
+    end
+  end
+
+  defp wrap_spatial_results(body) when is_list(body) do
+    Enum.map(body, fn item ->
+      %{"spatial" => item, "_source" => "spatial",
+        "distance_km" => Map.get(item, "distance_km")}
+    end)
+  end
+  defp wrap_spatial_results(body) when is_map(body) do
+    results = Map.get(body, "results", [body])
+    wrap_spatial_results(results)
+  end
+  defp wrap_spatial_results(_), do: []
+
+  defp parse_float_safe(str) when is_binary(str) do
+    case Float.parse(str) do
+      {f, _} -> f
+      :error -> 0.0
+    end
+  end
+  defp parse_float_safe(num) when is_number(num), do: num / 1
+  defp parse_float_safe(_), do: 0.0
 
   defp extract_multi_modal_params(modalities, where_clause) do
     %{modalities: modalities, conditions: where_clause}

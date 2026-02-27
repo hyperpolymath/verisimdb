@@ -261,6 +261,121 @@ defmodule VeriSim.RustClient do
     end
   end
 
+  # Provenance Operations
+
+  @doc """
+  Retrieve the full provenance chain for an entity.
+  """
+  def get_provenance_chain(entity_id) do
+    cache_key = {:provenance_chain, entity_id}
+
+    case cache_get(cache_key) do
+      {:hit, cached} ->
+        {:ok, cached}
+
+      :miss ->
+        case get("/provenance/#{entity_id}") do
+          {:ok, %{status: 200, body: body}} ->
+            cache_put(cache_key, body, 15_000)
+            {:ok, body}
+
+          {:ok, %{status: 404}} ->
+            {:error, :not_found}
+
+          {:ok, %{status: status, body: body}} ->
+            {:error, {status, body}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  @doc """
+  Record a new provenance event for an entity.
+  """
+  def record_provenance(entity_id, event) do
+    case post("/provenance/#{entity_id}/record", event) do
+      {:ok, %{status: 200, body: body}} ->
+        invalidate_cache({:provenance_chain, entity_id})
+        {:ok, body}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Verify the hash-chain integrity for an entity's provenance.
+  """
+  def verify_provenance(entity_id) do
+    case get("/provenance/#{entity_id}/verify") do
+      {:ok, %{status: 200, body: body}} -> {:ok, body}
+      {:ok, %{status: 404}} -> {:error, :not_found}
+      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Spatial Operations
+
+  @doc """
+  Search for entities within a given radius of a point.
+  """
+  def search_spatial_radius(latitude, longitude, radius_km, opts \\ []) do
+    body = %{
+      latitude: latitude,
+      longitude: longitude,
+      radius_km: radius_km,
+      limit: Keyword.get(opts, :limit, 50)
+    }
+
+    case post("/spatial/search/radius", body) do
+      {:ok, %{status: 200, body: results}} -> {:ok, results}
+      {:ok, %{status: status, body: body_resp}} -> {:error, {status, body_resp}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Search for entities within a bounding box.
+  """
+  def search_spatial_bounds(min_lat, min_lon, max_lat, max_lon, opts \\ []) do
+    body = %{
+      min_lat: min_lat,
+      min_lon: min_lon,
+      max_lat: max_lat,
+      max_lon: max_lon,
+      limit: Keyword.get(opts, :limit, 50)
+    }
+
+    case post("/spatial/search/bounds", body) do
+      {:ok, %{status: 200, body: results}} -> {:ok, results}
+      {:ok, %{status: status, body: body_resp}} -> {:error, {status, body_resp}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Find the k nearest entities to a given point.
+  """
+  def search_spatial_nearest(latitude, longitude, k \\ 10) do
+    body = %{
+      latitude: latitude,
+      longitude: longitude,
+      k: k
+    }
+
+    case post("/spatial/search/nearest", body) do
+      {:ok, %{status: 200, body: results}} -> {:ok, results}
+      {:ok, %{status: status, body: body_resp}} -> {:error, {status, body_resp}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # HTTP Helpers (public: get/2 and post/2 used by Federation.Resolver)
 
   def get(path, params \\ []) do
