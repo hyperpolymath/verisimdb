@@ -1,8 +1,8 @@
 (* SPDX-License-Identifier: PMPL-1.0-or-later *)
 (* VeriSim Query Language (VQL) Grammar *)
 (* Format: Extended Backus-Naur Form (EBNF) *)
-(* Version: 2.0 — Dependent types, cross-modal correlation, write path *)
-(* Date: 2026-02-13 *)
+(* Version: 3.0 — Octad (8 modalities), provenance conditions, spatial conditions *)
+(* Date: 2026-02-27 *)
 
 (* ============================================================================
    1. TOP-LEVEL STRUCTURE
@@ -39,9 +39,9 @@ aggregate_field = aggregate_func, '(', field_ref, ')' ;
 aggregate_func = 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' ;
 
 (* Bare modality selection *)
-modality_spec = 'GRAPH', [graph_projection] | 'VECTOR', [vector_projection] | 'TENSOR', [tensor_projection] | 'SEMANTIC', [semantic_projection] | 'DOCUMENT', [document_projection] | 'TEMPORAL', [temporal_projection] | '*'  (* All available modalities *) ;
+modality_spec = 'GRAPH', [graph_projection] | 'VECTOR', [vector_projection] | 'TENSOR', [tensor_projection] | 'SEMANTIC', [semantic_projection] | 'DOCUMENT', [document_projection] | 'TEMPORAL', [temporal_projection] | 'PROVENANCE', [provenance_projection] | 'SPATIAL', [spatial_projection] | '*'  (* All available modalities *) ;
 
-modality_name = 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' ;
+modality_name = 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL' ;
 
 (* Projection specifics per modality *)
 graph_projection = '(', sparql_pattern, ')' ;
@@ -50,6 +50,8 @@ tensor_projection = '(', tensor_slice, ')' ;
 semantic_projection = '(', contract_names, ')' ;
 document_projection = '(', document_fields, ')' ;
 temporal_projection = '(', version_spec, ')' ;
+provenance_projection = '(', provenance_fields, ')' ;
+spatial_projection = '(', spatial_fields, ')' ;
 
 (* ============================================================================
    3. FROM CLAUSE - Data Sources
@@ -79,9 +81,9 @@ where_clause = 'WHERE', condition ;
 
 condition = simple_condition | compound_condition | '(', condition, ')' ;
 
-simple_condition = graph_condition | vector_condition | tensor_condition | semantic_condition | document_condition | temporal_condition | cross_modal_condition ;
+simple_condition = graph_condition | vector_condition | tensor_condition | semantic_condition | document_condition | temporal_condition | provenance_condition | spatial_condition | cross_modal_condition ;
 
-(* 4.7. Cross-Modal Conditions — relationships BETWEEN modalities *)
+(* 4.9. Cross-Modal Conditions — relationships BETWEEN modalities *)
 cross_modal_condition = cross_modal_field_compare | drift_condition | consistency_condition | exists_condition | not_exists_condition ;
 
 (* Compare fields across modalities: WHERE DOCUMENT.severity > GRAPH.centrality *)
@@ -141,6 +143,43 @@ comparison_op = '==' | '!=' | '>' | '<' | '>=' | '<=' | 'LIKE' ;
 (* 4.6. Temporal Conditions (Versioning) *)
 temporal_condition = 'AS', 'OF', timestamp | 'BETWEEN', timestamp, 'AND', timestamp | 'VERSION', version_id | 'MODIFIED', 'BY', actor_id ;
 
+(* 4.7. Provenance Conditions (Lineage Tracking) *)
+provenance_condition = provenance_actor | provenance_origin | provenance_chain | provenance_event ;
+
+(* Filter by actor: WHERE PROVENANCE.actor = 'system' *)
+provenance_actor = 'PROVENANCE', '.', 'actor', comparison_op, string_literal ;
+
+(* Filter by origin: WHERE PROVENANCE.origin = 'import' *)
+provenance_origin = 'PROVENANCE', '.', 'origin', comparison_op, string_literal ;
+
+(* Filter by chain integrity: WHERE PROVENANCE.chain_valid = true *)
+provenance_chain = 'PROVENANCE', '.', 'chain_valid', '=', boolean
+                 | 'PROVENANCE', '.', 'chain_length', comparison_op, integer ;
+
+(* Filter by event type: WHERE PROVENANCE.event_type = 'Modified' *)
+provenance_event = 'PROVENANCE', '.', 'event_type', comparison_op, string_literal ;
+
+(* Provenance-specific fields *)
+provenance_fields = identifier, { ',', identifier } ;
+
+(* 4.8. Spatial Conditions (Geospatial Queries) *)
+spatial_condition = spatial_radius | spatial_bounds | spatial_nearest | spatial_field ;
+
+(* Radius search: WHERE WITHIN RADIUS(51.5074, -0.1278, 100.0) *)
+spatial_radius = 'WITHIN', 'RADIUS', '(', float, ',', float, ',', float, ')' ;
+
+(* Bounding box: WHERE WITHIN BOUNDS(51.0, -1.0, 52.0, 0.5) *)
+spatial_bounds = 'WITHIN', 'BOUNDS', '(', float, ',', float, ',', float, ',', float, ')' ;
+
+(* K-nearest: WHERE NEAREST(51.5074, -0.1278, 10) *)
+spatial_nearest = 'NEAREST', '(', float, ',', float, ',', integer, ')' ;
+
+(* Field access: WHERE SPATIAL.latitude > 51.0 *)
+spatial_field = 'SPATIAL', '.', identifier, comparison_op, literal ;
+
+(* Spatial-specific fields *)
+spatial_fields = identifier, { ',', identifier } ;
+
 (* ============================================================================
    5. PROOF CLAUSE - Dependent-Type Safety (Multi-Proof Composition)
    ============================================================================ *)
@@ -186,7 +225,7 @@ insert_mutation = 'INSERT', 'HEXAD', 'WITH', modality_data_list, [proof_clause] 
 
 modality_data_list = modality_data, { ',', modality_data } ;
 
-modality_data = document_data | vector_data | graph_data | tensor_data | semantic_data | temporal_data ;
+modality_data = document_data | vector_data | graph_data | tensor_data | semantic_data | temporal_data | provenance_data | spatial_data ;
 
 document_data = 'DOCUMENT', '(', field_assignment_list, ')' ;
 vector_data = 'VECTOR', '(', vector_literal, ')' ;
@@ -194,6 +233,8 @@ graph_data = 'GRAPH', '(', identifier, ',', identifier, ')' ;  (* edge_type, tar
 tensor_data = 'TENSOR', '(', array_literal, ')' ;
 semantic_data = 'SEMANTIC', '(', identifier, ')' ;  (* contract name *)
 temporal_data = 'TEMPORAL', '(', timestamp, ')' ;
+provenance_data = 'PROVENANCE', '(', field_assignment_list, ')' ;  (* actor, event_type, description, source *)
+spatial_data = 'SPATIAL', '(', field_assignment_list, ')' ;  (* latitude, longitude, altitude, geometry_type, srid *)
 
 field_assignment_list = field_assignment, { ',', field_assignment } ;
 field_assignment = identifier, '=', literal ;
@@ -253,7 +294,7 @@ comment = '--', { ? any character except newline ? }, '\n'  (* Line comment *)
    ============================================================================ *)
 (* Keywords are case-insensitive in VQL *)
 keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
-         | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL'
+         | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL'
          | 'HEXAD' | 'FEDERATION' | 'STORE'
          | 'WITH' | 'DRIFT' | 'STRICT' | 'REPAIR' | 'TOLERATE' | 'LATEST'
          | 'AND' | 'OR' | 'NOT'
@@ -261,8 +302,9 @@ keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
          | 'SATISFIES' | 'HAS' | 'VERIFIED' | 'BY'
          | 'FULLTEXT' | 'CONTAINS' | 'MATCHES' | 'FIELD' | 'LIKE'
          | 'AS' | 'OF' | 'BETWEEN' | 'VERSION' | 'MODIFIED'
-         | 'EXISTENCE' | 'CITATION' | 'ACCESS' | 'INTEGRITY' | 'PROVENANCE' | 'CUSTOM'
+         | 'EXISTENCE' | 'CITATION' | 'ACCESS' | 'INTEGRITY' | 'CUSTOM'
          | 'COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT' | 'JACCARD' | 'SHAPE' | 'RANK'
+         | 'RADIUS' | 'BOUNDS'
          | 'ORDER' | 'GROUP' | 'HAVING' | 'ASC' | 'DESC'
          | 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'
          | 'INSERT' | 'UPDATE' | 'DELETE' | 'SET'

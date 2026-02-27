@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 //! VeriSim Hexad Entity
 //!
-//! One entity, six synchronized representations.
-//! The Hexad is the fundamental unit of VeriSimDB - each entity exists
-//! simultaneously across all six modalities, maintaining cross-modal consistency.
+//! One entity, eight synchronized representations (the octad).
+//! The Hexad is the fundamental unit of VeriSimDB — each entity exists
+//! simultaneously across all eight modalities, maintaining cross-modal
+//! consistency: Graph, Vector, Tensor, Semantic, Document, Temporal,
+//! Provenance, and Spatial.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -11,10 +13,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
-// Re-export modality types
+// Re-export modality types — all eight modalities
 pub use verisim_document::{Document, DocumentStore};
 pub use verisim_graph::{GraphEdge, GraphNode, GraphObject, GraphStore};
+pub use verisim_provenance::{
+    InMemoryProvenanceStore, ProvenanceChain, ProvenanceError, ProvenanceEventType,
+    ProvenanceRecord, ProvenanceStore,
+};
 pub use verisim_semantic::{ProofBlob, Provenance, SemanticAnnotation, SemanticStore, SemanticType, SemanticValue};
+pub use verisim_spatial::{
+    BoundingBox, Coordinates, GeometryType, InMemorySpatialStore, SpatialData,
+    SpatialSearchResult, SpatialStore,
+};
 pub use verisim_tensor::{Tensor, TensorStore};
 pub use verisim_temporal::{TemporalStore, TimeRange, Version};
 pub use verisim_vector::{Embedding, VectorStore};
@@ -105,7 +115,7 @@ pub struct HexadStatus {
     pub modality_status: ModalityStatus,
 }
 
-/// Status of each modality for an entity
+/// Status of each modality for an entity (octad: 8 modalities)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModalityStatus {
     pub graph: bool,
@@ -114,12 +124,21 @@ pub struct ModalityStatus {
     pub semantic: bool,
     pub document: bool,
     pub temporal: bool,
+    pub provenance: bool,
+    pub spatial: bool,
 }
 
 impl ModalityStatus {
-    /// Check if all modalities are populated
+    /// Check if all eight modalities are populated
     pub fn is_complete(&self) -> bool {
-        self.graph && self.vector && self.tensor && self.semantic && self.document && self.temporal
+        self.graph
+            && self.vector
+            && self.tensor
+            && self.semantic
+            && self.document
+            && self.temporal
+            && self.provenance
+            && self.spatial
     }
 
     /// Get list of missing modalities
@@ -131,6 +150,8 @@ impl ModalityStatus {
         if !self.semantic { missing.push("semantic"); }
         if !self.document { missing.push("document"); }
         if !self.temporal { missing.push("temporal"); }
+        if !self.provenance { missing.push("provenance"); }
+        if !self.spatial { missing.push("spatial"); }
         missing
     }
 }
@@ -148,6 +169,10 @@ pub struct HexadInput {
     pub semantic: Option<HexadSemanticInput>,
     /// Document content (optional)
     pub document: Option<HexadDocumentInput>,
+    /// Provenance event (optional)
+    pub provenance: Option<HexadProvenanceInput>,
+    /// Spatial coordinates (optional)
+    pub spatial: Option<HexadSpatialInput>,
     /// Additional metadata
     pub metadata: HashMap<String, String>,
 }
@@ -198,7 +223,38 @@ pub struct HexadDocumentInput {
     pub fields: HashMap<String, String>,
 }
 
-/// A complete Hexad entity with all modality data
+/// Provenance modality input — records a lineage event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexadProvenanceInput {
+    /// Event type (created, modified, imported, normalized, etc.)
+    pub event_type: String,
+    /// Who or what caused this event
+    pub actor: String,
+    /// Optional source identifier (URL, upstream entity, file path)
+    pub source: Option<String>,
+    /// Human-readable description of the event
+    pub description: String,
+}
+
+/// Spatial modality input — geospatial coordinates and geometry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HexadSpatialInput {
+    /// Latitude in decimal degrees (WGS84)
+    pub latitude: f64,
+    /// Longitude in decimal degrees (WGS84)
+    pub longitude: f64,
+    /// Altitude in metres (optional)
+    pub altitude: Option<f64>,
+    /// Geometry type (Point, LineString, Polygon, etc.) — defaults to Point
+    pub geometry_type: Option<String>,
+    /// Spatial Reference System Identifier — defaults to 4326 (WGS84)
+    pub srid: Option<u32>,
+    /// Arbitrary spatial properties (address, region, accuracy, etc.)
+    #[serde(default)]
+    pub properties: HashMap<String, String>,
+}
+
+/// A complete Hexad entity with all modality data (octad: 8 modalities)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hexad {
     /// Entity ID
@@ -217,6 +273,10 @@ pub struct Hexad {
     pub document: Option<Document>,
     /// Version history info
     pub version_count: u64,
+    /// Provenance chain length (number of recorded events)
+    pub provenance_chain_length: u64,
+    /// Spatial data (coordinates, geometry, SRID)
+    pub spatial_data: Option<SpatialData>,
 }
 
 /// Hexad store - manages entities across all modalities
@@ -336,6 +396,30 @@ impl HexadBuilder {
         self
     }
 
+    /// Add provenance event
+    pub fn with_provenance(mut self, event_type: &str, actor: &str, description: &str) -> Self {
+        self.input.provenance = Some(HexadProvenanceInput {
+            event_type: event_type.to_string(),
+            actor: actor.to_string(),
+            source: None,
+            description: description.to_string(),
+        });
+        self
+    }
+
+    /// Add spatial coordinates (WGS84 point)
+    pub fn with_spatial(mut self, latitude: f64, longitude: f64) -> Self {
+        self.input.spatial = Some(HexadSpatialInput {
+            latitude,
+            longitude,
+            altitude: None,
+            geometry_type: None,
+            srid: None,
+            properties: HashMap::new(),
+        });
+        self
+    }
+
     /// Add metadata
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.input.metadata.insert(key.to_string(), value.to_string());
@@ -384,7 +468,7 @@ mod tests {
     fn test_modality_status() {
         let mut status = ModalityStatus::default();
         assert!(!status.is_complete());
-        assert_eq!(status.missing().len(), 6);
+        assert_eq!(status.missing().len(), 8);
 
         status.graph = true;
         status.vector = true;
@@ -392,6 +476,8 @@ mod tests {
         status.semantic = true;
         status.document = true;
         status.temporal = true;
+        status.provenance = true;
+        status.spatial = true;
 
         assert!(status.is_complete());
         assert!(status.missing().is_empty());

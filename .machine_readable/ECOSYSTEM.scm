@@ -84,7 +84,19 @@
       (project "idaptik")
       (relationship "first-heterogeneous-federation-consumer")
       (url "https://github.com/hyperpolymath/idaptik")
-      (rationale "IDApTIK's database bridge (ArangoDB for game data + VerisimDB for level data) is the first working example of heterogeneous federation — VerisimDB coordinating with a non-VerisimDB database.")))
+      (rationale "IDApTIK's database bridge (ArangoDB for game data + VerisimDB for level data) is the first working example of heterogeneous federation — VerisimDB coordinating with a non-VerisimDB database."))
+
+    (interface-layer
+      (project "panll")
+      (relationship "primary-human-interface")
+      (url "https://github.com/hyperpolymath/panll")
+      (rationale "PanLL eNSAID (Environment for NeSy-Agentic Integrated Development) is VeriSimDB's primary accessibility layer. Three-pane Binary Star HTI maps directly to VQL-DT: Pane-L shows proof obligations and type constraints, Pane-N shows agentic inference suggestions, Pane-W shows query results, drift heatmaps, and entity explorer. Anti-Crash circuit breaker prevents malformed queries from corrupting data. Vexometer monitors cognitive load during complex VQL-DT sessions. Replaces need for standalone VQL workbench — PanLL is the neurosymbolic agentic DbVisualizer."))
+
+    (sibling-databases
+      (project "quandledb")
+      (relationship "sibling-nextgen-database")
+      (url "https://github.com/hyperpolymath/nextgen-databases")
+      (rationale "QuandleDB is a sibling database in the nextgen-databases monorepo. Future PanLL integration will provide unified interface across VeriSimDB (VQL/VQL-DT), QuandleDB (KQL), and LithoGlyph (GQL) — building on the NQC Web UI pattern already demonstrated at nextgen-databases/nqc/web/.")))
 
   (what-this-is
     "VeriSimDB is a cross-system entity consistency engine. It provides:\n  - Eight modalities (the octad) in one namespace: Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial\n  - Drift detection: Detects when different representations of the same entity disagree across systems\n  - Self-normalisation: Automatically repairs inconsistencies by regenerating drifted modalities\n  - Heterogeneous federation: Watches external databases (ArangoDB, PostgreSQL, Elasticsearch) for cross-system consistency without requiring data migration\n  - VQL with dependent types (VQL-DT): Formally verified query results with machine-checkable proof certificates\n  - Provenance/lineage: Tracks where data came from, how it was transformed, and who touched it — across system boundaries\n  - Tensor modality: Multi-dimensional representation with active research into novel applications beyond traditional numeric storage\n  - Zero-knowledge proofs: Verifiable query results without exposing private data (GDPR, HIPAA, FAIR compliance)\n\nThree-layer differentiator:\n  1. Drift detection — the door-opener (easy to explain, everyone has the problem)\n  2. Heterogeneous federation — enterprise value (watches your existing databases)\n  3. VQL-DT formal verification — technical moat (years to replicate)\n\nTarget users: Enterprise data teams (cross-system consistency), regulated industries (formal verification), researchers (citation networks + provenance), arts and digital identity (complex entity triangulation).")

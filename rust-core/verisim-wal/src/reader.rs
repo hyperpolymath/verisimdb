@@ -189,8 +189,14 @@ fn read_segment_entries(path: &Path) -> WalResult<Vec<WalEntry>> {
 
     while offset + 4 <= data.len() {
         // Read entry_length (u32 LE).
-        let entry_length =
-            u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
+        let entry_length = u32::from_le_bytes(
+            data[offset..offset + 4]
+                .try_into()
+                .map_err(|_| WalError::TruncatedEntry {
+                    segment: segment_name.clone(),
+                    offset: offset as u64,
+                })?,
+        );
 
         // Validate entry_length.
         if entry_length == 0 {

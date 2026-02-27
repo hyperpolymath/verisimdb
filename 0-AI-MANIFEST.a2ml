@@ -1,0 +1,88 @@
+; SPDX-License-Identifier: PMPL-1.0-or-later
+; SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath)
+;
+; 0-AI-MANIFEST.a2ml — Universal AI entry point for VeriSimDB
+; Media-Type: application/a2ml
+
+(manifest
+  (identity
+    (name "VeriSimDB")
+    (full-name "Veridical Simulacrum Database")
+    (version "0.1.0-alpha")
+    (repo "https://github.com/hyperpolymath/verisimdb")
+    (license "PMPL-1.0-or-later")
+    (author "Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>")
+    (monorepo-parent "nextgen-databases"))
+
+  (purpose
+    "6-core multimodal database with self-normalization. Each entity
+     (hexad) exists simultaneously across 6 modalities — Graph, Vector,
+     Tensor, Semantic, Document, Temporal — with drift detection and
+     automatic consistency maintenance.")
+
+  (canonical-locations
+    (ai-instructions ".claude/CLAUDE.md")
+    (state ".machine_readable/STATE.scm")
+    (meta ".machine_readable/META.scm")
+    (ecosystem ".machine_readable/ECOSYSTEM.scm")
+    (topology "TOPOLOGY.md")
+    (build "justfile")
+    (container-build "container/Containerfile")
+    (container-deploy "selur-compose.yml")
+    (container-layers "stapeln.toml")
+    (known-issues "KNOWN-ISSUES.adoc")
+    (changelog "CHANGELOG.adoc")
+    (deployment "DEPLOYMENT.adoc")
+    (security ".well-known/security.txt"))
+
+  (tech-stack
+    (primary "Rust" "Elixir/OTP")
+    (secondary "ReScript" "Idris2" "Zig")
+    (query-language "VQL")
+    (container-runtime "Podman")
+    (base-image "cgr.dev/chainguard/wolfi-base:latest"))
+
+  (architecture
+    (rust-core
+      (description "Performance-critical modality stores")
+      (location "rust-core/")
+      (crates "verisim-graph" "verisim-vector" "verisim-tensor"
+              "verisim-semantic" "verisim-document" "verisim-temporal"
+              "verisim-hexad" "verisim-drift" "verisim-normalizer"
+              "verisim-api"))
+    (elixir-otp
+      (description "Distributed coordination and supervision")
+      (location "elixir-orchestration/"))
+    (abi-ffi
+      (description "Idris2 ABI definitions + Zig FFI bridge")
+      (abi-location "src/abi/")
+      (ffi-location "ffi/zig/"))
+    (data-store
+      (description "Git-backed flat-file data repo")
+      (location "verisimdb-data/")))
+
+  (critical-invariants
+    (rule "SCM files ONLY in .machine_readable/ — never root")
+    (rule "All shell scripts must validate untrusted input")
+    (rule "No hardcoded secrets — use env vars with ${VAR:-} defaults")
+    (rule "Container images MUST use Chainguard base (cgr.dev)")
+    (rule "Container runtime is Podman — never Docker")
+    (rule "VQL is the query language — never raw SQL")
+    (rule "Hexad entities must maintain 6-modality consistency")
+    (rule "Drift thresholds gate all automatic normalization"))
+
+  (container-ecosystem
+    (selur "selur-compose.yml — deployment orchestration")
+    (stapeln "stapeln.toml — layer-based container builds")
+    (svalinn "TLS gateway with policy enforcement")
+    (vordr "Runtime verification and formal proof checking")
+    (cerro-torre "Image signing with ML-DSA-87 post-quantum crypto")
+    (rokur "Secret rotation with argon2id"))
+
+  (related-projects
+    (hypatia "Neurosymbolic CI/CD scanner — consumes verisimdb data")
+    (gitbot-fleet "Bot orchestration — dispatches fixes from verisimdb findings")
+    (panic-attacker "Static analysis scanner — produces scan data for verisimdb")
+    (proven "Formally verified safety library — provides SafeString, SafeJson, etc.")
+    (lithoglyph "Graph database sibling — shares GQL/GQL-DT patterns")
+    (quandledb "Knot-theoretic database sibling — KQL query language")))

@@ -222,6 +222,84 @@ impl DriftCalculator {
         drift_score.clamp(0.0, 1.0)
     }
 
+    /// Calculate provenance drift score
+    ///
+    /// Measures integrity of the provenance chain.  A broken chain (hash
+    /// mismatch, missing parent) produces maximum drift.  Staleness (long
+    /// gap since last event) produces moderate drift.
+    ///
+    /// Returns a score from 0.0 (no drift) to 1.0 (maximum drift)
+    pub fn provenance_drift(
+        &self,
+        chain_valid: bool,
+        chain_length: usize,
+        seconds_since_last_event: Option<u64>,
+        expected_max_gap_seconds: u64,
+    ) -> f64 {
+        let mut drift_score = 0.0;
+
+        // Chain integrity is critical — broken chain = maximum provenance drift
+        if !chain_valid {
+            return 1.0;
+        }
+
+        // Empty chain for an existing entity is suspicious
+        if chain_length == 0 {
+            drift_score += 0.5;
+        }
+
+        // Staleness: if the last event is much older than expected, lineage
+        // tracking may have stopped
+        if let Some(gap) = seconds_since_last_event {
+            if expected_max_gap_seconds > 0 && gap > expected_max_gap_seconds {
+                let staleness = (gap as f64 / expected_max_gap_seconds as f64 - 1.0).min(1.0);
+                drift_score += staleness * 0.3;
+            }
+        }
+
+        drift_score.clamp(0.0, 1.0)
+    }
+
+    /// Calculate spatial drift score
+    ///
+    /// Measures consistency between spatial coordinates and location
+    /// references in the document/graph modalities.  If an entity claims
+    /// to be "in London" but has coordinates pointing to New York, that's
+    /// spatial drift.
+    ///
+    /// Returns a score from 0.0 (no drift) to 1.0 (maximum drift)
+    pub fn spatial_drift(
+        &self,
+        has_coordinates: bool,
+        has_location_mentions: bool,
+        coordinate_matches_mentions: bool,
+        coordinates_valid: bool,
+    ) -> f64 {
+        let mut drift_score: f64 = 0.0;
+
+        // Invalid coordinates (NaN, out of WGS84 range) = high drift
+        if has_coordinates && !coordinates_valid {
+            return 0.9;
+        }
+
+        // Document mentions locations but no spatial data indexed
+        if has_location_mentions && !has_coordinates {
+            drift_score += 0.4;
+        }
+
+        // Has coordinates but they don't match document location mentions
+        if has_coordinates && has_location_mentions && !coordinate_matches_mentions {
+            drift_score += 0.5;
+        }
+
+        // Has coordinates but no location context in other modalities
+        if has_coordinates && !has_location_mentions {
+            drift_score += 0.1; // Minor — coordinates without context is OK
+        }
+
+        drift_score.clamp(0.0, 1.0)
+    }
+
     /// Calculate schema drift score
     ///
     /// Measures if the entity violates cross-modal schema constraints.
@@ -256,6 +334,7 @@ impl DriftCalculator {
     /// Calculate overall quality drift score
     ///
     /// Aggregates all drift metrics into an overall quality score.
+    /// Updated for octad (8 modalities) with provenance and spatial.
     ///
     /// Returns a score from 0.0 (no drift) to 1.0 (maximum drift)
     pub fn quality_drift(
@@ -280,6 +359,32 @@ impl DriftCalculator {
         weighted_sum.clamp(0.0, 1.0)
     }
 
+    /// Calculate overall quality drift score including all 8 modality drift types
+    pub fn quality_drift_octad(
+        &self,
+        semantic_vector: f64,
+        graph_document: f64,
+        temporal_consistency: f64,
+        tensor: f64,
+        schema: f64,
+        provenance: f64,
+        spatial: f64,
+    ) -> f64 {
+        // Rebalanced weights for octad (8 modalities)
+        let weights = [
+            (semantic_vector, 0.20),
+            (graph_document, 0.20),
+            (temporal_consistency, 0.15),
+            (tensor, 0.10),
+            (schema, 0.10),
+            (provenance, 0.15),
+            (spatial, 0.10),
+        ];
+
+        let weighted_sum: f64 = weights.iter().map(|(score, weight)| score * weight).sum();
+        weighted_sum.clamp(0.0, 1.0)
+    }
+
     /// Determine drift type from individual scores
     pub fn primary_drift_type(
         &self,
@@ -295,6 +400,34 @@ impl DriftCalculator {
             (DriftType::TemporalConsistencyDrift, temporal_consistency),
             (DriftType::TensorDrift, tensor),
             (DriftType::SchemaDrift, schema),
+        ];
+
+        scores
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(t, _)| *t)
+            .unwrap_or(DriftType::QualityDrift)
+    }
+
+    /// Determine drift type from all octad scores (including provenance + spatial)
+    pub fn primary_drift_type_octad(
+        &self,
+        semantic_vector: f64,
+        graph_document: f64,
+        temporal_consistency: f64,
+        tensor: f64,
+        schema: f64,
+        provenance: f64,
+        spatial: f64,
+    ) -> DriftType {
+        let scores = [
+            (DriftType::SemanticVectorDrift, semantic_vector),
+            (DriftType::GraphDocumentDrift, graph_document),
+            (DriftType::TemporalConsistencyDrift, temporal_consistency),
+            (DriftType::TensorDrift, tensor),
+            (DriftType::SchemaDrift, schema),
+            (DriftType::ProvenanceDrift, provenance),
+            (DriftType::SpatialDrift, spatial),
         ];
 
         scores

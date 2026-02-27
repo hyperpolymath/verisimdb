@@ -185,7 +185,7 @@ export
 %foreign "C:{{project}}_register_callback, lib{{project}}"
 prim__registerCallback : Bits64 -> (Bits64 -> Bits32 -> Bits32) -> PrimIO Bits32
 
-||| Safe callback registration (no believe_me — callback type matches FFI declaration)
+||| Safe callback registration (no cast — callback type matches FFI declaration)
 export
 registerCallback : Handle -> Callback -> IO (Either Result ())
 registerCallback h cb = do

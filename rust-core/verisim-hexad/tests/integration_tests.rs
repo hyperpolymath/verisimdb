@@ -22,6 +22,8 @@ type TestHexadStore = InMemoryHexadStore<
     InMemoryTensorStore,
     InMemorySemanticStore,
     InMemoryVersionStore<verisim_hexad::HexadSnapshot>,
+    verisim_provenance::InMemoryProvenanceStore,
+    verisim_spatial::InMemorySpatialStore,
 >;
 
 fn create_test_store(vector_dim: usize) -> TestHexadStore {
@@ -38,6 +40,8 @@ fn create_test_store(vector_dim: usize) -> TestHexadStore {
         Arc::new(InMemoryTensorStore::new()),
         Arc::new(InMemorySemanticStore::new()),
         Arc::new(InMemoryVersionStore::new()),
+        Arc::new(verisim_provenance::InMemoryProvenanceStore::new()),
+        Arc::new(verisim_spatial::InMemorySpatialStore::new()),
     )
 }
 

@@ -2,7 +2,7 @@
 
 [package]
 name = "verisim-hexad"
-description = "Hexad entity - one entity, six synchronized representations"
+description = "Hexad entity - one entity, eight synchronized representations (octad)"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -15,6 +15,8 @@ verisim-tensor = { path = "../verisim-tensor" }
 verisim-semantic = { path = "../verisim-semantic" }
 verisim-document = { path = "../verisim-document" }
 verisim-temporal = { path = "../verisim-temporal" }
+verisim-provenance = { path = "../verisim-provenance" }
+verisim-spatial = { path = "../verisim-spatial" }
 
 serde.workspace = true
 serde_json.workspace = true

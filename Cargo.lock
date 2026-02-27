@@ -8017,7 +8017,9 @@ dependencies = [
  "verisim-hexad",
  "verisim-normalizer",
  "verisim-planner",
+ "verisim-provenance",
  "verisim-semantic",
+ "verisim-spatial",
  "verisim-temporal",
  "verisim-tensor",
  "verisim-vector",
@@ -8080,7 +8082,9 @@ dependencies = [
  "uuid",
  "verisim-document",
  "verisim-graph",
+ "verisim-provenance",
  "verisim-semantic",
+ "verisim-spatial",
  "verisim-temporal",
  "verisim-tensor",
  "verisim-vector",
@@ -8125,6 +8129,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "verisim-provenance"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "verisim-repl"
 version = "0.1.0"
 dependencies = [
@@ -8153,6 +8172,19 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "verisim-spatial"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "proptest",
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

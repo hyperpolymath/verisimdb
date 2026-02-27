@@ -18,6 +18,8 @@ verisim-document = { path = "../verisim-document" }
 verisim-tensor = { path = "../verisim-tensor" }
 verisim-semantic = { path = "../verisim-semantic" }
 verisim-temporal = { path = "../verisim-temporal" }
+verisim-provenance = { path = "../verisim-provenance" }
+verisim-spatial = { path = "../verisim-spatial" }
 verisim-planner = { path = "../verisim-planner" }
 
 axum.workspace = true

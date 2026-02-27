@@ -45,6 +45,10 @@ pub enum DriftType {
     TensorDrift,
     /// Cross-modal schema violations
     SchemaDrift,
+    /// Provenance chain integrity broken or lineage inconsistent
+    ProvenanceDrift,
+    /// Spatial coordinates inconsistent with graph/document location mentions
+    SpatialDrift,
     /// Overall data quality degradation
     QualityDrift,
 }
@@ -57,6 +61,8 @@ impl std::fmt::Display for DriftType {
             DriftType::TemporalConsistencyDrift => write!(f, "temporal_consistency_drift"),
             DriftType::TensorDrift => write!(f, "tensor_drift"),
             DriftType::SchemaDrift => write!(f, "schema_drift"),
+            DriftType::ProvenanceDrift => write!(f, "provenance_drift"),
+            DriftType::SpatialDrift => write!(f, "spatial_drift"),
             DriftType::QualityDrift => write!(f, "quality_drift"),
         }
     }
@@ -161,6 +167,10 @@ pub struct DriftThresholds {
     pub tensor: f64,
     /// Threshold for schema drift
     pub schema: f64,
+    /// Threshold for provenance chain integrity drift
+    pub provenance: f64,
+    /// Threshold for spatial consistency drift
+    pub spatial: f64,
     /// Threshold for overall quality drift
     pub quality: f64,
     /// Optional adaptive policies per drift type (overrides fixed thresholds)
@@ -176,6 +186,8 @@ impl Default for DriftThresholds {
             temporal_consistency: 0.2,
             tensor: 0.35,
             schema: 0.1,
+            provenance: 0.1,
+            spatial: 0.3,
             quality: 0.25,
             adaptive_policies: HashMap::new(),
         }
@@ -195,6 +207,8 @@ impl DriftThresholds {
             DriftType::TemporalConsistencyDrift => self.temporal_consistency,
             DriftType::TensorDrift => self.tensor,
             DriftType::SchemaDrift => self.schema,
+            DriftType::ProvenanceDrift => self.provenance,
+            DriftType::SpatialDrift => self.spatial,
             DriftType::QualityDrift => self.quality,
         }
     }
@@ -298,6 +312,8 @@ impl DriftDetector {
             DriftType::TemporalConsistencyDrift,
             DriftType::TensorDrift,
             DriftType::SchemaDrift,
+            DriftType::ProvenanceDrift,
+            DriftType::SpatialDrift,
             DriftType::QualityDrift,
         ] {
             metrics.insert(drift_type, DriftMetrics::default());
@@ -335,6 +351,8 @@ impl DriftDetector {
             DriftType::TemporalConsistencyDrift,
             DriftType::TensorDrift,
             DriftType::SchemaDrift,
+            DriftType::ProvenanceDrift,
+            DriftType::SpatialDrift,
             DriftType::QualityDrift,
         ] {
             let gauge = Gauge::new(

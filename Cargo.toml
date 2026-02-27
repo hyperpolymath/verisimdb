@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # VeriSimDB - The Veridical Simulacrum Database
-# A 6-core multimodal database with self-normalization
+# An 8-core multimodal database (octad) with self-normalization
 
 [workspace]
 resolver = "2"
@@ -11,6 +11,8 @@ members = [
     "rust-core/verisim-semantic",
     "rust-core/verisim-document",
     "rust-core/verisim-temporal",
+    "rust-core/verisim-provenance",
+    "rust-core/verisim-spatial",
     "rust-core/verisim-hexad",
     "rust-core/verisim-normalizer",
     "rust-core/verisim-drift",

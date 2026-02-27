@@ -5,7 +5,7 @@
 
 (define-module (verisimdb state)
   #:version "1.1.0"
-  #:updated "2026-02-13T22:00:00Z")
+  #:updated "2026-02-27T23:00:00Z")
 
 ;; ============================================================================
 ;; METADATA
@@ -37,7 +37,7 @@
       (security . "proven (ZKP) + sactify-php"))))
 
 ;; ============================================================================
-;; CURRENT POSITION (2026-02-13)
+;; CURRENT POSITION (2026-02-27)
 ;; ============================================================================
 
 (define current-position
@@ -46,8 +46,8 @@
     (components
       ((architecture-design . 100)
        (vql-implementation . 95)
-       (documentation . 95)
-       (rust-modality-stores . 95)
+       (documentation . 98)
+       (rust-modality-stores . 100)
        (elixir-orchestration . 90)
        (rescript-registry . 80)
        (security-hardening . 95)
@@ -62,14 +62,15 @@
     (working-features
       "✅ VQL Parser (100%): VQLParser.res, VQLError.res, VQLExplain.res, VQLTypeChecker.res
        ✅ VQL Grammar (ISO/IEC 14977 EBNF compliant)
+       ✅ VQL-SPEC.adoc (2785-line normative language specification, 10 sections + 4 appendices)
        ✅ VQL Formal Semantics (operational + type system)
        ✅ VQL REFLECT keyword (meta-circular queries)
        ✅ VQL PROOF CUSTOM with circuit parameters
        ✅ Elixir Orchestration (90%): QueryRouter, EntityServer, DriftMonitor, SchemaRegistry, HealthChecker
        ✅ RustClient HTTP integration with ETS caching
        ✅ VQL Executor with cross-modal evaluation, REFLECT support
-       ✅ Rust Modality Stores (95%): Document, Graph, Vector, Tensor, Semantic, Temporal
-       ✅ Hexad entity management + query-as-hexad homoiconicity (hexad → octad evolution planned)
+       ✅ Rust Modality Stores (100%): Document, Graph, Vector, Tensor, Semantic, Temporal, Provenance, Spatial
+       ✅ Octad entity management (8 modalities) + query-as-hexad homoiconicity
        ✅ Drift detection with adaptive thresholds + normalization (5 strategies)
        ✅ HTTP API server (verisim-api) with TLS, IPv6, Prometheus metrics
        ✅ ZKP custom circuit registry, compiler, verification key management
@@ -100,9 +101,7 @@
          Phase 6: ZKP custom circuits (circuit registry, R1CS compiler, verification key management, VQL circuit DSL)
          Phase 7: Homoiconicity (queries as hexads, REFLECT keyword, /queries API, self-optimization)")
     (blocked-on
-      "- VQL needs full specification and end-to-end integration testing (Priority 1)
-       - Provenance/lineage modality not yet implemented (CRITICAL — Priority 3)
-       - Spatial modality not yet implemented (Priority 8, after provenance)
+      "- VQL end-to-end integration testing still needed (Priority 1, spec DONE)
        - Cross-modal write atomicity not formally guaranteed (Priority 0 — architectural concern)
        - Heterogeneous federation (non-VerisimDB peers) not yet implemented (Priority 5)
        - VQL-DT not connected to VQL PROOF runtime — Lean checker not invoked (Priority 7, after VQL)
@@ -141,18 +140,20 @@
 
       ((milestone "M3: Modality Stores (Rust)")
        (status . "COMPLETED")
-       (completion . 95)
+       (completion . 100)
        (items
-         "✅ verisim-hexad (core hexad structure + query-as-hexad homoiconicity)
+         "✅ verisim-hexad (core octad structure + query-as-hexad homoiconicity)
           ✅ verisim-graph (Oxigraph integration)
           ✅ verisim-vector (HNSW implementation, 670 lines)
           ✅ verisim-tensor (ndarray storage)
           ✅ verisim-semantic (CBOR proofs + custom circuit registry + compiler + verification keys)
           ✅ verisim-document (Tantivy full-text)
           ✅ verisim-temporal (version trees)
-          ✅ verisim-api (HTTP API: TLS, IPv6, metrics, auth middleware, query store)
-          ✅ verisim-drift (drift detection with adaptive thresholds)
-          ✅ verisim-normalizer (5 strategies: vector, document, graph, tensor regen, temporal repair, quality reconciliation)
+          ✅ verisim-provenance (hash-chain lineage tracking, SHA-256 chain verification)
+          ✅ verisim-spatial (WGS84 coordinates, haversine distance, radius/bounds/nearest queries)
+          ✅ verisim-api (HTTP API: TLS, IPv6, metrics, auth middleware, query store, provenance+spatial endpoints)
+          ✅ verisim-drift (drift detection with adaptive thresholds, 8 drift types)
+          ✅ verisim-normalizer (8 modality strategies, authority-ranked regeneration)
           ✅ verisim-planner (cost-based query planner with profiler)
           ✅ verisim-wal (write-ahead log)"))
 
@@ -200,10 +201,10 @@
 
       ((milestone "M7: Testing & Documentation")
        (status . "COMPLETED")
-       (completion . 95)
+       (completion . 98)
        (items
          "✅ Architecture documentation
-          ✅ VQL specification
+          ✅ VQL-SPEC.adoc normative specification (2785 lines, 10 sections + 4 appendices)
           ✅ API design
           ✅ Integration tests (Rust) - 510 tests
           ✅ Integration tests (Elixir) - full stack
@@ -250,25 +251,28 @@
 
 (define critical-next-actions
   '((immediate
-      "1. Finish VQL: full language spec, end-to-end cross-modal queries, aggregates, error messages
+      "1. VQL end-to-end integration tests: 20+ tests proving VQL-SPEC is implemented
        2. Build drift detection demo: 1000 entities, corrupt 50, detect all, repair all, verify
-       3. Design provenance/lineage modality: origin tracking, transformation chain, integrity hashes
-       4. Assess cross-modal write atomicity: verify 2PC or WAL coordination across modality stores")
+       3. Assess cross-modal write atomicity: verify 2PC or WAL coordination across modality stores
+       4. Wire VQL-DT Lean type checker to VQL PROOF runtime")
 
     (this-week
-      "1. VQL-SPEC.adoc — exhaustive language specification with examples
-       2. 20+ integration tests proving VQL spec is implemented
-       3. Drift demo script in demos/drift-detection/
-       4. Provenance modality design document")
+      "1. ✅ VQL-SPEC.adoc — DONE (2785 lines, 10 sections + 4 appendices, all grammar rules covered)
+       2. ✅ Octad evolution — DONE (provenance + spatial modalities across full 9-layer stack)
+       3. 20+ integration tests proving VQL spec is implemented
+       4. Drift demo script in demos/drift-detection/")
 
     (this-month
-      "1. Implement provenance/lineage modality (octad evolution — 7th of 8)
-       2. Design spatial modality (octad — 8th of 8)
-       3. Heterogeneous federation adapters (ArangoDB, PostgreSQL)
-       4. Reposition README: lead with drift detection, not modality count
-       4. One external user — find a project outside hyperpolymath to use VerisimDB
-       5. Wire VQL-DT Lean type checker (after VQL is solid)
-       6. Replace oxrocksdb-sys with fjall or redb")))
+      "1. VQL interface pass: fix REPL build (rustyline), wire playground to real backend, fix bridge .bs.js
+       2. Wire VQL-DT Lean type checker (after VQL is solid)
+       3. PanLL-VeriSimDB backend: wire VQL-DT as PanLL module (Pane-L=proofs/types, Pane-N=agent, Pane-W=results)
+       4. Documentation pass: man pages, machine-readable docs consistent with octad
+       5. Training wiki: getting-started guide, tutorials, working examples
+       6. NIF shim layer (Rustler): dual transport HTTP+NIF with VERISIM_TRANSPORT=http|nif|auto
+       7. Reposition README: lead with drift detection, not modality count
+       8. Heterogeneous federation adapters (ArangoDB, PostgreSQL)
+       9. One external user — find a project outside hyperpolymath to use VerisimDB
+       10. Replace oxrocksdb-sys with fjall or redb")))
 
 ;; ============================================================================
 ;; DESIGN DECISIONS COMPLETED
@@ -311,6 +315,54 @@
 
 (define session-history
   '((session
+      (date . "2026-02-27c")
+      (phase . "octad-evolution-implementation")
+      (accomplishments
+        "- Implemented full octad evolution: 2 new modalities (Provenance + Spatial) across 9-layer stack
+         - Created verisim-provenance crate: hash-chain lineage tracking, SHA-256 verification, InMemoryProvenanceStore
+         - Created verisim-spatial crate: WGS84 coordinates, haversine distance, radius/bounds/nearest queries
+         - Extended verisim-hexad: 8-modality ModalityStatus, HexadProvenanceInput, HexadSpatialInput, HexadBuilder
+         - Extended verisim-api: 6 new endpoints (provenance chain/record/verify, spatial radius/bounds/nearest)
+         - Extended verisim-drift: ProvenanceDrift + SpatialDrift types, provenance_drift() + spatial_drift() methods
+         - Extended verisim-normalizer: 8 modalities in authority order (Provenance ranked 3rd)
+         - Updated VQLParser.res: Provenance | Spatial modality variants + parser combinators + mutation data
+         - Updated VQLTypes.res: ProvenanceModality | SpatialModality + all conversion functions
+         - Updated VQLContext.res: PROVENANCE (7 fields) + SPATIAL (5 fields) registries
+         - Updated VQLBidir.res: ProvenanceData + SpatialData type checking
+         - Updated vql_bridge.ex: take_modalities, @modality_names, @safe_atoms for both
+         - Updated vql_executor.ex: provenance/spatial condition detectors, query extractors, API routing
+         - Updated vql-grammar.ebnf: v3.0 with provenance conditions (4.7), spatial conditions (4.8)
+         - Updated STATE.scm: removed provenance/spatial blockers, updated milestones")
+      (key-decisions
+        "- Spatial uses brute-force haversine (no rstar/geo-types deps) — production should use R-tree
+         - Provenance ranked 3rd in normalizer authority order (Document > Semantic > Provenance)
+         - InMemoryHexadStore now generic over 8 type parameters (G, V, D, T, S, R, P, L)
+         - VQL grammar v3.0: WITHIN RADIUS(), WITHIN BOUNDS(), NEAREST() spatial syntax
+         - Provenance proof verification enhanced: calls /provenance/{id}/verify for chain integrity"))
+
+    (session
+      (date . "2026-02-27b")
+      (phase . "vql-spec-completion")
+      (accomplishments
+        "- Created VQL-SPEC.adoc: 2785-line normative language specification
+         - Synthesised 7 source docs + 5 ReScript source files + 3 Elixir source files
+         - 10 sections: Introduction, Lexical Structure, Data Model, Type System, Query Statements, Mutation Statements, Federation Queries, Proof System, Query Execution Model, Implementation Status
+         - 4 appendices: Complete EBNF Grammar, Reserved Keywords, Error Codes, Related Specifications
+         - Every grammar production rule from vql-grammar.ebnf covered in body text + Appendix A
+         - Every type variant from VQLTypes.res documented
+         - Every error kind from VQLError.res (40+) documented in Appendix C
+         - All 6 proof types documented with formal propositions
+         - Honest implementation status markers: [.implemented], [.partial], [.planned]
+         - Resolves 3 known inconsistencies between pre-v2.0 docs
+         - Verified via automated completeness check (5 gaps found and fixed)
+         - Updated STATE.scm with VQL-SPEC completion")
+      (key-decisions
+        "- VQL-SPEC.adoc is the single normative reference; existing docs remain for deep dives
+         - Followed grammar and implementation over vql-vs-vql-dt.adoc proof type names
+         - Cross-modal conditions documented as post-fetch (not pushdown)
+         - Octad evolution noted but hexad model is current normative spec"))
+
+    (session
       (date . "2026-02-27")
       (phase . "strategic-assessment-and-priority-reordering")
       (accomplishments

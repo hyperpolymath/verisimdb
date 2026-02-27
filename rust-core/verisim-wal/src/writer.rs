@@ -16,7 +16,7 @@ use chrono::Utc;
 use tracing::{debug, info};
 
 use crate::entry::{WalEntry, WalModality, WalOperation};
-use crate::error::WalResult;
+use crate::error::{WalError, WalResult};
 use crate::segment::{
     list_segments, segment_path, DEFAULT_MAX_SEGMENT_SIZE, SegmentInfo,
 };
@@ -125,8 +125,8 @@ impl WalWriter {
             info!("Initialized fresh WAL at sequence 0");
             (segment, file, 1u64)
         } else {
-            // Resume from the last segment.
-            let last = segments.last().unwrap().clone();
+            // Resume from the last segment (safe: is_empty() checked above).
+            let last = segments.last().expect("segments is non-empty").clone();
             let next_seq = Self::scan_last_sequence(&last)?;
             let file = OpenOptions::new().append(true).open(&last.path)?;
             info!(
@@ -293,9 +293,21 @@ impl WalWriter {
         let mut offset = 0usize;
         let mut last_sequence = segment.start_sequence;
 
+        let segment_name = segment
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "<unknown>".to_string());
+
         while offset + 4 <= data.len() {
-            let entry_length =
-                u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
+            let entry_length = u32::from_le_bytes(
+                data[offset..offset + 4]
+                    .try_into()
+                    .map_err(|_| WalError::TruncatedEntry {
+                        segment: segment_name.clone(),
+                        offset: offset as u64,
+                    })?,
+            );
 
             // Sanity check: the entry must fit within the remaining data.
             if offset + 4 + entry_length as usize > data.len() {
@@ -308,7 +320,12 @@ impl WalWriter {
             let inner_start = offset + 4 + 4; // skip entry_length + crc
             if inner_start + 8 <= data.len() {
                 let seq = u64::from_le_bytes(
-                    data[inner_start..inner_start + 8].try_into().unwrap(),
+                    data[inner_start..inner_start + 8]
+                        .try_into()
+                        .map_err(|_| WalError::TruncatedEntry {
+                            segment: segment_name.clone(),
+                            offset: inner_start as u64,
+                        })?,
                 );
                 if seq >= last_sequence {
                     last_sequence = seq;

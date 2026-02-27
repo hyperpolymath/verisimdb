@@ -87,11 +87,12 @@ impl VqlClient {
 
     /// Request EXPLAIN output for a VQL query.
     ///
-    /// Sends `POST /query/explain` with the query wrapped as a plan JSON
-    /// object. The server returns an `ExplainOutput` structure.
+    /// Sends the query through the VQL execute endpoint with an EXPLAIN
+    /// prefix, which returns a query plan without executing the query.
     pub fn explain(&self, query: &str) -> Result<Value, ClientError> {
-        let url = format!("{}/query/explain", self.base_url);
-        let payload = serde_json::json!({ "plan_json": query });
+        let url = format!("{}/vql/execute", self.base_url);
+        let explain_query = format!("EXPLAIN {}", query);
+        let payload = serde_json::json!({ "query": explain_query });
 
         let response = self.http.post(&url).json(&payload).send()?;
         self.handle_response(response)

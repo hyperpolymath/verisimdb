@@ -464,7 +464,11 @@ impl LockTable {
         }
 
         while let Some(path) = queue.pop_front() {
-            let current = *path.last().unwrap();
+            let Some(&current) = path.last() else {
+                // Invariant: BFS paths are always non-empty (seeded with [start, neighbor]).
+                // Defensive guard — skip rather than panic in the deadlock detector.
+                continue;
+            };
 
             if current == start {
                 // Found a cycle
