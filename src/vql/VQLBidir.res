@@ -767,6 +767,18 @@ and checkModalityDataArray = (
           } else {
             Ok()
           }
+        | ProvenanceData(fields) =>
+          if Js.Array2.length(fields) == 0 {
+            Error(InsertModalityMismatch({modality: "PROVENANCE", reason: "Empty provenance data"}))
+          } else {
+            Ok()
+          }
+        | SpatialData(fields) =>
+          if Js.Array2.length(fields) == 0 {
+            Error(InsertModalityMismatch({modality: "SPATIAL", reason: "Empty spatial data"}))
+          } else {
+            Ok()
+          }
         }
       }
     })

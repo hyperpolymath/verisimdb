@@ -40,7 +40,8 @@ use crate::NormalizerError;
 // Modality enum (normalizer-local; avoids coupling to verisim-planner)
 // ---------------------------------------------------------------------------
 
-/// The six modalities of VeriSimDB, ordered by default authority ranking.
+/// The eight modalities of VeriSimDB (octad), ordered by default authority
+/// ranking.
 ///
 /// The normalizer defines its own copy so it does not depend on the planner
 /// crate. Conversion helpers exist for interop where necessary.
@@ -53,22 +54,32 @@ pub enum Modality {
     Vector,
     Tensor,
     Temporal,
+    Provenance,
+    Spatial,
 }
 
 impl Modality {
-    /// Default authority order: Document > Semantic > Graph > Vector > Tensor > Temporal.
-    pub const DEFAULT_AUTHORITY_ORDER: [Modality; 6] = [
+    /// Default authority order (highest to lowest):
+    ///
+    /// Document > Semantic > Provenance > Graph > Vector > Tensor > Spatial > Temporal
+    ///
+    /// Provenance is ranked high because lineage data is critical for audit
+    /// and compliance.  Spatial is ranked low because coordinates are often
+    /// derived from other modalities.
+    pub const DEFAULT_AUTHORITY_ORDER: [Modality; 8] = [
         Modality::Document,
         Modality::Semantic,
+        Modality::Provenance,
         Modality::Graph,
         Modality::Vector,
         Modality::Tensor,
+        Modality::Spatial,
         Modality::Temporal,
     ];
 
-    /// All six modalities (unordered -- use `DEFAULT_AUTHORITY_ORDER` when
+    /// All eight modalities (unordered — use `DEFAULT_AUTHORITY_ORDER` when
     /// ordering matters).
-    pub const ALL: [Modality; 6] = Self::DEFAULT_AUTHORITY_ORDER;
+    pub const ALL: [Modality; 8] = Self::DEFAULT_AUTHORITY_ORDER;
 
     /// Check whether this modality is populated on a given hexad.
     pub fn is_present_on(self, hexad: &Hexad) -> bool {
@@ -79,6 +90,8 @@ impl Modality {
             Modality::Vector => hexad.embedding.is_some(),
             Modality::Tensor => hexad.tensor.is_some(),
             Modality::Temporal => hexad.version_count > 0,
+            Modality::Provenance => hexad.provenance_chain_length > 0,
+            Modality::Spatial => hexad.spatial_data.is_some(),
         }
     }
 
@@ -117,6 +130,21 @@ impl Modality {
                     None
                 }
             }
+            Modality::Provenance => {
+                if hexad.provenance_chain_length > 0 {
+                    Some(format!("provenance(chain_length={})", hexad.provenance_chain_length))
+                } else {
+                    None
+                }
+            }
+            Modality::Spatial => hexad.spatial_data.as_ref().map(|s| {
+                format!(
+                    "spatial(lat={}, lon={}, type={})",
+                    s.coordinates.latitude,
+                    s.coordinates.longitude,
+                    s.geometry_type
+                )
+            }),
         }
     }
 }
@@ -130,6 +158,8 @@ impl fmt::Display for Modality {
             Modality::Vector => write!(f, "vector"),
             Modality::Tensor => write!(f, "tensor"),
             Modality::Temporal => write!(f, "temporal"),
+            Modality::Provenance => write!(f, "provenance"),
+            Modality::Spatial => write!(f, "spatial"),
         }
     }
 }
@@ -932,6 +962,8 @@ mod tests {
                 "Full content for normalizer testing",
             )),
             version_count: 3,
+            provenance_chain_length: 0,
+            spatial_data: None,
         }
     }
 
@@ -952,6 +984,8 @@ mod tests {
             semantic: None,
             document: Some(Document::new("doc-1", "Doc Only", "Minimal entity")),
             version_count: 0,
+            provenance_chain_length: 0,
+            spatial_data: None,
         }
     }
 
@@ -972,6 +1006,8 @@ mod tests {
             semantic: None,
             document: None,
             version_count: 0,
+            provenance_chain_length: 0,
+            spatial_data: None,
         }
     }
 
@@ -982,10 +1018,12 @@ mod tests {
         let order = Modality::DEFAULT_AUTHORITY_ORDER;
         assert_eq!(order[0], Modality::Document, "Document should be rank 1");
         assert_eq!(order[1], Modality::Semantic, "Semantic should be rank 2");
-        assert_eq!(order[2], Modality::Graph, "Graph should be rank 3");
-        assert_eq!(order[3], Modality::Vector, "Vector should be rank 4");
-        assert_eq!(order[4], Modality::Tensor, "Tensor should be rank 5");
-        assert_eq!(order[5], Modality::Temporal, "Temporal should be rank 6");
+        assert_eq!(order[2], Modality::Provenance, "Provenance should be rank 3");
+        assert_eq!(order[3], Modality::Graph, "Graph should be rank 4");
+        assert_eq!(order[4], Modality::Vector, "Vector should be rank 5");
+        assert_eq!(order[5], Modality::Tensor, "Tensor should be rank 6");
+        assert_eq!(order[6], Modality::Spatial, "Spatial should be rank 7");
+        assert_eq!(order[7], Modality::Temporal, "Temporal should be rank 8");
     }
 
     #[test]
@@ -1487,6 +1525,6 @@ mod tests {
         assert_eq!(config.max_concurrent, 10);
         assert_eq!(config.default_strategy, RegenerationStrategy::FromAuthoritative);
         assert!(config.modality_strategies.is_empty());
-        assert_eq!(config.authority_order.len(), 6);
+        assert_eq!(config.authority_order.len(), 8);
     }
 }

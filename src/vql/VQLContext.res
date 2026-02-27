@@ -107,6 +107,26 @@ let defaultContext = (): context => {
     {fieldName: "actor", fieldType: Types.StringType},
   ])
 
+  // Provenance modality fields
+  Js.Dict.set(fields, "PROVENANCE", [
+    {fieldName: "origin", fieldType: Types.StringType},
+    {fieldName: "actor", fieldType: Types.StringType},
+    {fieldName: "event_type", fieldType: Types.StringType},
+    {fieldName: "chain_length", fieldType: Types.IntType},
+    {fieldName: "chain_valid", fieldType: Types.BoolType},
+    {fieldName: "content_hash", fieldType: Types.StringType},
+    {fieldName: "description", fieldType: Types.StringType},
+  ])
+
+  // Spatial modality fields
+  Js.Dict.set(fields, "SPATIAL", [
+    {fieldName: "latitude", fieldType: Types.FloatType},
+    {fieldName: "longitude", fieldType: Types.FloatType},
+    {fieldName: "altitude", fieldType: Types.FloatType},
+    {fieldName: "geometry_type", fieldType: Types.StringType},
+    {fieldName: "srid", fieldType: Types.IntType},
+  ])
+
   {
     bindings: Js.Dict.empty(),
     contracts: Js.Dict.empty(),

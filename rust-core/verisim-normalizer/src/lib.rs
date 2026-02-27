@@ -719,6 +719,8 @@ mod tests {
             semantic: None,
             document: Some(Document::new("test-1", "Test Document", "Test content for normalization")),
             version_count: 1,
+            provenance_chain_length: 0,
+            spatial_data: None,
         }
     }
 
@@ -738,6 +740,8 @@ mod tests {
             semantic: None,
             document: None,
             version_count: 1,
+            provenance_chain_length: 0,
+            spatial_data: None,
         }
     }
 
