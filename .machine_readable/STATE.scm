@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: PMPL-1.0-or-later
 ;; VeriSimDB Project State
 ;; Media type: application/x-scheme
-;; Last updated: 2026-02-13
+;; Last updated: 2026-02-27
 
 (define-module (verisimdb state)
   #:version "1.1.0"
@@ -15,7 +15,7 @@
   '((version . "0.1.0-alpha")
     (schema-version . "1.0")
     (created . "2025-11-02")
-    (updated . "2026-02-13")
+    (updated . "2026-02-27")
     (project . "VeriSimDB")
     (repo . "https://github.com/hyperpolymath/verisimdb")
     (license . "PMPL-1.0-or-later")))
@@ -27,7 +27,7 @@
 (define project-context
   '((name . "VeriSimDB")
     (tagline . "A Tiny Core for Universal Federated Knowledge")
-    (description . "Multimodal database with federation capabilities. Operates as standalone database OR federated coordinator. Six modalities: Graph, Vector, Tensor, Semantic, Document, Temporal.")
+    (description . "Cross-system entity consistency engine with drift detection, self-normalisation, and formally verified queries. Eight modalities (octad): Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial. Operates as standalone database OR heterogeneous federation coordinator over existing databases.")
     (tech-stack
       (core . ("ReScript" "Elixir" "Rust"))
       (registry . "ReScript (compiles to WASM)")
@@ -69,7 +69,7 @@
        ✅ RustClient HTTP integration with ETS caching
        ✅ VQL Executor with cross-modal evaluation, REFLECT support
        ✅ Rust Modality Stores (95%): Document, Graph, Vector, Tensor, Semantic, Temporal
-       ✅ Hexad entity management + query-as-hexad homoiconicity
+       ✅ Hexad entity management + query-as-hexad homoiconicity (hexad → octad evolution planned)
        ✅ Drift detection with adaptive thresholds + normalization (5 strategies)
        ✅ HTTP API server (verisim-api) with TLS, IPv6, Prometheus metrics
        ✅ ZKP custom circuit registry, compiler, verification key management
@@ -100,7 +100,12 @@
          Phase 6: ZKP custom circuits (circuit registry, R1CS compiler, verification key management, VQL circuit DSL)
          Phase 7: Homoiconicity (queries as hexads, REFLECT keyword, /queries API, self-optimization)")
     (blocked-on
-      "- VQL-DT not connected to VQL PROOF runtime (Lean checker not invoked)
+      "- VQL needs full specification and end-to-end integration testing (Priority 1)
+       - Provenance/lineage modality not yet implemented (CRITICAL — Priority 3)
+       - Spatial modality not yet implemented (Priority 8, after provenance)
+       - Cross-modal write atomicity not formally guaranteed (Priority 0 — architectural concern)
+       - Heterogeneous federation (non-VerisimDB peers) not yet implemented (Priority 5)
+       - VQL-DT not connected to VQL PROOF runtime — Lean checker not invoked (Priority 7, after VQL)
        - oxrocksdb-sys (RocksDB C++) still in tree — needs fjall/redb replacement
        - Hypatia pipeline at 40% (connector works, fleet dispatch logged but not live)")))
 
@@ -109,7 +114,7 @@
 ;; ============================================================================
 
 (define route-to-mvp
-  '((mvp-definition . "Standalone VeriSimDB with all 6 modalities, VQL query support, basic drift detection, local deployment")
+  '((mvp-definition . "Standalone VeriSimDB with all 8 modalities (octad), VQL query support, drift detection, provenance, local deployment")
     (milestones
       ((milestone "M1: Foundation Infrastructure")
        (status . "COMPLETED")
@@ -230,13 +235,13 @@
       ())
 
     (medium
-      ("VQL-DT Lean type checker not wired to VQL PROOF runtime"
+      ("VQL-DT Lean type checker not wired to VQL PROOF runtime (after VQL is solid)"
+       "Heterogeneous federation — adapters for ArangoDB, PostgreSQL, Elasticsearch"
        "oxrocksdb-sys C++ dependency needs pure-Rust replacement (fjall or redb)"
        "Hypatia pipeline at 40% (connector works, fleet dispatch not live)"))
 
     (low
-      ("Query lineage tracking not implemented"
-       "Full Raft consensus (currently quorum-based)"
+      ("Full Raft consensus (currently quorum-based)"
        "protoc binary still required at build time (pre-generate proto code to eliminate)"))))
 
 ;; ============================================================================
@@ -245,22 +250,25 @@
 
 (define critical-next-actions
   '((immediate
-      "1. Wire VQL-DT Lean type checker into VQL PROOF runtime
-       2. Integrate proven library for real ZKP proofs
-       3. Complete Hypatia fleet dispatch (live GraphQL integration)")
+      "1. Finish VQL: full language spec, end-to-end cross-modal queries, aggregates, error messages
+       2. Build drift detection demo: 1000 entities, corrupt 50, detect all, repair all, verify
+       3. Design provenance/lineage modality: origin tracking, transformation chain, integrity hashes
+       4. Assess cross-modal write atomicity: verify 2PC or WAL coordination across modality stores")
 
     (this-week
-      "1. Performance testing against baselines
-       2. Container deployment testing (Podman + vordr)
-       3. Self-hosted VeriSimDB instance for repo metadata (dogfooding)
-       4. Prepare v0.1.0-alpha release")
+      "1. VQL-SPEC.adoc — exhaustive language specification with examples
+       2. 20+ integration tests proving VQL spec is implemented
+       3. Drift demo script in demos/drift-detection/
+       4. Provenance modality design document")
 
     (this-month
-      "1. Full Raft consensus for federation
-       2. Production deployment on Fly.io or equivalent
-       3. Query lineage tracking
-       4. Beta testing with sample datasets
-       5. Tag and publish v0.1.0-alpha")))
+      "1. Implement provenance/lineage modality (octad evolution — 7th of 8)
+       2. Design spatial modality (octad — 8th of 8)
+       3. Heterogeneous federation adapters (ArangoDB, PostgreSQL)
+       4. Reposition README: lead with drift detection, not modality count
+       4. One external user — find a project outside hyperpolymath to use VerisimDB
+       5. Wire VQL-DT Lean type checker (after VQL is solid)
+       6. Replace oxrocksdb-sys with fjall or redb")))
 
 ;; ============================================================================
 ;; DESIGN DECISIONS COMPLETED
@@ -303,6 +311,31 @@
 
 (define session-history
   '((session
+      (date . "2026-02-27")
+      (phase . "strategic-assessment-and-priority-reordering")
+      (accomplishments
+        "- Strategic improvements design document (docs/design/DESIGN-2026-02-27-strategic-improvements.adoc)
+         - Honest assessment: what is strong, what is weak, where VerisimDB wins
+         - Full Virtuoso vs VerisimDB comparison table
+         - Competitor analysis: Great Expectations, Monte Carlo, Soda, Atlan, Bigeye, Anomalo, Elementary, Datafold
+         - Identified three-layer differentiator strategy: drift detection → federation → VQL-DT
+         - Architecture evolved from hexad (6) to octad (8): provenance (CRITICAL) + spatial (planned)
+         - Tensor modality retained with active research into novel applications (details confidential)
+         - Heterogeneous federation (non-VerisimDB peers) identified as enterprise value proposition
+         - Cross-modal write atomicity identified as Priority 0 architectural concern
+         - IDApTIK database federation bridge implemented (ArangoDB + VerisimDB) as first working example
+         - Updated STATE.scm, META.scm, ECOSYSTEM.scm with new priorities
+         - Database tier comparison for IDApTIK (4-tier: no-db, MariaDB, ArangoDB, VerisimDB)")
+      (key-decisions
+        "- VQL-DT is the technical moat, not the lead pitch — drift detection is the door-opener
+         - Provenance/lineage is CRITICAL — compounds with federation for unassailable positioning
+         - Octad architecture: 8 modalities (6 existing + provenance + spatial, tensor retained with future plans)
+         - VerisimDB competes with data quality tools (Great Expectations, Monte Carlo), not databases
+         - Heterogeneous federation (watching Postgres/ArangoDB/ES) is the enterprise play
+         - No introspection endpoints, ever — schema is in the code, not discoverable at runtime
+         - No SQL, no SPARQL, no admin UI — do not dilute focus"))
+
+    (session
       (date . "2026-02-13c")
       (phase . "zkp-integration-c-dep-elimination-container-fixes")
       (accomplishments

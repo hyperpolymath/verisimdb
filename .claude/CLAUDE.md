@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-VeriSimDB (Veridical Simulacrum Database) is a 6-core multimodal database with self-normalization. Each entity exists simultaneously across 6 modalities (Graph, Vector, Tensor, Semantic, Document, Temporal) with drift detection and automatic consistency maintenance.
+VeriSimDB (Veridical Simulacrum Database) is a cross-system entity consistency engine with drift detection, self-normalisation, and formally verified queries. Each entity exists simultaneously across 8 modalities — the octad (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial) — with drift detection and automatic consistency maintenance. Operates as standalone database OR heterogeneous federation coordinator over existing databases.
 
 ## Machine-Readable Artefacts
 
@@ -29,7 +29,9 @@ The following files in `.machine_readable/` contain structured project metadata:
 │    ├── verisim-semantic (CBOR proof blobs)                  │
 │    ├── verisim-document (Tantivy full-text)                 │
 │    ├── verisim-temporal (versioning/time-series)            │
-│    ├── verisim-hexad (unified entity)                       │
+│    ├── verisim-provenance (origin/lineage tracking) [planned]│
+│    ├── verisim-spatial (geospatial/R-tree) [planned]        │
+│    ├── verisim-hexad (unified entity → octad evolution)     │
 │    ├── verisim-drift (drift detection)                      │
 │    └── verisim-normalizer (self-normalization)              │
 └─────────────────────────────────────────────────────────────┘
@@ -104,14 +106,16 @@ podman run -p 8080:8080 verisimdb:latest
 
 ## Key Concepts
 
-### Hexad Entity
-A Hexad is one entity with 6 synchronized representations:
+### Octad Entity (formerly Hexad)
+An Octad is one entity with 8 synchronized representations:
 - **Graph**: RDF triples and property graph edges
 - **Vector**: Embedding for similarity search
-- **Tensor**: Multi-dimensional numeric data
+- **Tensor**: Multi-dimensional representation — active research into novel applications (details forthcoming)
 - **Semantic**: Type annotations and proof blobs
 - **Document**: Full-text searchable content
 - **Temporal**: Version history and time-series
+- **Provenance**: Origin tracking, transformation chain, actor trail (CRITICAL — planned)
+- **Spatial**: Geospatial coordinates, geometries, proximity queries (planned)
 
 ### Drift Detection
 Drift is measured as divergence between modalities:

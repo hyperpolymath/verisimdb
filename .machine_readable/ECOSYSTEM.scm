@@ -5,7 +5,7 @@
   (version "1.0.0")
   (name "verisimdb")
   (type "database-system")
-  (purpose "Multimodal federated database with drift-tolerant coordination, zero-knowledge proofs, and six data modalities (Graph, Vector, Tensor, Semantic, Document, Temporal)")
+  (purpose "Cross-system entity consistency engine with drift detection, self-normalisation, and formally verified queries. Eight data modalities — the octad (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial). Operates as standalone database OR heterogeneous federation coordinator over existing databases (ArangoDB, PostgreSQL, Elasticsearch, etc.).")
 
   (position-in-ecosystem
     (layer "infrastructure")
@@ -66,10 +66,28 @@
       (project "fair-principles")
       (relationship "implements")
       (url "https://www.go-fair.org/fair-principles/")
-      (rationale "VeriSimDB implements FAIR principles (Findable, Accessible, Interoperable, Reusable) through ZKP proofs, federation, and semantic types.")))
+      (rationale "VeriSimDB implements FAIR principles (Findable, Accessible, Interoperable, Reusable) through ZKP proofs, federation, semantic types, and provenance lineage."))
+
+    (competitor-space
+      (project "great-expectations")
+      (relationship "competes-at-different-level")
+      (url "https://greatexpectations.io")
+      (rationale "Great Expectations validates single tables/columns. VerisimDB validates cross-system entity consistency. Different granularity, different problem."))
+
+    (competitor-space
+      (project "monte-carlo-data")
+      (relationship "competes-at-different-level")
+      (url "https://www.montecarlodata.com")
+      (rationale "Monte Carlo detects statistical anomalies in one warehouse. VerisimDB detects semantic inconsistencies across multiple systems at entity level."))
+
+    (first-integration
+      (project "idaptik")
+      (relationship "first-heterogeneous-federation-consumer")
+      (url "https://github.com/hyperpolymath/idaptik")
+      (rationale "IDApTIK's database bridge (ArangoDB for game data + VerisimDB for level data) is the first working example of heterogeneous federation — VerisimDB coordinating with a non-VerisimDB database.")))
 
   (what-this-is
-    "VeriSimDB is a multimodal federated database designed for research, AI, and knowledge work. It provides:\n  - Six modalities in one namespace: Graph (citations), Vector (embeddings), Tensor (model weights), Semantic (types), Document (text), Temporal (versions)\n  - Drift-tolerant federation: Detect and repair inconsistencies across federated stores without blocking availability\n  - VQL (VeriSim Query Language): Unified query language with dependent types for formal verification (PROOF path) and simple types for performance (slipstream path)\n  - Zero-knowledge proofs: Verifiable query results without exposing private data (GDPR, HIPAA, FAIR compliance)\n  - Tiny core (<5k LOC): Operates as standalone database OR federated coordinator without rewrite\n  - Adaptive learning: System self-tunes cache TTL, normalization policies, and query strategies based on workload\n\nTarget users: Researchers (citation networks), AI engineers (embeddings + model weights), institutions (federated privacy-preserving data sharing).")
+    "VeriSimDB is a cross-system entity consistency engine. It provides:\n  - Eight modalities (the octad) in one namespace: Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial\n  - Drift detection: Detects when different representations of the same entity disagree across systems\n  - Self-normalisation: Automatically repairs inconsistencies by regenerating drifted modalities\n  - Heterogeneous federation: Watches external databases (ArangoDB, PostgreSQL, Elasticsearch) for cross-system consistency without requiring data migration\n  - VQL with dependent types (VQL-DT): Formally verified query results with machine-checkable proof certificates\n  - Provenance/lineage: Tracks where data came from, how it was transformed, and who touched it — across system boundaries\n  - Tensor modality: Multi-dimensional representation with active research into novel applications beyond traditional numeric storage\n  - Zero-knowledge proofs: Verifiable query results without exposing private data (GDPR, HIPAA, FAIR compliance)\n\nThree-layer differentiator:\n  1. Drift detection — the door-opener (easy to explain, everyone has the problem)\n  2. Heterogeneous federation — enterprise value (watches your existing databases)\n  3. VQL-DT formal verification — technical moat (years to replicate)\n\nTarget users: Enterprise data teams (cross-system consistency), regulated industries (formal verification), researchers (citation networks + provenance), arts and digital identity (complex entity triangulation).")
 
   (what-this-is-not
-    "- NOT a traditional relational database (use PostgreSQL for that)\n- NOT a pure graph database (use Neo4j if you only need graphs)\n- NOT a pure vector database (use Pinecone/Weaviate if you only need embeddings)\n- NOT a document store with full-text search only (use Elasticsearch for that)\n- NOT a blockchain (immutable log ≠ distributed ledger)\n- NOT a data lake (VeriSimDB enforces types and semantics)\n- NOT a message queue (though temporal store provides event log)\n- NOT an ETL tool (VeriSimDB eliminates need for ETL between modalities)\n- NOT a single-language system (uses ReScript, Elixir, Rust for different components)\n- NOT production-ready yet (v0.1.0-alpha, ~88% complete, security-hardened)"))
+    "- NOT a traditional relational database (use PostgreSQL for that)\n- NOT a pure graph database (use Neo4j if you only need graphs)\n- NOT a pure vector database (use Pinecone/Weaviate if you only need embeddings)\n- NOT a document store with full-text search only (use Elasticsearch for that)\n- NOT a blockchain (immutable log ≠ distributed ledger)\n- NOT a data lake (VeriSimDB enforces types and semantics)\n- NOT a message queue (though temporal store provides event log)\n- NOT an ETL tool (VeriSimDB eliminates need for ETL between modalities)\n- NOT a single-language system (uses ReScript, Elixir, Rust for different components)\n- NOT production-ready yet (v0.1.0-alpha, ~88% complete, security-hardened)\n- NOT limited to traditional database use cases (octad architecture enables arts, digital identity, and complex entity consistency domains)"))

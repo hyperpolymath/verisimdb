@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: PMPL-1.0-or-later
 ;; VeriSimDB Meta-Level Information
 ;; Media type: application/meta+scheme
-;; Last updated: 2026-01-22
+;; Last updated: 2026-02-27
 
 (define-module (verisimdb meta)
   #:version "1.1.0"
@@ -142,7 +142,62 @@
       (consequences
         (positive . "Well-understood, compatible with existing ZKP libraries (Groth16, Spartan)")
         (negative . "Less expressive than Plonk for some circuit patterns")
-        (neutral . "Can add Plonk support later as alternative backend")))))
+        (neutral . "Can add Plonk support later as alternative backend")))
+
+    (adr-013
+      (title . "Octad Architecture: 8 Modalities (Hexad → Octad Evolution)")
+      (status . "accepted")
+      (date . "2026-02-27")
+      (context . "The original hexad (6 modalities) covered data representation but lacked origin tracking and geospatial awareness. Temporal tracks versions (what changed); provenance tracks origins (where it came from). Spatial captures physical location and proximity.")
+      (decision . "Evolve from hexad (6) to octad (8). Add provenance/lineage as 7th modality (CRITICAL) and spatial/geospatial as 8th modality. Tensor modality retained — active research is exploring novel applications with significant future potential beyond traditional numeric storage. All existing modalities unchanged.")
+      (consequences
+        (positive . "Provenance enables GDPR compliance, audit trails, cross-system lineage, drift causality explanation. Spatial enables IoT, logistics, fleet management consistency. Tensor research opens future possibilities.")
+        (negative . "Structural change across codebase. All modality iteration must account for 8 stores. Naming evolution (hexad → octad) throughout documentation.")
+        (neutral . "Provenance is append-only (simpler than graph or vector). Spatial uses mature Rust crates (geo, rstar). Tensor research is ongoing and confidential.")))
+
+    (adr-014
+      (title . "Heterogeneous Database Federation")
+      (status . "proposed")
+      (date . "2026-02-27")
+      (context . "Current federation is peer-to-peer between VerisimDB instances. Enterprise value requires watching non-VerisimDB databases (ArangoDB, PostgreSQL, Elasticsearch) for cross-system entity consistency. IDApTIK database bridge is the first working example.")
+      (decision . "Extend federation with adapter interface for external databases. Each adapter maps an external database's API to VerisimDB's hexad model. Drift detection operates across adapters.")
+      (consequences
+        (positive . "Enterprise adoption without requiring data migration. VerisimDB becomes consistency layer over existing stack. Unique positioning vs data quality tools.")
+        (negative . "Each adapter is maintenance burden. External database schema changes can break adapters.")
+        (neutral . "Adapter interface isolates external complexity. Start with ArangoDB and PostgreSQL.")))
+
+    (adr-015
+      (title . "No Introspection Endpoints")
+      (status . "accepted")
+      (date . "2026-02-27")
+      (context . "Should VerisimDB expose schema discovery endpoints (/_introspect, SHOW COLLECTIONS, DESCRIBE HEXAD)? Standard practice in many databases.")
+      (decision . "No introspection endpoints. Not disabled, not gated — not written. The Elixir orchestration layer knows the schema from source code. If the code path does not exist, it cannot be misconfigured into production.")
+      (consequences
+        (positive . "Zero attack surface from schema discovery. No information leakage about internal structure.")
+        (negative . "External tooling cannot auto-discover schema. Developers must read docs.")
+        (neutral . "The REPL and REST API provide all needed functionality without exposing structure.")))
+
+    (adr-016
+      (title . "Three-Layer Differentiator Strategy")
+      (status . "accepted")
+      (date . "2026-02-27")
+      (context . "VerisimDB has multiple novel capabilities. Which to lead with? Options: 6 modalities (marketing-sounding), drift detection (broad appeal), VQL-DT (deep tech).")
+      (decision . "Layer 1: Drift detection (door-opener, easy to explain). Layer 2: Heterogeneous federation (enterprise value). Layer 3: VQL-DT formal verification (technical moat, impossible to clone quickly). Provenance compounds with all three layers.")
+      (consequences
+        (positive . "Clear positioning for different audiences. Drift for data teams, federation for enterprise, VQL-DT for regulated industries.")
+        (negative . "VQL-DT development deferred until VQL is solid. Risk of losing momentum on strongest technical feature.")
+        (neutral . "Competitors in data quality space (Great Expectations, Monte Carlo) operate at table/column level — VerisimDB operates at entity level across systems. Different category.")))
+
+    (adr-017
+      (title . "Cross-Modal Write Atomicity via Elixir 2PC Coordination")
+      (status . "proposed")
+      (date . "2026-02-27")
+      (context . "Writes to an octad entity span 8 independent Rust modality stores. If a write succeeds in the document store but fails in the graph store, the entity is born inconsistent — VerisimDB generates the very drift it claims to detect. This is potentially the most critical architectural concern.")
+      (decision . "Elixir EntityServer acts as 2PC coordinator. Phase 1: prepare writes to all modality stores (each returns WAL entry). Phase 2: commit all or rollback all. WAL replay on crash recovery ensures atomicity survives process restarts.")
+      (consequences
+        (positive . "Eliminates self-inflicted drift. Entity writes are atomic across all modalities. WAL provides crash recovery. Elixir is natural coordinator (already manages entity lifecycle).")
+        (negative . "2PC adds latency to every write. WAL requires disk I/O. Complexity in failure handling (partial prepare failures, network timeouts).")
+        (neutral . "Existing verisim-wal crate provides the WAL foundation. EntityServer GenServer already exists. This is coordination logic, not new storage.")))))
 
 ;; ============================================================================
 ;; DEVELOPMENT PRACTICES
@@ -246,10 +301,10 @@
       (solution . "VeriSimDB: <5k LOC core that operates as database AND coordinator. Start standalone, federate later.")
       (benefit . "Users choose deployment mode (standalone/federated/hybrid) without rewrite"))
 
-    (why-six-modalities
-      (problem . "AI/research workloads need graph (citations), vector (embeddings), tensor (model weights), semantic (types), document (text), temporal (versions). No single database provides all.")
-      (solution . "VeriSimDB: Six modalities in one namespace. Query across modalities (e.g., 'papers with similar embeddings AND valid citations')")
-      (benefit . "Eliminates ETL between specialized databases. One query, multiple modalities."))
+    (why-eight-modalities-octad
+      (problem . "Complex data workloads need graph (citations), vector (embeddings), tensor (novel research applications), semantic (types), document (text), temporal (versions), provenance (origins/lineage), and spatial (geolocation). No single database provides all.")
+      (solution . "VeriSimDB: Eight modalities (octad) in one namespace. Query across modalities with cross-modal drift detection ensuring consistency.")
+      (benefit . "Eliminates ETL between specialized databases. One query, multiple modalities. Provenance tracks data origins for compliance. Tensor modality opens future research possibilities."))
 
     (why-drift-tolerant
       (problem . "Federated systems diverge. Forcing strict consistency blocks federation. Ignoring drift causes errors.")
