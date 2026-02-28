@@ -126,6 +126,26 @@ Key files in `container/`:
 - `manifest.toml` — cerro-torre .ctp bundle manifest (provenance, attestations, security)
 - `ct-build.sh` — build/sign/verify pipeline script
 
+## Test Infrastructure
+
+Integration test stack in `connectors/test-infra/`:
+
+```bash
+# Start test databases
+cd connectors/test-infra && selur-compose up -d
+# Or fallback: podman-compose up -d
+
+# Run integration tests
+cd elixir-orchestration && mix test --include integration
+
+# Stop stack
+cd connectors/test-infra && selur-compose down
+```
+
+Services: MongoDB (27017), Redis Stack (6379), Neo4j (7474/7687), ClickHouse (8123/9000), SurrealDB (8000), InfluxDB (8086), MinIO (9002/9001).
+
+All images use `cgr.dev/chainguard/wolfi-base:latest`.
+
 ## Key Concepts
 
 ### Octad Entity (formerly Hexad)
@@ -195,6 +215,13 @@ mix test                      # Elixir
 ```bash
 cargo test --test integration # Rust integration tests
 mix test test/integration     # Elixir integration tests
+```
+
+### Federation Adapter Integration Tests
+```bash
+# Requires test-infra stack running (see Test Infrastructure section above)
+cd elixir-orchestration && mix test --include integration
+# 105 tests across 7 adapter test files (MongoDB, Redis, Neo4j, ClickHouse, SurrealDB, InfluxDB, MinIO)
 ```
 
 ## GitHub CI Integration (Priority - Sonnet Task)
@@ -361,6 +388,10 @@ verisimdb/
 │   ├── lib/verisim/
 │   ├── config/
 │   └── mix.exs
+├── connectors/                # Federation adapters + client SDKs + test infra
+│   ├── clients/               # 6 SDKs: Rust, V, Elixir, ReScript, Julia, Gleam
+│   ├── shared/                # JSON Schema, OpenAPI, protobuf
+│   └── test-infra/            # selur-compose: 7 databases for integration testing
 ├── container/                 # Containerfiles
 ├── docs/                      # Documentation
 └── tests/                     # Integration tests

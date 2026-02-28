@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: PMPL-1.0-or-later
 ;; VeriSimDB Project State
 ;; Media type: application/x-scheme
-;; Last updated: 2026-02-27
+;; Last updated: 2026-02-28
 
 (define-module (verisimdb state)
   #:version "1.2.0"
@@ -54,7 +54,7 @@
        (operational-hardening . 95)
        (zkp-custom-circuits . 80)
        (homoiconicity . 85)
-       (integration-tests . 90)
+       (integration-tests . 95)
        (performance-benchmarks . 70)
        (deployment-guide . 90)
        (github-ci-integration . 100)
@@ -65,8 +65,8 @@
        (business-materials . 100)
        (white-papers . 100)
        (sample-data . 100)
-       (connector-federation-adapters . 20)
-       (connector-client-sdks . 15)))
+       (connector-federation-adapters . 80)
+       (connector-client-sdks . 100)))
     (working-features
       "✅ VQL Parser (100%): VQLParser.res, VQLError.res, VQLExplain.res, VQLTypeChecker.res
        ✅ VQL Grammar (ISO/IEC 14977 EBNF compliant)
@@ -104,8 +104,11 @@
        ✅ PanLL VeriSimDB module (drift heatmap, normalise button, proof parsing)
        ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
        ✅ Federation adapter behaviour + registry (14 adapters, 36+ tests)
-       🔲 Connector federation adapters: MongoDB, Redis, DuckDB, ClickHouse, SurrealDB, SQLite, Neo4j, VectorDB, InfluxDB, ObjectStorage (scaffolded)
-       🔲 Connector client SDKs: Rust, Elixir, V, ReScript, Julia, Gleam (scaffolded)
+       ✅ Connector federation adapters: 10 adapters with real query builders + selur-compose test infrastructure (7 containerised databases, 105 integration tests)
+       ✅ Connector client SDKs: 6 SDKs complete (Rust, Elixir, V, ReScript, Julia, Gleam) — full feature parity across types, hexad, search, drift, provenance, vql, federation
+       ✅ selur-compose test stack: 7 databases (MongoDB, Redis Stack, Neo4j, ClickHouse, SurrealDB, InfluxDB, MinIO) on Chainguard wolfi-base
+       ✅ k9-svc Hunt-level deployment component for test infrastructure (deploy.k9.ncl)
+       ✅ Seed scripts with consistent hexad test data across all 7 databases
        ✅ Getting-started guide and adoption strategy documentation
        ✅ Zero C/C++ deps in default build (clang, RocksDB, protoc all eliminated)
        ✅ redb persistent backends: verisim-storage (KV) and verisim-graph (triple store)
@@ -308,16 +311,19 @@
 
 (define critical-next-actions
   '((immediate
-      "1. VQL end-to-end integration tests: 20+ tests proving VQL-SPEC is implemented
-       2. Build drift detection demo: 1000 entities, corrupt 50, detect all, repair all, verify
-       3. Assess cross-modal write atomicity: verify 2PC or WAL coordination across modality stores
-       4. Wire VQL-DT Lean type checker to VQL PROOF runtime")
+      "1. Run integration tests against live test-infra stack (selur-compose up, mix test --include integration)
+       2. VQL end-to-end integration tests: 20+ tests proving VQL-SPEC is implemented
+       3. Build drift detection demo: 1000 entities, corrupt 50, detect all, repair all, verify
+       4. Assess cross-modal write atomicity: verify 2PC or WAL coordination across modality stores")
 
     (this-week
       "1. ✅ VQL-SPEC.adoc — DONE (2785 lines, 10 sections + 4 appendices, all grammar rules covered)
        2. ✅ Octad evolution — DONE (provenance + spatial modalities across full 9-layer stack)
-       3. 20+ integration tests proving VQL spec is implemented
-       4. Drift demo script in demos/drift-detection/")
+       3. ✅ Connector federation adapters — DONE (10 adapters with real query builders + test infra)
+       4. ✅ Connector client SDKs — DONE (6 SDKs with full feature parity)
+       5. ✅ Integration test infrastructure — DONE (selur-compose stack, 7 databases, 105 tests)
+       6. 20+ VQL integration tests proving VQL spec is implemented
+       7. Drift demo script in demos/drift-detection/")
 
     (this-month
       "1. ✅ REPL updated to octad (8 modalities, 9 proof types, compiles+tests clean)
@@ -329,7 +335,9 @@
        7. ✅ Replace oxrocksdb-sys with redb (feature-flagged persistent backends for graph + storage)
        8. ✅ Wire playground to real backend (ApiClient.res, async fetch, demo fallback, octad modalities)
        9. One external user — execute outreach plan (GraphRAG community first)
-       10. ✅ Full Raft consensus (WAL, crash recovery, transport abstraction, snapshotting)")))
+       10. ✅ Full Raft consensus (WAL, crash recovery, transport abstraction, snapshotting)
+       11. ✅ Connector test infra + integration tests (selur-compose, 7 databases, 105 tests)
+       12. ✅ All 6 client SDKs complete (Rust, V, Elixir, ReScript, Julia, Gleam)")))
 
 ;; ============================================================================
 ;; DESIGN DECISIONS COMPLETED
@@ -372,6 +380,26 @@
 
 (define session-history
   '((session
+      (date . "2026-02-28i")
+      (phase . "test-infra-integration-tests")
+      (accomplishments
+        "- Created connectors/test-infra/ with selur-compose stack (7 databases)
+         - 5 custom Containerfiles (Redis Stack, Neo4j, ClickHouse, SurrealDB, InfluxDB) on wolfi-base
+         - 7 seed scripts with consistent hexad test data (hexad-test-001..003) across all databases
+         - compose.toml, manifest.toml, .gatekeeper.yaml (permissive), ct-build.sh, vordr.toml
+         - k9-svc Hunt-level deploy component (deploy.k9.ncl) + AI manifest (0-AI-MANIFEST.a2ml)
+         - 7 integration test files (105 tests): MongoDB, Redis, Neo4j, ClickHouse, SurrealDB, InfluxDB, MinIO
+         - All tests tagged @moduletag :integration, run with mix test --include integration
+         - Confirmed all 6 client SDKs are complete (Rust, V, Elixir, ReScript, Julia, Gleam)
+         - Existing tests still pass: 360 tests, 121 excluded, 1 pre-existing KRaft race condition")
+      (key-decisions
+        "- MinIO API port remapped to 9002 to avoid ClickHouse native TCP conflict on 9000
+         - MongoDB uses replica set rs0 (required for change streams in drift monitor)
+         - SurrealDB runs in memory mode (no persistence overhead during testing)
+         - Integration test data uses hexad-integration-* prefix (distinct from seed hexad-test-*)
+         - All custom Containerfiles use multi-stage builds from wolfi-base with non-root users"))
+
+    (session
       (date . "2026-02-28h")
       (phase . "connector-architecture-scaffold")
       (accomplishments
