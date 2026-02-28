@@ -17,6 +17,7 @@ verisim-document = { path = "../verisim-document" }
 verisim-temporal = { path = "../verisim-temporal" }
 verisim-provenance = { path = "../verisim-provenance" }
 verisim-spatial = { path = "../verisim-spatial" }
+verisim-wal = { path = "../verisim-wal" }
 
 serde.workspace = true
 serde_json.workspace = true

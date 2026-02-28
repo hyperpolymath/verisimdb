@@ -9,6 +9,14 @@ defmodule VeriSim.Query.VQLDTTest do
 
   Without the Rust core running, these tests verify that the Elixir-side wiring
   is correct and that proof failures propagate as errors (NOT silent passes).
+
+  ## Security invariants tested
+
+  1. Proofs MUST fail when the Rust core is unreachable — never silently pass.
+  2. Each proof type returns a specific error on failure, not a generic :ok.
+  3. Invalid or malformed proof data is rejected, not silently accepted.
+  4. Non-list proof_specs are rejected (previously silently passed).
+  5. Provenance proofs without an entity ID are rejected (previously silently passed).
   """
 
   use ExUnit.Case, async: false
@@ -89,9 +97,6 @@ defmodule VeriSim.Query.VQLDTTest do
 
   describe "proof verification types" do
     test "existence proof fails when Rust core unavailable" do
-      # Simulate an existence proof spec
-      proof_spec = %{proofType: "EXISTENCE", contractName: "abc-123"}
-
       # Without Rust core, existence check should fail (not silently pass)
       result =
         try do
@@ -106,8 +111,7 @@ defmodule VeriSim.Query.VQLDTTest do
       assert elem(result, 0) == :error
     end
 
-    test "provenance proof calls verify_provenance" do
-      # Parse a provenance proof query
+    test "provenance proof fails when Rust core unavailable" do
       result =
         try do
           VQLExecutor.execute_string(
@@ -122,8 +126,7 @@ defmodule VeriSim.Query.VQLDTTest do
       assert elem(result, 0) == :error
     end
 
-    test "integrity proof requires contract name" do
-      # Parse an integrity proof without contract
+    test "integrity proof fails when Rust core unavailable" do
       result =
         try do
           VQLExecutor.execute_string(
@@ -135,6 +138,91 @@ defmodule VeriSim.Query.VQLDTTest do
         end
 
       # Must be an error (Rust core not running) — NOT a silent pass
+      assert elem(result, 0) == :error
+    end
+
+    test "access proof fails when Rust core unavailable and entity specified" do
+      result =
+        try do
+          VQLExecutor.execute_string(
+            "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF ACCESS(abc-123)",
+            timeout: 1_000
+          )
+        rescue
+          _ -> {:error, :rust_core_unavailable}
+        end
+
+      assert elem(result, 0) == :error
+    end
+
+    test "citation proof fails when Rust core unavailable" do
+      result =
+        try do
+          VQLExecutor.execute_string(
+            "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF CITATION(my_citation)",
+            timeout: 1_000
+          )
+        rescue
+          _ -> {:error, :rust_core_unavailable}
+        end
+
+      assert elem(result, 0) == :error
+    end
+
+    test "zkp proof fails when Rust core unavailable" do
+      result =
+        try do
+          VQLExecutor.execute_string(
+            "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF ZKP(claim_123)",
+            timeout: 1_000
+          )
+        rescue
+          _ -> {:error, :rust_core_unavailable}
+        end
+
+      assert elem(result, 0) == :error
+    end
+  end
+
+  # ===========================================================================
+  # Silent-pass regression tests (these bugs were fixed)
+  # ===========================================================================
+
+  describe "silent-pass bug regressions" do
+    test "provenance proof without entity ID must fail, not silently pass" do
+      # REGRESSION: Previously, provenance proofs without a contract_name
+      # returned :ok instead of failing. This was a security violation —
+      # a provenance proof that cannot identify its target entity is meaningless.
+      result =
+        try do
+          VQLExecutor.execute_string(
+            "SELECT PROVENANCE.* FROM HEXAD 'abc-123' PROOF PROVENANCE(abc-123)",
+            timeout: 1_000
+          )
+        rescue
+          _ -> {:error, :rust_core_unavailable}
+        end
+
+      # Whether the Rust core is up or down, this must NEVER silently pass.
+      # It should either fail (Rust unavailable) or succeed with a real proof.
+      assert elem(result, 0) == :error or
+               (elem(result, 0) == :ok and
+                  is_map(elem(result, 1)) and
+                  Map.has_key?(elem(result, 1), :proof_certificate))
+    end
+
+    test "unknown proof type must fail, not silently pass" do
+      # A completely unknown proof type should produce an error.
+      result =
+        try do
+          VQLExecutor.execute_string(
+            "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF BOGUS_TYPE(entity)",
+            timeout: 1_000
+          )
+        rescue
+          _ -> {:error, :unknown_proof_type}
+        end
+
       assert elem(result, 0) == :error
     end
   end

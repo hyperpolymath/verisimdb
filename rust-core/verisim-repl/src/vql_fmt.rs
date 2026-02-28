@@ -21,8 +21,11 @@ const VQL_KEYWORDS: &[&str] = &[
 ];
 
 /// VQL modality names that should be uppercased.
+/// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
+/// Provenance, Spatial.
 const VQL_MODALITIES: &[&str] = &[
     "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
+    "PROVENANCE", "SPATIAL",
 ];
 
 /// Keywords that start a new major clause (indented on a new line).

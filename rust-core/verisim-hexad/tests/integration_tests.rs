@@ -9,14 +9,14 @@ use verisim_hexad::{
     HexadBuilder, HexadConfig, HexadStore, InMemoryHexadStore,
 };
 use verisim_document::TantivyDocumentStore;
-use verisim_graph::OxiGraphStore;
+use verisim_graph::SimpleGraphStore;
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
 use verisim_vector::{BruteForceVectorStore, DistanceMetric, VectorStore as _};
 
 type TestHexadStore = InMemoryHexadStore<
-    OxiGraphStore,
+    SimpleGraphStore,
     BruteForceVectorStore,
     TantivyDocumentStore,
     InMemoryTensorStore,
@@ -34,7 +34,7 @@ fn create_test_store(vector_dim: usize) -> TestHexadStore {
 
     InMemoryHexadStore::new(
         config,
-        Arc::new(OxiGraphStore::in_memory().unwrap()),
+        Arc::new(SimpleGraphStore::in_memory().unwrap()),
         Arc::new(BruteForceVectorStore::new(vector_dim, DistanceMetric::Cosine)),
         Arc::new(TantivyDocumentStore::in_memory().unwrap()),
         Arc::new(InMemoryTensorStore::new()),

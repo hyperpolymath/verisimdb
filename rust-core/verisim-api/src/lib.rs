@@ -30,7 +30,7 @@ use std::sync::Mutex;
 
 use verisim_document::TantivyDocumentStore;
 use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
-use verisim_graph::OxiGraphStore;
+use verisim_graph::SimpleGraphStore;
 use verisim_planner::{
     CacheConfig, ExplainOutput, ExplainAnalyzeOutput, LogicalPlan, ParamValue,
     PhysicalPlan, PlanCache, Planner, PlannerConfig, PreparedId, PreparedStatement,
@@ -54,7 +54,7 @@ use verisim_vector::{DistanceMetric, BruteForceVectorStore};
 
 /// Type alias for our concrete HexadStore implementation (octad: 8 modality stores)
 pub type ConcreteHexadStore = InMemoryHexadStore<
-    OxiGraphStore,
+    SimpleGraphStore,
     BruteForceVectorStore,
     TantivyDocumentStore,
     InMemoryTensorStore,
@@ -445,7 +445,7 @@ impl AppState {
         };
 
         let graph = Arc::new(
-            OxiGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
+            SimpleGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
         );
         let vector = Arc::new(BruteForceVectorStore::new(
             config.vector_dimension,

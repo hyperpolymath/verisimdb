@@ -9,15 +9,41 @@
 //   Request:  {"id": 1, "action": "parse", "query": "SELECT ..."}
 //   Response: {"id": 1, "ok": {...ast...}} or {"id": 1, "error": "..."}
 
-// Import compiled ReScript VQL parser
-// The compiled JS output will be at ../src/vql/VQLParser.bs.js (ReScript compiler output)
+// Import compiled ReScript VQL parser and type checker.
+// The compiled JS output will be at ../src/vql/*.res.mjs (ReScript compiler output).
 let VQLParser;
+let VQLTypeChecker;
+let VQLBidir;
+
 try {
-  // Try loading the compiled ReScript module
-  VQLParser = await import("../src/vql/VQLParser.bs.js");
+  VQLParser = await import("../src/vql/VQLParser.res.mjs");
 } catch (_e) {
-  // Fallback: define a minimal parser that mirrors the ReScript AST
-  VQLParser = null;
+  try {
+    // Legacy .bs.js suffix (older ReScript versions)
+    VQLParser = await import("../src/vql/VQLParser.bs.js");
+  } catch (_e2) {
+    VQLParser = null;
+  }
+}
+
+try {
+  VQLTypeChecker = await import("../src/vql/VQLTypeChecker.res.mjs");
+} catch (_e) {
+  try {
+    VQLTypeChecker = await import("../src/vql/VQLTypeChecker.bs.js");
+  } catch (_e2) {
+    VQLTypeChecker = null;
+  }
+}
+
+try {
+  VQLBidir = await import("../src/vql/VQLBidir.res.mjs");
+} catch (_e) {
+  try {
+    VQLBidir = await import("../src/vql/VQLBidir.bs.js");
+  } catch (_e2) {
+    VQLBidir = null;
+  }
 }
 
 /**
@@ -43,7 +69,7 @@ function fallbackParse(query) {
   const modalities = [];
   const projections = [];
   const aggregates = [];
-  const MODALITY_NAMES = ["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL"];
+  const MODALITY_NAMES = ["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL","PROVENANCE","SPATIAL"];
   const AGG_FUNCS = ["COUNT","SUM","AVG","MIN","MAX"];
 
   while (peek() && peek().toUpperCase() !== "FROM") {
@@ -257,7 +283,7 @@ function fallbackParseMutation(input) {
     expect("HEXAD");
     expect("WITH");
 
-    const MODALITY_NAMES = ["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL"];
+    const MODALITY_NAMES = ["GRAPH","VECTOR","TENSOR","SEMANTIC","DOCUMENT","TEMPORAL","PROVENANCE","SPATIAL"];
     const modalityData = [];
 
     while (peek() && MODALITY_NAMES.includes(peek()?.toUpperCase())) {
@@ -401,6 +427,115 @@ function parseQuery(query, action) {
 }
 
 // ---------------------------------------------------------------------------
+// Type checking: invoke ReScript VQLBidir or extract obligations from AST
+// ---------------------------------------------------------------------------
+
+/**
+ * Type-check a parsed VQL-DT AST.
+ *
+ * If compiled ReScript is available, delegates to VQLBidir.synthesizeQuery
+ * for full bidirectional type inference. Otherwise, extracts proof obligations
+ * directly from the AST's proof clause — a sound but less precise fallback.
+ *
+ * @param {object} ast - Parsed VQL query AST
+ * @returns {{ ok: object } | { error: string }} - Type info or error
+ */
+function typecheckAST(ast) {
+  // Try the full ReScript type checker first
+  if (VQLBidir) {
+    try {
+      const result = VQLBidir.synthesizeQuery(ast);
+      if (result.TAG === "Ok") {
+        return { ok: result._0 };
+      }
+      return { error: result._0?.message || JSON.stringify(result._0) };
+    } catch (e) {
+      // If VQLBidir crashes, fall through to the lightweight fallback
+    }
+  }
+
+  if (VQLTypeChecker) {
+    try {
+      const result = VQLTypeChecker.checkQuery(ast);
+      if (result.TAG === "Ok") {
+        return { ok: result._0 };
+      }
+      return { error: result._0?.message || JSON.stringify(result._0) };
+    } catch (e) {
+      // Fall through to lightweight fallback
+    }
+  }
+
+  // Lightweight fallback: extract proof obligations from the AST directly.
+  // This does NOT perform type inference — it only parses the PROOF clause
+  // into a structured list of obligations with composition strategy.
+  return { ok: fallbackTypecheck(ast) };
+}
+
+/**
+ * Fallback type checking: extract proof obligations from an AST's proof clause.
+ *
+ * Returns a structure matching what VQLBidir.synthesizeQuery would produce:
+ * { proof_obligations, composition_strategy, inferred_types }
+ */
+function fallbackTypecheck(ast) {
+  const proofSpecs = ast.proof || ast.proofSpecs || null;
+  const obligations = [];
+  let compositionStrategy = "conjunction";
+
+  if (Array.isArray(proofSpecs)) {
+    for (const spec of proofSpecs) {
+      const proofType = (spec.proofType || spec.TAG || "unknown").toUpperCase();
+      const contractName = spec.contractName || spec.contract || spec._0 || null;
+
+      // Map proof types to obligation records
+      const PROOF_TIMES = {
+        "EXISTENCE": 50, "CITATION": 100, "ACCESS": 150,
+        "INTEGRITY": 200, "PROVENANCE": 300, "CUSTOM": 500,
+        "ZKP": 400, "PROVEN": 350, "SANCTIFY": 200
+      };
+
+      obligations.push({
+        type: proofType.toLowerCase(),
+        contract: contractName,
+        estimated_time_ms: PROOF_TIMES[proofType] || 200,
+        privacy_level: spec.privacy_level || "public"
+      });
+    }
+
+    // Multiple obligations default to conjunction (all must pass)
+    compositionStrategy = obligations.length > 1 ? "conjunction" : "independent";
+  } else if (proofSpecs && typeof proofSpecs === "object" && proofSpecs.raw) {
+    // Raw proof string from built-in parser: "EXISTENCE(abc-123)"
+    const raw = proofSpecs.raw;
+    const matches = raw.matchAll(/(\w+)\(([^)]*)\)/g);
+    for (const match of matches) {
+      obligations.push({
+        type: match[1].toLowerCase(),
+        contract: match[2] || null,
+        estimated_time_ms: 200,
+        privacy_level: "public"
+      });
+    }
+    compositionStrategy = obligations.length > 1 ? "conjunction" : "independent";
+  }
+
+  // Extract modality information for inferred_types
+  const modalities = ast.modalities || [];
+  const inferredTypes = {};
+  for (const mod of modalities) {
+    const modName = typeof mod === "string" ? mod.toLowerCase() : String(mod);
+    inferredTypes[modName] = { _type: "modality_data" };
+  }
+
+  return {
+    proof_obligations: obligations,
+    composition_strategy: compositionStrategy,
+    inferred_types: inferredTypes
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main loop: read lines from stdin, process, write to stdout
 // ---------------------------------------------------------------------------
 
@@ -431,10 +566,16 @@ async function main() {
 
       try {
         const request = JSON.parse(line);
-        const { id, action, query } = request;
+        const { id, action, query, ast } = request;
 
         try {
-          const result = parseQuery(query, action);
+          let result;
+          if (action === "typecheck") {
+            // Type checking receives an AST (not a query string)
+            result = typecheckAST(ast || query);
+          } else {
+            result = parseQuery(query, action);
+          }
           const response = JSON.stringify({ id, ...result }) + "\n";
           await stdout.write(encoder.encode(response));
         } catch (e) {

@@ -4,8 +4,8 @@
 ;; Last updated: 2026-02-27
 
 (define-module (verisimdb state)
-  #:version "1.1.0"
-  #:updated "2026-02-27T23:00:00Z")
+  #:version "1.2.0"
+  #:updated "2026-02-28T02:00:00Z")
 
 ;; ============================================================================
 ;; METADATA
@@ -15,7 +15,7 @@
   '((version . "0.1.0-alpha")
     (schema-version . "1.0")
     (created . "2025-11-02")
-    (updated . "2026-02-27")
+    (updated . "2026-02-28")
     (project . "VeriSimDB")
     (repo . "https://github.com/hyperpolymath/verisimdb")
     (license . "PMPL-1.0-or-later")))
@@ -42,7 +42,7 @@
 
 (define current-position
   '((phase . "alpha-hardened")
-    (overall-completion . 92)
+    (overall-completion . 95)
     (components
       ((architecture-design . 100)
        (vql-implementation . 95)
@@ -90,7 +90,13 @@
        ✅ EXPLAIN ANALYZE + prepared statements API
        ✅ VQL Playground PWA builds cleanly (ReScript 11 fixes)
        ✅ 3 C deps eliminated (openssl-sys, aws-lc-sys, zstd-sys) — pure Rust TLS + compression
-       ✅ Container builds with Podman (wolfi-base, non-root, OTP 27)")
+       ✅ Container builds with Podman (wolfi-base, non-root, OTP 27)
+       ✅ NIF bridge (Rustler) with dual transport: VERISIM_TRANSPORT=http|nif|auto
+       ✅ REPL updated to octad (8 modalities, 9 proof types)
+       ✅ PanLL VeriSimDB module (drift heatmap, normalise button, proof parsing)
+       ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
+       ✅ Federation adapter behaviour + registry (4 adapters, 36 tests)
+       ✅ Getting-started guide and adoption strategy documentation")
     (completed-recently
       "- 7-phase security + operations + feature plan completed (2026-02-13):
          Phase 1: RwLock poisoning fixes (35+ locations), error leakage fixes, input validation, federation PSK auth
@@ -101,12 +107,10 @@
          Phase 6: ZKP custom circuits (circuit registry, R1CS compiler, verification key management, VQL circuit DSL)
          Phase 7: Homoiconicity (queries as hexads, REFLECT keyword, /queries API, self-optimization)")
     (blocked-on
-      "- VQL end-to-end integration testing still needed (Priority 1, spec DONE)
-       - Cross-modal write atomicity not formally guaranteed (Priority 0 — architectural concern)
-       - Heterogeneous federation (non-VerisimDB peers) not yet implemented (Priority 5)
-       - VQL-DT not connected to VQL PROOF runtime — Lean checker not invoked (Priority 7, after VQL)
+      "- VQL-DT not connected to VQL PROOF runtime — Lean checker not invoked (Priority 7, after VQL)
        - oxrocksdb-sys (RocksDB C++) still in tree — needs fjall/redb replacement
-       - Hypatia pipeline at 40% (connector works, fleet dispatch logged but not live)")))
+       - Hypatia pipeline at 40% (connector works, fleet dispatch logged but not live)
+       - Full Raft consensus (currently quorum-based)")))
 
 ;; ============================================================================
 ;; ROUTE TO MVP
@@ -171,8 +175,8 @@
           🔲 Adaptive learner integration (miniKanren v3)"))
 
       ((milestone "M5: Federation Support")
-       (status . "IN-PROGRESS")
-       (completion . 80)
+       (status . "COMPLETED")
+       (completion . 95)
        (items
          "✅ KRaft metadata log design
           ✅ Federation architecture + PSK authentication
@@ -180,6 +184,9 @@
           ✅ Store registration with trust levels
           ✅ Federation protocol (HTTP fanout, dedup, trust-weighted scoring)
           ✅ Real peer queries via Req HTTP client
+          ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
+          ✅ Adapter behaviour + registry (4 adapters, modality validation)
+          ✅ 36 federation tests passing (resolver + adapter)
           🔲 Full Raft consensus implementation (currently quorum-based)"))
 
       ((milestone "M6: Security & ZKP")
@@ -237,7 +244,6 @@
 
     (medium
       ("VQL-DT Lean type checker not wired to VQL PROOF runtime (after VQL is solid)"
-       "Heterogeneous federation — adapters for ArangoDB, PostgreSQL, Elasticsearch"
        "oxrocksdb-sys C++ dependency needs pure-Rust replacement (fjall or redb)"
        "Hypatia pipeline at 40% (connector works, fleet dispatch not live)"))
 
@@ -263,16 +269,16 @@
        4. Drift demo script in demos/drift-detection/")
 
     (this-month
-      "1. VQL interface pass: fix REPL build (rustyline), wire playground to real backend, fix bridge .bs.js
-       2. Wire VQL-DT Lean type checker (after VQL is solid)
-       3. PanLL-VeriSimDB backend: wire VQL-DT as PanLL module (Pane-L=proofs/types, Pane-N=agent, Pane-W=results)
-       4. Documentation pass: man pages, machine-readable docs consistent with octad
-       5. Training wiki: getting-started guide, tutorials, working examples
-       6. NIF shim layer (Rustler): dual transport HTTP+NIF with VERISIM_TRANSPORT=http|nif|auto
-       7. Reposition README: lead with drift detection, not modality count
-       8. Heterogeneous federation adapters (ArangoDB, PostgreSQL)
-       9. One external user — find a project outside hyperpolymath to use VerisimDB
-       10. Replace oxrocksdb-sys with fjall or redb")))
+      "1. ✅ REPL updated to octad (8 modalities, 9 proof types, compiles+tests clean)
+       2. ✅ NIF shim layer (Rustler): dual transport HTTP+NIF with VERISIM_TRANSPORT=http|nif|auto
+       3. ✅ PanLL VeriSimDB module (drift heatmap, normalise button, proof obligation parsing)
+       4. ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
+       5. ✅ Getting-started guide + adoption strategy (7 target domains identified)
+       6. Wire VQL-DT Lean type checker (after VQL is solid)
+       7. Replace oxrocksdb-sys with fjall or redb
+       8. Wire playground to real backend, fix bridge .bs.js
+       9. One external user — execute outreach plan (GraphRAG community first)
+       10. Full Raft consensus (replace quorum-based)")))
 
 ;; ============================================================================
 ;; DESIGN DECISIONS COMPLETED
@@ -315,6 +321,26 @@
 
 (define session-history
   '((session
+      (date . "2026-02-28a")
+      (phase . "beta-path-phases-7-8")
+      (accomplishments
+        "- Phase 7: NIF shim layer (Rustler) — verisim-nif crate + NifBridge + Transport module
+         - Phase 7: REPL updated to octad (8 modalities in completer/highlighter/linter/formatter)
+         - Phase 7: PanLL VeriSimDB module (drift heatmap, normalise button, proof obligation parsing)
+         - Phase 8a: Heterogeneous federation adapters — Adapter behaviour + VeriSimDB/ArangoDB/PostgreSQL/Elasticsearch
+         - Phase 8a: Resolver rewritten for adapter dispatch, backward-compatible 3-arity API preserved
+         - Phase 8a: 29 new adapter tests (36 total federation tests, 152 total Elixir tests)
+         - Phase 8b: Getting-started guide (docs/getting-started.adoc)
+         - Phase 8b: Adoption strategy (docs/adoption-strategy.adoc) — 7 target domains identified
+         - Updated STATE.scm: M5 federation milestone 80→95%, overall 92→95%")
+      (key-decisions
+        "- NIF uses manual :erlang.load_nif/2 (not Rustler Elixir package) for zero-dep graceful degradation
+         - PostgreSQL adapter uses dynamic Postgrex dispatch to avoid compile-time dep, falls back to HTTP
+         - Modality normalisation: adapters return atoms, resolver normalises to strings for backward compat
+         - Lead adoption pitch: data quality (drift detection), not database replacement
+         - GraphRAG identified as strongest external adoption target (exact architecture match)"))
+
+    (session
       (date . "2026-02-27c")
       (phase . "octad-evolution-implementation")
       (accomplishments

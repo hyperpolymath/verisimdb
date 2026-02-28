@@ -248,6 +248,11 @@ defmodule VeriSim.DriftMonitor do
 
           %{new_state | drift_scores: updated_scores}
 
+        {:ok, _unexpected} ->
+          # Non-list response (e.g. HTML from wrong server on port 8080)
+          Logger.debug("DriftMonitor: Rust core returned unexpected response, skipping")
+          new_state
+
         {:error, reason} ->
           Logger.warning("DriftMonitor: failed to fetch Rust core drift status: #{inspect(reason)}")
           new_state

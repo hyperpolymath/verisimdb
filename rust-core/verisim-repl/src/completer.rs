@@ -23,8 +23,11 @@ const KEYWORDS: &[&str] = &[
 ];
 
 /// Modality names (also offered as completions).
+/// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
+/// Provenance, Spatial.
 const MODALITIES: &[&str] = &[
     "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
+    "PROVENANCE", "SPATIAL",
 ];
 
 /// Meta-commands starting with backslash.

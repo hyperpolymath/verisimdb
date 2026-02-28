@@ -21,6 +21,7 @@ members = [
     "rust-core/verisim-repl",
     "rust-core/verisim-wal",
     "rust-core/verisim-storage",
+    "rust-core/verisim-nif",
     "benches",
 ]
 
@@ -32,9 +33,9 @@ license = "PMPL-1.0-or-later"
 repository = "https://gitlab.com/hyperpolymath/verisimdb"
 
 [workspace.dependencies]
-# Graph modality (RDF/Property Graph)
+# Graph modality — SimpleGraphStore is default (pure Rust, no C++ linker needed).
+# Enable oxigraph-backend feature on verisim-graph for full RDF/SPARQL support.
 oxigraph = "0.4"
-sophia = "0.8"
 
 # Vector modality (HNSW)
 hnsw_rs = "0.3"

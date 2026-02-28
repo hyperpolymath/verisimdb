@@ -23,7 +23,7 @@
 // [8 bytes: sequence (u64)]
 // [8 bytes: timestamp (i64)]      -- Unix milliseconds UTC
 // [1 byte:  operation]            -- 0=Insert, 1=Update, 2=Delete, 3=Checkpoint
-// [1 byte:  modality]             -- 0-5 for modalities, 255=All
+// [1 byte:  modality]             -- 0-7 for modalities (octad), 255=All
 // [4 bytes: entity_id_len (u32)]  -- length of entity_id UTF-8 bytes
 // [N bytes: entity_id]
 // [4 bytes: payload_len (u32)]    -- length of payload bytes

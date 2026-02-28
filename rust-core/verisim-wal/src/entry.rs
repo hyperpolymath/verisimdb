@@ -13,7 +13,7 @@
 //   [8 bytes: sequence (u64)]
 //   [8 bytes: timestamp (i64)]      -- Unix milliseconds UTC
 //   [1 byte:  operation]            -- 0=Insert, 1=Update, 2=Delete, 3=Checkpoint
-//   [1 byte:  modality]             -- 0-5 for modalities, 255=All
+//   [1 byte:  modality]             -- 0-7 for modalities (octad), 255=All
 //   [4 bytes: entity_id_len (u32)]  -- length of entity_id UTF-8 bytes
 //   [N bytes: entity_id]
 //   [4 bytes: payload_len (u32)]    -- length of payload bytes
@@ -75,7 +75,7 @@ impl WalOperation {
 // WalModality
 // ---------------------------------------------------------------------------
 
-/// Which VeriSimDB modality this entry targets.
+/// Which VeriSimDB modality this entry targets (octad: 8 modalities).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WalModality {
     /// RDF / property graph store.
@@ -90,6 +90,10 @@ pub enum WalModality {
     Document = 4,
     /// Temporal versioning / time-series store.
     Temporal = 5,
+    /// Origin/lineage tracking store.
+    Provenance = 6,
+    /// Geospatial/R-tree indexing store.
+    Spatial = 7,
     /// Applies to all modalities (used in checkpoints).
     All = 255,
 }
@@ -104,6 +108,8 @@ impl WalModality {
             3 => Ok(Self::Semantic),
             4 => Ok(Self::Document),
             5 => Ok(Self::Temporal),
+            6 => Ok(Self::Provenance),
+            7 => Ok(Self::Spatial),
             255 => Ok(Self::All),
             other => Err(WalError::InvalidModality(other)),
         }
@@ -406,6 +412,8 @@ mod tests {
             WalModality::Semantic,
             WalModality::Document,
             WalModality::Temporal,
+            WalModality::Provenance,
+            WalModality::Spatial,
             WalModality::All,
         ] {
             assert_eq!(WalModality::from_byte(modality.to_byte()).unwrap(), modality);

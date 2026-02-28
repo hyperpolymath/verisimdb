@@ -157,11 +157,14 @@ defmodule VeriSim.Query.VQLExecutor do
         info
 
       {:error, :type_checker_unavailable} ->
-        # Fall back to extracting obligations from the AST directly
+        # Fall back to extracting obligations from the AST directly.
+        # This produces structured obligations from the raw proof specs
+        # (which come from the built-in parser as %{raw: "TYPE(entity)"}).
         Logger.warning("VQL-DT: Type checker unavailable, extracting proof obligations from AST")
+        structured_obligations = structure_proof_obligations(proof_specs)
         %{
-          proof_obligations: proof_specs,
-          composition_strategy: :conjunction,
+          proof_obligations: structured_obligations,
+          composition_strategy: determine_composition(structured_obligations),
           inferred_types: %{}
         }
 
@@ -191,15 +194,19 @@ defmodule VeriSim.Query.VQLExecutor do
           proof_result = verify_multi_proof(query_ast, obligations)
 
           case proof_result do
-            :ok ->
-              # Step 4: Bundle data + proof certificate as ProvedResult
+            {:ok, artifacts} ->
+              # Step 4: Bundle data + proof certificate as ProvedResult.
+              # The certificate includes the proof artifacts returned by each
+              # verifier (e.g., hash commitments, Merkle proofs, entity existence
+              # confirmations) so downstream consumers can independently verify.
               query_text = Map.get(query_ast, :raw, "") || ""
               composition = type_info[:composition_strategy] || type_info["composition_strategy"] || :conjunction
 
               proved_result = %{
                 data: processed_rows,
                 proof_certificate: %{
-                  proofs: obligations,
+                  proofs: artifacts,
+                  obligations: obligations,
                   composition: composition,
                   verified_at: DateTime.utc_now(),
                   query_hash: :crypto.hash(:sha256, to_string(query_text)) |> Base.encode16(case: :lower)
@@ -513,13 +520,13 @@ defmodule VeriSim.Query.VQLExecutor do
   # ===========================================================================
 
   defp execute_insert(modality_data, proof, _timeout) do
-    proof_result = if proof, do: verify_multi_proof(nil, proof), else: :ok
+    proof_result = if proof, do: verify_multi_proof(nil, proof), else: {:ok, []}
 
     case proof_result do
       {:error, reason} ->
         {:error, {:write_proof_failed, reason}}
 
-      :ok ->
+      {:ok, _artifacts} ->
         case RustClient.create_hexad(modality_data) do
           {:ok, hexad_id} -> {:ok, %{hexad_id: hexad_id, operation: :insert}}
           {:error, reason} -> {:error, {:insert_failed, reason}}
@@ -530,13 +537,13 @@ defmodule VeriSim.Query.VQLExecutor do
   end
 
   defp execute_update(hexad_id, sets, proof, _timeout) do
-    proof_result = if proof, do: verify_multi_proof(nil, proof), else: :ok
+    proof_result = if proof, do: verify_multi_proof(nil, proof), else: {:ok, []}
 
     case proof_result do
       {:error, reason} ->
         {:error, {:write_proof_failed, reason}}
 
-      :ok ->
+      {:ok, _artifacts} ->
         field_updates = Enum.map(sets, fn {field_ref, value} ->
           {field_ref, value}
         end)
@@ -551,13 +558,13 @@ defmodule VeriSim.Query.VQLExecutor do
   end
 
   defp execute_delete(hexad_id, proof, _timeout) do
-    proof_result = if proof, do: verify_multi_proof(nil, proof), else: :ok
+    proof_result = if proof, do: verify_multi_proof(nil, proof), else: {:ok, []}
 
     case proof_result do
       {:error, reason} ->
         {:error, {:write_proof_failed, reason}}
 
-      :ok ->
+      {:ok, _artifacts} ->
         case RustClient.delete_hexad(hexad_id) do
           {:ok, _} -> {:ok, %{hexad_id: hexad_id, operation: :delete}}
           {:error, reason} -> {:error, {:delete_failed, reason}}
@@ -572,17 +579,29 @@ defmodule VeriSim.Query.VQLExecutor do
   # ===========================================================================
 
   defp verify_multi_proof(_query_ast, proof_specs) when is_list(proof_specs) do
-    # Verify each proof in the composition
+    # Verify each proof in the composition, collecting proof artifacts.
+    # Each verify_single_proof/1 returns {:ok, artifact} or {:error, reason}.
     results = Enum.map(proof_specs, fn spec ->
       verify_single_proof(spec)
     end)
 
     case Enum.find(results, &match?({:error, _}, &1)) do
-      nil -> :ok
-      error -> error
+      nil ->
+        # All proofs passed — collect the artifacts for the ProvedResult certificate
+        artifacts = Enum.map(results, fn {:ok, artifact} -> artifact end)
+        {:ok, artifacts}
+
+      error ->
+        error
     end
   end
-  defp verify_multi_proof(_query_ast, _proof_specs), do: :ok
+  defp verify_multi_proof(_query_ast, nil), do: {:ok, []}
+  defp verify_multi_proof(_query_ast, proof_specs) do
+    # Non-list proof specs are a safety violation — they must not silently pass.
+    # This catch-all previously returned :ok, which meant malformed proof specs
+    # (e.g., a bare map or atom) would bypass verification entirely.
+    {:error, {:invalid_proof_specs, "Expected a list of proof specifications, got: #{inspect(proof_specs)}"}}
+  end
 
   defp verify_single_proof(proof_spec) do
     # Verify a single proof obligation against the VeriSimDB contract registry.
@@ -594,14 +613,17 @@ defmodule VeriSim.Query.VQLExecutor do
     case proof_type do
       :existence ->
         # Existence proofs verify the hexad exists and is accessible.
-        # Extract entity ID from proof spec or contract name.
         entity_id = contract_name || extract_entity_from_proof(proof_spec)
 
         if entity_id do
           case RustClient.get_hexad(entity_id) do
-            {:ok, _hexad} -> :ok
-            {:error, :not_found} -> {:error, {:existence_failed, "Entity '#{entity_id}' does not exist"}}
-            {:error, reason} -> {:error, {:existence_check_failed, reason}}
+            {:ok, hexad} ->
+              {:ok, %{type: :existence, entity_id: entity_id, verified: true,
+                       status: Map.get(hexad, "status", %{})}}
+            {:error, :not_found} ->
+              {:error, {:existence_failed, "Entity '#{entity_id}' does not exist"}}
+            {:error, reason} ->
+              {:error, {:existence_check_failed, reason}}
           end
         else
           {:error, {:missing_entity, "Existence proof requires an entity ID or contract name"}}
@@ -610,19 +632,22 @@ defmodule VeriSim.Query.VQLExecutor do
       :citation ->
         # Citation proofs verify the citation chain is valid
         if contract_name do
-          validate_contract_exists(contract_name)
+          case validate_contract_exists(contract_name) do
+            {:ok, artifact} -> {:ok, artifact}
+            {:error, _} = err -> err
+          end
         else
           {:error, {:missing_contract, "Citation proof requires a contract name"}}
         end
 
       :access ->
         # Access proofs verify the user has rights via the Rust RBAC module.
-        # Extract resource and check authorization through the auth endpoint.
         entity_id = contract_name || extract_entity_from_proof(proof_spec)
 
         if entity_id do
           case RustClient.get("/auth/check/#{entity_id}") do
-            {:ok, %{status: 200, body: %{"authorized" => true}}} -> :ok
+            {:ok, %{status: 200, body: %{"authorized" => true}}} ->
+              {:ok, %{type: :access, entity_id: entity_id, authorized: true}}
             {:ok, %{status: 200, body: %{"authorized" => false}}} ->
               {:error, {:access_denied, "Not authorized to access '#{entity_id}'"}}
             {:ok, %{status: 403}} ->
@@ -631,8 +656,9 @@ defmodule VeriSim.Query.VQLExecutor do
               {:error, {:access_check_failed, reason}}
           end
         else
-          # No specific entity — access proof passes (global query)
-          :ok
+          # No specific entity — log a warning but allow for global queries.
+          Logger.warning("VQL-DT: Access proof without entity ID — global query, skipping entity-level check")
+          {:ok, %{type: :access, entity_id: nil, authorized: true, scope: :global}}
         end
 
       :integrity ->
@@ -644,12 +670,15 @@ defmodule VeriSim.Query.VQLExecutor do
                  contract: contract_name,
                  privacy_level: "public"
                }) do
-            {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
+            {:ok, %{status: 200, body: %{"success" => true} = body}} ->
+              {:ok, %{type: :integrity, contract: contract_name, verified: true,
+                       proof_data: Map.get(body, "proof")}}
             {:ok, %{status: 200, body: %{"success" => false, "error" => reason}}} ->
               {:error, {:integrity_failed, reason}}
             {:ok, %{status: 200, body: %{"error" => reason}}} ->
               {:error, {:integrity_failed, reason}}
-            {:error, reason} -> {:error, {:integrity_check_failed, reason}}
+            {:error, reason} ->
+              {:error, {:integrity_check_failed, reason}}
           end
         else
           {:error, {:missing_contract, "Integrity proof requires a contract name"}}
@@ -657,26 +686,29 @@ defmodule VeriSim.Query.VQLExecutor do
 
       :provenance ->
         # Provenance proofs verify lineage is verifiable via the provenance store.
-        # Checks chain integrity if a contract/entity reference is provided.
-        if contract_name do
-          case RustClient.verify_provenance(contract_name) do
-            {:ok, %{"has_provenance" => true, "chain_valid" => true}} ->
-              :ok
+        # An entity/contract reference is REQUIRED.
+        entity_id = contract_name || extract_entity_from_proof(proof_spec)
+
+        if entity_id do
+          case RustClient.verify_provenance(entity_id) do
+            {:ok, %{"has_provenance" => true, "chain_valid" => true} = body} ->
+              {:ok, %{type: :provenance, entity_id: entity_id, chain_valid: true,
+                       chain_length: Map.get(body, "chain_length", 0)}}
 
             {:ok, %{"has_provenance" => true, "chain_valid" => false}} ->
-              {:error, {:provenance_chain_broken, contract_name}}
+              {:error, {:provenance_chain_broken, entity_id}}
 
             {:ok, %{"has_provenance" => false}} ->
-              {:error, {:no_provenance, "Entity '#{contract_name}' has no provenance chain"}}
+              {:error, {:no_provenance, "Entity '#{entity_id}' has no provenance chain"}}
 
             {:error, :not_found} ->
-              {:error, {:entity_not_found, contract_name}}
+              {:error, {:entity_not_found, entity_id}}
 
             {:error, reason} ->
               {:error, {:provenance_verify_failed, reason}}
           end
         else
-          :ok
+          {:error, {:missing_entity, "Provenance proof requires an entity ID or contract name"}}
         end
 
       :custom ->
@@ -689,10 +721,13 @@ defmodule VeriSim.Query.VQLExecutor do
                  claim: claim,
                  privacy_level: Map.get(proof_spec, :privacy_level, "public")
                }) do
-            {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
+            {:ok, %{status: 200, body: %{"success" => true} = body}} ->
+              {:ok, %{type: :custom, circuit: contract_name, verified: true,
+                       proof_data: Map.get(body, "proof")}}
             {:ok, %{status: 200, body: %{"error" => reason}}} ->
               {:error, {:custom_proof_failed, reason}}
-            {:error, reason} -> {:error, {:custom_proof_failed, reason}}
+            {:error, reason} ->
+              {:error, {:custom_proof_failed, reason}}
           end
         else
           {:error, {:missing_contract, "Custom proof requires a circuit/contract name"}}
@@ -703,24 +738,33 @@ defmodule VeriSim.Query.VQLExecutor do
         privacy_level = Map.get(proof_spec, :privacy_level, "public")
         claim = Map.get(proof_spec, :claim, "")
         case RustClient.post("/proofs/generate", %{claim: claim, privacy_level: privacy_level}) do
-          {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
-          {:ok, %{status: 200, body: %{"error" => reason}}} -> {:error, {:zkp_failed, reason}}
-          {:error, reason} -> {:error, {:zkp_unavailable, reason}}
+          {:ok, %{status: 200, body: %{"success" => true} = body}} ->
+            {:ok, %{type: :zkp, verified: true, privacy_level: privacy_level,
+                     proof_data: Map.get(body, "proof")}}
+          {:ok, %{status: 200, body: %{"error" => reason}}} ->
+            {:error, {:zkp_failed, reason}}
+          {:error, reason} ->
+            {:error, {:zkp_unavailable, reason}}
         end
 
       :proven ->
         # Proven proofs verify against certificates from the proven library
-        # Certificates are stored as proof blobs in the semantic store
         claim = Map.get(proof_spec, :claim, "")
         case RustClient.post("/proofs/generate", %{claim: claim, privacy_level: "public"}) do
-          {:ok, %{status: 200, body: %{"success" => true}}} -> :ok
-          _ -> {:error, {:proven_unavailable, "proven certificate verification failed"}}
+          {:ok, %{status: 200, body: %{"success" => true} = body}} ->
+            {:ok, %{type: :proven, verified: true,
+                     proof_data: Map.get(body, "proof")}}
+          _ ->
+            {:error, {:proven_unavailable, "proven certificate verification failed"}}
         end
 
       :sanctify ->
         # Sanctify proofs verify security contracts from sanctify-php
         if contract_name do
-          validate_contract_exists(contract_name)
+          case validate_contract_exists(contract_name) do
+            {:ok, artifact} -> {:ok, artifact}
+            {:error, _} = err -> err
+          end
         else
           {:error, {:missing_contract, "Sanctify proof requires a contract name"}}
         end
@@ -733,7 +777,12 @@ defmodule VeriSim.Query.VQLExecutor do
   defp extract_proof_type(%{proofType: type}), do: normalize_proof_type(type)
   defp extract_proof_type(%{TAG: tag}), do: normalize_proof_type(tag)
   defp extract_proof_type(%{raw: raw}) when is_binary(raw) do
-    raw |> String.split() |> List.first() |> normalize_proof_type()
+    # Raw proof strings look like "EXISTENCE(entity-001)" or "EXISTENCE entity-001".
+    # Extract just the proof type name (before any parens or whitespace).
+    raw
+    |> String.split(~r/[\s(]/, parts: 2)
+    |> List.first()
+    |> normalize_proof_type()
   end
   defp extract_proof_type(_), do: :unknown
 
@@ -748,7 +797,13 @@ defmodule VeriSim.Query.VQLExecutor do
   defp normalize_proof_type("SANCTIFY"), do: :sanctify
   defp normalize_proof_type(%{TAG: tag}), do: normalize_proof_type(tag)
   defp normalize_proof_type(atom) when is_atom(atom), do: atom
-  defp normalize_proof_type(str) when is_binary(str), do: String.downcase(str) |> String.to_existing_atom()
+  defp normalize_proof_type(str) when is_binary(str) do
+    try do
+      String.downcase(str) |> String.to_existing_atom()
+    rescue
+      ArgumentError -> :unknown
+    end
+  end
   defp normalize_proof_type(_), do: :unknown
 
   defp extract_contract_name(%{contractName: name}), do: name
@@ -767,10 +822,14 @@ defmodule VeriSim.Query.VQLExecutor do
     # If the store is unreachable, the proof MUST fail — silently passing
     # would defeat the purpose of verified queries.
     case RustClient.search_text("contract:#{contract_name}", 1) do
-      {:ok, results} when is_list(results) and length(results) > 0 -> :ok
-      {:ok, %{"results" => [_ | _]}} -> :ok
-      {:ok, _} -> {:error, {:contract_not_found, contract_name}}
-      {:error, reason} -> {:error, {:contract_verification_failed, reason}}
+      {:ok, results} when is_list(results) and length(results) > 0 ->
+        {:ok, %{type: :contract_verified, contract: contract_name, verified: true}}
+      {:ok, %{"results" => [_ | _]}} ->
+        {:ok, %{type: :contract_verified, contract: contract_name, verified: true}}
+      {:ok, _} ->
+        {:error, {:contract_not_found, contract_name}}
+      {:error, reason} ->
+        {:error, {:contract_verification_failed, reason}}
     end
   end
 
@@ -779,6 +838,33 @@ defmodule VeriSim.Query.VQLExecutor do
   defp extract_entity_from_proof(%{hexad_id: id}), do: id
   defp extract_entity_from_proof(%{hexadId: id}), do: id
   defp extract_entity_from_proof(_), do: nil
+
+  # ---------------------------------------------------------------------------
+  # Proof obligation structuring (fallback when type checker unavailable)
+  # ---------------------------------------------------------------------------
+
+  defp structure_proof_obligations(nil), do: []
+  defp structure_proof_obligations(specs) when is_list(specs) do
+    Enum.map(specs, fn spec ->
+      proof_type = extract_proof_type(spec)
+      contract = extract_contract_name(spec)
+
+      %{
+        type: proof_type,
+        contract: contract,
+        proofType: proof_type |> Atom.to_string() |> String.upcase(),
+        contractName: contract
+      }
+    end)
+  end
+  defp structure_proof_obligations(spec) when is_map(spec) do
+    structure_proof_obligations([spec])
+  end
+  defp structure_proof_obligations(_), do: []
+
+  defp determine_composition([]), do: :independent
+  defp determine_composition([_]), do: :independent
+  defp determine_composition(_obligations), do: :conjunction
 
   # ===========================================================================
   # Query execution by source type

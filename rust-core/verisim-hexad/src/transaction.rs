@@ -4,8 +4,8 @@
 //! ACID Transaction Manager for VeriSimDB Hexad Operations
 //!
 //! Provides cross-modality atomicity for hexad operations. A hexad update must
-//! either succeed across all 6 modalities or fail completely, preserving the
-//! fundamental consistency guarantee of the hexad model.
+//! either succeed across all 8 modalities (octad) or fail completely,
+//! preserving the fundamental consistency guarantee of the hexad model.
 //!
 //! # Architecture
 //!
@@ -44,12 +44,16 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 // ---------------------------------------------------------------------------
-// Constants: the six VeriSimDB modalities
+// Constants: the eight VeriSimDB modalities (octad)
 // ---------------------------------------------------------------------------
 
-/// All six modalities that a hexad spans.
+/// All eight modalities that a hexad spans (the octad).
+///
+/// Originally six modalities; extended with `provenance` and `spatial` when
+/// VeriSimDB evolved from hexad to octad model.
 pub const MODALITIES: &[&str] = &[
     "graph", "vector", "tensor", "semantic", "document", "temporal",
+    "provenance", "spatial",
 ];
 
 // ---------------------------------------------------------------------------
@@ -78,7 +82,7 @@ pub enum TransactionError {
     },
     /// The requested transaction does not exist.
     TransactionNotFound(Uuid),
-    /// A modality name is not one of the six valid modalities.
+    /// A modality name is not one of the eight valid modalities.
     InvalidModality(String),
     /// MVCC version conflict: the entity was modified after the transaction read it.
     VersionConflict {
@@ -562,9 +566,9 @@ impl VersionTable {
 
 /// The central transaction manager for VeriSimDB hexad operations.
 ///
-/// Coordinates transactions, locks, and MVCC versioning across the six
-/// modalities. All public methods are `async` and thread-safe via interior
-/// `RwLock`s.
+/// Coordinates transactions, locks, and MVCC versioning across the eight
+/// modalities (octad). All public methods are `async` and thread-safe via
+/// interior `RwLock`s.
 pub struct TransactionManager {
     /// Active and recently completed transactions.
     active_transactions: Arc<RwLock<HashMap<Uuid, Transaction>>>,
@@ -1376,16 +1380,16 @@ mod tests {
                 .unwrap();
         }
 
-        // Record undo for all six modalities
+        // Record undo for all eight modalities (octad)
         for modality in MODALITIES {
             mgr.record_undo(txn_id, "e1", modality, Some(vec![0xDE, 0xAD]), 0)
                 .await
                 .unwrap();
         }
 
-        // Simulate a failure after writing 3 modalities -> rollback
+        // Simulate a failure after writing all modalities -> rollback
         let undo = mgr.rollback(txn_id).await.unwrap();
-        assert_eq!(undo.len(), 6);
+        assert_eq!(undo.len(), MODALITIES.len());
 
         // All locks should be released
         for modality in MODALITIES {

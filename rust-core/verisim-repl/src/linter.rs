@@ -87,7 +87,7 @@ impl LintRule {
     pub fn description(&self) -> &'static str {
         match self {
             LintRule::MissingLimit => "Query lacks LIMIT clause — may return unbounded results",
-            LintRule::SelectAllModalities => "Query selects all 6 modalities — consider selecting only what you need",
+            LintRule::SelectAllModalities => "Query selects all 8 modalities — consider selecting only what you need",
             LintRule::MissingProof => "Semantic modality accessed without PROOF clause — data integrity not verified",
             LintRule::UnboundedTraverse => "TRAVERSE without DEPTH limit — may explore entire graph",
             LintRule::MissingThreshold => "DRIFT/CONSISTENCY check without THRESHOLD — using implicit default",
@@ -117,15 +117,16 @@ impl fmt::Display for LintDiagnostic {
     }
 }
 
-/// VQL modality names.
+/// VQL modality names — all 8 octad modalities.
 const MODALITIES: &[&str] = &[
     "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
+    "PROVENANCE", "SPATIAL",
 ];
 
 /// Known VQL-DT proof types.
 const KNOWN_PROOF_TYPES: &[&str] = &[
     "EXISTENCE", "CONSISTENCY", "INTEGRITY", "AUTHENTICITY",
-    "PROVENANCE", "ZKP", "PLONK",
+    "PROVENANCE", "ACCESS", "CITATION", "ZKP", "PLONK",
 ];
 
 /// Lint a VQL query string and return diagnostics.
@@ -170,7 +171,7 @@ pub fn lint_query(query: &str) -> Vec<LintDiagnostic> {
             .iter()
             .filter(|m| tokens.contains(m))
             .count();
-        if modality_count >= 6 {
+        if modality_count >= 8 {
             diagnostics.push(LintDiagnostic {
                 rule: LintRule::SelectAllModalities,
                 severity: Severity::Hint,
@@ -366,7 +367,7 @@ mod tests {
     #[test]
     fn test_select_all_modalities() {
         let diagnostics = lint_query(
-            "SELECT GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL FROM HEXAD LIMIT 10"
+            "SELECT GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL PROVENANCE SPATIAL FROM HEXAD LIMIT 10"
         );
         assert!(diagnostics.iter().any(|d| d.rule == LintRule::SelectAllModalities));
     }

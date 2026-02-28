@@ -39,6 +39,10 @@ pub use query_hexad::{QueryHexadBuilder, QueryExecution};
 
 // ACID transaction manager for cross-modality atomicity
 pub mod transaction;
+pub use transaction::{IsolationLevel, LockType, TransactionManager, TransactionError, TransactionState};
+
+// WAL types (re-exported for external use)
+pub use verisim_wal::{SyncMode, WalEntry, WalModality, WalOperation, WalWriter};
 
 /// Hexad errors
 #[derive(Error, Debug)]

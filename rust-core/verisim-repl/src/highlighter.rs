@@ -22,8 +22,11 @@ const VQL_KEYWORDS: &[&str] = &[
 ];
 
 /// VQL modality names highlighted in green.
+/// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
+/// Provenance, Spatial.
 const VQL_MODALITIES: &[&str] = &[
     "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
+    "PROVENANCE", "SPATIAL",
 ];
 
 /// Syntax highlighter for VQL input lines.
