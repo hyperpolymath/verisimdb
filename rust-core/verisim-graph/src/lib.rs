@@ -23,6 +23,12 @@ mod oxigraph_backend;
 #[cfg(feature = "oxigraph-backend")]
 pub use oxigraph_backend::OxiGraphStore;
 
+// Re-export redb backend when feature is enabled
+#[cfg(feature = "redb-backend")]
+mod redb_backend;
+#[cfg(feature = "redb-backend")]
+pub use redb_backend::RedbGraphStore;
+
 /// Graph modality errors
 #[derive(Error, Debug)]
 pub enum GraphError {

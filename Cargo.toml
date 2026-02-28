@@ -28,9 +28,14 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 license = "PMPL-1.0-or-later"
 repository = "https://gitlab.com/hyperpolymath/verisimdb"
+homepage = "https://github.com/hyperpolymath/verisimdb"
+documentation = "https://github.com/hyperpolymath/verisimdb/tree/main/docs"
+keywords = ["database", "multimodal", "drift-detection", "federation", "consistency"]
+categories = ["database", "data-structures"]
+readme = "README.adoc"
 
 [workspace.dependencies]
 # Graph modality — SimpleGraphStore is default (pure Rust, no C++ linker needed).
@@ -95,6 +100,9 @@ uuid = { version = "1.11", features = ["v4"] }
 
 # Regex
 regex = "1.11"
+
+# Persistent storage (pure Rust, B-tree, ACID)
+redb = "3.1"
 
 # CRC (WAL integrity)
 crc32fast = "1.4"

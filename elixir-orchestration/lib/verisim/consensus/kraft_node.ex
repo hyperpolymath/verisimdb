@@ -39,10 +39,13 @@ defmodule VeriSim.Consensus.KRaftNode do
   use GenServer
   require Logger
 
+  alias VeriSim.Consensus.KRaftWAL
+
   @election_timeout_min 150
   @election_timeout_max 300
   @heartbeat_interval 50
   @tick_interval 10
+  @snapshot_interval 1000
 
   # ---------------------------------------------------------------------------
   # Types
@@ -101,6 +104,39 @@ defmodule VeriSim.Consensus.KRaftNode do
     GenServer.call(via(node_id), :registry)
   end
 
+  @doc """
+  Add a server to the cluster dynamically.
+
+  The new node starts as non-voting until caught up with the leader's log.
+  The command is replicated through the Raft log so all nodes learn about
+  the membership change atomically at the same commit index.
+
+  ## Parameters
+
+  - `node_id` — the node to send the request to (should be the leader)
+  - `new_node_id` — the ID of the node being added
+  - `new_peer_list` — the updated peer list for the new node (optional metadata)
+  """
+  def add_server(node_id, new_node_id, new_peer_list \\ []) do
+    GenServer.call(via(node_id), {:propose, {:add_server, new_node_id, new_peer_list}})
+  end
+
+  @doc """
+  Remove a server from the cluster dynamically.
+
+  The removed node will no longer receive AppendEntries or vote requests
+  once the removal command commits. The removed node should be stopped
+  separately after the command commits.
+
+  ## Parameters
+
+  - `node_id` — the node to send the request to (should be the leader)
+  - `target_node_id` — the ID of the node being removed
+  """
+  def remove_server(node_id, target_node_id) do
+    GenServer.call(via(node_id), {:propose, {:remove_server, target_node_id}})
+  end
+
   @doc "Receive a vote request RPC from a candidate."
   def request_vote(node_id, request) do
     GenServer.call(via(node_id), {:request_vote, request})
@@ -121,28 +157,36 @@ defmodule VeriSim.Consensus.KRaftNode do
     peers = Keyword.get(opts, :peers, [])
     wal_path = Keyword.get(opts, :wal_path, nil)
 
+    # Initialize WAL directory and recover persisted state
+    KRaftWAL.init(wal_path)
+    {current_term, voted_for, log, registry, snapshot_index} = recover_from_wal(wal_path)
+
     state = %State{
       node_id: node_id,
       peers: peers,
       role: :follower,
-      current_term: 0,
-      voted_for: nil,
-      log: [],
-      commit_index: 0,
-      last_applied: 0,
+      current_term: current_term,
+      voted_for: voted_for,
+      log: log,
+      commit_index: snapshot_index,
+      last_applied: snapshot_index,
       next_index: %{},
       match_index: %{},
       leader_id: nil,
       votes_received: MapSet.new(),
       election_timer: schedule_election_timeout(),
       heartbeat_timer: nil,
-      registry: initial_registry(),
+      registry: registry,
       pending_requests: [],
       election_count: 0,
       wal_path: wal_path
     }
 
-    Logger.info("KRaft: node #{node_id} started as follower")
+    Logger.info(
+      "KRaft: node #{node_id} started as follower " <>
+        "(term=#{current_term}, log=#{length(log)} entries)"
+    )
+
     {:ok, state}
   end
 
@@ -154,6 +198,9 @@ defmodule VeriSim.Consensus.KRaftNode do
       command: command,
       timestamp: System.system_time(:millisecond)
     }
+
+    # Persist entry to WAL before replicating (durability guarantee)
+    KRaftWAL.append_entry(state.wal_path, entry)
 
     new_log = state.log ++ [entry]
     pending = [{entry.index, from} | state.pending_requests]
@@ -268,6 +315,9 @@ defmodule VeriSim.Consensus.KRaftNode do
         election_timer: schedule_election_timeout()
     }
 
+    # Persist term and vote BEFORE sending RPCs (Raft safety requirement)
+    KRaftWAL.persist_state(state.wal_path, new_term, state.node_id)
+
     # Send vote requests to all peers
     last_log_index = length(state.log)
     last_log_term = last_log_term(state)
@@ -311,6 +361,7 @@ defmodule VeriSim.Consensus.KRaftNode do
 
         if log_up_to_date?(state, request) do
           state = %{state | voted_for: request.candidate_id}
+          KRaftWAL.persist_state(state.wal_path, state.current_term, state.voted_for)
           state = reset_election_timer(state)
           {state, %{term: state.current_term, vote_granted: true}}
         else
@@ -320,6 +371,7 @@ defmodule VeriSim.Consensus.KRaftNode do
       state.voted_for == nil or state.voted_for == request.candidate_id ->
         if log_up_to_date?(state, request) do
           state = %{state | voted_for: request.candidate_id}
+          KRaftWAL.persist_state(state.wal_path, state.current_term, state.voted_for)
           state = reset_election_timer(state)
           {state, %{term: state.current_term, vote_granted: true}}
         else
@@ -389,6 +441,7 @@ defmodule VeriSim.Consensus.KRaftNode do
       timestamp: System.system_time(:millisecond)
     }
 
+    KRaftWAL.append_entry(state.wal_path, noop)
     state = %{state | log: state.log ++ [noop]}
 
     # Send initial heartbeats
@@ -472,6 +525,16 @@ defmodule VeriSim.Consensus.KRaftNode do
           new_log = Enum.take(state.log, request.prev_log_index) ++ request.entries
           new_commit = min(request.leader_commit, length(new_log))
 
+          # Persist received entries to WAL for crash recovery
+          if request.entries != [] do
+            if request.prev_log_index < length(state.log) do
+              # Log conflict — truncate WAL entries at conflicting indices first
+              KRaftWAL.truncate_after(state.wal_path, request.prev_log_index)
+            end
+
+            KRaftWAL.append_entries(state.wal_path, request.entries)
+          end
+
           state = %{state | log: new_log, commit_index: new_commit}
           state = apply_committed(state)
 
@@ -549,9 +612,11 @@ defmodule VeriSim.Consensus.KRaftNode do
         state.log
         |> Enum.slice(state.last_applied, state.commit_index - state.last_applied)
 
-      new_registry =
-        Enum.reduce(entries_to_apply, state.registry, fn entry, reg ->
-          apply_command(reg, entry.command)
+      {new_registry, new_peers} =
+        Enum.reduce(entries_to_apply, {state.registry, state.peers}, fn entry, {reg, peers} ->
+          new_reg = apply_command(reg, entry.command)
+          new_peers = apply_membership_change(peers, state.node_id, entry.command)
+          {new_reg, new_peers}
         end)
 
       Logger.debug(
@@ -559,8 +624,81 @@ defmodule VeriSim.Consensus.KRaftNode do
           "(#{state.last_applied + 1}..#{state.commit_index})"
       )
 
-      %{state | last_applied: state.commit_index, registry: new_registry}
+      state = %{state | last_applied: state.commit_index, registry: new_registry, peers: new_peers}
+
+      # Update leader tracking structures when peers change
+      state =
+        if state.role == :leader and state.peers != new_peers do
+          # Add next_index/match_index entries for any new peers
+          new_next_index =
+            Enum.reduce(new_peers, state.next_index, fn peer, ni ->
+              Map.put_new(ni, peer, length(state.log) + 1)
+            end)
+
+          new_match_index =
+            Enum.reduce(new_peers, state.match_index, fn peer, mi ->
+              Map.put_new(mi, peer, 0)
+            end)
+
+          # Remove entries for removed peers
+          removed = MapSet.difference(MapSet.new(Map.keys(state.next_index)), MapSet.new(new_peers))
+
+          new_next_index = Map.drop(new_next_index, MapSet.to_list(removed))
+          new_match_index = Map.drop(new_match_index, MapSet.to_list(removed))
+
+          %{state | next_index: new_next_index, match_index: new_match_index}
+        else
+          state
+        end
+
+      # Trigger snapshot periodically to bound WAL growth
+      maybe_trigger_snapshot(state)
     end
+  end
+
+  # Update the peer list when a membership change command is applied.
+  # The new node is added as non-voting initially (it appears in the peer
+  # list but needs to catch up with the log before it counts for quorum).
+  defp apply_membership_change(peers, self_id, {:add_server, new_node_id, _peer_list}) do
+    if new_node_id != self_id and new_node_id not in peers do
+      peers ++ [new_node_id]
+    else
+      peers
+    end
+  end
+
+  defp apply_membership_change(peers, self_id, {:remove_server, target_node_id}) do
+    if target_node_id != self_id do
+      List.delete(peers, target_node_id)
+    else
+      # A node removing itself — leave the peer list intact; the node
+      # will be stopped separately after the command commits.
+      peers
+    end
+  end
+
+  defp apply_membership_change(peers, _self_id, _command), do: peers
+
+  defp maybe_trigger_snapshot(state) do
+    if state.wal_path != nil and state.last_applied > 0 and
+         rem(state.last_applied, @snapshot_interval) == 0 do
+      last_entry = Enum.at(state.log, state.last_applied - 1)
+
+      if last_entry do
+        KRaftWAL.save_snapshot(
+          state.wal_path,
+          state.registry,
+          state.last_applied,
+          last_entry.term
+        )
+
+        Logger.info(
+          "KRaft: node #{state.node_id} saved snapshot at index #{state.last_applied}"
+        )
+      end
+    end
+
+    state
   end
 
   defp apply_command(registry, {:register_store, store_id, endpoint, modalities}) do
@@ -603,6 +741,23 @@ defmodule VeriSim.Consensus.KRaftNode do
     end
   end
 
+  defp apply_command(registry, {:add_server, node_id, _peer_list}) do
+    # Track membership in registry config for observability.
+    # The actual peer list update happens in the GenServer state (see below).
+    members = get_in(registry, [:config, :members]) || []
+
+    unless node_id in members do
+      put_in(registry, [:config, :members], members ++ [node_id])
+    else
+      registry
+    end
+  end
+
+  defp apply_command(registry, {:remove_server, node_id}) do
+    members = get_in(registry, [:config, :members]) || []
+    put_in(registry, [:config, :members], List.delete(members, node_id))
+  end
+
   defp apply_command(registry, :noop), do: registry
 
   defp reply_to_pending(state) do
@@ -624,6 +779,9 @@ defmodule VeriSim.Consensus.KRaftNode do
 
   defp step_down(state, new_term) do
     if state.heartbeat_timer, do: Process.cancel_timer(state.heartbeat_timer)
+
+    # Persist new term BEFORE responding (Raft safety requirement)
+    KRaftWAL.persist_state(state.wal_path, new_term, nil)
 
     %{
       state
@@ -693,5 +851,24 @@ defmodule VeriSim.Consensus.KRaftNode do
         consistency_mode: :quorum
       }
     }
+  end
+
+  defp recover_from_wal(wal_path) do
+    case KRaftWAL.recover(wal_path) do
+      {:ok, nil} ->
+        # Fresh start — no WAL found
+        {0, nil, [], initial_registry(), 0}
+
+      {:ok, recovered} ->
+        registry = recovered.registry || initial_registry()
+
+        {
+          recovered.current_term,
+          recovered.voted_for,
+          recovered.log,
+          registry,
+          recovered.snapshot_index
+        }
+    end
   end
 end

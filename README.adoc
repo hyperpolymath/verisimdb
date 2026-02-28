@@ -327,7 +327,7 @@ iex -S mix
 ----
 cargo test                    # Rust: 510+ tests
 cd elixir-orchestration
-mix test                      # Elixir: 109+ VQL tests
+mix test                      # Elixir: 160+ tests (VQL, consensus, telemetry, federation, hypatia)
 ----
 
 === Container
@@ -377,6 +377,27 @@ curl http://localhost:8080/api/v1/drift/status
 [source,bash]
 ----
 curl -X POST http://localhost:8080/api/v1/normalizer/trigger/entity-001
+----
+
+=== gRPC (port 50051)
+
+VeriSimDB's gRPC server runs directly on the Rust core (via tonic) on port 50051. The V API gateway does not proxy gRPC traffic — connect directly to the Rust core.
+
+[source,bash]
+----
+# List available gRPC services
+grpcurl -plaintext localhost:50051 list
+
+# Health check
+grpcurl -plaintext localhost:50051 verisimdb.VeriSimService/Health
+
+# Execute a VQL query
+grpcurl -plaintext -d '{"query": "SELECT * FROM hexads LIMIT 10"}' \
+  localhost:50051 verisimdb.VeriSimService/Query
+
+# Get a specific hexad
+grpcurl -plaintext -d '{"id": "entity-001"}' \
+  localhost:50051 verisimdb.VeriSimService/GetHexad
 ----
 
 == Project Structure
@@ -436,6 +457,10 @@ ZKP proofs and dependent types enable tamper-evident knowledge exchange. VQL-DT 
 * link:docs/drift-handling.adoc[Drift Handling] — Detection, repair, federation drift
 * link:docs/safety-and-fault-tolerance.adoc[Safety & Fault Tolerance] — Memory, kernel, platform, supply chain safety
 * link:docs/deployment-modes.adoc[Deployment Modes] — Standalone, federated, hybrid
+* link:docs/getting-started.adoc[Getting Started] — Step-by-step setup guide
+* link:docs/adoption-strategy.adoc[Adoption Strategy] — Target domains and rollout plan
+* link:docs/VQL-SPEC.adoc[VQL Specification] — 2785-line normative language spec
+* link:docs/papers/[White Papers] — Academic and industry papers
 
 == License
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Example VQL queries for the playground.
+// Covers all 8 octad modalities, real backend queries, and VQL-DT proof types.
 
 type example = {
   label: string,
@@ -8,65 +9,96 @@ type example = {
 }
 
 let examples = [
+  // --- Standard VQL examples ---
   {
-    label: "Basic graph query",
-    query: "SELECT GRAPH\nFROM HEXAD\nWHERE type = 'Person'\nLIMIT 10",
-    vqlDt: false,
-  },
-  {
-    label: "Vector similarity search",
-    query: "SELECT VECTOR\nFROM HEXAD\nWHERE SIMILAR TO [0.1, 0.2, 0.3]\nLIMIT 5",
-    vqlDt: false,
-  },
-  {
-    label: "Multi-modality query",
-    query: "SELECT GRAPH, VECTOR, DOCUMENT\nFROM HEXAD\nWHERE name CONTAINS 'machine learning'\nORDER BY score DESC\nLIMIT 20",
-    vqlDt: false,
-  },
-  {
-    label: "Graph traversal",
-    query: "SELECT GRAPH\nFROM HEXAD\nTRAVERSE relates_to\nDEPTH 3\nWHERE type = 'Concept'\nLIMIT 50",
-    vqlDt: false,
-  },
-  {
-    label: "Temporal query",
-    query: "SELECT TEMPORAL\nFROM HEXAD\nAT TIME '2026-01-01T00:00:00Z'\nWHERE id = 'entity-123'\nLIMIT 1",
+    label: "List all hexads",
+    query: "SELECT * FROM hexads LIMIT 10",
     vqlDt: false,
   },
   {
     label: "Full-text search",
-    query: "SELECT DOCUMENT\nFROM HEXAD\nWHERE body CONTAINS 'multimodal database'\nORDER BY score DESC\nLIMIT 10",
+    query: "SEARCH TEXT 'multimodal database' LIMIT 10",
     vqlDt: false,
   },
   {
-    label: "Explain plan",
-    query: "EXPLAIN SELECT GRAPH, VECTOR, SEMANTIC\nFROM HEXAD\nWHERE type = 'Article'\nLIMIT 100",
+    label: "Vector similarity search",
+    query: "SEARCH VECTOR [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] LIMIT 5",
     vqlDt: false,
   },
   {
-    label: "Federation query",
+    label: "Graph traversal",
+    query: "SEARCH RELATED 'entity-1' BY 'relates_to'",
+    vqlDt: false,
+  },
+  {
+    label: "Insert a hexad",
+    query: "INSERT INTO hexads (title, body)\nVALUES ('My Entity', 'A multimodal entity in VeriSimDB')",
+    vqlDt: false,
+  },
+  {
+    label: "Show server status",
+    query: "SHOW STATUS",
+    vqlDt: false,
+  },
+  {
+    label: "Show drift metrics",
+    query: "SHOW DRIFT",
+    vqlDt: false,
+  },
+  {
+    label: "Explain a query",
+    query: "EXPLAIN SELECT * FROM hexads WHERE id = 'my-entity' LIMIT 1",
+    vqlDt: false,
+  },
+  {
+    label: "Count hexads",
+    query: "COUNT hexads",
+    vqlDt: false,
+  },
+  {
+    label: "Multi-modality query (demo)",
+    query: "SELECT GRAPH, VECTOR, DOCUMENT, PROVENANCE\nFROM HEXAD\nWHERE name CONTAINS 'example'\nORDER BY score DESC\nLIMIT 20",
+    vqlDt: false,
+  },
+  {
+    label: "Temporal query (demo)",
+    query: "SELECT TEMPORAL, PROVENANCE\nFROM HEXAD\nAT TIME '2026-02-28T00:00:00Z'\nWHERE id = 'entity-123'\nLIMIT 1",
+    vqlDt: false,
+  },
+  {
+    label: "Federation query (demo)",
     query: "SELECT GRAPH\nFROM FEDERATION STORE 'remote-cluster-1'\nHEXAD\nWHERE region = 'eu-west'\nLIMIT 25",
     vqlDt: false,
   },
-  // VQL-DT examples
+  // --- VQL-DT examples ---
   {
     label: "Proof of existence (VQL-DT)",
     query: "SELECT SEMANTIC\nFROM HEXAD\nPROOF EXISTENCE\nTHRESHOLD 0.95\nWHERE type = 'Certificate'\nLIMIT 10",
     vqlDt: true,
   },
   {
-    label: "ZKP verification (VQL-DT)",
-    query: "SELECT SEMANTIC, DOCUMENT\nFROM HEXAD\nPROOF ZKP\nTHRESHOLD 0.99\nWHERE classification = 'confidential'\nLIMIT 5",
-    vqlDt: true,
-  },
-  {
-    label: "PLONK proof (VQL-DT)",
-    query: "SELECT SEMANTIC\nFROM HEXAD\nPROOF PLONK\nTHRESHOLD 1.0\nWHERE provenance = 'verified'\nLIMIT 10",
+    label: "Integrity proof (VQL-DT)",
+    query: "SELECT SEMANTIC, DOCUMENT\nFROM HEXAD\nPROOF INTEGRITY\nTHRESHOLD 0.99\nWHERE classification = 'audit-trail'\nLIMIT 5",
     vqlDt: true,
   },
   {
     label: "Consistency check (VQL-DT)",
     query: "SELECT GRAPH, SEMANTIC\nFROM HEXAD\nPROOF CONSISTENCY\nTHRESHOLD 0.9\nWHERE DRIFT THRESHOLD 0.1\nLIMIT 20",
+    vqlDt: true,
+  },
+  {
+    label: "Provenance proof (VQL-DT)",
+    query: "SELECT PROVENANCE, SEMANTIC\nFROM HEXAD\nPROOF PROVENANCE\nTHRESHOLD 0.95\nWHERE source = 'verified-origin'\nLIMIT 10",
+    vqlDt: true,
+  },
+  {
+    label: "Freshness proof (VQL-DT)",
+    query: "SELECT TEMPORAL, SEMANTIC\nFROM HEXAD\nPROOF FRESHNESS\nTHRESHOLD 0.99\nWHERE age_ms < 86400000\nLIMIT 10",
+    vqlDt: true,
+  },
+  {
+    label: "Multi-proof composition (VQL-DT)",
+    query: "SELECT SEMANTIC, PROVENANCE, TEMPORAL\nFROM HEXAD\nPROOF EXISTENCE AND INTEGRITY AND FRESHNESS\nTHRESHOLD 0.95\nWHERE type = 'critical-entity'\nLIMIT 5",
     vqlDt: true,
   },
 ]

@@ -47,7 +47,7 @@ let lint = (query: string, ~vqlDt: bool=false): array<diagnostic> => {
       diagnostics->Array.push({
         code: "VQL002",
         severity: Hint,
-        message: "Query selects all 6 modalities — consider selecting only what you need",
+        message: "Query selects " ++ Int.toString(count) ++ " of 8 modalities — consider selecting only what you need",
       })
     }
   }

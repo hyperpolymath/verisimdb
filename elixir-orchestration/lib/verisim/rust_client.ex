@@ -381,11 +381,14 @@ defmodule VeriSim.RustClient do
   def get(path, params \\ []) do
     url = base_url() <> path
 
-    Req.get(url,
+    case Req.get(url,
       params: params,
       receive_timeout: timeout(),
       decode_body: true
-    )
+    ) do
+      {:ok, resp} -> validate_json_response(resp)
+      {:error, reason} -> {:error, reason}
+    end
   rescue
     e -> {:error, {:request_failed, e}}
   end
@@ -393,11 +396,14 @@ defmodule VeriSim.RustClient do
   def post(path, body) do
     url = base_url() <> path
 
-    Req.post(url,
+    case Req.post(url,
       json: body,
       receive_timeout: timeout(),
       decode_body: true
-    )
+    ) do
+      {:ok, resp} -> validate_json_response(resp)
+      {:error, reason} -> {:error, reason}
+    end
   rescue
     e -> {:error, {:request_failed, e}}
   end
@@ -405,11 +411,14 @@ defmodule VeriSim.RustClient do
   defp put(path, body) do
     url = base_url() <> path
 
-    Req.put(url,
+    case Req.put(url,
       json: body,
       receive_timeout: timeout(),
       decode_body: true
-    )
+    ) do
+      {:ok, resp} -> validate_json_response(resp)
+      {:error, reason} -> {:error, reason}
+    end
   rescue
     e -> {:error, {:request_failed, e}}
   end
@@ -417,11 +426,35 @@ defmodule VeriSim.RustClient do
   defp delete(path) do
     url = base_url() <> path
 
-    Req.delete(url,
+    case Req.delete(url,
       receive_timeout: timeout(),
       decode_body: true
-    )
+    ) do
+      {:ok, resp} -> validate_json_response(resp)
+      {:error, reason} -> {:error, reason}
+    end
   rescue
     e -> {:error, {:request_failed, e}}
   end
+
+  # Validates that the response body is decoded JSON (map or list), not a raw
+  # string. When a non-VeriSimDB server (e.g. nginx) sits on the configured
+  # port, Req returns status 200 with an HTML string body. Without this check,
+  # upstream code crashes trying to enumerate/map over a binary.
+  defp validate_json_response(%{status: status, body: body} = resp)
+       when is_map(body) or is_list(body) do
+    {:ok, resp}
+  end
+
+  defp validate_json_response(%{status: status, body: body})
+       when is_binary(body) and status >= 200 and status < 300 do
+    Logger.warning("Rust core returned non-JSON response (status #{status}): #{String.slice(body, 0, 120)}...")
+    {:error, {:non_json_response, status, String.slice(body, 0, 500)}}
+  end
+
+  defp validate_json_response(%{status: status, body: body}) when is_binary(body) do
+    {:error, {status, body}}
+  end
+
+  defp validate_json_response(resp), do: {:ok, resp}
 end

@@ -393,8 +393,9 @@ Any external adopter should know:
 | Query planner is basic | Queries using all 8 modalities may not be optimally
   planned. Single-modality queries perform well.
 
-| C++ dependency in graph store | Oxigraph pulls RocksDB (~1GB container, 15min
-  build). Pure-Rust replacement (fjall/redb) planned.
+| ~~C++ dependency in graph store~~ | *Resolved.* Oxigraph is optional (feature-flagged,
+  off by default). Default and persistent graph backends are pure Rust (redb).
+  Container builds require zero C/C++ toolchain.
 
 | No distributed consensus | Single-instance deployments are safe. Multi-node
   requires application-level coordination.

@@ -30,7 +30,10 @@ use std::sync::Mutex;
 
 use verisim_document::TantivyDocumentStore;
 use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
+#[cfg(not(feature = "persistent"))]
 use verisim_graph::SimpleGraphStore;
+#[cfg(feature = "persistent")]
+use verisim_graph::RedbGraphStore;
 use verisim_planner::{
     CacheConfig, ExplainOutput, ExplainAnalyzeOutput, LogicalPlan, ParamValue,
     PhysicalPlan, PlanCache, Planner, PlannerConfig, PreparedId, PreparedStatement,
@@ -52,9 +55,27 @@ use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
 use verisim_vector::{DistanceMetric, BruteForceVectorStore};
 
-/// Type alias for our concrete HexadStore implementation (octad: 8 modality stores)
+/// Type alias for our concrete HexadStore implementation (octad: 8 modality stores).
+///
+/// When the `persistent` feature is enabled, the graph store uses redb (pure Rust,
+/// ACID, single-file B-tree) and the document store uses file-backed Tantivy.
+/// WAL is enabled for crash recovery. Requires `VERISIM_PERSISTENCE_DIR` at runtime.
+#[cfg(not(feature = "persistent"))]
 pub type ConcreteHexadStore = InMemoryHexadStore<
     SimpleGraphStore,
+    BruteForceVectorStore,
+    TantivyDocumentStore,
+    InMemoryTensorStore,
+    InMemorySemanticStore,
+    InMemoryVersionStore<HexadSnapshot>,
+    InMemoryProvenanceStore,
+    InMemorySpatialStore,
+>;
+
+/// Persistent variant: redb graph store, file-backed Tantivy, WAL enabled.
+#[cfg(feature = "persistent")]
+pub type ConcreteHexadStore = InMemoryHexadStore<
+    RedbGraphStore,
     BruteForceVectorStore,
     TantivyDocumentStore,
     InMemoryTensorStore,
@@ -124,6 +145,9 @@ pub struct ApiConfig {
     pub version_prefix: String,
     /// Vector dimension for embeddings
     pub vector_dimension: usize,
+    /// Persistence directory for the `persistent` feature.
+    /// Overrides `VERISIM_PERSISTENCE_DIR` env var when set.
+    pub persistence_dir: Option<String>,
 }
 
 impl Default for ApiConfig {
@@ -134,6 +158,7 @@ impl Default for ApiConfig {
             enable_cors: true,
             version_prefix: "/api/v1".to_string(),
             vector_dimension: 384,
+            persistence_dir: None,
         }
     }
 }
@@ -437,30 +462,67 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create new application state with default configuration (async version)
+    /// Create new application state with default configuration (async version).
+    ///
+    /// With the `persistent` feature enabled, reads `VERISIM_PERSISTENCE_DIR`
+    /// to determine where to store data on disk. Defaults to `/var/lib/verisimdb`
+    /// if the variable is unset.
     pub async fn new_async(config: ApiConfig) -> Result<Self, ApiError> {
         let hexad_config = HexadConfig {
             vector_dimension: config.vector_dimension,
             ..Default::default()
         };
 
-        let graph = Arc::new(
-            SimpleGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
-        );
+        // --- In-memory stores (default, no `persistent` feature) ---
+        #[cfg(not(feature = "persistent"))]
+        let (graph, document) = {
+            let g = Arc::new(
+                SimpleGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
+            );
+            let d = Arc::new(
+                TantivyDocumentStore::in_memory()
+                    .map_err(|e| ApiError::Internal(e.to_string()))?,
+            );
+            (g, d)
+        };
+
+        // --- Persistent stores (with `persistent` feature) ---
+        #[cfg(feature = "persistent")]
+        let persist_dir = config
+            .persistence_dir
+            .clone()
+            .or_else(|| std::env::var("VERISIM_PERSISTENCE_DIR").ok())
+            .unwrap_or_else(|| "/var/lib/verisimdb".to_string());
+
+        #[cfg(feature = "persistent")]
+        let (graph, document) = {
+            std::fs::create_dir_all(&persist_dir)
+                .map_err(|e| ApiError::Internal(format!("create persistence dir: {e}")))?;
+
+            info!(dir = %persist_dir, "Persistent storage enabled");
+
+            let g = Arc::new(
+                RedbGraphStore::persistent(format!("{}/graph.redb", persist_dir))
+                    .map_err(|e| ApiError::Internal(e.to_string()))?,
+            );
+            let d = Arc::new(
+                TantivyDocumentStore::persistent(format!("{}/documents", persist_dir))
+                    .map_err(|e| ApiError::Internal(e.to_string()))?,
+            );
+            (g, d)
+        };
+
         let vector = Arc::new(BruteForceVectorStore::new(
             config.vector_dimension,
             DistanceMetric::Cosine,
         ));
-        let document = Arc::new(
-            TantivyDocumentStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
-        );
         let tensor = Arc::new(InMemoryTensorStore::new());
         let semantic = Arc::new(InMemorySemanticStore::new());
         let temporal = Arc::new(InMemoryVersionStore::new());
         let provenance = Arc::new(InMemoryProvenanceStore::new());
         let spatial = Arc::new(InMemorySpatialStore::new());
 
-        let hexad_store = Arc::new(InMemoryHexadStore::new(
+        let hexad_store_inner = InMemoryHexadStore::new(
             hexad_config,
             graph,
             vector,
@@ -470,7 +532,18 @@ impl AppState {
             temporal,
             provenance,
             spatial,
-        ));
+        );
+
+        // Enable WAL for crash recovery when persistent.
+        #[cfg(feature = "persistent")]
+        let hexad_store_inner = hexad_store_inner
+            .with_wal(
+                format!("{}/wal", persist_dir),
+                verisim_hexad::SyncMode::Fsync,
+            )
+            .map_err(|e| ApiError::Internal(format!("WAL init: {e}")))?;
+
+        let hexad_store = Arc::new(hexad_store_inner);
 
         let drift_detector = Arc::new(DriftDetector::new(DriftThresholds::default()));
         let normalizer = Arc::new(create_default_normalizer(drift_detector.clone()).await);
@@ -1963,12 +2036,27 @@ mod tests {
     use tower::ServiceExt;
 
     async fn create_test_state() -> AppState {
-        AppState::new_async(ApiConfig {
+        let mut config = ApiConfig {
             vector_dimension: 3,
             ..Default::default()
-        })
-        .await
-        .unwrap()
+        };
+
+        // When the `persistent` feature is enabled, each test gets a unique temp directory
+        // to avoid redb lock contention between parallel tests.
+        #[cfg(feature = "persistent")]
+        {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let tmp = std::env::temp_dir().join(format!(
+                "verisimdb-test-{}-{}",
+                std::process::id(),
+                id,
+            ));
+            config.persistence_dir = Some(tmp.to_string_lossy().into_owned());
+        }
+
+        AppState::new_async(config).await.unwrap()
     }
 
     #[tokio::test]

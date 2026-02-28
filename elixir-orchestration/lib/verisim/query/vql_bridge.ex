@@ -455,7 +455,20 @@ defmodule VeriSim.Query.VQLBridge do
     {proof_tokens, rest} = Enum.split_while(rest, fn token ->
       token not in ["LIMIT", "OFFSET"]
     end)
-    {:ok, %{raw: Enum.join(proof_tokens, " ")}, rest}
+
+    raw = Enum.join(proof_tokens, " ")
+
+    # Split multi-proof specs on AND/OR connectors into a list.
+    # "EXISTENCE(a) AND PROVENANCE(b)" → [%{raw: "EXISTENCE(a)"}, %{raw: "PROVENANCE(b)"}]
+    specs = VeriSim.Query.VQLTypeChecker.parse_proof_specs(%{raw: raw})
+
+    proof = case specs do
+      [] -> %{raw: raw}
+      [single] -> single
+      multiple -> multiple
+    end
+
+    {:ok, proof, rest}
   end
 
   defp parse_proof(rest), do: {:ok, nil, rest}

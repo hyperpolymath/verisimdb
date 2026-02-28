@@ -10,10 +10,10 @@ use verisim_planner::LogicalPlan;
 
 use crate::AppState;
 
-// Include generated protobuf types.
-pub mod proto {
-    tonic::include_proto!("verisim");
-}
+// Pre-generated protobuf types (from proto/verisim.proto via prost-build).
+// Using a committed file eliminates the protoc build dependency.
+#[path = "proto/verisim.rs"]
+pub mod proto;
 
 use proto::veri_sim_planner_server::{VeriSimPlanner, VeriSimPlannerServer};
 use proto::veri_sim_hexad_server::{VeriSimHexad, VeriSimHexadServer};

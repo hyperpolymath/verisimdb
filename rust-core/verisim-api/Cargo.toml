@@ -45,10 +45,16 @@ axum-server.workspace = true
 rustls.workspace = true
 hex = "0.4"
 
-[build-dependencies]
-tonic-build = "0.14"
-tonic-prost-build = "0.14"
-prost-build = "0.14"
+[features]
+default = []
+# Enable persistent storage backends (redb for graph, file-backed Tantivy for documents, WAL).
+# Requires VERISIM_PERSISTENCE_DIR environment variable at runtime.
+persistent = ["verisim-graph/redb-backend"]
+
+# Build-dependencies removed: protobuf code is pre-generated at src/proto/verisim.rs.
+# To regenerate after changing proto/verisim.proto, run:
+#   protoc --prost_out=src/proto proto/verisim.proto
+# Or use tonic-build manually.
 
 [dev-dependencies]
 proptest.workspace = true

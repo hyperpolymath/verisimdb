@@ -2,9 +2,20 @@
 
 defmodule VeriSim.Telemetry do
   @moduledoc """
-  Telemetry - Metrics and observability for VeriSim.
+  Telemetry — metrics, observability, and product development insights for VeriSim.
 
-  Defines telemetry events and metric collectors.
+  Defines telemetry events, metric collectors, and supervises the opt-in
+  product telemetry collector. The collector aggregates counters and
+  distributions for query patterns, modality usage, drift frequency,
+  federation health, and VQL-DT proof adoption.
+
+  ## Opt-in telemetry
+
+  Set `VERISIM_TELEMETRY=true` or `config :verisim, telemetry_enabled: true`
+  to enable product telemetry collection. Disabled by default.
+
+  All collected data is aggregate-only (counters, rates, distributions).
+  No query content, entity data, or PII is ever captured.
   """
 
   use Supervisor
@@ -17,14 +28,16 @@ defmodule VeriSim.Telemetry do
   @impl true
   def init(_arg) do
     children = [
-      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
+      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000},
+      # Product telemetry collector (opt-in, ETS-backed)
+      VeriSim.Telemetry.Collector
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
   @doc """
-  Returns the list of telemetry events.
+  Returns the list of telemetry events emitted by VeriSimDB.
   """
   def events do
     [
@@ -42,10 +55,78 @@ defmodule VeriSim.Telemetry do
       [:verisim, :drift, :detected],
       [:verisim, :drift, :normalized],
 
+      # Federation events
+      [:verisim, :federation, :query],
+
+      # Proof events
+      [:verisim, :proof, :verified],
+
       # Rust client events
       [:verisim, :rust_client, :request],
       [:verisim, :rust_client, :response]
     ]
+  end
+
+  # ── Convenience helpers for emitting telemetry events ───────────────────
+
+  @doc "Emit a query completion event with timing and metadata."
+  def emit_query_stop(duration_native, metadata \\ %{}) do
+    :telemetry.execute(
+      [:verisim, :query, :stop],
+      %{duration: duration_native},
+      metadata
+    )
+  end
+
+  @doc "Emit a query exception event."
+  def emit_query_exception(metadata \\ %{}) do
+    :telemetry.execute([:verisim, :query, :exception], %{}, metadata)
+  end
+
+  @doc "Emit an entity creation event."
+  def emit_entity_create(metadata \\ %{}) do
+    :telemetry.execute([:verisim, :entity, :create], %{}, metadata)
+  end
+
+  @doc "Emit an entity deletion event."
+  def emit_entity_delete(metadata \\ %{}) do
+    :telemetry.execute([:verisim, :entity, :delete], %{}, metadata)
+  end
+
+  @doc "Emit a drift detection event for a specific modality."
+  def emit_drift_detected(modality, metadata \\ %{}) do
+    :telemetry.execute(
+      [:verisim, :drift, :detected],
+      %{},
+      Map.put(metadata, :modality, modality)
+    )
+  end
+
+  @doc "Emit a normalisation event with success/failure status."
+  def emit_drift_normalized(success?, metadata \\ %{}) do
+    :telemetry.execute(
+      [:verisim, :drift, :normalized],
+      %{success: success?},
+      metadata
+    )
+  end
+
+  @doc "Emit a federation query event."
+  def emit_federation_query(peer, metadata \\ %{}) do
+    :telemetry.execute(
+      [:verisim, :federation, :query],
+      %{},
+      Map.put(metadata, :peer, peer)
+    )
+  end
+
+  @doc "Emit a proof verification event."
+  def emit_proof_verified(proof_type, metadata \\ %{}) do
+    :telemetry.execute(
+      [:verisim, :proof, :verified],
+      %{},
+      Map.put(metadata, :proof_type, proof_type)
+    )
   end
 
   @doc """

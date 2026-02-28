@@ -43,6 +43,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "[::]".to_string()
     };
 
+    let persist_dir = std::env::var("VERISIM_PERSISTENCE_DIR").ok();
+
     let config = ApiConfig {
         host: std::env::var("VERISIM_HOST").unwrap_or(default_host),
         port: std::env::var("VERISIM_PORT")
@@ -58,11 +60,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(384),
+        persistence_dir: persist_dir.clone(),
     };
+
+    let storage_mode = if cfg!(feature = "persistent") { "persistent" } else { "in-memory" };
 
     tracing::info!(
         host = %config.host,
         port = %config.port,
+        storage = %storage_mode,
+        persistence_dir = ?persist_dir,
         "Starting VeriSimDB API server"
     );
 

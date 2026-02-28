@@ -74,7 +74,9 @@ let execute = (query: string, ~vqlDt: bool=false): executeResult => {
           | "TENSOR" => `shape=[3,3], dtype=f32`
           | "SEMANTIC" => if vqlDt { `{proof: "verified", scheme: "PLONK"}` } else { `{types: ["Thing"]}` }
           | "DOCUMENT" => `"Sample document ${Int.toString(i + 1)}"`
-          | "TEMPORAL" => `{version: ${Int.toString(i + 1)}, ts: "2026-02-13"}`
+          | "TEMPORAL" => `{version: ${Int.toString(i + 1)}, ts: "2026-02-28"}`
+          | "PROVENANCE" => `{source: "scan-v1", actor: "hypatia", chain_length: ${Int.toString(i + 1)}}`
+          | "SPATIAL" => `{lat: ${Float.toFixed(51.5 +. Float.fromInt(i) *. 0.01, ~digits=4)}, lon: -0.1278}`
           | _ => "null"
           }
         )

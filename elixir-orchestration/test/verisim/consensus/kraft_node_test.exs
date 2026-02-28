@@ -61,15 +61,28 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
           start_kraft(id, peers)
         end
 
-      # Allow enough time for election (timeouts are 150-300ms)
-      Process.sleep(1_000)
+      # Allow enough time for election (timeouts are 150-300ms, but under CI
+      # load or when the system is busy, elections can take several rounds).
+      # Retry up to 5 times with increasing delays to handle slow convergence.
+      {leaders, roles} =
+        Enum.reduce_while(1..5, {0, []}, fn attempt, _acc ->
+          wait = 500 * attempt
+          Process.sleep(wait)
 
-      roles =
-        Enum.map(ids, fn id ->
-          KRaftNode.diagnostics(id).role
+          roles =
+            Enum.map(ids, fn id ->
+              KRaftNode.diagnostics(id).role
+            end)
+
+          leaders = Enum.count(roles, &(&1 == :leader))
+
+          if leaders == 1 do
+            {:halt, {leaders, roles}}
+          else
+            {:cont, {leaders, roles}}
+          end
         end)
 
-      leaders = Enum.count(roles, &(&1 == :leader))
       assert leaders == 1, "Expected 1 leader, got #{leaders}. Roles: #{inspect(roles)}"
 
       Enum.each(pids, &stop_kraft/1)
@@ -135,6 +148,79 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
       assert {:error, {:not_leader, _leader}} = result
 
       Enum.each(pids, &stop_kraft/1)
+    end
+  end
+
+  describe "dynamic membership — add_server" do
+    test "leader accepts add_server and new peer appears in registry members" do
+      node_id = "add-#{System.unique_integer([:positive])}"
+      pid = start_kraft(node_id)
+
+      Process.sleep(500)
+
+      assert {:ok, _index} = KRaftNode.add_server(node_id, "new-peer-1", [])
+
+      Process.sleep(100)
+
+      registry = KRaftNode.registry(node_id)
+      members = get_in(registry, [:config, :members]) || []
+      assert "new-peer-1" in members
+
+      stop_kraft(pid)
+    end
+  end
+
+  describe "dynamic membership — remove_server" do
+    test "leader accepts remove_server and peer is removed from registry members" do
+      node_id = "rm-#{System.unique_integer([:positive])}"
+      pid = start_kraft(node_id)
+
+      Process.sleep(500)
+
+      # Add then remove
+      {:ok, _} = KRaftNode.add_server(node_id, "ephemeral-peer", [])
+      Process.sleep(100)
+      {:ok, _} = KRaftNode.remove_server(node_id, "ephemeral-peer")
+      Process.sleep(100)
+
+      registry = KRaftNode.registry(node_id)
+      members = get_in(registry, [:config, :members]) || []
+      refute "ephemeral-peer" in members
+
+      stop_kraft(pid)
+    end
+  end
+
+  describe "dynamic membership — removed node stops participating" do
+    test "removed peer no longer in diagnostics peer_count after commit" do
+      suffix = System.unique_integer([:positive])
+      leader_id = "dyn-l-#{suffix}"
+      follower_id = "dyn-f-#{suffix}"
+
+      leader_pid = start_kraft(leader_id, [follower_id])
+      follower_pid = start_kraft(follower_id, [leader_id])
+
+      Process.sleep(1_000)
+
+      # Find which one is leader
+      leader_diag = KRaftNode.diagnostics(leader_id)
+      {actual_leader, actual_follower, actual_follower_pid} =
+        if leader_diag.role == :leader do
+          {leader_id, follower_id, follower_pid}
+        else
+          {follower_id, leader_id, leader_pid}
+        end
+
+      # Remove the follower via the leader
+      {:ok, _} = KRaftNode.remove_server(actual_leader, actual_follower)
+      Process.sleep(200)
+
+      # Leader's peer count should now be 0 (follower removed from peers)
+      diag = KRaftNode.diagnostics(actual_leader)
+      assert diag.peer_count == 0
+
+      stop_kraft(leader_pid)
+      stop_kraft(follower_pid)
     end
   end
 

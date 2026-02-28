@@ -96,10 +96,10 @@ cd elixir-orchestration && mix run --no-halt
 
 [source,bash]
 ----
-# Build the container image
+# Build the container image (in-memory, default)
 podman build -t verisimdb:latest -f container/Containerfile .
 
-# Run VeriSimDB
+# Run VeriSimDB (in-memory -- data lost on restart)
 podman run -d \
   --name verisimdb \
   -p 8080:8080 \
@@ -108,6 +108,63 @@ podman run -d \
 # Verify it's running
 curl http://localhost:8080/api/v1/health
 ----
+
+=== Persistent Storage
+
+To persist data across restarts, build with the `persistent` feature:
+
+[source,bash]
+----
+# Build with persistent storage (redb graph + file-backed Tantivy + WAL)
+podman build -t verisimdb:persistent \
+  --build-arg FEATURES=persistent \
+  -f container/Containerfile .
+
+# Run with a named volume for data persistence
+podman run -d \
+  --name verisimdb \
+  -p 8080:8080 \
+  -v verisimdb-data:/data \
+  verisimdb:persistent
+----
+
+Persistent mode stores data at `VERISIM_PERSISTENCE_DIR` (defaults to `/data`
+in the container, `/var/lib/verisimdb` outside containers):
+
+* `graph.redb` -- redb B-tree database for graph triples (pure Rust, ACID)
+* `documents/` -- Tantivy full-text index (mmap-backed)
+* `wal/` -- Write-ahead log for crash recovery
+
+Other modalities (vector, tensor, semantic, temporal, provenance, spatial)
+remain in-memory. Graph and document persistence covers the two most
+query-intensive modalities.
+
+=== Verified Container Deployment (stapeln)
+
+For supply-chain-verified deployment using the
+link:https://github.com/hyperpolymath/stapeln[stapeln] container ecosystem:
+
+[source,bash]
+----
+# Build and sign as a .ctp (Cerro Torre Package) bundle
+cd container && ./ct-build.sh persistent --push
+
+# Deploy the full stack with selur-compose
+selur-compose verify                    # Verify all .ctp signatures
+selur-compose up --detach               # Start: rust-core + elixir + svalinn
+selur-compose ps                        # Check status
+selur-compose logs -f rust-core         # Stream logs
+----
+
+The `compose.toml` orchestrates three services:
+
+* **rust-core** -- Modality stores, drift detection, HTTP/gRPC API (port 8080)
+* **elixir-orchestration** -- Entity servers, drift monitor, federation (port 4000)
+* **svalinn** -- Edge gateway with JWT auth, rate limiting, policy enforcement (port 443)
+
+The `.gatekeeper.yaml` policy controls authentication, rate limits, and
+trust requirements. All `.ctp` bundles are cryptographically signed via
+cerro-torre (Ed25519) and verified before deployment.
 
 == Quick Start: Your First Hexad
 
@@ -489,13 +546,15 @@ cd elixir-orchestration && mix test
 
 === Rust core won't build
 
-If you see linker errors related to `oxrocksdb-sys` or C++ compilation:
+The default build requires only a Rust toolchain (no C/C++ compiler, no protoc,
+no external system libraries). If you enable the optional `oxigraph-backend`
+feature flag, you will need clang and cmake:
 
 [source,bash]
 ----
-# Ensure you have the C++ toolchain
-sudo dnf install gcc-c++ cmake  # Fedora
-sudo apt install g++ cmake       # Debian/Ubuntu
+# Only needed for --features oxigraph-backend (NOT the default)
+sudo dnf install clang cmake  # Fedora
+sudo apt install clang cmake   # Debian/Ubuntu
 ----
 
 === Elixir can't connect to Rust core

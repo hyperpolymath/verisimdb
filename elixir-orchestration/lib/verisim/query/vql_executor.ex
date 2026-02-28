@@ -22,7 +22,8 @@ defmodule VeriSim.Query.VQLExecutor do
 
   require Logger
 
-  alias VeriSim.{QueryRouter, RustClient}
+  alias VeriSim.{QueryRouter, RustClient, Telemetry}
+  alias VeriSim.Query.VQLProofCertificate
 
   @doc """
   Execute a parsed VQL query.
@@ -93,10 +94,55 @@ defmodule VeriSim.Query.VQLExecutor do
   Execute a VQL query string (includes parsing).
   """
   def execute_string(query_string, opts \\ []) do
-    case VeriSim.Query.VQLBridge.parse(query_string) do
-      {:ok, ast} -> execute(ast, opts)
-      {:error, reason} -> {:error, {:parse_error, reason}}
+    start_time = System.monotonic_time()
+
+    result =
+      case VeriSim.Query.VQLBridge.parse(query_string) do
+        {:ok, ast} -> execute(ast, opts)
+        {:error, reason} -> {:error, {:parse_error, reason}}
+      end
+
+    # Emit telemetry for product insights (aggregate-only, no query content).
+    duration = System.monotonic_time() - start_time
+    statement_type = classify_statement_type(query_string)
+    modalities = extract_modalities_from_string(query_string)
+
+    case result do
+      {:ok, _} ->
+        Telemetry.emit_query_stop(duration, %{
+          statement_type: statement_type,
+          modalities: modalities
+        })
+      {:error, _} ->
+        Telemetry.emit_query_exception(%{statement_type: statement_type})
     end
+
+    result
+  end
+
+  # Classify a query string into a statement type for telemetry (no content captured).
+  defp classify_statement_type(query_string) do
+    upper = String.upcase(String.trim(query_string))
+    cond do
+      String.starts_with?(upper, "SELECT") -> "SELECT"
+      String.starts_with?(upper, "INSERT") -> "INSERT"
+      String.starts_with?(upper, "UPDATE") -> "UPDATE"
+      String.starts_with?(upper, "DELETE") -> "DELETE"
+      String.starts_with?(upper, "EXPLAIN") -> "EXPLAIN"
+      String.starts_with?(upper, "SHOW") -> "SHOW"
+      String.starts_with?(upper, "SEARCH") -> "SEARCH"
+      String.starts_with?(upper, "COUNT") -> "COUNT"
+      true -> "OTHER"
+    end
+  end
+
+  # Extract modality names from a query string for telemetry (names only, no content).
+  defp extract_modalities_from_string(query_string) do
+    upper = String.upcase(query_string)
+    ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL PROVENANCE SPATIAL)
+    |> Enum.filter(&String.contains?(upper, &1))
+    |> Enum.map(&String.downcase/1)
+    |> Enum.map(&String.to_atom/1)
   end
 
   # ===========================================================================
@@ -149,24 +195,31 @@ defmodule VeriSim.Query.VQLExecutor do
   # VQL-DT execution — type check, execute, verify proofs, bundle certificate
   defp execute_dt_query(query_ast, proof_specs, modalities, source, where_clause,
                          limit, offset, order_by, group_by, aggregates, projections, timeout) do
-    alias VeriSim.Query.VQLBridge
+    alias VeriSim.Query.{VQLBridge, VQLTypeChecker}
 
-    # Step 1: Type-check the query to get proof obligations and composition strategy
+    # Step 1: Type-check the query to get proof obligations and composition strategy.
+    # Tries three strategies in order:
+    #   1. ReScript bidirectional type checker (VQLBridge.typecheck — full formal system)
+    #   2. Elixir-native type checker (VQLTypeChecker — validates types, generates obligations)
+    #   3. Bare AST extraction (last resort — no validation, just structuring)
     type_info = case VQLBridge.typecheck(query_ast) do
       {:ok, info} ->
         info
 
       {:error, :type_checker_unavailable} ->
-        # Fall back to extracting obligations from the AST directly.
-        # This produces structured obligations from the raw proof specs
-        # (which come from the built-in parser as %{raw: "TYPE(entity)"}).
-        Logger.warning("VQL-DT: Type checker unavailable, extracting proof obligations from AST")
-        structured_obligations = structure_proof_obligations(proof_specs)
-        %{
-          proof_obligations: structured_obligations,
-          composition_strategy: determine_composition(structured_obligations),
-          inferred_types: %{}
-        }
+        # ReScript subprocess not running. Use the Elixir-native type checker
+        # which validates proof types, modality compatibility, and composition.
+        Logger.info("VQL-DT: Using Elixir-native type checker (ReScript subprocess unavailable)")
+
+        case VQLTypeChecker.typecheck(query_ast) do
+          {:ok, info} ->
+            info
+
+          {:error, reason} ->
+            # Native type checker rejected the query — this is a real type error.
+            Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
+            nil
+        end
 
       {:error, reason} ->
         Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
@@ -202,6 +255,22 @@ defmodule VeriSim.Query.VQLExecutor do
               query_text = Map.get(query_ast, :raw, "") || ""
               composition = type_info[:composition_strategy] || type_info["composition_strategy"] || :conjunction
 
+              # Step 4b: Generate independently verifiable certificates for
+              # each proof obligation using VQLProofCertificate. Each artifact
+              # from the verifier becomes the witness for its corresponding
+              # obligation, yielding a hash-sealed certificate.
+              verifiable_certificates =
+                obligations
+                |> Enum.zip(List.wrap(artifacts))
+                |> Enum.map(fn {obligation, artifact} ->
+                  witness = if is_map(artifact), do: artifact, else: %{raw: artifact}
+                  case VQLProofCertificate.generate_certificate(obligation, witness) do
+                    {:ok, cert} -> cert
+                    {:error, _} -> nil
+                  end
+                end)
+                |> Enum.reject(&is_nil/1)
+
               proved_result = %{
                 data: processed_rows,
                 proof_certificate: %{
@@ -209,7 +278,8 @@ defmodule VeriSim.Query.VQLExecutor do
                   obligations: obligations,
                   composition: composition,
                   verified_at: DateTime.utc_now(),
-                  query_hash: :crypto.hash(:sha256, to_string(query_text)) |> Base.encode16(case: :lower)
+                  query_hash: :crypto.hash(:sha256, to_string(query_text)) |> Base.encode16(case: :lower),
+                  verifiable_certificates: verifiable_certificates
                 }
               }
               {:ok, proved_result}
@@ -711,6 +781,82 @@ defmodule VeriSim.Query.VQLExecutor do
           {:error, {:missing_entity, "Provenance proof requires an entity ID or contract name"}}
         end
 
+      :consistency ->
+        # Consistency proofs verify that two or more modalities are in agreement.
+        # Uses the Rust drift API to get the cross-modal drift score and compares
+        # against the threshold (default: 0.3). Requires an entity ID.
+        entity_id = contract_name || extract_entity_from_proof(proof_spec)
+
+        if entity_id do
+          case RustClient.get_drift_score(entity_id) do
+            {:ok, score} when is_number(score) ->
+              threshold = Map.get(proof_spec, :threshold, 0.3)
+              if score <= threshold do
+                {:ok, %{type: :consistency, entity_id: entity_id, drift_score: score,
+                         threshold: threshold, consistent: true}}
+              else
+                {:error, {:consistency_failed,
+                  "Entity '#{entity_id}' drift score #{score} exceeds threshold #{threshold}"}}
+              end
+
+            {:error, reason} ->
+              {:error, {:consistency_check_failed, reason}}
+          end
+        else
+          {:error, {:missing_entity, "Consistency proof requires an entity ID"}}
+        end
+
+      :freshness ->
+        # Freshness proofs verify that entity data is recent enough.
+        # Checks the temporal modality's last-modified timestamp against
+        # a maximum age (default: 1 hour = 3_600_000ms).
+        entity_id = contract_name || extract_entity_from_proof(proof_spec)
+
+        if entity_id do
+          case RustClient.get_hexad(entity_id) do
+            {:ok, hexad} ->
+              max_age_ms = Map.get(proof_spec, :max_age_ms, 3_600_000)
+              temporal = Map.get(hexad, "temporal", %{})
+              last_modified = Map.get(temporal, "last_modified") ||
+                              Map.get(temporal, "updated_at") ||
+                              Map.get(hexad, "updated_at")
+
+              if last_modified do
+                age_ms = case DateTime.from_iso8601(to_string(last_modified)) do
+                  {:ok, dt, _} ->
+                    DateTime.diff(DateTime.utc_now(), dt, :millisecond)
+                  _ ->
+                    # If timestamp is a unix epoch, convert
+                    if is_number(last_modified) do
+                      now_ms = System.system_time(:millisecond)
+                      now_ms - trunc(last_modified)
+                    else
+                      max_age_ms + 1  # Unknown format — treat as stale
+                    end
+                end
+
+                if age_ms <= max_age_ms do
+                  {:ok, %{type: :freshness, entity_id: entity_id, age_ms: age_ms,
+                           max_age_ms: max_age_ms, fresh: true}}
+                else
+                  {:error, {:freshness_expired,
+                    "Entity '#{entity_id}' is #{age_ms}ms old, exceeds max age #{max_age_ms}ms"}}
+                end
+              else
+                {:error, {:no_temporal_data,
+                  "Entity '#{entity_id}' has no temporal/timestamp data for freshness check"}}
+              end
+
+            {:error, :not_found} ->
+              {:error, {:entity_not_found, entity_id}}
+
+            {:error, reason} ->
+              {:error, {:freshness_check_failed, reason}}
+          end
+        else
+          {:error, {:missing_entity, "Freshness proof requires an entity ID"}}
+        end
+
       :custom ->
         # Custom ZKP proofs route to the circuit-specific proof generation endpoint
         if contract_name do
@@ -734,10 +880,19 @@ defmodule VeriSim.Query.VQLExecutor do
         end
 
       :zkp ->
-        # ZKP proofs route to the zkp_bridge via the Rust API
+        # ZKP proofs route to the zkp_bridge via the Rust API.
+        # When the type checker provides witness_fields and circuit, include them
+        # for richer proof generation (privacy-aware with blinding).
         privacy_level = Map.get(proof_spec, :privacy_level, "public")
         claim = Map.get(proof_spec, :claim, "")
-        case RustClient.post("/proofs/generate", %{claim: claim, privacy_level: privacy_level}) do
+        witness = Map.get(proof_spec, :witness_fields, [])
+        circuit = Map.get(proof_spec, :circuit)
+
+        request = %{claim: claim, privacy_level: privacy_level}
+        request = if witness != [], do: Map.put(request, :witness, witness), else: request
+        request = if circuit, do: Map.put(request, :circuit_name, circuit), else: request
+
+        case RustClient.post("/proofs/generate", request) do
           {:ok, %{status: 200, body: %{"success" => true} = body}} ->
             {:ok, %{type: :zkp, verified: true, privacy_level: privacy_level,
                      proof_data: Map.get(body, "proof")}}
@@ -790,7 +945,9 @@ defmodule VeriSim.Query.VQLExecutor do
   defp normalize_proof_type("CITATION"), do: :citation
   defp normalize_proof_type("ACCESS"), do: :access
   defp normalize_proof_type("INTEGRITY"), do: :integrity
+  defp normalize_proof_type("CONSISTENCY"), do: :consistency
   defp normalize_proof_type("PROVENANCE"), do: :provenance
+  defp normalize_proof_type("FRESHNESS"), do: :freshness
   defp normalize_proof_type("CUSTOM"), do: :custom
   defp normalize_proof_type("ZKP"), do: :zkp
   defp normalize_proof_type("PROVEN"), do: :proven
@@ -843,28 +1000,9 @@ defmodule VeriSim.Query.VQLExecutor do
   # Proof obligation structuring (fallback when type checker unavailable)
   # ---------------------------------------------------------------------------
 
-  defp structure_proof_obligations(nil), do: []
-  defp structure_proof_obligations(specs) when is_list(specs) do
-    Enum.map(specs, fn spec ->
-      proof_type = extract_proof_type(spec)
-      contract = extract_contract_name(spec)
-
-      %{
-        type: proof_type,
-        contract: contract,
-        proofType: proof_type |> Atom.to_string() |> String.upcase(),
-        contractName: contract
-      }
-    end)
-  end
-  defp structure_proof_obligations(spec) when is_map(spec) do
-    structure_proof_obligations([spec])
-  end
-  defp structure_proof_obligations(_), do: []
-
-  defp determine_composition([]), do: :independent
-  defp determine_composition([_]), do: :independent
-  defp determine_composition(_obligations), do: :conjunction
+  # Proof obligation structuring and composition determination are now handled
+  # by VeriSim.Query.VQLTypeChecker, which provides richer validation and
+  # enrichment (witness fields, circuit names, time estimates).
 
   # ===========================================================================
   # Query execution by source type

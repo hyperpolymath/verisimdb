@@ -44,6 +44,9 @@ defmodule VeriSim.MixProject do
       # HTTP client for Rust core communication
       {:req, "~> 0.5"},
 
+      # HTTP server for orchestration API (telemetry, status)
+      {:bandit, "~> 1.6"},
+
       # JSON encoding/decoding
       {:jason, "~> 1.4"},
 

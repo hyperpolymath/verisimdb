@@ -31,7 +31,7 @@ defmodule VeriSim.DriftMonitor do
   use GenServer
   require Logger
 
-  alias VeriSim.{EntityServer, RustClient}
+  alias VeriSim.{EntityServer, RustClient, Telemetry}
 
   # State structure
   defstruct [
@@ -120,6 +120,9 @@ defmodule VeriSim.DriftMonitor do
   @impl true
   def handle_cast({:report_drift, entity_id, score, drift_type}, state) do
     Logger.debug("Drift reported for #{entity_id}: #{drift_type} = #{score}")
+
+    # Emit telemetry event (aggregate counter only — no entity data captured).
+    Telemetry.emit_drift_detected(drift_type)
 
     new_entity_drift =
       Map.update(

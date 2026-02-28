@@ -46,10 +46,20 @@ defmodule VeriSim.Application do
       VeriSim.Federation.Resolver,
 
       # Health checker (periodic liveness probing)
-      VeriSim.HealthChecker
+      VeriSim.HealthChecker,
+
+      # Orchestration HTTP API (telemetry, status endpoints)
+      {Bandit, plug: VeriSim.Api.Router, port: orch_api_port()}
     ]
 
     opts = [strategy: :rest_for_one, name: VeriSim.Supervisor, max_restarts: 10, max_seconds: 60]
     Supervisor.start_link(children, opts)
+  end
+
+  defp orch_api_port do
+    case System.get_env("VERISIM_ORCH_PORT") do
+      nil -> Application.get_env(:verisim, :orch_api_port, 4080)
+      port -> String.to_integer(port)
+    end
   end
 end

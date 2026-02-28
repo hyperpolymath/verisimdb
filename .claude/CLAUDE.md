@@ -100,9 +100,31 @@ cd elixir-orchestration && mix compile
 
 Use Podman (NOT Docker):
 ```bash
+# In-memory (default)
 podman build -t verisimdb:latest -f container/Containerfile .
 podman run -p 8080:8080 verisimdb:latest
+
+# Persistent storage (redb graph + file-backed Tantivy + WAL)
+podman build -t verisimdb:persistent --build-arg FEATURES=persistent -f container/Containerfile .
+podman run -p 8080:8080 -v verisimdb-data:/data verisimdb:persistent
 ```
+
+### Verified Container Deployment (stapeln)
+
+For supply-chain-verified deployment with the stapeln ecosystem:
+```bash
+# Build, sign, verify as .ctp bundle
+cd container && ./ct-build.sh persistent --push
+
+# Full stack via selur-compose (rust-core + elixir + svalinn gateway)
+selur-compose up --detach
+```
+
+Key files in `container/`:
+- `compose.toml` — selur-compose stack definition (3 services + volumes + networks)
+- `.gatekeeper.yaml` — svalinn edge gateway policy (auth, rate limits, trust)
+- `manifest.toml` — cerro-torre .ctp bundle manifest (provenance, attestations, security)
+- `ct-build.sh` — build/sign/verify pipeline script
 
 ## Key Concepts
 
@@ -223,34 +245,37 @@ When ready to scale beyond flat files:
 - GitHub Actions calls the Fly.io endpoint instead of repository_dispatch
 - Keep verisimdb-data as backup/mirror
 
-## Hypatia Integration Pipeline (Priority - Sonnet Task)
+## Hypatia Integration Pipeline
 
-### Data Flow (NOT YET IMPLEMENTED)
+### Data Flow (IMPLEMENTED)
 
 ```
-panic-attack assail → verisimdb hexads → hypatia rules → gitbot-fleet
-                      ↑ WORKS            ↑ BUILD THIS   ↑ BUILD THIS
+panic-attack assail → ScanIngester → octad hexads → PatternQuery → DispatchBridge → gitbot-fleet
+                      ↑ WORKS        ↑ WORKS        ↑ WORKS        ↑ WORKS          ↑ JSONL logged
 ```
 
-### What Needs Building
+### VeriSimDB-Side Modules (elixir-orchestration/lib/verisim/hypatia/)
 
-1. **verisimdb → hypatia connector**: Hypatia needs a Logtalk rule that queries verisimdb-data
-   - Read scan results from verisimdb-data repo (or API)
-   - Transform weak points into Logtalk facts
-   - Fire rules to detect patterns (e.g., "3+ repos have same unsafe pattern")
+1. **ScanIngester** (`scan_ingester.ex`): Ingests panic-attack scan results as octad hexad entities
+   - Builds Document (searchable text), Graph (triples), Temporal (timestamps), Vector (embeddings),
+     Provenance (scanner origin), Semantic (category tags) modalities
+   - Falls back to ETS (`:hypatia_scans`) when Rust core unavailable
+   - API: `ingest_scan/1`, `ingest_file/1`, `ingest_directory/1`, `list_scans/0`, `get_scan/1`
 
-2. **hypatia → gitbot-fleet dispatcher**: When hypatia detects actionable patterns
-   - sustainabot: receives EcoScore/EconScore metrics from scan results
-   - echidnabot: receives proof obligations ("verify this fix resolves these weak points")
-   - rhodibot: receives automated fix suggestions
+2. **PatternQuery** (`pattern_query.ex`): Cross-repo pattern analytics over ingested scans
+   - API: `pipeline_health/0`, `cross_repo_patterns/1`, `severity_distribution/0`,
+     `category_distribution/0`, `temporal_trends/1`, `repos_by_severity/1`, `weakness_hotspots/0`
 
-3. **Hexad schema for scan results**:
-   ```rust
-   // Document modality: full JSON report as searchable text
-   // Graph modality: file -> weakness -> recommendation triples
-   // Temporal modality: track results over time (drift detection)
-   // Vector modality: embed weakness descriptions for similarity search
-   ```
+3. **DispatchBridge** (`dispatch_bridge.ex`): Bridge to Hypatia dispatch pipeline
+   - Reads JSONL dispatch manifests from `verisimdb-data/dispatch/`
+   - Tracks execution status and feeds outcomes back for drift tracking
+   - API: `read_pending/1`, `read_dispatch_log/2`, `read_all_dispatch_logs/1`,
+     `read_outcomes/1`, `summarize/1`, `feedback_to_drift/1`, `ingest_dispatch_summary/1`
+
+### Remaining: Fleet Dispatch (Live Execution)
+
+Fleet dispatch is logged to JSONL but not yet executing live GraphQL mutations.
+Requires GitHub PAT with `repo` scope — see `verisimdb-data/INTEGRATION.md`.
 
 ## Model Router (Future Tool - Sonnet Task)
 
@@ -279,18 +304,32 @@ User prompt → Haiku classifier → Route to:
 
 ## Known Issues
 
-See `KNOWN-ISSUES.adoc` at repo root for all honest gaps. Key open items:
-1. VQL-DT not connected to VQL PROOF runtime (Lean type checker not invoked)
-2. proven library not integrated (ZKP privacy-preserving proofs)
-3. verisim-repl has build issues (rustyline API incompatibilities, low priority)
+See `KNOWN-ISSUES.adoc` at repo root for all honest gaps. All 25 issues resolved.
+
+Resolved in recent sessions:
+- VQL-DT type checker wired end-to-end (Elixir-native + ReScript + Rust ZKP bridge)
+- 11 proof types: EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, ACCESS, CITATION, CUSTOM, ZKP, PROVEN, SANCTIFY
+- Multi-proof parsing: PROOF A(x) AND B(y) splits correctly
+- Modality compatibility validation (INTEGRITY needs semantic, PROVENANCE needs provenance, etc.)
+- proven library integrated (certificate-based JSON/CBOR bridge)
+- verisim-repl builds clean (67 tests pass)
+- oxrocksdb-sys C++ dependency eliminated (Oxigraph feature-flagged, redb pure-Rust backend added)
+- protoc build dependency eliminated (proto code pre-generated)
+- stapeln container ecosystem integrated (compose.toml, .gatekeeper.yaml, manifest.toml, ct-build.sh)
+- VQL Playground wired to real backend (ApiClient.res, async execution, demo mode fallback, octad modalities)
+- PanLL database module protocol (DatabaseModule.res, DatabaseRegistry.res — VeriSimDB/QuandleDB/LithoGlyph)
+- Product telemetry: opt-in collector (ETS), reporter (JSON), 19 telemetry tests, VQL executor + drift monitor wired
+- PanLL telemetry dashboard panel with modality heatmap, query patterns, performance metrics
 
 ## Hypatia Integration Status
 
-**Working:**
+**Working (VeriSimDB side — 3 modules, 37 tests):**
+- ScanIngester: panic-attack JSON → octad hexads (Document, Graph, Temporal, Vector, Provenance, Semantic)
+- PatternQuery: cross-repo analytics (pipeline health, severity distribution, temporal trends, hotspots)
+- DispatchBridge: reads JSONL dispatch manifests, summarizes outcomes, feeds drift tracking
 - Hypatia VQL layer reads verisimdb-data flat files directly
 - Built-in Elixir VQL parser (no external Deno/Node needed)
 - 954 canonical patterns tracked across 298 repos
-- Cross-repo analytics: `pipeline_health/0`, `cross_repo_patterns/1`, `category_distribution/0`
 
 **Needs PAT:** Automated cross-repo dispatch requires a GitHub PAT with `repo` scope.
 See `verisimdb-data/INTEGRATION.md` for PAT setup instructions.

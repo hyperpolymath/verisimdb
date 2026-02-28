@@ -45,9 +45,16 @@ pub mod memory;
 pub mod metrics;
 pub mod typed;
 
+// Optional persistent backends — feature-gated to keep the default build lean.
+#[cfg(feature = "redb-backend")]
+pub mod redb_backend;
+
 // Re-export the most commonly used types at the crate root for convenience.
 pub use backend::StorageBackend;
 pub use error::StorageError;
 pub use memory::InMemoryBackend;
 pub use metrics::{BackendStats, MetricsBackend};
 pub use typed::TypedStore;
+
+#[cfg(feature = "redb-backend")]
+pub use redb_backend::RedbBackend;

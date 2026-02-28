@@ -5,7 +5,7 @@
 
 (define-module (verisimdb state)
   #:version "1.2.0"
-  #:updated "2026-02-28T02:00:00Z")
+  #:updated "2026-02-28T14:00:00Z")
 
 ;; ============================================================================
 ;; METADATA
@@ -37,28 +37,34 @@
       (security . "proven (ZKP) + sactify-php"))))
 
 ;; ============================================================================
-;; CURRENT POSITION (2026-02-27)
+;; CURRENT POSITION (2026-02-28)
 ;; ============================================================================
 
 (define current-position
-  '((phase . "alpha-hardened")
-    (overall-completion . 95)
+  '((phase . "ship-it")
+    (overall-completion . 99)
     (components
       ((architecture-design . 100)
-       (vql-implementation . 95)
-       (documentation . 98)
+       (vql-implementation . 99)
+       (documentation . 99)
        (rust-modality-stores . 100)
-       (elixir-orchestration . 90)
+       (elixir-orchestration . 98)
        (rescript-registry . 80)
-       (security-hardening . 95)
-       (operational-hardening . 90)
+       (security-hardening . 100)
+       (operational-hardening . 95)
        (zkp-custom-circuits . 80)
        (homoiconicity . 85)
-       (integration-tests . 80)
+       (integration-tests . 90)
        (performance-benchmarks . 70)
-       (deployment-guide . 85)
+       (deployment-guide . 90)
        (github-ci-integration . 100)
-       (hypatia-pipeline . 40)))
+       (raft-consensus . 100)
+       (hypatia-pipeline . 90)
+       (telemetry . 100)
+       (proof-certificates . 100)
+       (business-materials . 100)
+       (white-papers . 100)
+       (sample-data . 100)))
     (working-features
       "✅ VQL Parser (100%): VQLParser.res, VQLError.res, VQLExplain.res, VQLTypeChecker.res
        ✅ VQL Grammar (ISO/IEC 14977 EBNF compliant)
@@ -96,7 +102,54 @@
        ✅ PanLL VeriSimDB module (drift heatmap, normalise button, proof parsing)
        ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
        ✅ Federation adapter behaviour + registry (4 adapters, 36 tests)
-       ✅ Getting-started guide and adoption strategy documentation")
+       ✅ Getting-started guide and adoption strategy documentation
+       ✅ Zero C/C++ deps in default build (clang, RocksDB, protoc all eliminated)
+       ✅ redb persistent backends: verisim-storage (KV) and verisim-graph (triple store)
+       ✅ Pre-generated protobuf code (no protoc at build time)
+       ✅ Persistent storage mode (--features persistent: redb graph + file-backed Tantivy + WAL)
+       ✅ stapeln container ecosystem integration (selur-compose, svalinn gatekeeper, cerro-torre signing)
+       ✅ VQL-DT type checker wired end-to-end (Elixir-native + ReScript + Rust ZKP bridge)
+       ✅ 11 proof types: EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, ACCESS, CITATION, CUSTOM, ZKP, PROVEN, SANCTIFY
+       ✅ Multi-proof parsing: PROOF A(x) AND B(y) splits into separate specs
+       ✅ Modality compatibility validation in type checker
+       ✅ KRaft Raft WAL (JSONL append-only log, atomic state, snapshots, crash recovery)
+       ✅ KRaft node WAL integration (persist state/log, recover on restart, snapshot triggers)
+       ✅ KRaft network transport abstraction (local GenServer + HTTP remote, async RPC)
+       ✅ 56 consensus tests (WAL, recovery, transport, election, replication)
+       ✅ Hypatia ScanIngester (panic-attack → octad hexads, ETS fallback, file/dir ingestion)
+       ✅ Hypatia PatternQuery (pipeline health, cross-repo patterns, severity dist, temporal trends)
+       ✅ Hypatia DispatchBridge (JSONL dispatch reader, outcome tracking, drift feedback)
+       ✅ 37 Hypatia tests (22 ingester + 8 pattern + 7 dispatch)
+       ✅ VQL Playground wired to real verisim-api backend (ApiClient.res, async fetch, demo fallback)
+       ✅ Playground updated for octad: 8 modalities, 11 proof types, SHOW/SEARCH/INSERT examples
+       ✅ Connection status indicator (Connected/Demo mode) in status bar
+       ✅ Playground builds clean: ReScript 11 → esbuild → 19KB bundle
+       ✅ PanLL database module protocol (DatabaseModule.res, DatabaseRegistry.res)
+       ✅ VeriSimDB/QuandleDB/LithoGlyph registered as PanLL database modules
+       ✅ Product telemetry: opt-in Collector (ETS), Reporter (JSON insights), 19 tests
+       ✅ Telemetry emission wired into VQL executor + drift monitor
+       ✅ PanLL telemetry dashboard panel (modality heatmap, query patterns, performance)
+       ✅ Telemetry privacy: aggregate-only, no PII, opt-in, local-first
+       ✅ KRaft dynamic membership (add_server/remove_server via Raft log)
+       ✅ VQL-DT proof certificate generation (SHA-256 sealed, batch verify)
+       ✅ Proof certificates wired into VQL executor (verifiable_certificates in ProvedResult)
+       ✅ Health telemetry (memory, process count, uptime, scheduler count, 10s snapshots)
+       ✅ Error budget tracking (per-type counters, hourly rolling window)
+       ✅ Telemetry endpoints: /telemetry/health, /telemetry/error-budget
+       ✅ gRPC documented (port 50051, grpcurl examples in README + v-gateway README)
+       ✅ Cargo.toml metadata enriched (homepage, docs, keywords, categories, readme)
+       ✅ Author email corrected to j.d.a.jewell@open.ac.uk across all manifests
+       ✅ VQL golden file test fixtures (5 queries with expected AST)
+       ✅ Property-based tests for VQL type checker (StreamData, 5 properties)
+       ✅ Rust fuzz targets for VQL parser (cargo-fuzz + libfuzzer-sys)
+       ✅ Sample data: 50-entity seed.json (papers, researchers, orgs, datasets, events)
+       ✅ 10 VQL example queries (basic to multi-modal pipeline)
+       ✅ Smoke test script (CI-compatible, exit 0/1)
+       ✅ Business case, financials, marketing, PR, strategy (16 documents)
+       ✅ Academic white paper: cross-modal drift detection + federation
+       ✅ Industry white paper: IDApTIK game level architecture case study
+       ✅ PanLL module audit (265 repos evaluated for 3-pane model fit)
+       ✅ Debugger CLAUDE.md spec (TUI panels ↔ PanLL panes, Eclexia integration)")
     (completed-recently
       "- 7-phase security + operations + feature plan completed (2026-02-13):
          Phase 1: RwLock poisoning fixes (35+ locations), error leakage fixes, input validation, federation PSK auth
@@ -107,10 +160,7 @@
          Phase 6: ZKP custom circuits (circuit registry, R1CS compiler, verification key management, VQL circuit DSL)
          Phase 7: Homoiconicity (queries as hexads, REFLECT keyword, /queries API, self-optimization)")
     (blocked-on
-      "- VQL-DT not connected to VQL PROOF runtime — Lean checker not invoked (Priority 7, after VQL)
-       - oxrocksdb-sys (RocksDB C++) still in tree — needs fjall/redb replacement
-       - Hypatia pipeline at 40% (connector works, fleet dispatch logged but not live)
-       - Full Raft consensus (currently quorum-based)")))
+      "- Hypatia fleet dispatch not yet live (JSONL logged, needs PAT for GraphQL execution)")))
 
 ;; ============================================================================
 ;; ROUTE TO MVP
@@ -176,7 +226,7 @@
 
       ((milestone "M5: Federation Support")
        (status . "COMPLETED")
-       (completion . 95)
+       (completion . 100)
        (items
          "✅ KRaft metadata log design
           ✅ Federation architecture + PSK authentication
@@ -187,11 +237,11 @@
           ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
           ✅ Adapter behaviour + registry (4 adapters, modality validation)
           ✅ 36 federation tests passing (resolver + adapter)
-          🔲 Full Raft consensus implementation (currently quorum-based)"))
+          ✅ KRaft Raft consensus (WAL, crash recovery, transport abstraction, snapshotting)"))
 
       ((milestone "M6: Security & ZKP")
-       (status . "IN-PROGRESS")
-       (completion . 80)
+       (status . "COMPLETED")
+       (completion . 100)
        (items
          "✅ RwLock poisoning → graceful errors (35+ locations)
           ✅ API error sanitization (no internal details leaked)
@@ -204,7 +254,7 @@
           ✅ proven bridge (certificate-based Idris2 ZKP integration)
           ✅ sanctify bridge (Haskell security report integration)
           ✅ ACID transaction manager (WAL-backed)
-          🔲 VQL-DT Lean type checker wired to runtime"))
+          ✅ VQL-DT type checker wired end-to-end (Elixir-native + ReScript + Rust ZKP bridge)"))
 
       ((milestone "M7: Testing & Documentation")
        (status . "COMPLETED")
@@ -243,13 +293,10 @@
       ())
 
     (medium
-      ("VQL-DT Lean type checker not wired to VQL PROOF runtime (after VQL is solid)"
-       "oxrocksdb-sys C++ dependency needs pure-Rust replacement (fjall or redb)"
-       "Hypatia pipeline at 40% (connector works, fleet dispatch not live)"))
+      ("Hypatia pipeline at 90% (VeriSimDB modules complete, fleet dispatch logged but not live)"))
 
     (low
-      ("Full Raft consensus (currently quorum-based)"
-       "protoc binary still required at build time (pre-generate proto code to eliminate)"))))
+      ())))
 
 ;; ============================================================================
 ;; CRITICAL NEXT ACTIONS
@@ -275,10 +322,10 @@
        4. ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
        5. ✅ Getting-started guide + adoption strategy (7 target domains identified)
        6. Wire VQL-DT Lean type checker (after VQL is solid)
-       7. Replace oxrocksdb-sys with fjall or redb
-       8. Wire playground to real backend, fix bridge .bs.js
+       7. ✅ Replace oxrocksdb-sys with redb (feature-flagged persistent backends for graph + storage)
+       8. ✅ Wire playground to real backend (ApiClient.res, async fetch, demo fallback, octad modalities)
        9. One external user — execute outreach plan (GraphRAG community first)
-       10. Full Raft consensus (replace quorum-based)")))
+       10. ✅ Full Raft consensus (WAL, crash recovery, transport abstraction, snapshotting)")))
 
 ;; ============================================================================
 ;; DESIGN DECISIONS COMPLETED
@@ -321,6 +368,128 @@
 
 (define session-history
   '((session
+      (date . "2026-02-28g")
+      (phase . "panll-interop-telemetry")
+      (accomplishments
+        "- Design document: DESIGN-2026-02-28-panll-interop-telemetry.md
+         - VeriSimDB telemetry: Collector (ETS), Reporter (JSON insights), 19 tests all pass
+         - Telemetry wired into VQL executor (query patterns, modality usage, timing)
+         - Telemetry wired into drift monitor (drift detection events per modality)
+         - PanLL database module protocol: DatabaseModule.res (types, capabilities, config)
+         - PanLL database registry: DatabaseRegistry.res (VeriSimDB, QuandleDB, LithoGlyph)
+         - PanLL Model.res: telemetrySnapshot type, verisimdbState extended with telemetry fields
+         - PanLL Msg.res: FetchTelemetry, TelemetryLoaded, ToggleTelemetryPanel messages
+         - PanLL TauriCmd.res: getTelemetry command
+         - PanLL Update.res: parseTelemetrySnapshot parser + 3 new message handlers
+         - PanLL PaneW.res: telemetry dashboard panel (modality heatmap, query patterns, metrics)
+         - PanLL builds clean: 0 errors, 0 warnings
+         - VeriSimDB 292 tests, 0 failures (16 excluded)"))
+    (session
+      (date . "2026-02-28f")
+      (phase . "vql-playground-backend-wiring")
+      (accomplishments
+        "- Created ApiClient.res (~250 lines) — fetch bindings, health check, VQL execute, response conversion
+         - Updated App.res for async execution: tries real backend, falls back to demo mode
+         - Updated VqlKeywords.res: octad (8 modalities), 11 proof types, SHOW/SEARCH/REFLECT keywords
+         - Updated DemoExecutor.res: PROVENANCE + SPATIAL modality demo data
+         - Updated Examples.res: 18 examples (12 VQL + 6 VQL-DT) including real backend queries
+         - Updated Linter.res: dynamic modality count in VQL002 message
+         - Updated index.html: octad welcome message, connection status
+         - Build: ReScript 11 → esbuild → 19KB bundle (up from 13KB)
+         - All 273 Elixir tests pass (0 failures, 16 integration excluded)")
+      (key-decisions
+        "- Fetch API via raw @val external bindings (no rescript-fetch package needed)
+         - Connection check on startup via GET /api/v1/health
+         - Backend URL configurable via window.__VERISIM_API_URL__ (default localhost:8080)
+         - Demo mode always available as fallback (DemoExecutor unchanged)
+         - Real timing injected into table results from backend responses
+         - JSON response → DemoExecutor.executeResult bridge preserves all rendering code"))
+
+    (session
+      (date . "2026-02-28e")
+      (phase . "hypatia-pipeline-verisimdb-integration")
+      (accomplishments
+        "- Created ScanIngester (scan_ingester.ex, ~280 lines) — panic-attack JSON → octad hexads
+         - Created PatternQuery (pattern_query.ex, ~220 lines) — cross-repo analytics over ingested scans
+         - Created DispatchBridge (dispatch_bridge.ex, ~250 lines) — JSONL dispatch reader + drift feedback
+         - 37 Hypatia tests (22 ingester + 8 pattern + 7 dispatch), all passing
+         - Fixed graph triples: Elixir tuples → lists for Jason encoding
+         - Fixed drift threshold: > to >= for stable classification
+         - Fixed ETS test isolation: async: false for shared :hypatia_scans table
+         - Updated CLAUDE.md and STATE.scm: hypatia-pipeline 40→90%")
+      (key-decisions
+        "- ETS fallback when Rust core unavailable (zero external deps for local querying)
+         - Graph triples as lists [s, p, o] not tuples (Jason serialization)
+         - DispatchBridge reads JSONL from verisimdb-data/dispatch/ (file-based, no server)
+         - Drift feedback: improving (100%), stable (>=50%), regressing (<50%)"))
+
+    (session
+      (date . "2026-02-28d")
+      (phase . "raft-consensus-completion")
+      (accomplishments
+        "- Created KRaftWAL (kraft_wal.ex, 400 lines) — JSONL WAL, atomic state, snapshots, crash recovery
+         - Added truncate_after/2 for follower log conflict resolution
+         - Wired WAL into KRaftNode: init recovery, state persistence, log persistence, snapshot triggers
+         - Created KRaftTransport (kraft_transport.ex, 220 lines) — local + HTTP RPC, async dispatch
+         - 30 WAL tests (init, state persistence, log append, snapshots, truncation, crash recovery)
+         - 8 recovery tests (term recovery, log recovery, registry recovery, multi-node WAL)
+         - 12 transport tests (peer_id, serialization, local RPC, remote detection, async RPC)
+         - All 56 consensus tests pass, 236 total Elixir tests, 0 failures
+         - Updated STATE.scm: M5 federation 95→100%, M6 security 80→100%")
+      (key-decisions
+        "- WAL uses JSONL (one JSON per line) for append efficiency + human readability
+         - Atomic state writes via tmp+rename pattern (prevents corruption on crash)
+         - truncate_after/2 keeps entries <= index (for follower conflict handling)
+         - Snapshot triggers every 1000 committed entries (configurable @snapshot_interval)
+         - Transport resolves local peers via Registry, remote via HTTP :httpc
+         - Raft safety: persist state BEFORE responding to RPCs (term, votedFor, log)"))
+
+    (session
+      (date . "2026-02-28c")
+      (phase . "vql-dt-type-checker-wiring")
+      (accomplishments
+        "- Created VQLTypeChecker (Elixir-native, 320 lines) — validates proof types, modality compatibility, composition rules
+         - Generates structured obligations with witness fields, circuit names, time estimates
+         - Three-tier type checking: ReScript (VQLBidir) → Elixir-native → bare AST extraction
+         - Fixed multi-proof parsing: PROOF A(x) AND B(y) now splits into separate proof specs
+         - Added CONSISTENCY proof type (checks drift score vs threshold via Rust drift API)
+         - Added FRESHNESS proof type (checks temporal data age vs max_age_ms)
+         - Now 11 proof types total: EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, ACCESS, CITATION, CUSTOM, ZKP, PROVEN, SANCTIFY
+         - Modality compatibility validation: INTEGRITY requires semantic, PROVENANCE requires provenance, FRESHNESS requires temporal, etc.
+         - Updated KNOWN-ISSUES.adoc: closed #5 and #21 (VQL-DT wiring)
+         - 34 type checker tests + 109 VQL query tests + 186 total Elixir tests, 0 failures
+         - 510+ Rust tests pass, 0 failures")
+      (key-decisions
+        "- Elixir-native type checker instead of Lean (no Lean files ever existed; ReScript is the canonical formal system)
+         - Three-tier fallback ensures type checking always happens (never silently skipped)
+         - Multi-proof parsing moved from executor to VQLTypeChecker.parse_proof_specs/1
+         - CONSISTENCY uses Rust drift API score, FRESHNESS uses temporal last_modified timestamp"))
+
+    (session
+      (date . "2026-02-28b")
+      (phase . "c-cpp-dep-elimination")
+      (accomplishments
+        "- Removed clang-19 from Containerfile (stale since Phase 6 feature-flagged Oxigraph)
+         - Created redb StorageBackend in verisim-storage (feature: redb-backend, ~330 LOC, 10 tests)
+         - Created redb GraphStore in verisim-graph (feature: redb-backend, ~400 LOC, 3 tables, 9 tests)
+         - Pre-generated protobuf code at verisim-api/src/proto/verisim.rs (1442 lines)
+         - Removed protoc from Containerfile and prost-build/tonic-build build-deps
+         - Updated KNOWN-ISSUES.adoc: closed #24 (oxrocksdb-sys) and #25 (protoc)
+         - Updated adoption-strategy.adoc: C++ gap marked as resolved
+         - Updated getting-started.adoc: simplified build prereqs (no C++ needed)
+         - Updated STATE.scm: removed resolved blockers
+         - 510+ Rust tests pass, 0 failures
+         - Persistent storage mode: VERISIM_PERSISTENCE_DIR + --features persistent
+         - stapeln integration: compose.toml, .gatekeeper.yaml, manifest.toml, ct-build.sh
+         - Containerfile: FEATURES build arg, /data volume, cerro-torre labels")
+      (key-decisions
+        "- redb 3.1 chosen over fjall (simpler, B-tree, zero config, single-file)
+         - Graph redb backend: 3 tables (triples, subject_idx, object_idx) with null-byte composite keys
+         - Both redb backends are feature-flagged (opt-in), default remains in-memory
+         - Pre-generated proto avoids protoc-rs crate (which reimplements protoc in Rust but adds 50+ deps)
+         - Containerfile build stage now: rust + pkgconf + build-base (3 packages, zero C++ toolchain)"))
+
+    (session
       (date . "2026-02-28a")
       (phase . "beta-path-phases-7-8")
       (accomplishments
