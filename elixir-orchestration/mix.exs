@@ -61,6 +61,7 @@ defmodule VeriSim.MixProject do
       # Testing
       {:ex_machina, "~> 2.7", only: :test},
       {:mox, "~> 1.0", only: :test},
+      {:stream_data, "~> 1.1", only: [:test, :dev]},
 
       # Optional: native protocol adapters for federation
       # These are only needed when using :wire protocol instead of HTTP

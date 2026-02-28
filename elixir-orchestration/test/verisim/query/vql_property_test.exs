@@ -55,7 +55,7 @@ defmodule VeriSim.Query.VQLPropertyTest do
   property "type checker never crashes on valid proof specs" do
     check all query_ast <- valid_query_ast() do
       result = VQLTypeChecker.typecheck(query_ast)
-      assert match?({:ok, _} | {:error, _}, result)
+      assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
   end
 
@@ -101,7 +101,11 @@ defmodule VeriSim.Query.VQLPropertyTest do
   end
 
   property "unknown proof types always rejected" do
-    check all bad_type <- string(:alphanumeric, min_length: 10, max_length: 15) do
+    # Prefix with "XBOGUS" to guarantee the generated string never collides
+    # with a known proof type (existence, integrity, consistency, etc.)
+    check all suffix <- string(:alphanumeric, min_length: 3, max_length: 10) do
+      bad_type = "XBOGUS#{suffix}"
+
       query_ast = %{
         modalities: [:all],
         proof: [%{raw: "#{bad_type}(test)"}]
