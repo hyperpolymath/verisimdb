@@ -12,6 +12,8 @@ defmodule VeriSim.Federation.AdapterTest do
 
   alias VeriSim.Federation.Adapter
   alias VeriSim.Federation.Adapters.{ArangoDB, Elasticsearch, PostgreSQL, VeriSimDB}
+  alias VeriSim.Federation.Adapters.{MongoDB, Redis, DuckDB, ClickHouse, SurrealDB}
+  alias VeriSim.Federation.Adapters.{SQLite, Neo4j, VectorDB, InfluxDB, ObjectStorage}
   alias VeriSim.Federation.Resolver
 
   # ---------------------------------------------------------------------------
@@ -24,20 +26,40 @@ defmodule VeriSim.Federation.AdapterTest do
       assert {:ok, ArangoDB} = Adapter.module_for(:arangodb)
       assert {:ok, PostgreSQL} = Adapter.module_for(:postgresql)
       assert {:ok, Elasticsearch} = Adapter.module_for(:elasticsearch)
+      assert {:ok, MongoDB} = Adapter.module_for(:mongodb)
+      assert {:ok, Redis} = Adapter.module_for(:redis)
+      assert {:ok, DuckDB} = Adapter.module_for(:duckdb)
+      assert {:ok, ClickHouse} = Adapter.module_for(:clickhouse)
+      assert {:ok, SurrealDB} = Adapter.module_for(:surrealdb)
+      assert {:ok, SQLite} = Adapter.module_for(:sqlite)
+      assert {:ok, Neo4j} = Adapter.module_for(:neo4j)
+      assert {:ok, VectorDB} = Adapter.module_for(:vector_db)
+      assert {:ok, InfluxDB} = Adapter.module_for(:influxdb)
+      assert {:ok, ObjectStorage} = Adapter.module_for(:object_storage)
     end
 
     test "returns error for unknown adapter type" do
       assert {:error, :unknown_adapter} = Adapter.module_for(:unknown)
-      assert {:error, :unknown_adapter} = Adapter.module_for(:mongodb)
+      assert {:error, :unknown_adapter} = Adapter.module_for(:cassandra)
     end
 
-    test "adapter_types/0 lists all registered types" do
+    test "adapter_types/0 lists all 14 registered types" do
       types = Adapter.adapter_types()
       assert :verisimdb in types
       assert :arangodb in types
       assert :postgresql in types
       assert :elasticsearch in types
-      assert length(types) == 4
+      assert :mongodb in types
+      assert :redis in types
+      assert :duckdb in types
+      assert :clickhouse in types
+      assert :surrealdb in types
+      assert :sqlite in types
+      assert :neo4j in types
+      assert :vector_db in types
+      assert :influxdb in types
+      assert :object_storage in types
+      assert length(types) == 14
     end
   end
 
@@ -314,11 +336,11 @@ defmodule VeriSim.Federation.AdapterTest do
       result =
         Resolver.register_peer("bad-adapter", %{
           endpoint: "http://mystery:1234",
-          adapter_type: :mongodb,
+          adapter_type: :cassandra,
           modalities: ["document"]
         })
 
-      assert {:error, {:unknown_adapter, :mongodb}} = result
+      assert {:error, {:unknown_adapter, :cassandra}} = result
       assert Resolver.list_peers() == []
     end
 

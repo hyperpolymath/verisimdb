@@ -64,7 +64,9 @@
        (proof-certificates . 100)
        (business-materials . 100)
        (white-papers . 100)
-       (sample-data . 100)))
+       (sample-data . 100)
+       (connector-federation-adapters . 20)
+       (connector-client-sdks . 15)))
     (working-features
       "✅ VQL Parser (100%): VQLParser.res, VQLError.res, VQLExplain.res, VQLTypeChecker.res
        ✅ VQL Grammar (ISO/IEC 14977 EBNF compliant)
@@ -101,7 +103,9 @@
        ✅ REPL updated to octad (8 modalities, 9 proof types)
        ✅ PanLL VeriSimDB module (drift heatmap, normalise button, proof parsing)
        ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
-       ✅ Federation adapter behaviour + registry (4 adapters, 36 tests)
+       ✅ Federation adapter behaviour + registry (14 adapters, 36+ tests)
+       🔲 Connector federation adapters: MongoDB, Redis, DuckDB, ClickHouse, SurrealDB, SQLite, Neo4j, VectorDB, InfluxDB, ObjectStorage (scaffolded)
+       🔲 Connector client SDKs: Rust, Elixir, V, ReScript, Julia, Gleam (scaffolded)
        ✅ Getting-started guide and adoption strategy documentation
        ✅ Zero C/C++ deps in default build (clang, RocksDB, protoc all eliminated)
        ✅ redb persistent backends: verisim-storage (KV) and verisim-graph (triple store)
@@ -235,7 +239,7 @@
           ✅ Federation protocol (HTTP fanout, dedup, trust-weighted scoring)
           ✅ Real peer queries via Req HTTP client
           ✅ Heterogeneous federation adapters (ArangoDB, PostgreSQL, Elasticsearch)
-          ✅ Adapter behaviour + registry (4 adapters, modality validation)
+          ✅ Adapter behaviour + registry (14 adapters, modality validation)
           ✅ 36 federation tests passing (resolver + adapter)
           ✅ KRaft Raft consensus (WAL, crash recovery, transport abstraction, snapshotting)"))
 
@@ -368,6 +372,27 @@
 
 (define session-history
   '((session
+      (date . "2026-02-28h")
+      (phase . "connector-architecture-scaffold")
+      (accomplishments
+        "- Created connectors/ top-level directory with full architecture scaffold
+         - Shared type definitions: 8 JSON Schema files, OpenAPI 3.1 spec, federation protobuf
+         - 10 new federation adapter stubs: MongoDB, Redis, DuckDB, ClickHouse, SurrealDB, SQLite, Neo4j, VectorDB, InfluxDB, ObjectStorage
+         - Updated adapter.ex registry: 4 → 14 adapters, modality mapping tables expanded
+         - Updated mix.exs with optional deps (postgrex, redix, exqlite, bolt_sips)
+         - 6 client SDK scaffolds: Rust, Elixir, V, ReScript, Julia, Gleam
+         - Each SDK: types, client, hexad CRUD, search, drift, provenance, VQL, federation, error modules
+         - 10 adapter test stubs with modality and translate_results assertions
+         - connectors/README.adoc with architecture diagram")
+      (key-decisions
+        "- Federation adapters use HTTP via Req (consistent with existing pattern)
+         - VectorDB unified adapter covers Qdrant/Milvus/Weaviate with backend dispatch
+         - ObjectStorage unified adapter covers MinIO/S3
+         - Client SDKs follow same module decomposition across all 6 languages
+         - Redis/DuckDB/SQLite modalities are extension/module-dependent (PostgreSQL pattern)
+         - Gleam SDK uses MPL-2.0 (Hex ecosystem requirement)"))
+
+    (session
       (date . "2026-02-28g")
       (phase . "panll-interop-telemetry")
       (accomplishments

@@ -62,6 +62,13 @@ defmodule VeriSim.MixProject do
       {:ex_machina, "~> 2.7", only: :test},
       {:mox, "~> 1.0", only: :test},
 
+      # Optional: native protocol adapters for federation
+      # These are only needed when using :wire protocol instead of HTTP
+      {:postgrex, "~> 0.19", optional: true},
+      {:redix, "~> 1.5", optional: true},
+      {:exqlite, "~> 0.27", optional: true},
+      {:bolt_sips, "~> 2.0", optional: true},
+
       # Development
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

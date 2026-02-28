@@ -39,6 +39,36 @@ defmodule VeriSim.Federation.Adapter do
       │ :spatial    │ GeoJSON idx  │ PostGIS         │ geo_shape     │
       └─────────────┴──────────────┴─────────────────┴───────────────┘
 
+      Extended adapters (10 additional backends):
+
+      ┌─────────────┬──────────┬───────┬────────┬────────────┬───────────┐
+      │ Modality    │ MongoDB  │ Redis │ DuckDB │ ClickHouse │ SurrealDB │
+      ├─────────────┼──────────┼───────┼────────┼────────────┼───────────┤
+      │ :graph      │ $graphLkp│ Graph │ rCTE   │ —          │ native    │
+      │ :vector     │ AtlasVS  │ VSS   │ HNSW   │ annoy      │ —         │
+      │ :tensor     │ —        │ —     │ array  │ —          │ —         │
+      │ :semantic   │ BSON     │ JSON  │ JSON   │ JSON       │ schema-   │
+      │ :document   │ text idx │ FT    │ FTS    │ fulltext   │ FTS       │
+      │ :temporal   │ ISODate  │ TS    │ tstamp │ DateTime64 │ datetime  │
+      │ :provenance │ chg strm │ Strm  │ —      │ —          │ —         │
+      │ :spatial    │ 2dsphere │ —     │ spat   │ geo funcs  │ —         │
+      └─────────────┴──────────┴───────┴────────┴────────────┴───────────┘
+
+      ┌─────────────┬──────────┬──────────┬──────────┬──────────────┐
+      │ Modality    │ SQLite   │ Neo4j    │ VectorDB │ InfluxDB     │
+      ├─────────────┼──────────┼──────────┼──────────┼──────────────┤
+      │ :graph      │ rCTE     │ Cypher   │ —        │ —            │
+      │ :vector     │ vss      │ vec idx  │ native   │ —            │
+      │ :tensor     │ —        │ —        │ —        │ —            │
+      │ :semantic   │ JSON1    │ props    │ payload  │ tags         │
+      │ :document   │ FTS5     │ FT idx   │ —        │ —            │
+      │ :temporal   │ datetime │ temporal │ ts filt  │ native TS    │
+      │ :provenance │ —        │ —        │ —        │ —            │
+      │ :spatial    │ —        │ spatial  │ geo filt │ —            │
+      └─────────────┴──────────┴──────────┴──────────┴──────────────┘
+
+      ObjectStorage (MinIO/S3): :document, :temporal, :provenance, :semantic
+
   ## Peer Configuration
 
   When registering a peer, the `adapter_type` field selects the adapter:
@@ -215,11 +245,38 @@ defmodule VeriSim.Federation.Adapter do
   def module_for(:arangodb), do: {:ok, VeriSim.Federation.Adapters.ArangoDB}
   def module_for(:postgresql), do: {:ok, VeriSim.Federation.Adapters.PostgreSQL}
   def module_for(:elasticsearch), do: {:ok, VeriSim.Federation.Adapters.Elasticsearch}
+  def module_for(:mongodb), do: {:ok, VeriSim.Federation.Adapters.MongoDB}
+  def module_for(:redis), do: {:ok, VeriSim.Federation.Adapters.Redis}
+  def module_for(:duckdb), do: {:ok, VeriSim.Federation.Adapters.DuckDB}
+  def module_for(:clickhouse), do: {:ok, VeriSim.Federation.Adapters.ClickHouse}
+  def module_for(:surrealdb), do: {:ok, VeriSim.Federation.Adapters.SurrealDB}
+  def module_for(:sqlite), do: {:ok, VeriSim.Federation.Adapters.SQLite}
+  def module_for(:neo4j), do: {:ok, VeriSim.Federation.Adapters.Neo4j}
+  def module_for(:vector_db), do: {:ok, VeriSim.Federation.Adapters.VectorDB}
+  def module_for(:influxdb), do: {:ok, VeriSim.Federation.Adapters.InfluxDB}
+  def module_for(:object_storage), do: {:ok, VeriSim.Federation.Adapters.ObjectStorage}
   def module_for(_), do: {:error, :unknown_adapter}
 
   @doc """
   List all registered adapter types.
   """
   @spec adapter_types() :: [atom()]
-  def adapter_types, do: [:verisimdb, :arangodb, :postgresql, :elasticsearch]
+  def adapter_types do
+    [
+      :verisimdb,
+      :arangodb,
+      :postgresql,
+      :elasticsearch,
+      :mongodb,
+      :redis,
+      :duckdb,
+      :clickhouse,
+      :surrealdb,
+      :sqlite,
+      :neo4j,
+      :vector_db,
+      :influxdb,
+      :object_storage
+    ]
+  end
 end
