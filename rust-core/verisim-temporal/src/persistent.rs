@@ -8,38 +8,41 @@
 // cache for fast reads.  Writes go to redb first (durable), then update the
 // cache.
 //
-// The associated type `Data` is `serde_json::Value`, making this store a
-// universal versioned key-value store.  Higher layers can convert to/from
-// concrete types using serde.
+// The store is generic over `T` (the versioned data type).  Any type that is
+// Serialize + DeserializeOwned + Clone + Send + Sync can be versioned.
 
 use std::collections::{BTreeMap, HashMap};
+use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use serde::{de::DeserializeOwned, Serialize};
 use tracing::info;
 use verisim_storage::redb_backend::RedbBackend;
 use verisim_storage::typed::TypedStore;
 
 use crate::{TemporalError, TemporalStore, TimeRange, Version};
 
-/// Type alias matching the InMemory store's internal structure.
-type VersionHistory = HashMap<String, BTreeMap<u64, Version<serde_json::Value>>>;
-
 /// Persistent version store: redb for durability, in-memory BTreeMap cache for
 /// fast reads and range queries.
 ///
 /// Each entity's entire version history is stored as a serialized
-/// `BTreeMap<u64, Version<serde_json::Value>>` under the entity_id key.
-pub struct RedbVersionStore {
+/// `BTreeMap<u64, Version<T>>` under the entity_id key.
+///
+/// `T` is the versioned data type — typically `OctadSnapshot` when used inside
+/// `InMemoryOctadStore`, or `serde_json::Value` for generic use.
+pub struct RedbVersionStore<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> {
     /// Typed store for version histories, keyed by entity_id.
     store: TypedStore<RedbBackend>,
     /// In-memory cache of all version histories.
-    versions: Arc<RwLock<VersionHistory>>,
+    versions: Arc<RwLock<HashMap<String, BTreeMap<u64, Version<T>>>>>,
+    /// Phantom data for the generic parameter.
+    _marker: PhantomData<T>,
 }
 
-impl RedbVersionStore {
+impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> RedbVersionStore<T> {
     /// Open (or create) a persistent version store at the given path.
     ///
     /// On open, all existing version histories are scanned from redb into the
@@ -49,12 +52,12 @@ impl RedbVersionStore {
             .map_err(|e| TemporalError::Conflict(format!("redb open: {}", e)))?;
         let store = TypedStore::new(backend, "ver");
 
-        let entries: Vec<(String, BTreeMap<u64, Version<serde_json::Value>>)> = store
+        let entries: Vec<(String, BTreeMap<u64, Version<T>>)> = store
             .scan_prefix("", 1_000_000)
             .await
             .map_err(|e| TemporalError::Conflict(format!("scan: {}", e)))?;
 
-        let mut cache: VersionHistory = HashMap::new();
+        let mut cache: HashMap<String, BTreeMap<u64, Version<T>>> = HashMap::new();
         for (id, history) in entries {
             cache.insert(id, history);
         }
@@ -66,6 +69,7 @@ impl RedbVersionStore {
         Ok(Self {
             store,
             versions: Arc::new(RwLock::new(cache)),
+            _marker: PhantomData,
         })
     }
 
@@ -89,8 +93,10 @@ impl RedbVersionStore {
 }
 
 #[async_trait]
-impl TemporalStore for RedbVersionStore {
-    type Data = serde_json::Value;
+impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> TemporalStore
+    for RedbVersionStore<T>
+{
+    type Data = T;
 
     async fn append(
         &self,
@@ -214,7 +220,7 @@ mod tests {
 
         // Write data in one session.
         {
-            let store = RedbVersionStore::open(&path).await.unwrap();
+            let store = RedbVersionStore::<serde_json::Value>::open(&path).await.unwrap();
             let v1 = store
                 .append(
                     "entity-1",
@@ -240,7 +246,7 @@ mod tests {
 
         // Reopen and verify data survived.
         {
-            let store = RedbVersionStore::open(&path).await.unwrap();
+            let store = RedbVersionStore::<serde_json::Value>::open(&path).await.unwrap();
 
             let latest = store.latest("entity-1").await.unwrap().unwrap();
             assert_eq!(latest.version, 2);

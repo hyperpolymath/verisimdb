@@ -47,9 +47,17 @@ hex = "0.4"
 
 [features]
 default = []
-# Enable persistent storage backends (redb for graph, file-backed Tantivy for documents, WAL).
-# Requires VERISIM_PERSISTENCE_DIR environment variable at runtime.
-persistent = ["verisim-graph/redb-backend"]
+# Enable persistent storage backends (redb for all modalities, file-backed Tantivy for
+# documents, WAL for crash recovery).  Requires VERISIM_PERSISTENCE_DIR at runtime.
+persistent = [
+    "verisim-graph/redb-backend",
+    "verisim-vector/redb-backend",
+    "verisim-tensor/redb-backend",
+    "verisim-semantic/redb-backend",
+    "verisim-temporal/redb-backend",
+    "verisim-provenance/redb-backend",
+    "verisim-spatial/redb-backend",
+]
 
 # Build-dependencies removed: protobuf code is pre-generated at src/proto/verisim.rs.
 # To regenerate after changing proto/verisim.proto, run:

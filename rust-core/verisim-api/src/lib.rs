@@ -35,6 +35,18 @@ use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
 use verisim_graph::SimpleGraphStore;
 #[cfg(feature = "persistent")]
 use verisim_graph::RedbGraphStore;
+#[cfg(feature = "persistent")]
+use verisim_vector::RedbVectorStore;
+#[cfg(feature = "persistent")]
+use verisim_tensor::RedbTensorStore;
+#[cfg(feature = "persistent")]
+use verisim_semantic::RedbSemanticStore;
+#[cfg(feature = "persistent")]
+use verisim_temporal::RedbVersionStore;
+#[cfg(feature = "persistent")]
+use verisim_provenance::RedbProvenanceStore;
+#[cfg(feature = "persistent")]
+use verisim_spatial::RedbSpatialStore;
 use verisim_planner::{
     CacheConfig, ExplainOutput, ExplainAnalyzeOutput, LogicalPlan, ParamValue,
     PhysicalPlan, PlanCache, Planner, PlannerConfig, PreparedId, PreparedStatement,
@@ -46,15 +58,22 @@ use verisim_octad::{
     OctadSpatialInput, OctadStore, OctadTensorInput, OctadVectorInput,
     InMemoryOctadStore, ProvenanceStore, SpatialStore,
 };
+#[cfg(not(feature = "persistent"))]
 use verisim_provenance::InMemoryProvenanceStore;
+#[cfg(not(feature = "persistent"))]
 use verisim_spatial::InMemorySpatialStore;
 use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
+#[cfg(not(feature = "persistent"))]
 use verisim_semantic::InMemorySemanticStore;
 use verisim_semantic::zkp_bridge::{self as zkp_api, PrivacyLevel, ZkpProofRequest as ZkpBridgeRequest};
 use verisim_semantic::circuit_registry::CircuitRegistry;
+#[cfg(not(feature = "persistent"))]
 use verisim_temporal::InMemoryVersionStore;
+#[cfg(not(feature = "persistent"))]
 use verisim_tensor::InMemoryTensorStore;
-use verisim_vector::{DistanceMetric, BruteForceVectorStore};
+use verisim_vector::DistanceMetric;
+#[cfg(not(feature = "persistent"))]
+use verisim_vector::BruteForceVectorStore;
 
 /// Type alias for our concrete OctadStore implementation (octad: 8 modality stores).
 ///
@@ -73,17 +92,18 @@ pub type ConcreteOctadStore = InMemoryOctadStore<
     InMemorySpatialStore,
 >;
 
-/// Persistent variant: redb graph store, file-backed Tantivy, WAL enabled.
+/// Persistent variant: all modalities backed by redb, file-backed Tantivy for
+/// documents, WAL enabled for crash recovery.
 #[cfg(feature = "persistent")]
 pub type ConcreteOctadStore = InMemoryOctadStore<
     RedbGraphStore,
-    BruteForceVectorStore,
+    RedbVectorStore,
     TantivyDocumentStore,
-    InMemoryTensorStore,
-    InMemorySemanticStore,
-    InMemoryVersionStore<OctadSnapshot>,
-    InMemoryProvenanceStore,
-    InMemorySpatialStore,
+    RedbTensorStore,
+    RedbSemanticStore,
+    RedbVersionStore<OctadSnapshot>,
+    RedbProvenanceStore,
+    RedbSpatialStore,
 >;
 
 /// API errors
@@ -525,14 +545,71 @@ impl AppState {
             (g, d)
         };
 
+        // --- Vector store ---
+        #[cfg(feature = "persistent")]
+        let vector = Arc::new(
+            RedbVectorStore::open(
+                format!("{}/vector.redb", persist_dir),
+                config.vector_dimension,
+                DistanceMetric::Cosine,
+            )
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        #[cfg(not(feature = "persistent"))]
         let vector = Arc::new(BruteForceVectorStore::new(
             config.vector_dimension,
             DistanceMetric::Cosine,
         ));
+
+        // --- Tensor store ---
+        #[cfg(feature = "persistent")]
+        let tensor = Arc::new(
+            RedbTensorStore::open(format!("{}/tensor.redb", persist_dir))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        #[cfg(not(feature = "persistent"))]
         let tensor = Arc::new(InMemoryTensorStore::new());
+
+        // --- Semantic store ---
+        #[cfg(feature = "persistent")]
+        let semantic = Arc::new(
+            RedbSemanticStore::open(format!("{}/semantic.redb", persist_dir))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        #[cfg(not(feature = "persistent"))]
         let semantic = Arc::new(InMemorySemanticStore::new());
+
+        // --- Temporal (versioning) store ---
+        #[cfg(feature = "persistent")]
+        let temporal = Arc::new(
+            RedbVersionStore::open(format!("{}/temporal.redb", persist_dir))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        #[cfg(not(feature = "persistent"))]
         let temporal = Arc::new(InMemoryVersionStore::new());
+
+        // --- Provenance store ---
+        #[cfg(feature = "persistent")]
+        let provenance = Arc::new(
+            RedbProvenanceStore::open(format!("{}/provenance.redb", persist_dir))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        #[cfg(not(feature = "persistent"))]
         let provenance = Arc::new(InMemoryProvenanceStore::new());
+
+        // --- Spatial store ---
+        #[cfg(feature = "persistent")]
+        let spatial = Arc::new(
+            RedbSpatialStore::open(format!("{}/spatial.redb", persist_dir))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?,
+        );
+        #[cfg(not(feature = "persistent"))]
         let spatial = Arc::new(InMemorySpatialStore::new());
 
         let octad_store_inner = InMemoryOctadStore::new(
