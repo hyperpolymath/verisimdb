@@ -176,7 +176,11 @@ impl TantivyDocumentStore {
         })
     }
 
-    /// Create a persistent store
+    /// Create a persistent store.
+    ///
+    /// On open, all existing documents are scanned from the Tantivy index into
+    /// the in-memory HashMap so that `get()` returns documents that were indexed
+    /// in previous sessions.
     pub fn persistent(path: impl AsRef<Path>) -> Result<Self, DocumentError> {
         let schema = DocumentSchema::new();
         std::fs::create_dir_all(path.as_ref())?;
@@ -188,12 +192,50 @@ impl TantivyDocumentStore {
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()?;
 
+        // Reload all stored documents from the Tantivy index into the in-memory
+        // cache so that get() works after restart.
+        let mut documents = HashMap::new();
+        let searcher = reader.searcher();
+        for segment_reader in searcher.segment_readers() {
+            let store_reader = segment_reader.get_store_reader(1)
+                .map_err(|e| DocumentError::IndexError(format!("store reader: {e}")))?;
+            for doc_id in 0..segment_reader.max_doc() {
+                if segment_reader.is_deleted(doc_id) {
+                    continue;
+                }
+                if let Ok(tantivy_doc) = store_reader.get::<TantivyDocument>(doc_id) {
+                    let extract = |field: Field| -> String {
+                        tantivy_doc
+                            .get_first(field)
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string()
+                    };
+                    let id_val = extract(schema.id);
+                    let title_val = extract(schema.title);
+                    let body_val = extract(schema.body);
+
+                    if !id_val.is_empty() {
+                        documents.insert(
+                            id_val.clone(),
+                            Document::new(id_val, title_val, body_val),
+                        );
+                    }
+                }
+            }
+        }
+
+        tracing::info!(
+            count = documents.len(),
+            "Loaded document store from Tantivy index"
+        );
+
         Ok(Self {
             schema,
             index,
             writer: Arc::new(RwLock::new(writer)),
             reader,
-            documents: Arc::new(RwLock::new(HashMap::new())),
+            documents: Arc::new(RwLock::new(documents)),
         })
     }
 }
