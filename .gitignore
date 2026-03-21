@@ -102,6 +102,9 @@ temp/
 /data/
 /storage/
 
+# verisimdb-data is its own repo — do not track here
+/verisimdb-data/
+
 # Container build artifacts
 *.tar
 
