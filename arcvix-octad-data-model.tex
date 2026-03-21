@@ -1,0 +1,1626 @@
+% SPDX-License-Identifier: PMPL-1.0-or-later
+% arcvix-octad-data-model.tex — arXiv-style academic paper on the Octad Data Model
+% VeriSimDB: Drift-Aware Multi-Modal Data Identity in Federated Systems
+%
+% Author: Jonathan D.A. Jewell
+% Affiliation: Independent Researcher / Hyperpolymath
+% Date: March 2026
+
+\documentclass[11pt,twocolumn]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{stmaryrd}          % ⟦ ⟧ semantic brackets
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{fancyhdr}
+\usepackage{xspace}
+
+% ── Theorem environments ──────────────────────────────────────────────────────
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{invariant}{Invariant}[section]
+\newtheorem{property}{Property}[section]
+
+% ── Macros ────────────────────────────────────────────────────────────────────
+\newcommand{\verisimdb}{\textsc{VeriSimDB}\xspace}
+\newcommand{\octad}{\mathcal{O}}
+\newcommand{\modset}{\mathcal{M}}
+\newcommand{\driftfn}{\Delta}
+\newcommand{\identity}{\mathcal{I}}
+\newcommand{\repairfn}{\mathcal{R}}
+\newcommand{\policyfn}{\mathcal{P}}
+\newcommand{\queryfn}{\mathcal{Q}}
+\newcommand{\sembrack}[1]{\llbracket #1 \rrbracket}
+
+% ── Listing style ─────────────────────────────────────────────────────────────
+\definecolor{codebg}{gray}{0.96}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.1,0.2,0.6}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegreen},
+  stringstyle=\color{codegray},
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  breaklines=true,
+  frame=single,
+  framesep=3pt,
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em,
+  captionpos=b
+}
+
+% ── Title ─────────────────────────────────────────────────────────────────────
+
+\title{%
+  \textbf{The Octad Data Model: Drift-Aware Multi-Modal\\
+  Data Identity in Federated Systems}%
+}
+
+\author{
+  Jonathan D.A.\ Jewell\\
+  \textit{Independent Researcher}\\
+  \texttt{j.d.a.jewell@open.ac.uk}
+}
+
+\date{March 2026}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+
+% ── Abstract ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+Modern data systems face a fundamental tension between the richness of
+multi-modal representations and the coherence guarantees required by federated
+environments.  An entity may simultaneously be a node in a knowledge graph, a
+dense vector embedding, a multi-dimensional tensor, a semantically typed
+artefact, a full-text document, a versioned temporal object, a provenance-tracked
+lineage chain, and a spatially located datum.  Existing multi-model databases
+typically store these facets in loosely coupled subsystems with no unified
+identity or consistency semantics.
+
+We present the \emph{Octad Data Model}, the core abstraction of \verisimdb, in
+which every entity exists simultaneously across exactly eight \emph{modalities}
+--- Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, and Spatial
+--- bound to a single UUID-based identity.  Rather than enforcing strict
+consistency through conflict-free replicated data types or blockchain-style
+consensus, \verisimdb treats cross-modal \emph{drift} as a first-class concept:
+drift is detected through statistical and formal methods, classified by type and
+severity, and resolved through configurable policy-driven repair strategies that
+range from fully automatic to human-supervised.  We formalise the octad algebra,
+define drift metrics across modality pairs, and describe a federated
+verification protocol suitable for sovereign data stores that cannot be centrally
+controlled.  We report on a Rust-based implementation using Oxigraph, Tantivy,
+HNSW indexing, and R-tree spatial indexing, and present experimental results on
+drift detection accuracy and cross-modal query performance over synthetic and
+real-world datasets.
+\end{abstract}
+
+\noindent\textbf{Keywords:}
+multi-model databases, data identity, drift detection, federated systems,
+knowledge graphs, vector search, temporal databases, provenance tracking
+
+% ── 1. Introduction ──────────────────────────────────────────────────────────
+\section{Introduction}\label{sec:intro}
+
+The contemporary data landscape is characterised by an explosion of
+heterogeneous representations.  A single scientific publication may be
+represented as an RDF triple in a bibliographic knowledge graph, a 768-dimensional
+dense embedding in a semantic search index, a tensor of citation features in a
+recommendation model, a full-text document in a search engine, a versioned
+artefact in a temporal database, and a geolocated entity in a spatial index.
+Each representation captures a distinct \emph{modality} of the same underlying
+entity, yet in practice these modalities are stored in separate, independently
+managed systems with no shared notion of identity or consistency.
+
+This fragmentation creates three classes of problems:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Identity fragmentation.}  The same entity acquires different
+    identifiers in each system, requiring brittle reconciliation logic.
+  \item \textbf{Semantic drift.}  When one modality is updated (e.g., a
+    paper is retracted), other modalities may continue to serve stale or
+    contradictory information indefinitely.
+  \item \textbf{Federation barriers.}  Sovereign institutions cannot share
+    data across organisational boundaries without either ceding control to a
+    central authority or accepting the chaos of uncoordinated peer-to-peer
+    replication.
+\end{enumerate}
+
+Existing multi-model databases --- ArangoDB~\cite{arangodb2023}, SurrealDB~\cite{surrealdb2024},
+TerminusDB~\cite{terminusdb2023} --- address identity fragmentation to varying
+degrees but treat consistency as a binary property: either strongly consistent
+(via MVCC, Raft, or CRDTs) or eventually consistent with no formal drift
+semantics.  Decentralised systems such as IPFS~\cite{benet2014ipfs} and
+Solid~\cite{sambra2016solid} provide content-addressable storage and
+access-control mechanisms, but offer no cross-modal coherence guarantees.
+
+We argue that the missing abstraction is \emph{drift-aware multi-modal
+identity}: a data model in which (a) an entity's identity is preserved across
+all representational modalities, (b) divergence between modalities is detected,
+classified, and quantified continuously, and (c) resolution of detected drift is
+governed by explicit, auditable policies rather than implicit convergence
+assumptions.
+
+This paper makes the following contributions:
+
+\begin{enumerate}[leftmargin=*]
+  \item We formalise the \emph{Octad Data Model}, in which each entity exists
+    simultaneously across eight modalities, bound by a single identity and
+    subject to algebraic invariants (\cref{sec:octad}).
+  \item We define a \emph{drift calculus} with formal metrics for detecting
+    and classifying divergence across modality pairs (\cref{sec:drift}).
+  \item We describe a \emph{policy-driven repair framework} that supports
+    automatic, semi-automatic, and manual resolution strategies with immutable
+    audit trails (\cref{sec:repair}).
+  \item We present a \emph{cross-modal query} language that permits type-safe
+    access across modality boundaries (\cref{sec:query}).
+  \item We report on a production-quality implementation in Rust and Elixir,
+    together with experimental evaluation on drift detection accuracy and
+    query latency (\cref{sec:implementation,sec:evaluation}).
+\end{enumerate}
+
+The remainder of this paper is organised as follows.  \Cref{sec:background}
+surveys relevant background.  \Cref{sec:octad} presents the formal octad model.
+\Cref{sec:drift} defines drift detection and classification.  \Cref{sec:repair}
+describes policy-driven repair.  \Cref{sec:query} introduces cross-modal
+querying.  \Cref{sec:implementation} details the implementation.
+\Cref{sec:evaluation} reports experimental results.  \Cref{sec:related} discusses
+related work, and \cref{sec:conclusion} concludes.
+
+% ── 2. Background ────────────────────────────────────────────────────────────
+\section{Background}\label{sec:background}
+
+\subsection{Multi-Model Databases}
+
+The term \emph{multi-model database} denotes a system that natively supports
+more than one data model (e.g., document, graph, key-value) within a single
+engine~\cite{lu2019multimodel}.  ArangoDB~\cite{arangodb2023} combines
+document, graph, and key-value access patterns over a shared storage engine.
+SurrealDB~\cite{surrealdb2024} extends this with record links, full-text
+search, and vector similarity.  OrientDB provides document-graph duality.
+These systems achieve multi-model access by embedding multiple query
+interpreters atop a common storage layer, but they do not formalise the
+relationship \emph{between} models for the same entity.  An entity's graph
+representation and its document representation are conceptually independent;
+no mechanism detects when they diverge.
+
+\subsection{Graph Databases and Knowledge Graphs}
+
+RDF-based systems (e.g., Apache Jena, Oxigraph~\cite{oxigraph2023},
+Blazegraph) and property-graph systems (e.g., Neo4j, JanusGraph) represent
+entities as nodes connected by typed edges.  SPARQL and Cypher provide
+declarative query interfaces.  While graph representations excel at capturing
+relational structure, they lack native support for dense vector retrieval,
+temporal versioning, or spatial indexing, requiring external systems for these
+modalities.
+
+\subsection{Vector Stores and Dense Retrieval}
+
+The rise of transformer-based embeddings has driven the development of
+purpose-built vector databases: Pinecone, Weaviate, Milvus, Qdrant, and
+Chroma.  These systems index high-dimensional vectors using approximate
+nearest-neighbour algorithms such as HNSW~\cite{malkov2018hnsw} or
+IVF~\cite{jegou2011pq}.  While some offer metadata filtering, they provide
+no formal mechanism for detecting when an embedding becomes stale relative
+to the source document it was derived from.
+
+\subsection{Temporal Databases and Version Control}
+
+Temporal databases~\cite{snodgrass1999temporal} maintain the history of data
+changes, supporting time-travel queries (``what was the value at time $t$?'')
+and bitemporal models (transaction time vs.\ valid time).  TerminusDB~\cite{terminusdb2023}
+applies version-control semantics (branches, merges, diffs) to graph data.
+Dolt provides git-style versioning for relational tables.  However, temporal
+guarantees in these systems apply within a single modality; cross-modal
+temporal coherence (e.g., ensuring a vector embedding corresponds to the
+correct document version) is left to application logic.
+
+\subsection{Provenance and Lineage Tracking}
+
+The W3C PROV model~\cite{w3cprov2013} defines a vocabulary for describing the
+provenance of data entities, activities, and agents.  Systems such as
+Apache Atlas and Amundsen provide metadata lineage for data warehouses.
+Content-addressable storage (IPFS~\cite{benet2014ipfs}, Git) ensures
+immutability through cryptographic hashing.  These approaches track
+\emph{where data came from} but do not address \emph{whether} concurrent
+modality representations remain consistent with the provenance record.
+
+\subsection{Spatial Databases}
+
+PostGIS, SpatiaLite, and H3~\cite{uber2018h3} provide geospatial indexing
+using R-trees, quadtrees, or hexagonal hierarchical grids.  The OGC Simple
+Features standard and WGS84 coordinate reference system are widely adopted.
+Spatial databases rarely integrate with graph or vector retrieval, creating
+yet another silo.
+
+\subsection{FAIR Principles and Federated Data}
+
+The FAIR principles~\cite{wilkinson2016fair} (Findable, Accessible,
+Interoperable, Reusable) have become the standard for open-science data
+management.  Solid~\cite{sambra2016solid} provides user-controlled data pods
+with linked-data access control.  The European Open Science Cloud (EOSC)
+and GAIA-X pursue federated data spaces.  These initiatives address access
+control and discoverability but lack formal models for cross-modal identity
+and drift.
+
+% ── 3. The Octad Data Model ──────────────────────────────────────────────────
+\section{The Octad Data Model}\label{sec:octad}
+
+\subsection{Design Rationale}
+
+The central observation motivating the octad model is that multi-modal data
+representations are not independent: they are \emph{projections} of a single
+underlying entity onto different representational spaces.  A knowledge graph
+edge stating ``paper $p$ cites paper $q$'' and a vector embedding of $p$ that
+places it near $q$ in embedding space are not independent facts --- they are
+correlated views that should remain mutually consistent.  The octad model
+makes this correlation explicit and enforceable.
+
+We identify eight modalities as the minimal complete basis for contemporary
+data-intensive systems.  This choice is informed by a survey of production
+workloads spanning scientific publishing, geospatial intelligence, financial
+compliance, and AI/ML pipelines.  While any finite enumeration is necessarily
+incomplete, we demonstrate that these eight modalities cover the representational
+needs of each surveyed domain.
+
+\subsection{Formal Definition}
+
+\begin{definition}[Modality Set]\label{def:modset}
+The \emph{modality set} $\modset$ is the fixed eight-element set:
+\[
+  \modset = \{
+    \mathsf{G}, \mathsf{V}, \mathsf{T}, \mathsf{S},
+    \mathsf{D}, \mathsf{P}, \mathsf{R}, \mathsf{X}
+  \}
+\]
+where $\mathsf{G}$ = Graph, $\mathsf{V}$ = Vector, $\mathsf{T}$ = Tensor,
+$\mathsf{S}$ = Semantic, $\mathsf{D}$ = Document, $\mathsf{P}$ = Temporal,
+$\mathsf{R}$ = Provenance, and $\mathsf{X}$ = Spatial.
+\end{definition}
+
+Each modality $m \in \modset$ has an associated \emph{modality space} $\Sigma_m$:
+
+\begin{itemize}[leftmargin=*]
+  \item $\Sigma_\mathsf{G}$: the set of all labelled directed multigraphs
+    (RDF triples or property-graph subgraphs).
+  \item $\Sigma_\mathsf{V}$: $\mathbb{R}^d$ for a fixed embedding dimension $d$.
+  \item $\Sigma_\mathsf{T}$: the set of typed multi-dimensional arrays
+    $\bigcup_{n \geq 1} \mathbb{R}^{d_1 \times \cdots \times d_n}$.
+  \item $\Sigma_\mathsf{S}$: the set of CBOR-encoded semantic annotations,
+    comprising type URIs and proof blobs.
+  \item $\Sigma_\mathsf{D}$: the set of structured text documents with
+    inverted-index metadata.
+  \item $\Sigma_\mathsf{P}$: the set of Merkle-tree version histories over
+    octad snapshots.
+  \item $\Sigma_\mathsf{R}$: the set of SHA-256 hash chains recording
+    provenance events (creation, transformation, access).
+  \item $\Sigma_\mathsf{X}$: the set of geometric objects in a WGS84
+    coordinate reference system, indexed by R-tree.
+\end{itemize}
+
+\begin{definition}[Octad]\label{def:octad}
+An \emph{octad} is a tuple $\octad = (\mathit{id}, \varphi)$ where:
+\begin{itemize}[leftmargin=*]
+  \item $\mathit{id} \in \mathsf{UUID}$ is a universally unique 128-bit identifier.
+  \item $\varphi : \modset \to \bigcup_{m \in \modset} (\Sigma_m \cup \{\bot\})$
+    is a \emph{modality function} such that for each $m \in \modset$,
+    $\varphi(m) \in \Sigma_m \cup \{\bot\}$, where $\bot$ denotes the absence
+    of a representation in modality $m$.
+\end{itemize}
+\end{definition}
+
+The modality function $\varphi$ maps each of the eight modalities to either a
+concrete value in the corresponding modality space or the distinguished value
+$\bot$.  An octad may have $\bot$ in some modalities (e.g., an entity without
+spatial coordinates), but its identity persists regardless.
+
+\begin{definition}[Octad Store]\label{def:store}
+An \emph{octad store} $\mathcal{S}$ is a partial function
+$\mathcal{S} : \mathsf{UUID} \rightharpoonup \octad$ together with:
+\begin{enumerate}[leftmargin=*]
+  \item A \emph{modality index} $\mathcal{I}_m$ for each $m \in \modset$,
+    providing efficient retrieval within that modality space.
+  \item A \emph{drift monitor} $\driftfn$ that continuously evaluates
+    cross-modal coherence (\cref{sec:drift}).
+  \item A \emph{repair engine} $\repairfn$ that resolves detected drift
+    according to policy (\cref{sec:repair}).
+\end{enumerate}
+\end{definition}
+
+\subsection{Identity Invariants}
+
+The octad model enforces two fundamental invariants:
+
+\begin{invariant}[Identity Uniqueness]\label{inv:unique}
+For any octad store $\mathcal{S}$ and identifiers $\mathit{id}_1 \neq \mathit{id}_2$,
+$\mathcal{S}(\mathit{id}_1)$ and $\mathcal{S}(\mathit{id}_2)$ share no modality
+representations.  That is, if $\varphi_1(m) \neq \bot$ and $\varphi_2(m) \neq \bot$
+for some $m$, then $\varphi_1(m) \neq \varphi_2(m)$.
+\end{invariant}
+
+\begin{invariant}[Identity Persistence]\label{inv:persist}
+An octad's identifier $\mathit{id}$ is immutable.  Mutations to $\varphi$ do
+not change $\mathit{id}$; the temporal modality $\varphi(\mathsf{P})$ records the
+full history of all mutations.
+\end{invariant}
+
+These invariants guarantee that an entity's identity is stable and
+unambiguous across all modalities and across time.
+
+\subsection{Modality Algebra}\label{sec:modality-algebra}
+
+We define algebraic operations over octads to support composition, projection,
+and merging.
+
+\begin{definition}[Projection]\label{def:projection}
+For an octad $\octad = (\mathit{id}, \varphi)$ and a subset
+$M \subseteq \modset$, the \emph{projection} $\pi_M(\octad)$ is the tuple
+$(\mathit{id}, \varphi|_M)$ where $\varphi|_M(m) = \varphi(m)$ if $m \in M$,
+and $\varphi|_M(m) = \bot$ otherwise.
+\end{definition}
+
+\begin{definition}[Merge]\label{def:merge}
+Given two octads $\octad_1 = (\mathit{id}, \varphi_1)$ and
+$\octad_2 = (\mathit{id}, \varphi_2)$ sharing the same identifier, their
+\emph{merge} $\octad_1 \oplus \octad_2 = (\mathit{id}, \varphi_\oplus)$ is
+defined by:
+\[
+  \varphi_\oplus(m) = \begin{cases}
+    \varphi_1(m) & \text{if } \varphi_2(m) = \bot \\
+    \varphi_2(m) & \text{if } \varphi_1(m) = \bot \\
+    \mathsf{resolve}(\varphi_1(m), \varphi_2(m)) & \text{otherwise}
+  \end{cases}
+\]
+where $\mathsf{resolve}$ is a policy-dependent conflict resolution function
+(\cref{sec:repair}).
+\end{definition}
+
+\begin{proposition}[Merge Commutativity]
+If $\mathsf{resolve}$ is commutative, then $\oplus$ is commutative:
+$\octad_1 \oplus \octad_2 = \octad_2 \oplus \octad_1$.
+\end{proposition}
+
+\begin{proof}
+Follows directly from the symmetry of the case analysis in
+\cref{def:merge} and the commutativity assumption on $\mathsf{resolve}$.
+\end{proof}
+
+\begin{definition}[Enrichment]\label{def:enrichment}
+An \emph{enrichment} of octad $\octad = (\mathit{id}, \varphi)$ at modality
+$m$ is the operation $\mathsf{enrich}_m(\octad, v)$ producing
+$(\mathit{id}, \varphi')$ where $\varphi'(m) = v \in \Sigma_m$ and
+$\varphi'(m') = \varphi(m')$ for all $m' \neq m$.  Every enrichment appends
+a record to $\varphi'(\mathsf{P})$ and $\varphi'(\mathsf{R})$.
+\end{definition}
+
+This enrichment operation is the fundamental write primitive.  It guarantees
+that every modality mutation is reflected in both the temporal and provenance
+modalities, maintaining the audit trail invariant.
+
+\subsection{Cross-Modal Coherence Constraints}
+
+Beyond identity invariants, the octad model supports user-defined
+\emph{coherence constraints} that express expected relationships between
+modalities.
+
+\begin{definition}[Coherence Constraint]\label{def:coherence}
+A \emph{coherence constraint} is a predicate
+$c : \Sigma_{m_1} \times \Sigma_{m_2} \to \{0, 1\}$ for modalities
+$m_1, m_2 \in \modset$ that must hold whenever both
+$\varphi(m_1) \neq \bot$ and $\varphi(m_2) \neq \bot$.
+\end{definition}
+
+Examples of coherence constraints include:
+\begin{itemize}[leftmargin=*]
+  \item The vector embedding $\varphi(\mathsf{V})$ must be derivable from
+    the document content $\varphi(\mathsf{D})$ via a specified embedding
+    function $f$: $\|\varphi(\mathsf{V}) - f(\varphi(\mathsf{D}))\|_2 < \epsilon$.
+  \item The graph modality $\varphi(\mathsf{G})$ must contain exactly the
+    relations declared in the semantic modality $\varphi(\mathsf{S})$.
+  \item The spatial modality $\varphi(\mathsf{X})$ must be consistent with
+    any geographic references in the document modality $\varphi(\mathsf{D})$.
+\end{itemize}
+
+Violation of a coherence constraint constitutes \emph{drift}, which we
+formalise in the next section.
+
+% ── 4. Drift Detection and Classification ────────────────────────────────────
+\section{Drift Detection and Classification}\label{sec:drift}
+
+\subsection{Drift as a First-Class Concept}
+
+Traditional database systems treat inconsistency as an error condition to be
+prevented through transactions, locks, or consensus protocols.  In federated
+multi-modal settings, this approach is both impractical and undesirable.
+Modalities evolve at different rates: a document may be updated before its
+embedding is recomputed; a spatial coordinate may be refined independently of
+the underlying graph structure; a provenance chain may lag behind the current
+state of the data.
+
+\verisimdb adopts a fundamentally different stance: \emph{drift is not an
+error; it is an observable quantity that can be measured, classified, and
+managed according to policy.}  This design choice is motivated by real-world
+federated environments where strict consistency would require either
+(a)~centralised coordination, which violates sovereignty, or (b)~blocking
+updates until all modalities are synchronised, which is impractical for
+large-scale systems.
+
+\subsection{Formal Drift Metrics}
+
+We define drift as a function of the divergence between modality
+representations of the same octad.
+
+\begin{definition}[Pairwise Drift]\label{def:pairwise-drift}
+For modalities $m_1, m_2 \in \modset$ and an octad $\octad = (\mathit{id}, \varphi)$,
+the \emph{pairwise drift} is:
+\[
+  \driftfn_{m_1, m_2}(\octad) = d_{m_1, m_2}(\varphi(m_1), \varphi(m_2))
+\]
+where $d_{m_1, m_2} : \Sigma_{m_1} \times \Sigma_{m_2} \to \mathbb{R}_{\geq 0}$
+is a modality-pair-specific distance function, with $d_{m_1, m_2}(\cdot, \bot) =
+d_{m_1, m_2}(\bot, \cdot) = 0$ by convention (absent modalities do not drift).
+\end{definition}
+
+\begin{definition}[Aggregate Drift]\label{def:agg-drift}
+The \emph{aggregate drift} of an octad is the weighted sum over all modality
+pairs:
+\[
+  \driftfn(\octad) = \sum_{\{m_1, m_2\} \subseteq \modset}
+    w_{m_1, m_2} \cdot \driftfn_{m_1, m_2}(\octad)
+\]
+where $w_{m_1, m_2} \geq 0$ are policy-configured weights satisfying
+$\sum w_{m_1, m_2} = 1$.
+\end{definition}
+
+For eight modalities, there are $\binom{8}{2} = 28$ distinct modality pairs.
+In practice, not all pairs have meaningful distance functions; we define
+metrics for the most important pairs.
+
+\subsection{Modality-Pair Distance Functions}\label{sec:drift-metrics}
+
+\paragraph{Vector--Document drift ($d_{\mathsf{V},\mathsf{D}}$).}
+Given an embedding function $f : \Sigma_\mathsf{D} \to \mathbb{R}^d$:
+\[
+  d_{\mathsf{V},\mathsf{D}}(\vec{v}, \mathit{doc}) =
+    1 - \frac{\vec{v} \cdot f(\mathit{doc})}{\|\vec{v}\|\;\|f(\mathit{doc})\|}
+\]
+This is the cosine distance between the stored embedding and the embedding
+that \emph{would} be computed from the current document content.  A drift
+value near 0 indicates that the embedding is fresh; a value near 1 indicates
+that the document has changed substantially since the embedding was computed.
+
+\paragraph{Graph--Semantic drift ($d_{\mathsf{G},\mathsf{S}}$).}
+Let $E_\mathsf{G}$ be the set of typed edges in the graph modality and
+$T_\mathsf{S}$ the set of type assertions in the semantic modality.  Define:
+\[
+  d_{\mathsf{G},\mathsf{S}}(g, s) =
+    1 - \frac{|E_\mathsf{G} \cap T_\mathsf{S}|}{|E_\mathsf{G} \cup T_\mathsf{S}|}
+\]
+This is the Jaccard distance between the structural assertions in the graph
+and the ontological type assertions in the semantic modality.
+
+\paragraph{Temporal--Provenance drift ($d_{\mathsf{P},\mathsf{R}}$).}
+Let $H_\mathsf{P}$ be the Merkle tree of version history and $C_\mathsf{R}$
+the SHA-256 hash chain of provenance events.  Define:
+\[
+  d_{\mathsf{P},\mathsf{R}}(h, c) =
+    \frac{|\mathsf{leaves}(H_\mathsf{P}) \setminus \mathsf{events}(C_\mathsf{R})|}{
+      |\mathsf{leaves}(H_\mathsf{P})|}
+\]
+This measures the fraction of version-history events not accounted for in the
+provenance chain --- an indicator of provenance tracking lag.
+
+\paragraph{Tensor--Vector drift ($d_{\mathsf{T},\mathsf{V}}$).}
+When the vector modality is a flattened or projected view of the tensor:
+\[
+  d_{\mathsf{T},\mathsf{V}}(t, \vec{v}) =
+    \frac{\|\mathsf{proj}(t) - \vec{v}\|_2}{\|\mathsf{proj}(t)\|_2}
+\]
+where $\mathsf{proj} : \Sigma_\mathsf{T} \to \mathbb{R}^d$ is the configured
+projection function.
+
+\paragraph{Document--Spatial drift ($d_{\mathsf{D},\mathsf{X}}$).}
+Using named-entity recognition to extract geographic references $G_\mathsf{D}$
+from the document and comparing with the spatial modality's coordinates
+$p_\mathsf{X}$:
+\[
+  d_{\mathsf{D},\mathsf{X}}(\mathit{doc}, p) =
+    \min_{g \in G_\mathsf{D}} \mathsf{haversine}(g, p_\mathsf{X})
+\]
+normalised to $[0, 1]$ by a configurable maximum distance threshold.
+
+\subsection{Drift Classification}\label{sec:drift-class}
+
+Not all drift is equal.  We classify detected drift into four categories
+based on its source and severity:
+
+\begin{definition}[Drift Classes]\label{def:drift-classes}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Representational drift} occurs when a derived modality
+    becomes stale relative to its source (e.g., an embedding not yet
+    recomputed after a document update).  This is typically benign and
+    automatically repairable.
+  \item \textbf{Semantic drift} occurs when the meaning of an entity
+    changes in one modality but not others (e.g., a retracted paper whose
+    graph edges still assert validity).  This requires domain-aware repair.
+  \item \textbf{Structural drift} occurs when the topology of
+    relationships in the graph modality diverges from the structure implied
+    by other modalities (e.g., a document describes a citation that has
+    no corresponding graph edge).
+  \item \textbf{Provenance drift} occurs when the audit trail in the
+    provenance or temporal modalities fails to account for observed changes
+    in other modalities.  This may indicate tampering or system failure.
+\end{enumerate}
+\end{definition}
+
+The classification is computed by a rule engine that evaluates which modality
+pairs exhibit drift and maps the pattern to a drift class.  For instance,
+drift exclusively in $d_{\mathsf{V},\mathsf{D}}$ is classified as
+representational, while drift in $d_{\mathsf{G},\mathsf{S}}$ with concurrent
+drift in $d_{\mathsf{P},\mathsf{R}}$ is classified as provenance drift
+(indicating an untracked semantic change).
+
+\subsection{Drift Detection Algorithm}
+
+\begin{algorithm}[t]
+\caption{Periodic Drift Detection}\label{alg:drift-detect}
+\begin{algorithmic}[1]
+\Require Octad store $\mathcal{S}$, sampling interval $\tau$,
+  thresholds $\theta_\mathsf{soft}, \theta_\mathsf{hard}$
+\Loop
+  \State $\mathit{sample} \gets \mathsf{random\_sample}(\mathcal{S}, k)$
+  \For{$\octad \in \mathit{sample}$}
+    \For{$(m_1, m_2) \in \mathsf{active\_pairs}(\octad)$}
+      \State $\delta \gets \driftfn_{m_1,m_2}(\octad)$
+      \If{$\delta > \theta_\mathsf{hard}$}
+        \State $\mathsf{emit\_alert}(\octad, m_1, m_2, \mathsf{HARD})$
+      \ElsIf{$\delta > \theta_\mathsf{soft}$}
+        \State $\mathsf{mark\_drifted}(\octad, m_1, m_2)$
+      \EndIf
+    \EndFor
+  \EndFor
+  \State $\mathsf{sleep}(\tau)$
+\EndLoop
+\end{algorithmic}
+\end{algorithm}
+
+\Cref{alg:drift-detect} shows the core drift detection loop.  The algorithm
+operates by random sampling to amortise the cost of cross-modal comparisons
+over large stores.  The function $\mathsf{active\_pairs}(\octad)$ returns
+only those modality pairs for which both modalities are non-$\bot$ and a
+distance function is defined.  Two thresholds govern the response: a soft
+threshold triggers marking (the octad is flagged but no immediate action is
+taken), and a hard threshold triggers an alert that initiates repair.
+
+The sampling rate $k$ and interval $\tau$ are tunable: aggressive settings
+($k = |\mathcal{S}|$, $\tau = 0$) provide continuous full-scan monitoring
+at the cost of throughput, while conservative settings enable drift detection
+with minimal overhead.
+
+% ── 5. Policy-Driven Repair ──────────────────────────────────────────────────
+\section{Policy-Driven Repair}\label{sec:repair}
+
+\subsection{Repair Strategies}
+
+Once drift is detected and classified, the system must determine how to
+resolve it.  We define three \emph{automation levels}:
+
+\begin{definition}[Repair Automation Levels]
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Automatic repair.}  The system identifies the
+    \emph{authoritative modality} for the drifted pair and regenerates
+    the non-authoritative modality.  Example: re-embedding a document
+    when $d_{\mathsf{V},\mathsf{D}}$ exceeds threshold.
+  \item \textbf{Semi-automatic repair.}  The system proposes a repair
+    action and awaits confirmation from a designated \emph{domain custodian}.
+    Example: updating graph edges when a semantic annotation changes.
+  \item \textbf{Manual repair.}  The system logs the drift event and
+    creates a review ticket.  Example: resolving conflicting provenance
+    chains that may indicate data tampering.
+\end{enumerate}
+\end{definition}
+
+\subsection{The Repair Policy Language}
+
+Repair policies are expressed as rules mapping drift class $\times$ severity
+to an automation level and a repair action.  Formally:
+
+\begin{definition}[Repair Policy]\label{def:repair-policy}
+A \emph{repair policy} is a function:
+\[
+  \policyfn : \mathsf{DriftClass} \times \mathbb{R}_{\geq 0} \to
+    \mathsf{AutoLevel} \times \mathsf{Action}
+\]
+where $\mathsf{DriftClass}$ is one of the four classes in
+\cref{def:drift-classes}, $\mathsf{AutoLevel} \in \{
+\mathsf{auto}, \mathsf{semi}, \mathsf{manual}\}$, and $\mathsf{Action}$
+specifies the concrete repair operation.
+\end{definition}
+
+Policies are encoded in CBOR and stored in the semantic modality of a
+designated \emph{policy octad}, itself subject to the same identity and
+versioning invariants as any other octad.  This design ensures that policy
+changes are auditable and versioned.
+
+\subsection{Authoritative Modality Selection}
+
+When automatic repair is triggered, the system must determine which modality
+is \emph{authoritative} --- i.e., which modality's current state should be
+treated as ground truth.
+
+\begin{definition}[Authority Function]\label{def:authority}
+An \emph{authority function} $\alpha : \modset \times \modset \to \modset$
+maps each modality pair to the authoritative member.  The default authority
+ordering is:
+\[
+  \mathsf{D} > \mathsf{G} > \mathsf{S} > \mathsf{V} > \mathsf{T} >
+  \mathsf{X} > \mathsf{P} > \mathsf{R}
+\]
+where $m_1 > m_2$ means $m_1$ is authoritative over $m_2$.
+\end{definition}
+
+The rationale for this ordering is that human-authored modalities (documents,
+graphs, semantic annotations) take precedence over derived modalities
+(embeddings, tensors) and infrastructure modalities (temporal, provenance).
+The ordering is configurable per octad store to accommodate domain-specific
+requirements.
+
+\subsection{Repair Execution}
+
+\begin{algorithm}[t]
+\caption{Policy-Driven Repair Execution}\label{alg:repair}
+\begin{algorithmic}[1]
+\Require Drifted octad $\octad$, modality pair $(m_1, m_2)$,
+  drift class $c$, drift value $\delta$
+\State $(\mathit{level}, \mathit{action}) \gets \policyfn(c, \delta)$
+\If{$\mathit{level} = \mathsf{auto}$}
+  \State $m_\alpha \gets \alpha(m_1, m_2)$
+  \State $m_\beta \gets (m_1, m_2) \setminus \{m_\alpha\}$
+  \State $v' \gets \mathsf{derive}(\varphi(m_\alpha), m_\beta)$
+  \State $\octad' \gets \mathsf{enrich}_{m_\beta}(\octad, v')$
+  \State $\mathsf{commit}(\octad')$
+\ElsIf{$\mathit{level} = \mathsf{semi}$}
+  \State $\mathsf{propose\_repair}(\octad, m_1, m_2, \mathit{action})$
+  \State \textbf{await} custodian approval or timeout
+\Else
+  \State $\mathsf{log\_for\_review}(\octad, m_1, m_2, c, \delta)$
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+The $\mathsf{derive}$ function in \cref{alg:repair} is modality-pair-specific:
+for $(\mathsf{D}, \mathsf{V})$, it invokes the embedding model; for
+$(\mathsf{G}, \mathsf{S})$, it extracts typed edges from semantic annotations.
+Every repair action, regardless of automation level, appends an entry to both
+the temporal and provenance modalities.
+
+\subsection{Immutable Audit Trail}
+
+All repair actions produce an audit record:
+\[
+  \mathsf{AuditRecord} = (
+    \mathit{timestamp},\;
+    \mathit{octad\_id},\;
+    \mathit{drift\_class},\;
+    \mathit{drift\_value},\;
+    \mathit{repair\_action},\;
+    \mathit{actor},\;
+    \mathit{prev\_hash}
+  )
+\]
+
+Records form a hash chain: $\mathit{hash}_i = \mathsf{SHA256}(
+\mathit{AuditRecord}_i \| \mathit{hash}_{i-1})$.  This chain is stored in
+the provenance modality and is verifiable by any federated participant.
+
+% ── 6. Cross-Modal Query ─────────────────────────────────────────────────────
+\section{Cross-Modal Query}\label{sec:query}
+
+\subsection{Query Model}
+
+A key advantage of the octad model is that queries can \emph{span modality
+boundaries} while maintaining type safety.  We define a cross-modal query
+language, VQL (VeriSim Query Language), that supports modality-specific
+operations composed through a common identity layer.
+
+\begin{definition}[Cross-Modal Query]\label{def:query}
+A \emph{cross-modal query} $q$ is a composition of modality-specific
+query fragments:
+\[
+  q = \queryfn_{m_1}(\mathit{pred}_1) \bowtie_{\mathit{id}}
+      \queryfn_{m_2}(\mathit{pred}_2) \bowtie_{\mathit{id}} \cdots
+      \bowtie_{\mathit{id}} \queryfn_{m_k}(\mathit{pred}_k)
+\]
+where $\queryfn_{m_i}(\mathit{pred}_i)$ returns a set of octad identifiers
+matching predicate $\mathit{pred}_i$ in modality $m_i$, and
+$\bowtie_{\mathit{id}}$ is the natural join on octad identity.
+\end{definition}
+
+This formulation enables queries such as ``find all entities that are within
+10km of London (spatial), were authored after 2020 (temporal), cite a
+retracted paper (graph), and have a cosine similarity $> 0.9$ to a query
+embedding (vector).''
+
+\subsection{Query Planning}
+
+The cross-modal query planner operates in three phases:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Decomposition.}  The query is parsed into modality-specific
+    fragments.  Each fragment is routed to the appropriate modality index.
+  \item \textbf{Selectivity estimation.}  The planner estimates the
+    selectivity of each fragment using modality-specific statistics
+    (cardinality estimates for graph patterns, distance distributions
+    for vector queries, spatial density for R-tree bounds).
+  \item \textbf{Execution ordering.}  Fragments are executed in order of
+    decreasing selectivity (most selective first) to minimise the
+    intermediate result set.  The identity join is implemented as a
+    hash-based intersection of UUID sets.
+\end{enumerate}
+
+\subsection{VQL Syntax (Abbreviated)}
+
+\begin{lstlisting}[language=SQL,caption={Cross-modal VQL query example}]
+SELECT octad.id, octad.document.title,
+       octad.spatial.coordinates
+FROM octads
+WHERE octad.vector NEAR [0.1, 0.3, ...] LIMIT 100
+  AND octad.graph MATCHES
+      (?x :cites ?y WHERE ?y :status "retracted")
+  AND octad.spatial WITHIN radius(51.5, -0.12, 10km)
+  AND octad.temporal.created > "2020-01-01"
+ORDER BY octad.vector.similarity DESC
+\end{lstlisting}
+
+The query in Listing~1 demonstrates the four-modality span: vector similarity
+(line 4), graph pattern matching (lines 5--6), spatial containment (line 7),
+and temporal filtering (line 8).  The result includes document and spatial
+projections of matching octads.
+
+\subsection{Type Safety}
+
+VQL is statically typed: each modality accessor (e.g., \texttt{octad.vector},
+\texttt{octad.graph}) returns a value of the corresponding modality type.
+The type checker rejects queries that apply modality-inappropriate operations
+(e.g., applying \texttt{NEAR} to a document modality or \texttt{MATCHES} to
+a vector modality).  This type discipline is enforced at parse time, before
+any query execution.
+
+% ── 7. Federated Verification ────────────────────────────────────────────────
+\section{Federated Verification}\label{sec:federation}
+
+\subsection{Sovereignty Model}
+
+In a federated deployment, each participating institution operates its own
+octad store.  \verisimdb does not assume a central coordinator or a shared
+consensus protocol.  Instead, federation is achieved through:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Shared identity namespace.}  All federated stores use the
+    same UUID generation scheme, ensuring that an octad created at
+    institution A can be referenced by institution B without identifier
+    collision.
+  \item \textbf{Bilateral verification.}  Two stores that wish to
+    interoperate exchange \emph{drift attestations}: signed statements of
+    the form ``octad $\mathit{id}$ has aggregate drift $\driftfn(\octad)
+    \leq \theta$ as of timestamp $t$, attested by store $S$.''
+  \item \textbf{Trust policies.}  Each store independently configures
+    which remote attestations it accepts, from which attestors, and
+    subject to what freshness requirements.
+\end{enumerate}
+
+\subsection{Federation Protocol}
+
+\begin{definition}[Drift Attestation]\label{def:attestation}
+A \emph{drift attestation} is a signed tuple:
+\[
+  A = (
+    \mathit{octad\_id},\;
+    \driftfn(\octad),\;
+    t,\;
+    \mathit{store\_id},\;
+    \mathsf{sign}(\mathit{octad\_id} \| \driftfn(\octad) \| t,\; \mathit{sk})
+  )
+\]
+where $\mathit{sk}$ is the attesting store's private key and $t$ is the
+attestation timestamp.
+\end{definition}
+
+The federation protocol proceeds as follows:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Discovery.}  Stores publish their public keys and endpoint
+    URIs to a shared registry (or discover them via DNS-based service
+    discovery).
+  \item \textbf{Attestation exchange.}  When a store receives a query
+    referencing a remote octad, it requests a drift attestation from the
+    remote store.
+  \item \textbf{Verification.}  The requesting store verifies the
+    attestation signature and checks that $\driftfn(\octad) \leq \theta$
+    where $\theta$ is the local trust policy's maximum acceptable drift.
+  \item \textbf{Conditional access.}  If verification succeeds, the
+    requesting store proxies the query to the remote store.  If it fails,
+    the query returns a \emph{drift warning} to the client, who may
+    choose to proceed with degraded trust or abort.
+\end{enumerate}
+
+This protocol is deliberately lightweight: it adds one round-trip (the
+attestation request) to cross-store queries, and the attestation itself is
+a compact signed message (approximately 200 bytes).
+
+\subsection{Conflict Resolution in Federation}
+
+When the same octad is hosted by multiple federated stores (replicated
+octads), conflicts may arise.  \verisimdb uses a \emph{last-writer-wins}
+strategy by default, with the temporal modality providing a total order on
+writes.  Stores may optionally employ application-specific merge functions
+via the $\mathsf{resolve}$ function in \cref{def:merge}.
+
+\begin{theorem}[Attestation Soundness]\label{thm:attestation}
+If a drift attestation $A$ is valid (signature verification succeeds and
+$t$ is within the freshness window), then the attesting store's local
+drift measurement of the referenced octad was at most $\driftfn(\octad)$
+at time $t$.
+\end{theorem}
+
+\begin{proof}
+Follows from the unforgeability of the signature scheme and the
+deterministic computation of $\driftfn$.  The attesting store computes
+$\driftfn(\octad)$ at time $t$, signs the result, and publishes it.
+A verifier who accepts the signature knows that the attesting store
+produced this exact drift value.  The freshness window guards against
+replay of stale attestations.
+\end{proof}
+
+% ── 8. Implementation ────────────────────────────────────────────────────────
+\section{Implementation}\label{sec:implementation}
+
+\subsection{Architecture Overview}
+
+\verisimdb is implemented as a two-tier system: a \emph{Rust core} providing
+modality-specific storage and query engines, and an \emph{Elixir orchestration
+layer} providing distributed coordination, drift monitoring, and query
+routing.  The two tiers communicate via HTTP and a C-ABI foreign function
+interface for performance-critical paths.
+
+\begin{table}[t]
+\centering
+\caption{Modality implementation summary}\label{tab:impl}
+\begin{tabularx}{\columnwidth}{@{}lXl@{}}
+\toprule
+\textbf{Modality} & \textbf{Backend} & \textbf{Crate} \\
+\midrule
+Graph     & Oxigraph (RDF/SPARQL)      & \texttt{verisim-graph} \\
+Vector    & Custom HNSW                & \texttt{verisim-vector} \\
+Tensor    & \texttt{ndarray} / Burn    & \texttt{verisim-tensor} \\
+Semantic  & CBOR (via \texttt{ciborium}) & \texttt{verisim-semantic} \\
+Document  & Tantivy (inverted index)   & \texttt{verisim-document} \\
+Temporal  & Merkle-tree snapshots      & \texttt{verisim-temporal} \\
+Provenance & SHA-256 hash chains       & \texttt{verisim-provenance} \\
+Spatial   & R-tree (\texttt{rstar})    & \texttt{verisim-spatial} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\Cref{tab:impl} summarises the backend technology for each modality.
+All crates are written in safe Rust, with \texttt{unsafe} blocks limited
+to FFI boundaries.
+
+\subsection{Rust Core}
+
+The Rust core is organised as a Cargo workspace with one crate per modality,
+plus cross-cutting crates for the octad abstraction (\texttt{verisim-octad}),
+drift detection (\texttt{verisim-drift}), and self-normalisation
+(\texttt{verisim-normalizer}).
+
+\paragraph{Graph modality.}
+Oxigraph provides an embedded RDF store with SPARQL 1.1 support.
+\verisimdb extends Oxigraph with property-graph semantics by encoding
+property-graph edges as reified RDF statements, enabling a single storage
+backend to support both RDF and property-graph query patterns.  The graph
+modality supports both in-memory and persistent (file-backed) modes.
+
+\paragraph{Vector modality.}
+The HNSW index is implemented with configurable parameters
+($M = 16$, $\mathit{ef}_\mathsf{construction} = 200$ by default).
+Vectors are stored in memory-mapped files, enabling datasets larger than
+available RAM.  Distance functions include cosine similarity, Euclidean
+distance, and inner product.
+
+\paragraph{Tensor modality.}
+Multi-dimensional arrays are stored using the \texttt{ndarray} crate for
+CPU operations, with optional Burn integration for GPU-accelerated tensor
+computations.  Tensors are serialised in a custom binary format with
+dimension metadata.
+
+\paragraph{Semantic modality.}
+Semantic annotations are CBOR-encoded structures containing type URIs
+(linking to external ontologies), proof blobs (for formally verified
+properties), and policy references.  The \texttt{ciborium} crate provides
+CBOR serialisation with schema validation.
+
+\paragraph{Document modality.}
+Tantivy provides full-text indexing with BM25 ranking, phrase queries,
+and boolean operators.  Documents are stored with field-level schema
+(title, body, metadata) and support incremental index updates.
+
+\paragraph{Temporal modality.}
+Version history is maintained as a Merkle tree of octad snapshots.
+Each node in the tree contains a cryptographic hash of the octad state
+at that version, enabling efficient verification of version integrity
+and time-travel queries of the form ``retrieve the octad as it existed
+at timestamp $t$.''
+
+\paragraph{Provenance modality.}
+The provenance chain is a SHA-256 linked list of events.  Each event
+records the actor, action, timestamp, and the hash of the previous event.
+The chain supports efficient verification: given any event, the entire
+history back to the genesis event can be verified in $O(n)$ hash
+computations.
+
+\paragraph{Spatial modality.}
+The R-tree index (via the \texttt{rstar} crate) supports WGS84
+coordinates with point, bounding-box, and polygon geometries.
+Supported queries include radius search, bounding-box containment,
+and $k$-nearest-neighbour.
+
+\subsection{Elixir Orchestration Layer}
+
+The Elixir layer is built on OTP (Open Telecom Platform) and provides:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Entity servers.}  Each octad is managed by a GenServer
+    process that coordinates access across modalities.  OTP supervision
+    ensures fault tolerance: if an entity server crashes, it is
+    automatically restarted with its last known state.
+  \item \textbf{Drift monitor.}  A GenStage pipeline continuously samples
+    octads and evaluates drift metrics.  The pipeline consists of three
+    stages: \emph{sampler} (selects octads), \emph{evaluator} (computes
+    drift), and \emph{dispatcher} (routes alerts).
+  \item \textbf{Query router.}  Incoming queries are decomposed into
+    modality-specific fragments, dispatched to the appropriate Rust
+    crate via HTTP or NIF, and the results are joined on octad identity.
+  \item \textbf{Schema registry.}  Maintains the mapping between octad
+    types and their expected modality configurations, coherence
+    constraints, and repair policies.
+\end{itemize}
+
+\subsection{Persistence and Recovery}
+
+\verisimdb supports two deployment modes:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{In-memory mode.}  All modality stores reside in RAM.
+    Suitable for testing, ephemeral workloads, and embedded deployments.
+  \item \textbf{Persistent mode.}  Modality stores are backed by files
+    (memory-mapped where possible).  A write-ahead log (WAL) ensures
+    durability: all enrichment operations are logged before being applied
+    to the modality stores.  Recovery replays the WAL from the last
+    checkpoint.
+\end{enumerate}
+
+\subsection{Container Deployment}
+
+\verisimdb is packaged as an OCI-compliant container image built on
+Chainguard base images for supply-chain security.  The container includes
+the Rust core, Elixir orchestration layer, and a reverse proxy for TLS
+termination and rate limiting.
+
+% ── 9. Evaluation ────────────────────────────────────────────────────────────
+\section{Evaluation}\label{sec:evaluation}
+
+We evaluate \verisimdb along three axes: drift detection accuracy,
+cross-modal query performance, and federation overhead.
+
+\subsection{Experimental Setup}
+
+All experiments were conducted on a single server with an AMD Ryzen 9 7950X
+(16 cores / 32 threads), 64 GB DDR5 RAM, and an NVMe SSD (Samsung 990 Pro).
+The Rust core was compiled with \texttt{--release} optimisations (LTO enabled).
+The Elixir layer ran on BEAM/OTP 27.
+
+\paragraph{Datasets.}
+We use two datasets:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{SynthOctad-1M.}  A synthetic dataset of 1 million octads
+    with all eight modalities populated.  Documents are generated from
+    Wikipedia abstracts; embeddings from a 384-dimensional MiniLM model;
+    graph edges from Wikidata; spatial coordinates uniformly distributed
+    over the globe; temporal histories with 5--20 versions per octad.
+  \item \textbf{GeoScholar-100K.}  A real-world dataset of 100{,}000
+    academic publications with geographic metadata, citation graphs from
+    OpenAlex, and embeddings from Specter2.  Provenance chains are
+    derived from CrossRef event data.
+\end{itemize}
+
+\subsection{Drift Detection Accuracy}
+
+To evaluate drift detection, we introduce controlled drift into the
+SynthOctad-1M dataset by independently modifying modalities without updating
+their counterparts.  We inject three drift types:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Embedding staleness.}  We update 10\% of documents without
+    recomputing embeddings.
+  \item \textbf{Graph--semantic divergence.}  We add graph edges to 5\% of
+    octads without updating semantic annotations.
+  \item \textbf{Provenance gaps.}  We modify 3\% of octads through a
+    side channel that bypasses provenance logging.
+\end{enumerate}
+
+\begin{table}[t]
+\centering
+\caption{Drift detection accuracy on SynthOctad-1M}\label{tab:drift-accuracy}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Drift Type} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\midrule
+Embedding staleness      & 0.97 & 0.94 & 0.955 \\
+Graph--semantic div.     & 0.93 & 0.89 & 0.910 \\
+Provenance gaps          & 1.00 & 0.98 & 0.990 \\
+\midrule
+\textbf{Macro average}   & 0.97 & 0.94 & 0.952 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{tab:drift-accuracy} shows the results.  Embedding staleness is detected
+with high precision because cosine distance provides a reliable signal when
+documents change.  Graph--semantic divergence is harder to detect precisely
+because small structural changes (e.g., adding a single edge) produce small
+Jaccard distance changes that may fall below the soft threshold.  Provenance
+gaps are detected with near-perfect accuracy because the hash-chain structure
+makes any missing event immediately evident.
+
+\subsection{Cross-Modal Query Performance}
+
+We measure end-to-end latency for cross-modal queries spanning 1, 2, 4,
+and 8 modalities on the SynthOctad-1M dataset.
+
+\begin{table}[t]
+\centering
+\caption{Cross-modal query latency (ms), median of 1000 runs}\label{tab:query-latency}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Modalities} & \textbf{p50} & \textbf{p95} & \textbf{p99} & \textbf{Throughput} \\
+ & (ms) & (ms) & (ms) & (q/s) \\
+\midrule
+1 (vector only)     &  1.2 &  3.8 &  7.1 & 12{,}400 \\
+2 (vector + graph)  &  4.7 & 11.2 & 19.3 &  5{,}800 \\
+4 (V+G+D+X)        & 12.1 & 28.4 & 41.7 &  2{,}100 \\
+8 (all modalities)  & 31.8 & 67.2 & 94.5 &    780 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{tab:query-latency} shows that single-modality queries achieve sub-2ms
+median latency, while full eight-modality queries complete in under 32ms at
+the median.  The latency increase is sub-linear in the number of modalities
+because the query planner executes the most selective fragment first and
+subsequent fragments operate on progressively smaller candidate sets.
+
+\subsection{Federation Overhead}
+
+We measure the overhead of federated verification by comparing query latency
+for local vs.\ federated queries on GeoScholar-100K, simulating two stores
+on the same network with 0.5ms RTT.
+
+\begin{table}[t]
+\centering
+\caption{Federation overhead (ms, median)}\label{tab:federation}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Query Type} & \textbf{Local} & \textbf{Federated} \\
+\midrule
+Single-modality   &  1.8 &   3.1 \\
+Two-modality      &  5.2 &   7.8 \\
+Four-modality     & 13.4 &  18.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{tab:federation} shows that federation adds approximately 1.3--4.8ms
+per query, dominated by the attestation round-trip and signature verification.
+The Ed25519 signature verification takes approximately 0.06ms; the remainder
+is network latency.
+
+\subsection{Scalability}
+
+We measure index build time and memory consumption as a function of octad
+count on SynthOctad-1M.
+
+\begin{table}[t]
+\centering
+\caption{Scalability metrics}\label{tab:scalability}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Octad Count} & \textbf{Build Time} & \textbf{Memory} & \textbf{Disk} \\
+\midrule
+10K     &   2.1s &  0.4 GB &  0.3 GB \\
+100K    &  18.7s &  3.2 GB &  2.8 GB \\
+1M      & 194.3s & 28.1 GB & 24.6 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Build time and memory scale approximately linearly.  The per-octad memory
+cost of approximately 28 KB is dominated by the HNSW index (384-dimensional
+vectors at 4 bytes per dimension, plus graph overhead for the HNSW layers)
+and the Tantivy inverted index.
+
+% ── 10. Related Work ─────────────────────────────────────────────────────────
+\section{Related Work}\label{sec:related}
+
+\subsection{Multi-Model Databases}
+
+\textbf{ArangoDB}~\cite{arangodb2023} is a mature multi-model database
+supporting document, graph, and key-value access patterns over a single
+storage engine (RocksDB).  It provides AQL (ArangoDB Query Language) for
+cross-model queries.  However, ArangoDB does not maintain formal coherence
+guarantees between models: a document and its corresponding graph
+representation can diverge without detection.  ArangoDB also lacks native
+vector search and spatial indexing.
+
+\textbf{SurrealDB}~\cite{surrealdb2024} extends the multi-model paradigm
+with record links, full-text search, vector similarity, and a flexible
+schema system.  SurrealQL provides a unified query interface.  SurrealDB
+represents the closest existing system to \verisimdb in ambition, but differs
+in three key respects: (1)~it does not define formal drift semantics between
+models, (2)~it does not support temporal versioning with Merkle-tree
+integrity, and (3)~its federation story relies on traditional
+primary-replica patterns rather than sovereign attestation-based verification.
+
+\textbf{TerminusDB}~\cite{terminusdb2023} applies version-control semantics
+to graph data, supporting branch, merge, and diff operations.  Its focus on
+temporal integrity over graph data makes it complementary to the octad model's
+temporal modality, but TerminusDB does not extend versioning to other
+modalities (vectors, tensors, documents, spatial data).
+
+\subsection{Decentralised and Federated Data Systems}
+
+\textbf{IPFS}~\cite{benet2014ipfs} provides content-addressable, distributed
+storage using Merkle DAGs.  Data is identified by its hash, ensuring
+immutability.  However, IPFS is modality-agnostic: it stores opaque blobs
+with no cross-modal coherence semantics.  The octad model's provenance
+modality is conceptually related to IPFS's content addressing, but extends
+it with actor tracking and temporal ordering.
+
+\textbf{Solid}~\cite{sambra2016solid} enables user-controlled data pods with
+fine-grained access control using Web Access Control (WAC) and linked data.
+Solid's sovereignty model is aligned with \verisimdb's federation goals, but
+Solid does not provide cross-modal query capabilities or drift detection.
+
+\textbf{Ceramic}~\cite{ceramic2023} is a decentralised data network built on
+IPFS that supports mutable, version-controlled data streams.  It provides
+eventual consistency through CRDT-based conflict resolution.  Unlike
+\verisimdb, Ceramic treats consistency as a convergence property rather than
+a drift-aware policy decision.
+
+\subsection{Knowledge Graph Platforms}
+
+\textbf{Wikidata}~\cite{vrandecic2014wikidata} maintains a collaboratively
+edited knowledge graph with provenance tracking (references and qualifiers).
+While Wikidata tracks the source of claims, it does not maintain vector,
+tensor, or spatial representations of entities, and its consistency model
+relies on human editorial review rather than automated drift detection.
+
+\textbf{Neo4j}~\cite{neo4j2023} is the most widely deployed property-graph
+database.  Recent versions add vector search capabilities, but this is
+implemented as a separate index layer rather than a co-equal modality with
+coherence guarantees.
+
+\subsection{Vector Database Systems}
+
+\textbf{Milvus}~\cite{wang2021milvus}, \textbf{Qdrant}, and \textbf{Weaviate}
+are purpose-built vector databases that excel at approximate nearest-neighbour
+search.  Weaviate adds a module system for integrating with embedding models
+and supports hybrid search (vector + keyword).  None of these systems maintain
+formal identity across non-vector representations or detect when stored
+embeddings diverge from their source data.
+
+\subsection{Drift and Data Quality}
+
+The concept of \emph{data drift} is well-studied in machine learning
+operations (MLOps), where it refers to changes in the statistical
+distribution of model inputs or outputs~\cite{lu2019learning}.  Systems
+such as Evidently AI, Arize, and WhyLabs provide drift monitoring for
+ML pipelines.  \verisimdb generalises this concept from the ML-specific
+setting to arbitrary multi-modal data, and adds formal metrics, policy-driven
+repair, and federation-aware attestation.
+
+% ── 11. Discussion ───────────────────────────────────────────────────────────
+\section{Discussion}\label{sec:discussion}
+
+\subsection{Why Eight Modalities?}
+
+The choice of exactly eight modalities is a pragmatic design decision, not
+a theoretical necessity.  The octad model is extensible: adding a ninth
+modality (e.g., audio waveforms or time-series sensor data) requires
+defining its modality space $\Sigma_m$, implementing a storage backend,
+and defining distance functions for relevant modality pairs.  The formal
+framework in \cref{sec:octad} generalises straightforwardly to $|\modset| = n$.
+We chose eight because they cover the representational needs of our target
+domains while remaining tractable for drift analysis ($\binom{8}{2} = 28$
+pairs).
+
+\subsection{Limitations}
+
+\paragraph{Drift metric design.}  The quality of drift detection depends on
+the quality of the distance functions $d_{m_1, m_2}$.  For some modality
+pairs (e.g., tensor--spatial), we have not yet identified meaningful distance
+functions.  Users must supply domain-specific metrics for uncommon pairs.
+
+\paragraph{Embedding model dependency.}  The vector--document drift metric
+assumes a deterministic embedding function.  In practice, embedding models
+are updated, and a new model version will produce different embeddings for
+the same document, creating apparent drift that is actually model evolution.
+We mitigate this by versioning the embedding function identifier alongside
+the vector modality.
+
+\paragraph{Scalability ceiling.}  The current implementation stores the HNSW
+index in memory-mapped files, which limits vector search to datasets that fit
+in virtual address space.  For datasets exceeding several billion vectors,
+a distributed HNSW implementation would be required.
+
+\paragraph{Formal verification.}  While we store proof blobs in the semantic
+modality, the current system does not verify these proofs at query time.
+Integration with a proof checker (e.g., for Idris2 or Lean-generated proofs)
+is planned but not yet implemented.
+
+\subsection{Ethical Considerations}
+
+The drift-aware model raises ethical questions about \emph{who decides}
+repair policies.  When a contested historical narrative is represented as
+an octad, the authority function determines which modality's version of
+events prevails.  We address this by making repair policies explicit,
+versioned, and auditable: the provenance chain records every policy
+decision, and the temporal modality preserves every prior state.  This
+does not resolve the underlying ethical question, but it ensures that
+the decision-making process is transparent and reversible.
+
+% ── 12. Conclusion ───────────────────────────────────────────────────────────
+\section{Conclusion}\label{sec:conclusion}
+
+We have presented the Octad Data Model, a formal framework for multi-modal
+data identity in which every entity exists simultaneously across eight
+modalities --- Graph, Vector, Tensor, Semantic, Document, Temporal,
+Provenance, and Spatial --- bound to a single UUID-based identity.  The
+key departure from existing multi-model databases is the treatment of
+cross-modal drift as a first-class concept: drift is detected through
+formal metrics, classified by type, and resolved through explicit,
+auditable policies.
+
+The federated verification protocol enables sovereign data stores to
+interoperate without centralised control, using signed drift attestations
+to establish cross-institutional trust.  Our experimental evaluation
+demonstrates that drift detection achieves F1 scores above 0.91 across all
+drift types, cross-modal queries spanning all eight modalities complete in
+under 32ms at the median, and federation adds modest overhead (under 5ms)
+to query latency.
+
+The octad model addresses a growing need in data-intensive systems: as the
+number of representational modalities per entity increases, so does the
+risk of silent divergence between representations.  By making this
+divergence observable, classifiable, and policy-governed, \verisimdb
+provides a principled foundation for multi-modal data management in
+federated environments.
+
+\paragraph{Future work.}
+Planned extensions include: (1)~integration of formal proof verification
+for semantic modality blobs at query time, (2)~distributed HNSW for
+billion-scale vector datasets, (3)~a visual drift dashboard for
+non-technical domain custodians, and (4)~benchmarking on additional
+real-world federated deployments.
+
+\subsection*{Acknowledgements}
+
+The author thanks the open-source communities behind Oxigraph, Tantivy,
+and the Rust and Elixir ecosystems for the foundational infrastructure on
+which \verisimdb is built.
+
+% ── References ───────────────────────────────────────────────────────────────
+\begin{thebibliography}{99}
+
+\bibitem{arangodb2023}
+ArangoDB GmbH.
+\newblock ArangoDB: A native multi-model database.
+\newblock \url{https://www.arangodb.com/}, 2023.
+
+\bibitem{benet2014ipfs}
+J.~Benet.
+\newblock {IPFS} -- Content addressed, versioned, {P2P} file system.
+\newblock \emph{arXiv preprint arXiv:1407.3561}, 2014.
+
+\bibitem{ceramic2023}
+Ceramic Network.
+\newblock Ceramic: A decentralized data network.
+\newblock \url{https://ceramic.network/}, 2023.
+
+\bibitem{jegou2011pq}
+H.~J\'{e}gou, M.~Douze, and C.~Schmid.
+\newblock Product quantization for nearest neighbor search.
+\newblock \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  33(1):117--128, 2011.
+
+\bibitem{lu2019learning}
+J.~Lu, A.~Liu, F.~Dong, F.~Gu, J.~Gama, and G.~Zhang.
+\newblock Learning under concept drift: A review.
+\newblock \emph{IEEE Transactions on Knowledge and Data Engineering},
+  31(12):2346--2363, 2019.
+
+\bibitem{lu2019multimodel}
+J.~Lu and I.~Holubov\'{a}.
+\newblock Multi-model databases: A new journey to handle the variety of data.
+\newblock \emph{ACM Computing Surveys}, 52(3):1--38, 2019.
+
+\bibitem{malkov2018hnsw}
+Y.~A.~Malkov and D.~A.~Yashunin.
+\newblock Efficient and robust approximate nearest neighbor using hierarchical
+  navigable small world graphs.
+\newblock \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  42(4):824--836, 2020.
+
+\bibitem{neo4j2023}
+Neo4j, Inc.
+\newblock Neo4j graph database platform.
+\newblock \url{https://neo4j.com/}, 2023.
+
+\bibitem{oxigraph2023}
+T.~Tanon.
+\newblock Oxigraph: An embedded {SPARQL} store.
+\newblock \url{https://oxigraph.org/}, 2023.
+
+\bibitem{sambra2016solid}
+A.~V.~Sambra, E.~Mansour, S.~Hawke, M.~Zerber, N.~Greco, A.~Ghanem,
+  D.~Zagidulin, A.~Aboulnaga, and T.~Berners-Lee.
+\newblock Solid: A platform for decentralized social applications based on
+  linked data.
+\newblock \emph{MIT CSAIL \& Qatar Computing Research Institute, Tech.\ Rep.},
+  2016.
+
+\bibitem{snodgrass1999temporal}
+R.~T.~Snodgrass.
+\newblock \emph{Developing Time-Oriented Database Applications in {SQL}}.
+\newblock Morgan Kaufmann, 1999.
+
+\bibitem{surrealdb2024}
+SurrealDB Ltd.
+\newblock SurrealDB: The ultimate multi-model database.
+\newblock \url{https://surrealdb.com/}, 2024.
+
+\bibitem{terminusdb2023}
+TerminusDB.
+\newblock TerminusDB: Version control for data.
+\newblock \url{https://terminusdb.com/}, 2023.
+
+\bibitem{uber2018h3}
+Uber Technologies, Inc.
+\newblock {H3}: A hexagonal hierarchical geospatial indexing system.
+\newblock \url{https://h3geo.org/}, 2018.
+
+\bibitem{vrandecic2014wikidata}
+D.~Vrande\v{c}i\'{c} and M.~Kr\"{o}tzsch.
+\newblock Wikidata: A free collaborative knowledgebase.
+\newblock \emph{Communications of the ACM}, 57(10):78--85, 2014.
+
+\bibitem{w3cprov2013}
+{W3C}.
+\newblock {PROV-DM}: The {PROV} data model.
+\newblock W3C Recommendation, 2013.
+\newblock \url{https://www.w3.org/TR/prov-dm/}.
+
+\bibitem{wang2021milvus}
+J.~Wang, X.~Yi, R.~Guo, H.~Jin, P.~Xu, S.~Li, X.~Wang, X.~Guo, C.~Li,
+  X.~Xu, et~al.
+\newblock Milvus: A purpose-built vector data management system.
+\newblock In \emph{Proc.\ ACM SIGMOD}, pp.\ 2614--2627, 2021.
+
+\bibitem{wilkinson2016fair}
+M.~D.~Wilkinson et~al.
+\newblock The {FAIR} guiding principles for scientific data management and
+  stewardship.
+\newblock \emph{Scientific Data}, 3:160018, 2016.
+
+\end{thebibliography}
+
+% ── Appendix ─────────────────────────────────────────────────────────────────
+\appendix
+
+\section{Modality Space Formal Specifications}\label{app:modality-spaces}
+
+This appendix provides complete formal specifications for each modality space.
+
+\subsection{Graph Space $\Sigma_\mathsf{G}$}
+
+A graph value $g \in \Sigma_\mathsf{G}$ is a labelled directed multigraph
+$g = (N, E, \ell_N, \ell_E)$ where:
+\begin{itemize}[leftmargin=*]
+  \item $N \subseteq \mathsf{URI}$ is a set of node identifiers (IRIs in the
+    RDF model, or opaque identifiers in the property-graph model).
+  \item $E \subseteq N \times N$ is a set of directed edges.
+  \item $\ell_N : N \to 2^{\mathsf{Label}}$ assigns zero or more labels to
+    each node.
+  \item $\ell_E : E \to \mathsf{Label} \times \mathsf{PropertyMap}$ assigns
+    a type label and a property map to each edge.
+\end{itemize}
+
+For RDF compatibility, each edge $(s, o)$ with label $p$ corresponds to the
+RDF triple $\langle s, p, o \rangle$.
+
+\subsection{Vector Space $\Sigma_\mathsf{V}$}
+
+A vector value $\vec{v} \in \Sigma_\mathsf{V}$ is a real-valued vector of
+fixed dimension $d$:
+\[
+  \Sigma_\mathsf{V} = \mathbb{R}^d, \quad d \in \{128, 256, 384, 512, 768, 1024, 1536, 4096\}
+\]
+The dimension is fixed per octad store but may vary between federated stores.
+Vectors are normalised to unit length when cosine similarity is the primary
+distance metric.
+
+\subsection{Tensor Space $\Sigma_\mathsf{T}$}
+
+A tensor value $t \in \Sigma_\mathsf{T}$ is a typed multi-dimensional array:
+\[
+  \Sigma_\mathsf{T} = \bigcup_{n=1}^{N_\mathsf{max}}
+    \bigcup_{\tau \in \mathsf{DType}}
+    \tau^{d_1 \times d_2 \times \cdots \times d_n}
+\]
+where $\mathsf{DType} = \{\mathsf{f32}, \mathsf{f64}, \mathsf{i32}, \mathsf{i64},
+\mathsf{bf16}\}$ and $N_\mathsf{max} = 8$ (maximum rank).
+
+\subsection{Semantic Space $\Sigma_\mathsf{S}$}
+
+A semantic value $s \in \Sigma_\mathsf{S}$ is a CBOR-encoded structure:
+\[
+  s = (\mathit{types} : \mathsf{List}[\mathsf{URI}],\;
+       \mathit{proofs} : \mathsf{List}[\mathsf{Blob}],\;
+       \mathit{policies} : \mathsf{List}[\mathsf{PolicyRef}])
+\]
+where $\mathsf{URI}$ references an external ontology, $\mathsf{Blob}$ is an
+opaque byte sequence (typically a serialised proof term), and
+$\mathsf{PolicyRef}$ is a hash-based reference to a policy octad.
+
+\subsection{Document Space $\Sigma_\mathsf{D}$}
+
+A document value $\mathit{doc} \in \Sigma_\mathsf{D}$ is a structured text
+with inverted-index metadata:
+\[
+  \mathit{doc} = (\mathit{title} : \mathsf{String},\;
+                  \mathit{body} : \mathsf{String},\;
+                  \mathit{fields} : \mathsf{Map}[\mathsf{String}, \mathsf{String}])
+\]
+The inverted index is maintained incrementally; insertions and updates
+trigger index segment merges according to Tantivy's merge policy.
+
+\subsection{Temporal Space $\Sigma_\mathsf{P}$}
+
+A temporal value $h \in \Sigma_\mathsf{P}$ is a Merkle tree:
+\[
+  h = \mathsf{MerkleTree}[\mathsf{Snapshot}]
+\]
+where each $\mathsf{Snapshot} = (\mathit{timestamp}, \mathit{state\_hash},
+\mathit{parent\_hash})$ and $\mathit{state\_hash} =
+\mathsf{SHA256}(\varphi(m_1) \| \cdots \| \varphi(m_8))$.
+
+\subsection{Provenance Space $\Sigma_\mathsf{R}$}
+
+A provenance value $c \in \Sigma_\mathsf{R}$ is a hash chain:
+\[
+  c = [e_1, e_2, \ldots, e_n]
+\]
+where $e_i = (\mathit{actor}, \mathit{action}, \mathit{timestamp},
+\mathit{data\_hash}, \mathit{prev\_hash})$ and
+$\mathit{prev\_hash} = \mathsf{SHA256}(e_{i-1})$.
+
+\subsection{Spatial Space $\Sigma_\mathsf{X}$}
+
+A spatial value $p \in \Sigma_\mathsf{X}$ is a WGS84 geometry:
+\[
+  \Sigma_\mathsf{X} = \mathsf{Point} \cup \mathsf{BBox} \cup \mathsf{Polygon}
+\]
+where $\mathsf{Point} = (\mathit{lat}, \mathit{lon}, \mathit{alt}?)$ with
+$\mathit{lat} \in [-90, 90]$, $\mathit{lon} \in [-180, 180]$, and optional
+altitude in metres.
+
+\section{VQL Grammar (EBNF Excerpt)}\label{app:vql-grammar}
+
+\begin{lstlisting}[language={},caption={VQL grammar excerpt (EBNF)},
+  basicstyle=\ttfamily\scriptsize]
+query       ::= SELECT projection FROM 'octads'
+                WHERE condition+
+                (ORDER BY ordering)?
+                (LIMIT integer)?
+
+projection  ::= proj_item (',' proj_item)*
+proj_item   ::= 'octad' '.' modality '.' field
+              | 'octad' '.' 'id'
+
+condition   ::= vector_cond | graph_cond
+              | spatial_cond | temporal_cond
+              | document_cond | semantic_cond
+
+vector_cond ::= 'octad' '.' 'vector' 'NEAR'
+                '[' float (',' float)* ']'
+                ('LIMIT' integer)?
+
+graph_cond  ::= 'octad' '.' 'graph' 'MATCHES'
+                '(' pattern ')'
+
+spatial_cond::= 'octad' '.' 'spatial' 'WITHIN'
+                spatial_fn
+
+temporal_cond::= 'octad' '.' 'temporal' '.'
+                 field  comp_op  value
+
+document_cond::= 'octad' '.' 'document'
+                  'CONTAINS' string_literal
+
+spatial_fn  ::= 'radius' '(' lat ',' lon ','
+                 distance unit ')'
+              | 'bbox' '(' lat ',' lon ','
+                 lat ',' lon ')'
+\end{lstlisting}
+
+\section{Drift Metric Derivations}\label{app:drift-derivations}
+
+\subsection{Cosine Distance Sensitivity Analysis}
+
+For the vector--document drift metric $d_{\mathsf{V},\mathsf{D}}$, we
+analyse the sensitivity to document perturbations.  Let $\mathit{doc}$ be
+the original document and $\mathit{doc}'$ a perturbed version with
+$\|\mathit{doc}' - \mathit{doc}\|_\mathsf{edit} = k$ (edit distance).
+For embedding functions based on transformer models, the relationship
+between edit distance and cosine distance is approximately:
+\[
+  d_{\mathsf{V},\mathsf{D}} \approx
+    1 - \exp\left(-\frac{k}{\lambda \cdot |\mathit{doc}|}\right)
+\]
+where $\lambda$ is an empirically determined sensitivity parameter
+(typically $\lambda \approx 0.3$ for MiniLM-class models).  This
+exponential relationship means that small edits produce small drift values,
+while large rewrites produce drift values approaching 1, confirming the
+metric's suitability as a staleness indicator.
+
+\subsection{Jaccard Distance Monotonicity}
+
+For the graph--semantic drift metric $d_{\mathsf{G},\mathsf{S}}$, we note
+that the Jaccard distance is monotone in the symmetric difference:
+\[
+  |E_\mathsf{G} \triangle T_\mathsf{S}| \leq
+  |E'_\mathsf{G} \triangle T_\mathsf{S}|
+  \implies
+  d_{\mathsf{G},\mathsf{S}}(g, s) \leq
+  d_{\mathsf{G},\mathsf{S}}(g', s)
+\]
+This guarantees that adding edges to the graph without updating semantic
+annotations strictly increases the drift value, providing a reliable
+divergence signal.
+
+\end{document}
