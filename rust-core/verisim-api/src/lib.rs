@@ -756,6 +756,70 @@ pub fn build_router(state: AppState) -> Router {
         .merge(graphql::graphql_router(state))
         // Federation endpoints (separate state)
         .merge(federation_routes)
+        // Public well-known endpoints (no auth required)
+        .merge(wellknown_router())
+}
+
+/// Groove capability manifest served at /.well-known/groove.
+///
+/// Exposes VeriSimDB's service capabilities for groove-based service discovery.
+/// See the Groove.idr ABI definition for the canonical manifest schema.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrooveCapability {
+    /// Capability name (e.g. "octad-storage")
+    pub name: String,
+    /// Protocol (always "http" for REST endpoints)
+    pub protocol: String,
+    /// Endpoint path
+    pub endpoint: String,
+}
+
+/// Groove service manifest for /.well-known/groove discovery.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrooveManifest {
+    /// Unique service identifier
+    pub service_id: String,
+    /// Protocol version
+    pub groove_version: String,
+    /// Service capabilities
+    pub capabilities: Vec<GrooveCapability>,
+    /// Capability names this service consumes from others
+    pub consumes: Vec<String>,
+    /// Port the service listens on
+    pub port: u16,
+}
+
+/// Build the /.well-known router (public, no authentication required)
+fn wellknown_router() -> Router {
+    Router::new()
+        .route("/.well-known/groove", get(groove_handler))
+}
+
+/// Handler for GET /.well-known/groove — returns the VeriSimDB capability manifest
+async fn groove_handler() -> Json<GrooveManifest> {
+    Json(GrooveManifest {
+        service_id: "verisimdb".to_string(),
+        groove_version: "1.0.0".to_string(),
+        capabilities: vec![
+            GrooveCapability {
+                name: "octad-storage".to_string(),
+                protocol: "http".to_string(),
+                endpoint: "/api/v1/entities".to_string(),
+            },
+            GrooveCapability {
+                name: "drift-detection".to_string(),
+                protocol: "http".to_string(),
+                endpoint: "/api/v1/drift".to_string(),
+            },
+            GrooveCapability {
+                name: "temporal-versioning".to_string(),
+                protocol: "http".to_string(),
+                endpoint: "/api/v1/versions".to_string(),
+            },
+        ],
+        consumes: vec!["scanning".to_string()],
+        port: 8080,
+    })
 }
 
 /// Health check handler — verifies drift detector status and reports degraded when critical
