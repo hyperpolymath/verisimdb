@@ -374,11 +374,13 @@ pub struct TensorRequest {
     pub data: Vec<f64>,
 }
 
-/// Octad response
+/// Octad response — includes content from document and semantic modalities
+/// so consumers can read back what they stored (not just boolean flags).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OctadResponse {
     pub id: String,
     pub status: OctadStatusResponse,
+    // Modality presence flags
     pub has_graph: bool,
     pub has_vector: bool,
     pub has_tensor: bool,
@@ -388,6 +390,15 @@ pub struct OctadResponse {
     pub has_spatial: bool,
     pub version_count: u64,
     pub provenance_chain_length: u64,
+    // Content fields — returned when the modality is populated
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub types: Option<Vec<String>>,
 }
 
 /// Status response
@@ -400,6 +411,16 @@ pub struct OctadStatusResponse {
 
 impl From<&verisim_octad::Octad> for OctadResponse {
     fn from(h: &verisim_octad::Octad) -> Self {
+        let (title, body, metadata) = match &h.document {
+            Some(doc) => (
+                Some(doc.title.clone()),
+                if doc.body.is_empty() { None } else { Some(doc.body.clone()) },
+                if doc.metadata.is_empty() { None } else { Some(doc.metadata.clone()) },
+            ),
+            None => (None, None, None),
+        };
+        let types = h.semantic.as_ref().map(|s| s.types.clone());
+
         Self {
             id: h.id.to_string(),
             status: OctadStatusResponse {
@@ -416,6 +437,10 @@ impl From<&verisim_octad::Octad> for OctadResponse {
             has_spatial: h.spatial_data.is_some(),
             version_count: h.version_count,
             provenance_chain_length: h.provenance_chain_length,
+            title,
+            body,
+            metadata,
+            types,
         }
     }
 }

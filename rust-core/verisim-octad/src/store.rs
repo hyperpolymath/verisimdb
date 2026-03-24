@@ -430,10 +430,16 @@ where
         &self,
         id: &OctadId,
         input: &OctadDocumentInput,
+        extra_metadata: &HashMap<String, String>,
     ) -> Result<Document, OctadError> {
         let mut doc = Document::new(id.as_str(), &input.title, &input.body);
         for (key, value) in &input.fields {
             doc = doc.with_field(key, value);
+        }
+        // Store OctadInput.metadata in Document.metadata so it roundtrips
+        // through GET responses.
+        for (key, value) in extra_metadata {
+            doc.metadata.insert(key.clone(), value.clone());
         }
 
         self.document.index(&doc).await.map_err(|e| OctadError::ModalityError {
@@ -804,7 +810,7 @@ where
 
         let mut document = None;
         if let Some(ref doc_input) = input.document {
-            match self.process_document(&id, doc_input).await {
+            match self.process_document(&id, doc_input, &input.metadata).await {
                 Ok(doc) => {
                     document = Some(doc);
                     modality_status.document = true;
@@ -1050,7 +1056,7 @@ where
 
         let mut document = None;
         if let Some(ref doc_input) = input.document {
-            match self.process_document(id, doc_input).await {
+            match self.process_document(id, doc_input, &input.metadata).await {
                 Ok(doc) => {
                     document = Some(doc);
                     modality_status.document = true;
