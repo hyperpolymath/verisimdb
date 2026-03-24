@@ -1,0 +1,59 @@
+; SPDX-License-Identifier: PMPL-1.0-or-later
+; INTENT.contractile — Purpose and scope for verisimdb
+; Helps LLM/SLM agents understand what this repo IS and IS NOT.
+
+(intent-contractile
+  (version "1.0.0")
+  (repo "verisimdb")
+
+  ; === Purpose (what this repo IS) ===
+  (purpose
+    "VeriSimDB (Veridical Simulacrum Database) is a cross-system entity consistency
+     engine with drift detection, self-normalisation, and formally verified queries.
+     Each entity exists simultaneously across 8 modalities — the octad (Graph, Vector,
+     Tensor, Semantic, Document, Temporal, Provenance, Spatial) — with drift detection
+     and automatic consistency maintenance. It operates as a standalone database OR as a
+     heterogeneous federation coordinator over existing databases. Rust core handles
+     modality stores; Elixir/OTP orchestrates distributed coordination."
+  )
+
+  ; === Anti-Purpose (what this repo is NOT — prevents scope creep) ===
+  (anti-purpose
+    "VeriSimDB is NOT a general-purpose relational database — it solves cross-modal
+     entity consistency. It is NOT a document store, graph database, or vector database
+     alone — it unifies all 8 modalities. It does NOT store application data in its
+     source repository — each consumer gets its own instance, port, and volume. It is
+     NOT an ORM or query builder — VQL (VeriSim Query Language) is the native interface,
+     not SQL."
+  )
+
+  ; === Key Architectural Decisions That Must Not Be Reversed ===
+  (architectural-invariants
+    "8-modality octad — one entity ID maps to exactly eight synchronized stores"
+    "Drift detection with configurable thresholds and automatic self-normalisation"
+    "Elixir orchestration layer with GenServer-per-entity supervision"
+    "Rust core for performance-critical modality stores"
+    "VQL as the native query interface — not SQL"
+    "Standalone mode AND heterogeneous federation coordinator mode"
+    "Each project gets its own VeriSimDB instance + port + volume"
+    "Design justified at Marr's three levels (computational, algorithmic, implementational)"
+    "HTTP API between Elixir orchestration and Rust core"
+    "Prometheus metrics for observability"
+  )
+
+  ; === Sensitive Areas (if in doubt, ask) ===
+  (ask-before-touching
+    "rust-core/ — modality store implementations; changes affect data integrity"
+    "elixir-orchestration/ — GenServer supervision; incorrect changes cause data loss"
+    "connectors/ — federation interfaces; changes affect external database integration"
+    "src/abi/ — formal verification proofs for query correctness"
+    ".machine_readable/ — checkpoint files, format is specified"
+  )
+
+  ; === Ecosystem Position ===
+  (ecosystem
+    (belongs-to "nextgen-databases (monorepo)")
+    (depends-on ("oxigraph" "tantivy" "idris2" "zig"))
+    (depended-on-by ("hypatia" "panll" "ambientops" "boj-server" "idaptik" "gossamer"))
+  )
+)
