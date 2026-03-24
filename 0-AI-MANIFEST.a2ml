@@ -4,6 +4,8 @@
 ; 0-AI-MANIFEST.a2ml — Universal AI entry point for VeriSimDB
 ; Media-Type: application/a2ml
 
+; THIS FILE MUST BE READ FIRST BY ALL AI AGENTS
+
 (manifest
   (identity
     (name "VeriSimDB")
@@ -16,26 +18,55 @@
 
   (purpose
     "8-modality (octad) database with self-normalization. Each entity
-     exists simultaneously across 8 modalities — Graph, Vector, Tensor,
-     Semantic, Document, Temporal, Provenance, Spatial — with drift
-     detection and automatic consistency maintenance.")
+     exists simultaneously across Graph, Vector, Tensor, Semantic,
+     Document, Temporal, Provenance, Spatial — with drift detection
+     and automatic consistency maintenance. Standalone or federation coordinator.")
+
+  ;; ===================================================================
+  ;; CONTEXT TIERS
+  ;; ===================================================================
+
+  (context-tiers
+    ; Tier 0 (always load): This file + .claude/CLAUDE.md — orientation only
+    ; Tier 1 (load if working on code): README.adoc, EXPLAINME.adoc, Justfile, Cargo.toml
+    ; Tier 2 (load on demand): .machine_readable/*.scm, docs/, KNOWN-ISSUES.adoc
+    ; Tier 3 (never load unless asked): tests/, generated/, CI configs, connectors/test-infra/
+    ;
+    ; DO NOT READ unless specifically asked:
+    ;   tests/          — test files (run them, don't read them)
+    ;   target/         — Rust build output
+    ;   _build/         — Elixir build output
+    ;   deps/           — Elixir dependencies
+    ;   generated/      — auto-generated code
+    ;   *.lock          — lock files
+    ;   connectors/test-infra/ — containerised test databases
+    )
+
+  ;; ===================================================================
+  ;; CANONICAL LOCATIONS
+  ;; ===================================================================
 
   (canonical-locations
-    (ai-instructions ".claude/CLAUDE.md")
-    (state ".machine_readable/STATE.scm")
-    (meta ".machine_readable/META.scm")
-    (ecosystem ".machine_readable/ECOSYSTEM.scm")
-    (topology "TOPOLOGY.md")
-    (build "justfile")
+    (ai-manifest     "0-AI-MANIFEST.a2ml"           "THIS FILE")
+    (ai-instructions ".claude/CLAUDE.md"             "Claude-specific patterns — DETAILED")
+    (state           ".machine_readable/STATE.scm")
+    (meta            ".machine_readable/META.scm")
+    (ecosystem       ".machine_readable/ECOSYSTEM.scm")
+    (topology        "TOPOLOGY.md")
+    (known-issues    "KNOWN-ISSUES.adoc")
     (container-build "container/Containerfile")
-    (container-deploy "container/compose.toml")
-    (test-infra "connectors/test-infra/compose.toml")
-    (test-infra-manifest "connectors/test-infra/0-AI-MANIFEST.a2ml")
-    (integration-tests "elixir-orchestration/test/verisim/federation/adapters/integration/")
-    (known-issues "KNOWN-ISSUES.adoc")
-    (changelog "CHANGELOG.adoc")
-    (deployment "DEPLOYMENT.adoc")
-    (security ".well-known/security.txt"))
+    (test-infra      "connectors/test-infra/compose.toml"))
+
+  ;; ===================================================================
+  ;; ARCHITECTURE SUMMARY
+  ;; ===================================================================
+
+  (architecture
+    (rust-core "rust-core/"           "10 crates — modality stores, drift, normalizer, API")
+    (elixir    "elixir-orchestration/" "OTP supervision, entity servers, drift monitor, query router")
+    (abi-ffi   "src/abi/ + ffi/zig/"  "Idris2 ABI + Zig FFI bridge")
+    (connectors "connectors/"         "10 federation adapters + 6 client SDKs")
+    (query     "VQL"                  "VeriSim Query Language — never raw SQL"))
 
   (tech-stack
     (primary "Rust" "Elixir/OTP")
@@ -44,67 +75,47 @@
     (container-runtime "Podman")
     (base-image "cgr.dev/chainguard/wolfi-base:latest"))
 
-  (architecture
-    (rust-core
-      (description "Performance-critical modality stores")
-      (location "rust-core/")
-      (crates "verisim-graph" "verisim-vector" "verisim-tensor"
-              "verisim-semantic" "verisim-document" "verisim-temporal"
-              "verisim-octad" "verisim-drift" "verisim-normalizer"
-              "verisim-api"))
-    (elixir-otp
-      (description "Distributed coordination and supervision")
-      (location "elixir-orchestration/"))
-    (abi-ffi
-      (description "Idris2 ABI definitions + Zig FFI bridge")
-      (abi-location "src/abi/")
-      (ffi-location "ffi/zig/"))
-    (data-store
-      (description "Git-backed flat-file data repo")
-      (location "verisimdb-data/"))
-    (test-infra
-      (description "Containerised test stack for federation adapter integration testing")
-      (location "connectors/test-infra/")
-      (services "mongodb" "redis-stack" "neo4j" "clickhouse" "surrealdb" "influxdb" "minio"))
-    (connectors
-      (description "Federation adapters (10) and client SDKs (6)")
-      (location "connectors/")
-      (adapters "MongoDB" "Redis" "DuckDB" "ClickHouse" "SurrealDB" "SQLite" "Neo4j" "VectorDB" "InfluxDB" "ObjectStorage")
-      (sdks "Rust" "V" "Elixir" "ReScript" "Julia" "Gleam")))
+  ;; ===================================================================
+  ;; CRITICAL INVARIANTS
+  ;; ===================================================================
 
   (critical-invariants
     (rule "SCM files ONLY in .machine_readable/ — never root")
-    (rule "All shell scripts must validate untrusted input")
-    (rule "No hardcoded secrets — use env vars with ${VAR:-} defaults")
-    (rule "Container images MUST use Chainguard base (cgr.dev)")
-    (rule "Container runtime is Podman — never Docker")
     (rule "VQL is the query language — never raw SQL")
     (rule "Octad entities must maintain 8-modality consistency")
-    (rule "Drift thresholds gate all automatic normalization"))
+    (rule "Drift thresholds gate all automatic normalization")
+    (rule "Container: Chainguard base, Containerfile not Dockerfile, Podman not Docker")
+    (rule "PMPL-1.0-or-later on all source files"))
 
-  (container-ecosystem
-    (selur "container/compose.toml — deployment orchestration")
-    (stapeln "stapeln.toml — layer-based container builds")
-    (svalinn "TLS gateway with policy enforcement")
-    (vordr "Runtime verification and formal proof checking")
-    (cerro-torre "Image signing with ML-DSA-87 post-quantum crypto")
-    (rokur "Secret rotation with argon2id"))
+  ;; ===================================================================
+  ;; RELATED PROJECTS
+  ;; ===================================================================
 
   (related-projects
-    (hypatia "Neurosymbolic CI/CD scanner — consumes verisimdb data")
-    (gitbot-fleet "Bot orchestration — dispatches fixes from verisimdb findings")
-    (panic-attacker "Static analysis scanner — produces scan data for verisimdb")
-    (proven "Formally verified safety library — provides SafeString, SafeJson, etc.")
-    (lithoglyph "Graph database sibling — shares GQL/GQL-DT patterns")
-    (quandledb "Knot-theoretic database sibling — KQL query language")))
+    (hypatia      "Neurosymbolic CI/CD — consumes verisimdb data")
+    (panic-attacker "Static analysis — produces scan data for verisimdb")
+    (proven       "Formally verified safety library — SafeString, SafeJson, etc.")
+    (lithoglyph   "Graph database sibling — shares GQL patterns")
+    (quandledb    "Knot-theoretic database sibling — KQL"))
 
-## Taxonomy Index
+  ;; ===================================================================
+  ;; SESSION LIFECYCLE
+  ;; ===================================================================
 
-- `spec/grammar.ebnf` — @taxonomy: spec/grammar
-- `spec/README.adoc` — @taxonomy: spec/index
-- `verification/README.adoc` — @taxonomy: verification/index
+  (lifecycle
+    (on-enter
+      (step "Read THIS file first")
+      (step "Read .claude/CLAUDE.md — contains full architecture and build commands")
+      (step "Read .machine_readable/STATE.scm for current status"))
 
-### New RSR Standard Directories
+    (on-exit
+      (step "Update .machine_readable/STATE.scm if changes made")
+      (step "Summarise outcomes")))
 
-- `spec/` — Canonical specification files
-- `verification/` — Unified verification gateway (symlinks to proofs, tests, conformance, benchmarks, fuzzing)
+  (format-meta
+    (version "2.1.0")
+    (media-type "application/a2ml")
+    (created "2026-02-20")
+    (last-updated "2026-03-24")
+    (maintained-by "Jonathan D.A. Jewell / hyperpolymath")
+    (protocol "https://github.com/hyperpolymath/0-ai-gatekeeper-protocol")))
