@@ -4,6 +4,8 @@
 :toc:
 :toc-placement!:
 
+image:https://api.thegreenwebfoundation.org/greencheckimage/jewell.nexus[Green Hosting,link="https://www.thegreenwebfoundation.org/green-web-check/?url=jewell.nexus"]
+
 **Cross-system data consistency that catches drift before it causes damage.**
 
 toc::[]
