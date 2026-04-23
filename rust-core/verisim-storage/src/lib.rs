@@ -45,6 +45,7 @@ pub mod error;
 pub mod memory;
 pub mod metrics;
 pub mod typed;
+pub mod wal_backend;
 
 // Optional persistent backends — feature-gated to keep the default build lean.
 #[cfg(feature = "redb-backend")]
@@ -56,6 +57,7 @@ pub use error::StorageError;
 pub use memory::InMemoryBackend;
 pub use metrics::{BackendStats, MetricsBackend};
 pub use typed::TypedStore;
+pub use wal_backend::WalBackend;
 
 #[cfg(feature = "redb-backend")]
 pub use redb_backend::RedbBackend;

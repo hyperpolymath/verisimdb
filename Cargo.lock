@@ -8026,6 +8026,7 @@ name = "verisim-storage"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "redb",
  "serde",
  "serde_json",
@@ -8034,6 +8035,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "verisim-wal",
 ]
 
 [[package]]

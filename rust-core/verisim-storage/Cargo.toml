@@ -16,10 +16,12 @@ redb-backend = ["dep:redb"]
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
+verisim-wal = { path = "../verisim-wal" }
 
 # Optional: redb for persistent on-disk storage (pure Rust, no C/C++)
 redb = { workspace = true, optional = true }
