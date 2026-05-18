@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+= Rust/SPARK Stance — verisimdb
+:toc: macro
+:toclevels: 2
+
+toc::[]
+
+== Summary
+
+VeriSimDB is a safety-critical cross-modal entity engine ("octad model":
+each entity exists across 8 modalities). Its application logic is written
+in Rust (workspace crates under `rust-core/` — `verisim-octad`,
+`verisim-graph`, `verisim-planner`, `verisim-drift`, `verisim-nif`,
+etc.). Per the estate language policy
+(`standards/rhodium-standard-repositories/spec/LANGUAGE-POLICY.adoc`
+§Terminology), *"Rust" means "Rust/SPARK"*: Rust is the primary
+implementation language now, but the project is *designed to admit
+SPARK/Ada verification modules* across a stable, Idris2-typed boundary,
+with Zig as the FFI layer. Rust here is never the ABI/API/FFI layer.
+
+This document is the project's compliance stance against that policy.
+Prior to this audit (2026-05-18) the seam (`src/abi/*.idr` + `ffi/zig/`)
+was present but carried *no stance doc* — a silent-regress risk flagged
+by the estate audit (status was "DESIGNED-ONLY"). This document records
+the seam honestly and brings the project to documented structural
+compliance.
+
+== What is correctness-critical here
+
+VeriSimDB is a database/verisimilitude engine, not a ledger. The
+correctness-critical surface is the cross-modal entity store, its drift
+detection, and the C ABI that exposes it to consumers.
+
+[cols="1,3",options="header"]
+|===
+| Critical surface | Where
+
+| Result-code round-trip (no FFI status corruption)
+| `src/abi/Types.idr` — `vresultToInt` / `vresultFromInt`, `DecEq VResult`
+
+| Entity lifecycle / modality read-write safety
+| `src/abi/Foreign.idr` — `entityCreate`, `entityGet`, `entityDelete`,
+  `modalityWrite`, `modalityRead`
+
+| C ABI struct layout fidelity
+| `src/abi/Layout.idr` — field offsets / sizes vs the Rust `#[repr(C)]`
+  structs
+
+| Octad cross-modal consistency, drift thresholds
+| Rust workspace: `rust-core/verisim-octad`, `verisim-drift`,
+  `verisim-graph`
+|===
+
+== The seam
+
+[cols="1,3",options="header"]
+|===
+| File | Role
+
+| `src/abi/Types.idr`
+| Idris2 boundary types — total models of `VResult`, `EntityId`,
+  `EntityHandle`, modality masks. `%default total`. Constructor and
+  integer-code order is ABI-significant and matches the Rust enums;
+  `vresultFromInt . vresultToInt` is the round-trip obligation and
+  `DecEq VResult` is discharged.
+
+| `src/abi/Layout.idr`
+| C-ABI struct layout — offsets/sizes that must match the Rust
+  `#[repr(C)]` definitions consumed via `libverisimdb`.
+
+| `src/abi/Foreign.idr`
+| Zig/C-FFI boundary: every `%foreign "C:verisimdb_*, libverisimdb"`
+  entry point, with safe Idris2 wrappers that decode raw `Bits32`
+  returns back into `VResult` (defaulting to `VError` on out-of-range,
+  i.e. fail-closed).
+|===
+
+All three modules carry `%default total` and contain *zero* proof
+escapes (no `believe_me`, `assert_total`, `postulate`, `idris_crash`).
+They are checkable in principle with `idris2 --check src/abi/Types.idr`
+etc. The Idris2 toolchain is *not yet wired into CI*; wiring it is the
+primary tracked follow-up.
+
+`debugger/src/abi/` carries a parallel copy of the same three modules
+for the debugger component; the same total/no-escape property holds
+there.
+
+== SPARK/Ada admission path
+
+The boundary is the Idris2 seam above. A future SPARK/Ada
+re-implementation of any correctness-critical store/drift component sits
+on the far side of the `Foreign` C-ABI contract without changing it: it
+must honour the `VResult` code discipline and the `Layout` struct
+contract. No SPARK code exists yet; the seam exists so it *can* be added
+without redesign, which is exactly what §Terminology requires of a
+"designed to admit SPARK/Ada" Rust project.
+
+== Honest gaps
+
+* The Idris2 seam states the FFI *shape* contract (result-code
+  round-trip, layout, total wrappers). It does *not* yet carry
+  type-level statements of the deeper octad-consistency or
+  drift-threshold invariants enforced (only) in the Rust workspace;
+  those are owed, not proven.
+* `ffi/zig/src/main.zig` still contains unfilled `{{PROJECT}}` RSR
+  template placeholders — the Zig implementation layer is scaffolding,
+  not a finished faithful implementation of the `Foreign.idr` contract.
+  This is a real gap on the FFI side, not merely a missing proof.
+* Idris2 is not in CI (`.tool-versions` carries no `idris2` entry), so
+  the seam's totality is asserted, not gate-enforced.
+* The companion data repo `verisimdb-data` deliberately *removed* its
+  template ABI Idris2 files (see its `PROOF-NEEDS.md`) to avoid a false
+  formal-verification impression; that repo is data, not verified code,
+  and makes no verification claims.
+
+== References
+
+* `standards/rhodium-standard-repositories/spec/LANGUAGE-POLICY.adoc`
+  §Terminology, §"Rust is never the ABI"
+* Estate exemplar stance: `proof-of-work/RUST-SPARK-STANCE.adoc`
+* This repo's seam: `src/abi/{Types,Layout,Foreign}.idr`
+* Tracking: hyperpolymath/standards#124
