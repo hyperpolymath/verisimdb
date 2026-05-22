@@ -460,7 +460,7 @@ defmodule VeriSim.QueryCache do
     path = l3_cache_path(key)
     case File.read(path) do
       {:ok, content} ->
-        case :erlang.binary_to_term(content) do
+        case :erlang.binary_to_term(content, [:safe]) do
           %CacheEntry{} = entry ->
             if DateTime.compare(entry.expires_at, DateTime.utc_now()) == :gt do
               {:ok, entry}

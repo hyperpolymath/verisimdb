@@ -248,7 +248,7 @@ defmodule VeriSim.QueryPlannerConfig do
     case File.read(path) do
       {:ok, content} ->
         try do
-          :erlang.binary_to_term(content)
+          :erlang.binary_to_term(content, [:safe])
         rescue
           _ -> nil
         end

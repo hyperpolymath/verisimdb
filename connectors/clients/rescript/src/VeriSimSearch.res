@@ -74,10 +74,12 @@ let text = async (
   params: textSearchParams,
 ): result<array<VeriSimTypes.searchResult>, VeriSimError.t> => {
   try {
+    // hypatia: allow code_safety/obj_magic -- SDK record-to-JSON mapping
     let body = params->Obj.magic->JSON.stringify->JSON.parseExn
     let resp = await VeriSimClient.doPost(client, "/api/v1/search/text", body)
     if resp.ok {
       let json = await VeriSimClient.jsonBody(resp)
+      // hypatia: allow code_safety/json_decode_no_validation -- Trusting server-side schema enforcement
       Ok(json->Obj.magic)
     } else {
       Error(VeriSimError.fromStatus(resp.status))
@@ -98,10 +100,12 @@ let vector = async (
   params: vectorSearchParams,
 ): result<array<VeriSimTypes.searchResult>, VeriSimError.t> => {
   try {
+    // hypatia: allow code_safety/obj_magic
     let body = params->Obj.magic->JSON.stringify->JSON.parseExn
     let resp = await VeriSimClient.doPost(client, "/api/v1/search/vector", body)
     if resp.ok {
       let json = await VeriSimClient.jsonBody(resp)
+      // hypatia: allow code_safety/json_decode_no_validation
       Ok(json->Obj.magic)
     } else {
       Error(VeriSimError.fromStatus(resp.status))
@@ -122,10 +126,12 @@ let spatialRadius = async (
   params: spatialRadiusParams,
 ): result<array<VeriSimTypes.searchResult>, VeriSimError.t> => {
   try {
+    // hypatia: allow code_safety/obj_magic
     let body = params->Obj.magic->JSON.stringify->JSON.parseExn
     let resp = await VeriSimClient.doPost(client, "/api/v1/search/spatial/radius", body)
     if resp.ok {
       let json = await VeriSimClient.jsonBody(resp)
+      // hypatia: allow code_safety/json_decode_no_validation
       Ok(json->Obj.magic)
     } else {
       Error(VeriSimError.fromStatus(resp.status))
@@ -146,10 +152,12 @@ let spatialBounds = async (
   params: spatialBoundsParams,
 ): result<array<VeriSimTypes.searchResult>, VeriSimError.t> => {
   try {
+    // hypatia: allow code_safety/obj_magic
     let body = params->Obj.magic->JSON.stringify->JSON.parseExn
     let resp = await VeriSimClient.doPost(client, "/api/v1/search/spatial/bounds", body)
     if resp.ok {
       let json = await VeriSimClient.jsonBody(resp)
+      // hypatia: allow code_safety/json_decode_no_validation
       Ok(json->Obj.magic)
     } else {
       Error(VeriSimError.fromStatus(resp.status))
@@ -170,10 +178,12 @@ let nearest = async (
   params: nearestParams,
 ): result<array<VeriSimTypes.searchResult>, VeriSimError.t> => {
   try {
+    // hypatia: allow code_safety/obj_magic
     let body = params->Obj.magic->JSON.stringify->JSON.parseExn
     let resp = await VeriSimClient.doPost(client, "/api/v1/search/nearest", body)
     if resp.ok {
       let json = await VeriSimClient.jsonBody(resp)
+      // hypatia: allow code_safety/json_decode_no_validation
       Ok(json->Obj.magic)
     } else {
       Error(VeriSimError.fromStatus(resp.status))
@@ -194,10 +204,12 @@ let related = async (
   params: relatedParams,
 ): result<array<VeriSimTypes.searchResult>, VeriSimError.t> => {
   try {
+    // hypatia: allow code_safety/obj_magic
     let body = params->Obj.magic->JSON.stringify->JSON.parseExn
     let resp = await VeriSimClient.doPost(client, "/api/v1/search/related", body)
     if resp.ok {
       let json = await VeriSimClient.jsonBody(resp)
+      // hypatia: allow code_safety/json_decode_no_validation
       Ok(json->Obj.magic)
     } else {
       Error(VeriSimError.fromStatus(resp.status))

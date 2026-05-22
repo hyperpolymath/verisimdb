@@ -308,8 +308,13 @@ defmodule VeriSim.Query.VQLTypeChecker do
   defp normalize_proof_type(_), do: :unknown
 
   defp do_normalize(str) when is_binary(str) do
-    atom = str |> String.downcase() |> String.to_atom()
-    if atom in @known_proof_types, do: atom, else: :unknown
+    str_down = String.downcase(str)
+    try do
+      atom = String.to_existing_atom(str_down)
+      if atom in @known_proof_types, do: atom, else: :unknown
+    rescue
+      ArgumentError -> :unknown
+    end
   end
   defp do_normalize(atom) when is_atom(atom) do
     if atom in @known_proof_types, do: atom, else: :unknown

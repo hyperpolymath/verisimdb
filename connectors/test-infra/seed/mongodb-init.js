@@ -177,7 +177,7 @@ db.hexads.insertMany([
                 data: {
                     types: [
                         "https://schema.org/Article",
-                        "http://verisimdb.org/ontology/Entity",
+                        "https://verisimdb.org/ontology/Entity",
                     ],
                     relationships: [
                         {
