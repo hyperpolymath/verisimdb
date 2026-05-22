@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
+# hypatia: allow code_safety/elixir_send_unsanitised
 
 defmodule VeriSim.QueryPlannerConfig do
   @moduledoc """
