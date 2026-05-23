@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Pitch Deck — 12-Slide Structure
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -372,7 +372,7 @@ coherence from the ground up.
 
 *Open Source Readiness*
 
-* PMPL-1.0-or-later license
+* MPL-2.0 license
 * CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
 * CI/CD pipeline with Hypatia neurosymbolic scanning
 * SBOM generation, SLSA provenance, OpenSSF Scorecard
@@ -444,7 +444,7 @@ collaborations.
 
 * GitHub: https://github.com/hyperpolymath/verisimdb
 * Email: j.d.a.jewell@open.ac.uk
-* License: PMPL-1.0-or-later (full-featured, free forever)
+* License: MPL-2.0 (full-featured, free forever)
 
 === Speaker Notes
 

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # VeriSimDB - The Veridical Simulacrum Database
 # An 8-core multimodal database (octad) with self-normalization
 
@@ -29,7 +29,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
-license = "PMPL-1.0-or-later"
+license = "MPL-2.0"
 repository = "https://gitlab.com/hyperpolymath/verisimdb"
 homepage = "https://github.com/hyperpolymath/verisimdb"
 documentation = "https://github.com/hyperpolymath/verisimdb/tree/main/docs"

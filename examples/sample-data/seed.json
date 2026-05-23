@@ -1656,7 +1656,7 @@
         "size": "8 MB",
         "records": 1200,
         "format": "VQL + JSON expected results",
-        "license": "PMPL-1.0-or-later"
+        "license": "MPL-2.0"
       }
     },
     "temporal": {
@@ -1745,7 +1745,7 @@
         "size": "120 MB",
         "records": 5000,
         "format": "JSON octad with drift labels",
-        "license": "PMPL-1.0-or-later"
+        "license": "MPL-2.0"
       }
     },
     "temporal": {

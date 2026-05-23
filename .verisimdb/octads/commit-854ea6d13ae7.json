@@ -3,8 +3,8 @@
   "source": "git-log",
   "created_at": "2026-01-21T01:59:00Z",
   "document": {
-    "title": "Revert to PMPL-1.0-or-later (ethical/quantum-safe provenance)",
-    "body": "Commit 854ea6d1 by Your Name: Revert to PMPL-1.0-or-later (ethical/quantum-safe provenance)",
+    "title": "Revert to MPL-2.0 (ethical/quantum-safe provenance)",
+    "body": "Commit 854ea6d1 by Your Name: Revert to MPL-2.0 (ethical/quantum-safe provenance)",
     "fields": {
       "type": "commit",
       "hash": "854ea6d13ae79f6bcb3cda857f537ec331c15f11",

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 #
 # Cerro Torre manifest for VeriSimDB .ctp bundle
 #
@@ -18,7 +18,7 @@ and Spatial. Operates as a standalone database or heterogeneous federation
 coordinator over PostgreSQL, ArangoDB, Elasticsearch, and other VeriSimDB
 instances.
 """
-license = "PMPL-1.0-or-later"
+license = "MPL-2.0"
 homepage = "https://github.com/hyperpolymath/verisimdb"
 maintainer = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
 

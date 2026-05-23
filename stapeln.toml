@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath)
 #
 # stapeln.toml — Layer-based container build configuration for VeriSimDB
@@ -11,7 +11,7 @@ name = "verisimdb"
 version = "0.1.0-alpha"
 description = "6-core multimodal database with self-normalization"
 author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
-license = "PMPL-1.0-or-later"
+license = "MPL-2.0"
 registry = "ghcr.io/hyperpolymath"
 
 [build]

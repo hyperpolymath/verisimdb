@@ -3,8 +3,8 @@
   "source": "git-log",
   "created_at": "2026-01-22T09:03:32Z",
   "document": {
-    "title": "chore: update license identifier to PMPL-1.0-or-later in README",
-    "body": "Commit dfe015d2 by Your Name: chore: update license identifier to PMPL-1.0-or-later in README",
+    "title": "chore: update license identifier to MPL-2.0 in README",
+    "body": "Commit dfe015d2 by Your Name: chore: update license identifier to MPL-2.0 in README",
     "fields": {
       "type": "commit",
       "hash": "dfe015d2ea267bbd8c94148db453c0f8674e847e",

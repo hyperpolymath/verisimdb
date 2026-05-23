@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VeriSimDB — Frequently Asked Questions
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -216,14 +216,14 @@ operate as a standalone database without any external connections.
 
 === Is VeriSimDB open source?
 
-Yes. VeriSimDB is released under the *Palimpsest License (PMPL-1.0-or-later)*,
+Yes. VeriSimDB is released under the *Palimpsest License (MPL-2.0)*,
 a permissive open-source license. The community edition is full-featured with
 no artificial restrictions -- all 8 modalities, drift detection,
 self-normalisation, VQL, and federation are included.
 
 === What is the PMPL license?
 
-The Palimpsest License (PMPL-1.0-or-later) is a permissive open-source license
+The Palimpsest License (MPL-2.0) is a permissive open-source license
 developed by hyperpolymath. It allows free use, modification, and distribution
 of the software with minimal restrictions. For projects that require an
 OSI-approved license, an MPL-2.0 fallback is available.

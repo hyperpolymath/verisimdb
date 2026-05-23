@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // VeriSimDB V API Gateway
 //
 // Unified REST + GraphQL gateway proxying to the Rust core (data operations)

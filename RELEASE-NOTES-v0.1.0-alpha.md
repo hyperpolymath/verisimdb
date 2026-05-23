@@ -339,7 +339,7 @@ Run full benchmarks: `cd benches && cargo bench`
 
 ## 📄 License
 
-VeriSimDB is licensed under **PMPL-1.0-or-later** (Palimpsest License).
+VeriSimDB is licensed under **MPL-2.0** (Palimpsest License).
 
 Third-party components retain their original licenses (MIT, Apache, BSD, etc.).
 

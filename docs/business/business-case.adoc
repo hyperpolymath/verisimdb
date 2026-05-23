@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Business Case
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -34,7 +34,7 @@ This capability positions VeriSimDB at the intersection of three high-growth
 markets: data quality tools ($2.3B by 2027), graph databases ($5.6B), and the
 emerging multimodal database segment ($800M+). The open-core business model
 provides a free, full-featured community edition under the Palimpsest License
-(PMPL-1.0-or-later), with revenue generated through commercial support licenses,
+(MPL-2.0), with revenue generated through commercial support licenses,
 enterprise SLAs, and deployment consulting.
 
 == Problem Statement
@@ -346,7 +346,7 @@ dynamics are:
 
 | *Community Edition (PMPL)*
 | Full-featured VeriSimDB with all 8 modalities, drift detection,
-  self-normalisation, VQL, and federation. Free, open source under PMPL-1.0-or-later.
+  self-normalisation, VQL, and federation. Free, open source under MPL-2.0.
 
 | *Commercial Support License*
 | Enterprise SLA (99.9% uptime guarantee), priority security patches (24-hour

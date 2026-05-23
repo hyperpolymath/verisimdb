@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 //! Cost model and estimation.
 //!
 //! Base costs match VQLExplain.res values. Mode multipliers match

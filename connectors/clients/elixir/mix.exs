@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 defmodule VeriSimClient.MixProject do
@@ -42,7 +42,7 @@ defmodule VeriSimClient.MixProject do
 
   defp package do
     [
-      licenses: ["PMPL-1.0-or-later"],
+      licenses: ["MPL-2.0"],
       links: %{
         "GitLab" => "https://gitlab.com/hyperpolymath/verisimdb",
         "GitHub" => "https://github.com/hyperpolymath/verisimdb"

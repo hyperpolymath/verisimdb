@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 #
 # Cerro Torre manifest for VeriSimDB test infrastructure bundle
 #
@@ -22,7 +22,7 @@ ClickHouse, SurrealDB, InfluxDB 2, and MinIO (S3-compatible).
 DuckDB and SQLite are embedded databases tested via unit tests and are
 not included in this stack.
 """
-license = "PMPL-1.0-or-later"
+license = "MPL-2.0"
 homepage = "https://github.com/hyperpolymath/verisimdb"
 maintainer = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
 

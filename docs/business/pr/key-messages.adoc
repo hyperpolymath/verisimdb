@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VeriSimDB -- Key Messages and Talking Points
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -255,7 +255,7 @@ proofs of query correctness.
 
 [quote]
 VeriSimDB is a full-featured multimodal database released under a permissive
-open-source licence (PMPL-1.0-or-later, with MPL-2.0 fallback). All 8
+open-source licence (MPL-2.0, with MPL-2.0 fallback). All 8
 modalities, drift detection, self-normalisation, VQL, and federation are in the
 community edition. There is no "enterprise edition" that gates features.
 
@@ -269,7 +269,7 @@ community edition. There is no "enterprise edition" that gates features.
   engine), Elixir (orchestration), ReScript (registry), documentation, testing.
   `CONTRIBUTING.md` with clear guidelines.
 
-* *Principled licensing*: PMPL-1.0-or-later is permissive. MPL-2.0 fallback for
+* *Principled licensing*: MPL-2.0 is permissive. MPL-2.0 fallback for
   ecosystems requiring OSI-approved licences. Third-party dependencies retain
   their original licences.
 
@@ -338,7 +338,7 @@ better version of an existing category
 additional hardening. Do not oversell readiness.
 
 | Licence accuracy
-| PMPL-1.0-or-later (primary). MPL-2.0 (fallback where required). Not AGPL.
+| MPL-2.0 (primary). MPL-2.0 (fallback where required). Not AGPL.
 Not MIT. Not Apache.
 
 | Author attribution

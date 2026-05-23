@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 = VeriSimDB: Cross-Modal Drift Detection and Self-Normalisation in Heterogeneous Database Federations
@@ -810,7 +810,7 @@ The 11 proof types cover a range of assurance levels from basic existence checki
 
 Federation extends these guarantees across organisational boundaries, enabling multi-institutional data sharing with configurable drift policies that balance consistency against latency and autonomy.
 
-VeriSimDB is open source under the Palimpsest License (PMPL-1.0-or-later), with the Rust core, Elixir orchestration layer, and VQL parser available at https://github.com/hyperpolymath/verisimdb.
+VeriSimDB is open source under the Palimpsest License (MPL-2.0), with the Rust core, Elixir orchestration layer, and VQL parser available at https://github.com/hyperpolymath/verisimdb.
 
 
 // ============================================================================

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Service Worker for VQL Playground PWA — offline support.
 
 const CACHE_NAME = "vql-playground-v1";
