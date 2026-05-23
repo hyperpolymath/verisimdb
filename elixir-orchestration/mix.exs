@@ -45,7 +45,12 @@ defmodule VeriSim.MixProject do
       {:req, "~> 0.5"},
 
       # HTTP server for orchestration API (telemetry, status)
-      {:bandit, "~> 1.6"},
+      # >= 1.11.1 required for GHSA-rf5q-vwxw-gmrf (chunked-trailer DoS, High).
+      {:bandit, "~> 1.11 and >= 1.11.1"},
+
+      # Plug is a transitive of bandit but pinned directly to enforce the
+      # GHSA-468c-vq7p-gh64 fix (multipart-header buffer exhaustion, High).
+      {:plug, "~> 1.19 and >= 1.19.2"},
 
       # JSON encoding/decoding
       {:jason, "~> 1.4"},
@@ -65,7 +70,9 @@ defmodule VeriSim.MixProject do
 
       # Optional: native protocol adapters for federation
       # These are only needed when using :wire protocol instead of HTTP
-      {:postgrex, "~> 0.19", optional: true},
+      # >= 0.22.2 required for GHSA-r73h-97w8-m54h (channel-name SQL
+      # injection in Postgrex.Notifications.listen/3, High).
+      {:postgrex, "~> 0.22 and >= 0.22.2", optional: true},
       {:redix, "~> 1.5", optional: true},
       {:exqlite, "~> 0.27", optional: true},
       {:bolt_sips, "~> 2.0", optional: true},

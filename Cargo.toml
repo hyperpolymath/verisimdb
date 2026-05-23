@@ -47,7 +47,7 @@ hnsw_rs = "0.3"
 ndarray = "0.16"
 
 # Tensor modality
-burn = "0.20"
+burn = "0.21"
 
 # Semantic modality
 serde = { version = "1.0", features = ["derive"] }

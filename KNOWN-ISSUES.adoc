@@ -68,15 +68,19 @@ Additionally:
 
 **Original issue:** PROOF clauses were parsed but type checking only worked when the ReScript subprocess was running (which it typically wasn't). Queries silently fell back to unvalidated AST extraction.
 
-=== 6. ZKP / Proven Library Not Integrated
+=== 6. ZKP / Sanctify Library Integration — ✅ RESOLVED
 
-**Location:** `docs/zkp-and-sanctify-integration.adoc` (design), `proven-coherence.md` (notes)
+**Location:** `rust-core/verisim-semantic/src/{zkp.rs, zkp_bridge.rs, sanctify_bridge.rs}`, `elixir-orchestration/lib/verisim/query/vql_executor.ex`, `vql_type_checker.ex`
 
-**Current state:** The integration of zero-knowledge proofs via the sanctify library is documented as a consultation paper and design specification. The integration is not implemented. No ZKP circuits are generated, no proofs are created, and no verification occurs at runtime.
+**Resolved:** ZKP and sanctify integrations are implemented across three Rust modules and routed through the VQL pipeline:
 
-**Impact:** Privacy-preserving proofs (where a query result can be verified without revealing the underlying data) are not available. This affects multi-tenant federation and compliance scenarios where data must remain private but provenance must be verifiable.
+- `zkp.rs` (367 LOC) — hash commitments (SHA-256), Merkle proofs, and verification primitives.
+- `zkp_bridge.rs` (628 LOC) — wires ZKP primitives to the `ProofBlob`/`SemanticStore` types so CBOR-encoded `VerifiableProofData` round-trips through the semantic modality.
+- `sanctify_bridge.rs` (413 LOC) — consumes sanctify-php JSON reports, maps OWASP/WordPress security findings into security contracts, and binds them to octads as semantic annotations.
+- VQL type checker (`vql_type_checker.ex`) registers `ZKP` and `SANCTIFY` as first-class proof types with modality compatibility (`semantic`), required witness fields, and circuit names (`zkp-base`, `sanctify-v1`).
+- VQL executor (`vql_executor.ex`) routes `PROOF ZKP(...)` queries to `RustClient.post("/proofs/generate", ...)` and `PROOF SANCTIFY(...)` to contract-existence validation against the semantic store.
 
-**Resolution:** Implement sanctify integration after VQL-DT (issue 5) is resolved, since ZKP proof generation depends on the dependent type checking pipeline being functional.
+**Original issue:** ZKP/sanctify integration was documented as a consultation paper only; no circuits, proofs, or runtime verification existed. Resolution was blocked on VQL-DT (issue 5), which has also been resolved.
 
 === 7. ReScript Registry 60% Complete — ✅ RESOLVED
 
