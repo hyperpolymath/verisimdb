@@ -96,7 +96,7 @@ async-trait = "0.1"
 prometheus = "0.14"
 
 # UUID
-uuid = { version = "1.11", features = ["v4"] }
+uuid = { version = "1.23", features = ["v4"] }
 
 # Regex
 regex = "1.11"
