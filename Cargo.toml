@@ -40,7 +40,7 @@ readme = "README.adoc"
 [workspace.dependencies]
 # Graph modality — SimpleGraphStore is default (pure Rust, no C++ linker needed).
 # Enable oxigraph-backend feature on verisim-graph for full RDF/SPARQL support.
-oxigraph = "0.4"
+oxigraph = "0.5"
 
 # Vector modality (HNSW)
 hnsw_rs = "0.3"
@@ -82,7 +82,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # TLS (pure Rust via ring — no OpenSSL, no aws-lc-sys/cmake)
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
-axum-server = { version = "0.7", default-features = false, features = ["tls-rustls-no-provider"] }
+axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 
 # Testing
 proptest = "1.4"
@@ -108,7 +108,7 @@ redb = "3.1"
 crc32fast = "1.4"
 
 # Cryptography (ZKP proofs in semantic store)
-sha2 = "0.10"
+sha2 = "0.11"
 
 # GraphQL
 async-graphql = "7.2"
