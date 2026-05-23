@@ -339,6 +339,7 @@ Resolved in recent sessions:
 - Multi-proof parsing: PROOF A(x) AND B(y) splits correctly
 - Modality compatibility validation (INTEGRITY needs semantic, PROVENANCE needs provenance, etc.)
 - proven library integrated (certificate-based JSON/CBOR bridge)
+- ZKP / sanctify integration (zkp.rs 367 LOC + zkp_bridge.rs 628 LOC + sanctify_bridge.rs 413 LOC, VQL-routed)
 - verisim-repl builds clean (67 tests pass)
 - oxrocksdb-sys C++ dependency eliminated (Oxigraph feature-flagged, redb pure-Rust backend added)
 - protoc build dependency eliminated (proto code pre-generated)
