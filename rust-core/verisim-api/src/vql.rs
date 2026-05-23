@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{info, instrument};
 
-use verisim_octad::{OctadId, OctadInput, OctadDocumentInput, OctadStore};
+use verisim_octad::{OctadDocumentInput, OctadId, OctadInput, OctadStore};
 
 use crate::{ApiError, AppState, OctadResponse};
 
@@ -84,7 +84,9 @@ pub async fn vql_execute_handler(
     // Parse and route the query.
     let tokens = tokenize(query);
     if tokens.is_empty() {
-        return Err(ApiError::BadRequest("Empty query after parsing".to_string()));
+        return Err(ApiError::BadRequest(
+            "Empty query after parsing".to_string(),
+        ));
     }
 
     // Pre-flight: validate with TypeLL VQL-UT checker if available.
@@ -136,8 +138,8 @@ pub async fn vql_execute_handler(
 /// regardless. The safety metadata is attached to the response for downstream
 /// consumers (PanLL, ECHIDNA) to act on.
 async fn validate_with_typell(query: &str) -> Option<(u8, String, Vec<String>)> {
-    let typell_url = std::env::var("TYPELL_URL")
-        .unwrap_or_else(|_| "http://localhost:7800".to_string());
+    let typell_url =
+        std::env::var("TYPELL_URL").unwrap_or_else(|_| "http://localhost:7800".to_string());
 
     let check_body = serde_json::json!({
         "expression": query,
@@ -336,16 +338,14 @@ async fn execute_select(
 }
 
 /// Find `WHERE id = '<value>'` in token list.
-fn find_where_id<'a>(tokens: &'a [String]) -> Option<&'a str> {
+fn find_where_id(tokens: &[String]) -> Option<&str> {
     for (i, token) in tokens.iter().enumerate() {
-        if token.to_uppercase() == "WHERE" {
-            // Expect: WHERE id = '<value>'
-            if tokens.get(i + 1).map(|t| t.to_lowercase()) == Some("id".to_string()) {
-                if tokens.get(i + 2).map(|t| t.as_str()) == Some("=") {
-                    if let Some(val) = tokens.get(i + 3) {
-                        return Some(unquote(val));
-                    }
-                }
+        if token.to_uppercase() == "WHERE"
+            && tokens.get(i + 1).map(|t| t.to_lowercase()) == Some("id".to_string())
+            && tokens.get(i + 2).map(|t| t.as_str()) == Some("=")
+        {
+            if let Some(val) = tokens.get(i + 3) {
+                return Some(unquote(val));
             }
         }
     }
@@ -527,10 +527,7 @@ fn parse_vector(s: &str) -> Result<Vec<f32>, ApiError> {
 ///
 /// Also accepts simplified form:
 /// `INSERT '<title>' '<body>'`
-async fn execute_insert(
-    state: &AppState,
-    raw: &str,
-) -> Result<VqlExecuteResponse, ApiError> {
+async fn execute_insert(state: &AppState, raw: &str) -> Result<VqlExecuteResponse, ApiError> {
     let upper = raw.to_uppercase();
 
     let (title, body) = if upper.starts_with("INSERT INTO") {
@@ -541,7 +538,8 @@ async fn execute_insert(
         let tokens = tokenize(raw);
         if tokens.len() < 3 {
             return Err(ApiError::BadRequest(
-                "INSERT requires: INSERT INTO octads (title, body) VALUES ('<title>', '<body>')".to_string(),
+                "INSERT requires: INSERT INTO octads (title, body) VALUES ('<title>', '<body>')"
+                    .to_string(),
             ));
         }
         (
@@ -550,12 +548,14 @@ async fn execute_insert(
         )
     };
 
-    let mut input = OctadInput::default();
-    input.document = Some(OctadDocumentInput {
-        title: title.clone(),
-        body,
-        fields: std::collections::HashMap::new(),
-    });
+    let input = OctadInput {
+        document: Some(OctadDocumentInput {
+            title: title.clone(),
+            body,
+            fields: std::collections::HashMap::new(),
+        }),
+        ..OctadInput::default()
+    };
 
     let octad = state
         .octad_store
@@ -586,9 +586,7 @@ fn parse_insert_values(raw: &str) -> Result<(String, String), ApiError> {
         .ok_or_else(|| ApiError::BadRequest("INSERT INTO requires a VALUES clause".to_string()))?;
 
     let values_part = &raw[values_idx + 6..].trim();
-    let values_part = values_part
-        .trim_start_matches('(')
-        .trim_end_matches(')');
+    let values_part = values_part.trim_start_matches('(').trim_end_matches(')');
 
     // Split on comma, respecting quotes.
     let value_tokens = tokenize(&values_part.replace(',', " "));
@@ -618,9 +616,7 @@ async fn execute_delete(
     tokens: &[String],
 ) -> Result<VqlExecuteResponse, ApiError> {
     let id = find_where_id(tokens).ok_or_else(|| {
-        ApiError::BadRequest(
-            "DELETE requires: DELETE FROM octads WHERE id = '<id>'".to_string(),
-        )
+        ApiError::BadRequest("DELETE requires: DELETE FROM octads WHERE id = '<id>'".to_string())
     })?;
 
     let octad_id = OctadId::new(id);
@@ -659,10 +655,7 @@ async fn execute_delete(
 /// - `SHOW DRIFT` — drift metrics
 /// - `SHOW NORMALIZER` — normalizer status
 /// - `SHOW OCTADS [LIMIT n]` — list octads (alias for SELECT)
-async fn execute_show(
-    state: &AppState,
-    tokens: &[String],
-) -> Result<VqlExecuteResponse, ApiError> {
+async fn execute_show(state: &AppState, tokens: &[String]) -> Result<VqlExecuteResponse, ApiError> {
     if tokens.len() < 2 {
         return Err(ApiError::BadRequest(
             "SHOW requires: SHOW STATUS | SHOW DRIFT | SHOW NORMALIZER | SHOW OCTADS".to_string(),
@@ -827,7 +820,9 @@ async fn execute_explain(
     raw: &str,
 ) -> Result<VqlExecuteResponse, ApiError> {
     if tokens.len() < 2 {
-        return Err(ApiError::BadRequest("EXPLAIN requires a query to explain".to_string()));
+        return Err(ApiError::BadRequest(
+            "EXPLAIN requires a query to explain".to_string(),
+        ));
     }
 
     let inner_query = &raw[raw.to_uppercase().find("EXPLAIN").unwrap() + 7..].trim();
@@ -863,7 +858,10 @@ async fn execute_explain(
             }
         }
         "SEARCH" => {
-            let search_type = inner_tokens.get(1).map(|t| t.to_uppercase()).unwrap_or_default();
+            let search_type = inner_tokens
+                .get(1)
+                .map(|t| t.to_uppercase())
+                .unwrap_or_default();
             match search_type.as_str() {
                 "TEXT" => json!({
                     "operation": "Full-Text Search",
@@ -934,7 +932,10 @@ mod tests {
     #[test]
     fn test_tokenize_quoted() {
         let tokens = tokenize("SEARCH TEXT 'hello world' LIMIT 10");
-        assert_eq!(tokens, vec!["SEARCH", "TEXT", "'hello world'", "LIMIT", "10"]);
+        assert_eq!(
+            tokens,
+            vec!["SEARCH", "TEXT", "'hello world'", "LIMIT", "10"]
+        );
     }
 
     #[test]
@@ -968,10 +969,19 @@ mod tests {
 
     #[test]
     fn test_find_where_id() {
-        let tokens: Vec<String> = vec!["SELECT", "*", "FROM", "octads", "WHERE", "id", "=", "'abc-123'"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let tokens: Vec<String> = vec![
+            "SELECT",
+            "*",
+            "FROM",
+            "octads",
+            "WHERE",
+            "id",
+            "=",
+            "'abc-123'",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
         assert_eq!(find_where_id(&tokens), Some("abc-123"));
     }
 

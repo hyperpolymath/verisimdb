@@ -13,7 +13,8 @@ defmodule VeriSim.RustClient do
   @default_base_url "http://localhost:8080/api/v1"
   @default_timeout 30_000
   @cache_table :verisim_rust_client_cache
-  @cache_ttl_ms 30_000  # 30 seconds default TTL
+  # 30 seconds default TTL
+  @cache_ttl_ms 30_000
 
   # ---------------------------------------------------------------------------
   # ETS Cache — transparent read-through caching for octad lookups and searches
@@ -26,6 +27,7 @@ defmodule VeriSim.RustClient do
     if :ets.info(@cache_table) == :undefined do
       :ets.new(@cache_table, [:set, :public, :named_table, read_concurrency: true])
     end
+
     :ok
   end
 
@@ -36,6 +38,7 @@ defmodule VeriSim.RustClient do
     if :ets.info(@cache_table) != :undefined do
       :ets.delete_all_objects(@cache_table)
     end
+
     :ok
   end
 
@@ -46,6 +49,7 @@ defmodule VeriSim.RustClient do
     if :ets.info(@cache_table) != :undefined do
       :ets.delete(@cache_table, key)
     end
+
     :ok
   end
 
@@ -59,7 +63,9 @@ defmodule VeriSim.RustClient do
             :ets.delete(@cache_table, key)
             :miss
           end
-        _ -> :miss
+
+        _ ->
+          :miss
       end
     else
       :miss
@@ -71,6 +77,7 @@ defmodule VeriSim.RustClient do
       expiry = System.monotonic_time(:millisecond) + ttl_ms
       :ets.insert(@cache_table, {key, value, expiry})
     end
+
     value
   end
 
@@ -93,8 +100,10 @@ defmodule VeriSim.RustClient do
     case get("/health") do
       {:ok, %{status: 200, body: body}} ->
         {:ok, body}
+
       {:ok, %{status: status}} ->
         {:error, {:unhealthy, status}}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -121,15 +130,23 @@ defmodule VeriSim.RustClient do
     cache_key = {:octad, entity_id}
 
     case cache_get(cache_key) do
-      {:hit, cached} -> {:ok, cached}
+      {:hit, cached} ->
+        {:ok, cached}
+
       :miss ->
         case get("/octads/#{entity_id}") do
           {:ok, %{status: 200, body: body}} ->
             cache_put(cache_key, body)
             {:ok, body}
-          {:ok, %{status: 404}} -> {:error, :not_found}
-          {:ok, %{status: status, body: body}} -> {:error, {status, body}}
-          {:error, reason} -> {:error, reason}
+
+          {:ok, %{status: 404}} ->
+            {:error, :not_found}
+
+          {:ok, %{status: status, body: body}} ->
+            {:error, {status, body}}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -143,9 +160,15 @@ defmodule VeriSim.RustClient do
         invalidate_cache({:octad, entity_id})
         invalidate_cache({:drift, entity_id})
         {:ok, body}
-      {:ok, %{status: 404}} -> {:error, :not_found}
-      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
-      {:error, reason} -> {:error, reason}
+
+      {:ok, %{status: 404}} ->
+        {:error, :not_found}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -158,13 +181,20 @@ defmodule VeriSim.RustClient do
         invalidate_cache({:octad, entity_id})
         invalidate_cache({:drift, entity_id})
         :ok
+
       {:ok, %{status: 200}} ->
         invalidate_cache({:octad, entity_id})
         invalidate_cache({:drift, entity_id})
         :ok
-      {:ok, %{status: 404}} -> {:error, :not_found}
-      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
-      {:error, reason} -> {:error, reason}
+
+      {:ok, %{status: 404}} ->
+        {:error, :not_found}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -213,15 +243,24 @@ defmodule VeriSim.RustClient do
     cache_key = {:drift, entity_id}
 
     case cache_get(cache_key) do
-      {:hit, cached} -> {:ok, cached}
+      {:hit, cached} ->
+        {:ok, cached}
+
       :miss ->
         case get("/drift/entity/#{entity_id}") do
           {:ok, %{status: 200, body: %{"score" => score}}} ->
-            cache_put(cache_key, score, 10_000)  # Short TTL — drift changes frequently
+            # Short TTL — drift changes frequently
+            cache_put(cache_key, score, 10_000)
             {:ok, score}
-          {:ok, %{status: 404}} -> {:ok, 0.0}
-          {:ok, %{status: status, body: body}} -> {:error, {status, body}}
-          {:error, reason} -> {:error, reason}
+
+          {:ok, %{status: 404}} ->
+            {:ok, 0.0}
+
+          {:ok, %{status: status, body: body}} ->
+            {:error, {status, body}}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -382,10 +421,10 @@ defmodule VeriSim.RustClient do
     url = base_url() <> path
 
     case Req.get(url,
-      params: params,
-      receive_timeout: timeout(),
-      decode_body: true
-    ) do
+           params: params,
+           receive_timeout: timeout(),
+           decode_body: true
+         ) do
       {:ok, resp} -> validate_json_response(resp)
       {:error, reason} -> {:error, reason}
     end
@@ -397,10 +436,10 @@ defmodule VeriSim.RustClient do
     url = base_url() <> path
 
     case Req.post(url,
-      json: body,
-      receive_timeout: timeout(),
-      decode_body: true
-    ) do
+           json: body,
+           receive_timeout: timeout(),
+           decode_body: true
+         ) do
       {:ok, resp} -> validate_json_response(resp)
       {:error, reason} -> {:error, reason}
     end
@@ -412,10 +451,10 @@ defmodule VeriSim.RustClient do
     url = base_url() <> path
 
     case Req.put(url,
-      json: body,
-      receive_timeout: timeout(),
-      decode_body: true
-    ) do
+           json: body,
+           receive_timeout: timeout(),
+           decode_body: true
+         ) do
       {:ok, resp} -> validate_json_response(resp)
       {:error, reason} -> {:error, reason}
     end
@@ -427,9 +466,9 @@ defmodule VeriSim.RustClient do
     url = base_url() <> path
 
     case Req.delete(url,
-      receive_timeout: timeout(),
-      decode_body: true
-    ) do
+           receive_timeout: timeout(),
+           decode_body: true
+         ) do
       {:ok, resp} -> validate_json_response(resp)
       {:error, reason} -> {:error, reason}
     end
@@ -448,7 +487,10 @@ defmodule VeriSim.RustClient do
 
   defp validate_json_response(%{status: status, body: body})
        when is_binary(body) and status >= 200 and status < 300 do
-    Logger.warning("Rust core returned non-JSON response (status #{status}): #{String.slice(body, 0, 120)}...")
+    Logger.warning(
+      "Rust core returned non-JSON response (status #{status}): #{String.slice(body, 0, 120)}..."
+    )
+
     {:error, {:non_json_response, status, String.slice(body, 0, 500)}}
   end
 

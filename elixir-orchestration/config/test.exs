@@ -8,5 +8,4 @@ config :verisim,
   rust_core_timeout: 5_000,
   orch_api_port: 0
 
-config :logger, :console,
-  level: :warning
+config :logger, :console, level: :warning

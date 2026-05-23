@@ -347,6 +347,8 @@ defmodule VeriSim.Federation.Adapters.ClickHouseIntegrationTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp skip_if_unavailable(%{skip: true}), do: flunk("ClickHouse not available — start test-infra stack")
+  defp skip_if_unavailable(%{skip: true}),
+    do: flunk("ClickHouse not available — start test-infra stack")
+
   defp skip_if_unavailable(_context), do: :ok
 end

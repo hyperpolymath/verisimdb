@@ -116,9 +116,7 @@ impl ApiKeyRegistry {
     pub fn validate(&self, plaintext_key: &str) -> Option<ApiKeyEntry> {
         let hash = hash_key(plaintext_key);
         let keys = self.keys.lock().expect("key registry lock");
-        keys.get(&hash)
-            .filter(|entry| entry.active)
-            .cloned()
+        keys.get(&hash).filter(|entry| entry.active).cloned()
     }
 
     /// Revoke an API key by its hash.
@@ -289,8 +287,10 @@ pub async fn auth_middleware(
         return (
             StatusCode::TOO_MANY_REQUESTS,
             [
-                (header::HeaderName::from_static("x-ratelimit-remaining"),
-                 remaining.to_string()),
+                (
+                    header::HeaderName::from_static("x-ratelimit-remaining"),
+                    remaining.to_string(),
+                ),
                 (header::RETRY_AFTER, "60".to_string()),
             ],
             Json(AuthError {
@@ -303,12 +303,8 @@ pub async fn auth_middleware(
 
     // RBAC authorization check.
     let method = request.method().clone();
-    if let Err(authz_err) = crate::rbac::check_authorization(
-        &identity,
-        &path,
-        &method,
-        &auth.rbac,
-    ) {
+    if let Err(authz_err) = crate::rbac::check_authorization(&identity, &path, &method, &auth.rbac)
+    {
         warn!(
             client = %identity.id,
             role = ?identity.role,
@@ -323,6 +319,7 @@ pub async fn auth_middleware(
 }
 
 /// Extract client identity from request headers.
+#[allow(clippy::result_large_err)]
 fn extract_identity(request: &Request, auth: &AuthState) -> Result<ClientIdentity, Response> {
     // Try X-API-Key header first.
     if let Some(api_key) = request
@@ -378,7 +375,9 @@ fn extract_identity(request: &Request, auth: &AuthState) -> Result<ClientIdentit
         StatusCode::UNAUTHORIZED,
         [(header::WWW_AUTHENTICATE, "Bearer, ApiKey")],
         Json(AuthError {
-            error: "Authentication required. Provide X-API-Key header or Authorization: Bearer <token>".to_string(),
+            error:
+                "Authentication required. Provide X-API-Key header or Authorization: Bearer <token>"
+                    .to_string(),
             code: 401,
         }),
     )
@@ -402,22 +401,22 @@ fn validate_jwt(token: &str, config: &AuthConfig) -> Result<ClientIdentity, Stri
     }
 
     // Decode the header and payload.
-    let payload_bytes = base64url_decode(parts[1])
-        .map_err(|_| "Invalid JWT payload encoding".to_string())?;
+    let payload_bytes =
+        base64url_decode(parts[1]).map_err(|_| "Invalid JWT payload encoding".to_string())?;
 
     // Verify HMAC-SHA256 signature.
     let signing_input = format!("{}.{}", parts[0], parts[1]);
     let expected_sig = hmac_sha256(signing_input.as_bytes(), secret.as_bytes());
-    let actual_sig = base64url_decode(parts[2])
-        .map_err(|_| "Invalid JWT signature encoding".to_string())?;
+    let actual_sig =
+        base64url_decode(parts[2]).map_err(|_| "Invalid JWT signature encoding".to_string())?;
 
     if expected_sig != actual_sig {
         return Err("Invalid JWT signature".to_string());
     }
 
     // Parse claims.
-    let claims: serde_json::Value = serde_json::from_slice(&payload_bytes)
-        .map_err(|_| "Invalid JWT payload".to_string())?;
+    let claims: serde_json::Value =
+        serde_json::from_slice(&payload_bytes).map_err(|_| "Invalid JWT payload".to_string())?;
 
     // Check expiration.
     if let Some(exp) = claims.get("exp").and_then(|v| v.as_i64()) {
@@ -446,10 +445,7 @@ fn validate_jwt(token: &str, config: &AuthConfig) -> Result<ClientIdentity, Stri
         })
         .unwrap_or(ClientRole::Reader);
 
-    Ok(ClientIdentity {
-        id: subject,
-        role,
-    })
+    Ok(ClientIdentity { id: subject, role })
 }
 
 /// Hash an API key with SHA-256 for storage.
@@ -491,7 +487,7 @@ fn hmac_sha256(data: &[u8], key: &[u8]) -> Vec<u8> {
     // Outer hash.
     let mut outer_hasher = Sha256::new();
     outer_hasher.update(&opad);
-    outer_hasher.update(&inner_hash);
+    outer_hasher.update(inner_hash);
     outer_hasher.finalize().to_vec()
 }
 
@@ -528,7 +524,7 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, &'static str> {
     }
 
     let bytes = input.as_bytes();
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err("invalid base64 length");
     }
 
@@ -690,9 +686,8 @@ mod tests {
         // Create JWT: header.payload.signature
         let header = base64url_encode(b"{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
         // Set exp far in the future.
-        let payload = base64url_encode(
-            b"{\"sub\":\"test-user\",\"role\":\"admin\",\"exp\":9999999999}",
-        );
+        let payload =
+            base64url_encode(b"{\"sub\":\"test-user\",\"role\":\"admin\",\"exp\":9999999999}");
         let signing_input = format!("{header}.{payload}");
         let sig = hmac_sha256(signing_input.as_bytes(), b"test-secret");
         let sig_encoded = base64url_encode(&sig);
@@ -750,8 +745,7 @@ mod tests {
 
     /// Base64url encode for test helpers.
     fn base64url_encode(input: &[u8]) -> String {
-        const CHARSET: &[u8] =
-            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
         let mut result = String::new();
         let mut i = 0;

@@ -31,49 +31,51 @@ use std::sync::Mutex;
 
 use verisim_document::TantivyDocumentStore;
 use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
-#[cfg(not(feature = "persistent"))]
-use verisim_graph::SimpleGraphStore;
 #[cfg(feature = "persistent")]
 use verisim_graph::RedbGraphStore;
-#[cfg(feature = "persistent")]
-use verisim_vector::RedbVectorStore;
-#[cfg(feature = "persistent")]
-use verisim_tensor::RedbTensorStore;
-#[cfg(feature = "persistent")]
-use verisim_semantic::RedbSemanticStore;
-#[cfg(feature = "persistent")]
-use verisim_temporal::RedbVersionStore;
-#[cfg(feature = "persistent")]
-use verisim_provenance::RedbProvenanceStore;
-#[cfg(feature = "persistent")]
-use verisim_spatial::RedbSpatialStore;
-use verisim_planner::{
-    CacheConfig, ExplainOutput, ExplainAnalyzeOutput, LogicalPlan, ParamValue,
-    PhysicalPlan, PlanCache, Planner, PlannerConfig, PreparedId, PreparedStatement,
-    Profiler, SlowQueryLog, SlowQuerySummary, StatisticsCollector,
-};
+#[cfg(not(feature = "persistent"))]
+use verisim_graph::SimpleGraphStore;
+use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
 use verisim_octad::{
-    BoundingBox, Coordinates, OctadConfig, OctadDocumentInput, OctadGraphInput,
+    BoundingBox, Coordinates, InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadGraphInput,
     OctadId, OctadInput, OctadProvenanceInput, OctadSemanticInput, OctadSnapshot,
-    OctadSpatialInput, OctadStore, OctadTensorInput, OctadVectorInput,
-    InMemoryOctadStore, ProvenanceStore, SpatialStore,
+    OctadSpatialInput, OctadStore, OctadTensorInput, OctadVectorInput, ProvenanceStore,
+    SpatialStore,
+};
+use verisim_planner::{
+    CacheConfig, ExplainAnalyzeOutput, ExplainOutput, LogicalPlan, ParamValue, PhysicalPlan,
+    PlanCache, Planner, PlannerConfig, PreparedId, PreparedStatement, Profiler, SlowQueryLog,
+    SlowQuerySummary, StatisticsCollector,
 };
 #[cfg(not(feature = "persistent"))]
 use verisim_provenance::InMemoryProvenanceStore;
-#[cfg(not(feature = "persistent"))]
-use verisim_spatial::InMemorySpatialStore;
-use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
+#[cfg(feature = "persistent")]
+use verisim_provenance::RedbProvenanceStore;
+use verisim_semantic::circuit_registry::CircuitRegistry;
+use verisim_semantic::zkp_bridge::{
+    self as zkp_api, PrivacyLevel, ZkpProofRequest as ZkpBridgeRequest,
+};
 #[cfg(not(feature = "persistent"))]
 use verisim_semantic::InMemorySemanticStore;
-use verisim_semantic::zkp_bridge::{self as zkp_api, PrivacyLevel, ZkpProofRequest as ZkpBridgeRequest};
-use verisim_semantic::circuit_registry::CircuitRegistry;
+#[cfg(feature = "persistent")]
+use verisim_semantic::RedbSemanticStore;
+#[cfg(not(feature = "persistent"))]
+use verisim_spatial::InMemorySpatialStore;
+#[cfg(feature = "persistent")]
+use verisim_spatial::RedbSpatialStore;
 #[cfg(not(feature = "persistent"))]
 use verisim_temporal::InMemoryVersionStore;
+#[cfg(feature = "persistent")]
+use verisim_temporal::RedbVersionStore;
 #[cfg(not(feature = "persistent"))]
 use verisim_tensor::InMemoryTensorStore;
-use verisim_vector::DistanceMetric;
+#[cfg(feature = "persistent")]
+use verisim_tensor::RedbTensorStore;
 #[cfg(not(feature = "persistent"))]
 use verisim_vector::BruteForceVectorStore;
+use verisim_vector::DistanceMetric;
+#[cfg(feature = "persistent")]
+use verisim_vector::RedbVectorStore;
 
 /// Type alias for our concrete OctadStore implementation (octad: 8 modality stores).
 ///
@@ -129,11 +131,17 @@ impl IntoResponse for ApiError {
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             ApiError::Internal(msg) => {
                 error!(error = %msg, "Internal server error");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             ApiError::Serialization(msg) => {
                 error!(error = %msg, "Serialization error");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
         };
 
@@ -207,14 +215,22 @@ fn validate_limit(limit: usize) -> usize {
 /// Validate a octad ID: max 128 chars, alphanumeric + dash + underscore only.
 fn validate_octad_id(id: &str) -> Result<(), ApiError> {
     if id.is_empty() {
-        return Err(ApiError::BadRequest("Octad ID must not be empty".to_string()));
+        return Err(ApiError::BadRequest(
+            "Octad ID must not be empty".to_string(),
+        ));
     }
     if id.len() > 128 {
-        return Err(ApiError::BadRequest("Octad ID must be at most 128 characters".to_string()));
-    }
-    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
         return Err(ApiError::BadRequest(
-            "Octad ID must contain only alphanumeric characters, dashes, and underscores".to_string(),
+            "Octad ID must be at most 128 characters".to_string(),
+        ));
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(ApiError::BadRequest(
+            "Octad ID must contain only alphanumeric characters, dashes, and underscores"
+                .to_string(),
         ));
     }
     Ok(())
@@ -513,8 +529,7 @@ impl AppState {
                 SimpleGraphStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
             );
             let d = Arc::new(
-                TantivyDocumentStore::in_memory()
-                    .map_err(|e| ApiError::Internal(e.to_string()))?,
+                TantivyDocumentStore::in_memory().map_err(|e| ApiError::Internal(e.to_string()))?,
             );
             (g, d)
         };
@@ -654,15 +669,15 @@ impl AppState {
         let planner = Arc::new(Mutex::new(Planner::new(PlannerConfig::default())));
         let plan_cache = Arc::new(PlanCache::new(CacheConfig::default()));
         let slow_query_log = Arc::new(SlowQueryLog::new(Default::default()));
-        let transaction_manager = Arc::new(
-            transaction::TransactionManager::new(transaction::TransactionConfig::default()),
-        );
+        let transaction_manager = Arc::new(transaction::TransactionManager::new(
+            transaction::TransactionConfig::default(),
+        ));
 
-        let self_endpoint = format!("http://{}:{}{}", config.host, config.port, config.version_prefix);
-        let federation = federation::FederationState::new(
-            "self".to_string(),
-            self_endpoint,
+        let self_endpoint = format!(
+            "http://{}:{}{}",
+            config.host, config.port, config.version_prefix
         );
+        let federation = federation::FederationState::new("self".to_string(), self_endpoint);
 
         let auth = auth::AuthState::default();
         let circuit_registry = Arc::new(CircuitRegistry::new());
@@ -695,7 +710,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(ready_handler))
         .route("/metrics", get(metrics_handler))
         // Octad CRUD
-        .route("/octads", get(list_octads_handler).post(create_octad_handler))
+        .route(
+            "/octads",
+            get(list_octads_handler).post(create_octad_handler),
+        )
         .route("/octads/{id}", get(get_octad_handler))
         .route("/octads/{id}", put(update_octad_handler))
         .route("/octads/{id}", delete(delete_octad_handler))
@@ -707,7 +725,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/drift/status", get(drift_status_handler))
         .route("/drift/entity/{id}", get(entity_drift_handler))
         .route("/normalizer/status", get(normalizer_status_handler))
-        .route("/normalizer/trigger/{id}", post(trigger_normalization_handler))
+        .route(
+            "/normalizer/trigger/{id}",
+            post(trigger_normalization_handler),
+        )
         // Meta-query store (homoiconicity: queries as octads)
         .route("/queries", post(store_query_handler))
         .route("/queries/similar", post(similar_queries_handler))
@@ -719,7 +740,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/planner/config", put(put_planner_config_handler))
         .route("/planner/stats", get(planner_stats_handler))
         // EXPLAIN ANALYZE
-        .route("/query/explain-analyze", post(query_explain_analyze_handler))
+        .route(
+            "/query/explain-analyze",
+            post(query_explain_analyze_handler),
+        )
         // Prepared statements
         .route("/prepared", post(prepared_create_handler))
         .route("/prepared/{id}", get(prepared_get_handler))
@@ -729,20 +753,35 @@ pub fn build_router(state: AppState) -> Router {
         .route("/planner/slow-queries", get(slow_queries_handler))
         // Transaction endpoints
         .route("/transactions/begin", post(transaction_begin_handler))
-        .route("/transactions/{id}/commit", post(transaction_commit_handler))
-        .route("/transactions/{id}/rollback", post(transaction_rollback_handler))
+        .route(
+            "/transactions/{id}/commit",
+            post(transaction_commit_handler),
+        )
+        .route(
+            "/transactions/{id}/rollback",
+            post(transaction_rollback_handler),
+        )
         .route("/transactions/{id}", get(transaction_status_handler))
         // ZKP proof endpoints
         .route("/proofs/generate", post(proof_generate_handler))
         .route("/proofs/verify", post(proof_verify_handler))
-        .route("/proofs/generate-with-circuit", post(proof_generate_with_circuit_handler))
+        .route(
+            "/proofs/generate-with-circuit",
+            post(proof_generate_with_circuit_handler),
+        )
         // Provenance endpoints
         .route("/provenance/{id}", get(provenance_get_chain_handler))
         .route("/provenance/{id}/record", post(provenance_record_handler))
         .route("/provenance/{id}/verify", get(provenance_verify_handler))
         // Spatial search endpoints
-        .route("/spatial/search/radius", post(spatial_radius_search_handler))
-        .route("/spatial/search/bounds", post(spatial_bounds_search_handler))
+        .route(
+            "/spatial/search/radius",
+            post(spatial_radius_search_handler),
+        )
+        .route(
+            "/spatial/search/bounds",
+            post(spatial_bounds_search_handler),
+        )
         .route("/spatial/search/nearest", post(spatial_nearest_handler))
         // VQL text query endpoint (used by verisim-repl)
         .route("/vql/execute", post(vql::vql_execute_handler))
@@ -809,12 +848,16 @@ async fn health_handler(State(state): State<AppState>) -> (StatusCode, Json<Heal
     }
 }
 
+type MetricsResponse = (
+    StatusCode,
+    [(axum::http::header::HeaderName, &'static str); 1],
+    String,
+);
+
 /// Prometheus metrics handler — exposes drift and query metrics for scraping
 #[instrument(skip(state))]
-async fn metrics_handler(
-    State(state): State<AppState>,
-) -> Result<(StatusCode, [(axum::http::header::HeaderName, &'static str); 1], String), ApiError> {
-    use prometheus::{Encoder, TextEncoder, GaugeVec, Opts, Registry};
+async fn metrics_handler(State(state): State<AppState>) -> Result<MetricsResponse, ApiError> {
+    use prometheus::{Encoder, GaugeVec, Opts, Registry, TextEncoder};
 
     let registry = Registry::new();
 
@@ -826,28 +869,46 @@ async fn metrics_handler(
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let drift_avg_gauge = GaugeVec::new(
-        Opts::new("verisimdb_drift_moving_average", "Drift moving average by type"),
+        Opts::new(
+            "verisimdb_drift_moving_average",
+            "Drift moving average by type",
+        ),
         &["drift_type"],
     )
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let drift_count_gauge = GaugeVec::new(
-        Opts::new("verisimdb_drift_measurement_count", "Drift measurement count by type"),
+        Opts::new(
+            "verisimdb_drift_measurement_count",
+            "Drift measurement count by type",
+        ),
         &["drift_type"],
     )
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    registry.register(Box::new(drift_gauge.clone())).map_err(|e| ApiError::Internal(e.to_string()))?;
-    registry.register(Box::new(drift_avg_gauge.clone())).map_err(|e| ApiError::Internal(e.to_string()))?;
-    registry.register(Box::new(drift_count_gauge.clone())).map_err(|e| ApiError::Internal(e.to_string()))?;
+    registry
+        .register(Box::new(drift_gauge.clone()))
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    registry
+        .register(Box::new(drift_avg_gauge.clone()))
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    registry
+        .register(Box::new(drift_count_gauge.clone()))
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     // Populate drift metrics
     if let Ok(all_metrics) = state.drift_detector.all_metrics() {
         for (drift_type, metrics) in &all_metrics {
             let label = drift_type.to_string();
-            drift_gauge.with_label_values(&[&label]).set(metrics.current_score);
-            drift_avg_gauge.with_label_values(&[&label]).set(metrics.moving_average);
-            drift_count_gauge.with_label_values(&[&label]).set(metrics.measurement_count as f64);
+            drift_gauge
+                .with_label_values(&[&label])
+                .set(metrics.current_score);
+            drift_avg_gauge
+                .with_label_values(&[&label])
+                .set(metrics.moving_average);
+            drift_count_gauge
+                .with_label_values(&[&label])
+                .set(metrics.measurement_count as f64);
         }
     }
 
@@ -855,20 +916,25 @@ async fn metrics_handler(
     let uptime = prometheus::Gauge::new("verisimdb_uptime_seconds", "Server uptime in seconds")
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     uptime.set(state.start_time.elapsed().as_secs() as f64);
-    registry.register(Box::new(uptime)).map_err(|e| ApiError::Internal(e.to_string()))?;
+    registry
+        .register(Box::new(uptime))
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     // Encode
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
-    encoder.encode(&registry.gather(), &mut buffer)
+    encoder
+        .encode(&registry.gather(), &mut buffer)
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let output = String::from_utf8(buffer)
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let output = String::from_utf8(buffer).map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok((
         StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
         output,
     ))
 }
@@ -1000,7 +1066,11 @@ async fn text_search_handler(
 ) -> Result<Json<Vec<SearchResultResponse>>, ApiError> {
     let q = match query.q {
         Some(q) if !q.is_empty() => q,
-        _ => return Err(ApiError::BadRequest("Query parameter 'q' must not be empty".to_string())),
+        _ => {
+            return Err(ApiError::BadRequest(
+                "Query parameter 'q' must not be empty".to_string(),
+            ))
+        }
     };
     let limit = validate_limit(query.limit.unwrap_or(10));
 
@@ -1092,7 +1162,9 @@ pub struct RelatedQuery {
 async fn drift_status_handler(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DriftStatusResponse>>, ApiError> {
-    let all_metrics = state.drift_detector.all_metrics()
+    let all_metrics = state
+        .drift_detector
+        .all_metrics()
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let responses: Vec<DriftStatusResponse> = all_metrics
@@ -1130,11 +1202,17 @@ async fn entity_drift_handler(
         .ok_or_else(|| ApiError::NotFound(format!("Octad {} not found", id)))?;
 
     // Get aggregate health from drift detector
-    let all_metrics = state.drift_detector.all_metrics()
+    let all_metrics = state
+        .drift_detector
+        .all_metrics()
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     let (worst_type, worst_score) = all_metrics
         .iter()
-        .max_by(|a, b| a.1.current_score.partial_cmp(&b.1.current_score).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| {
+            a.1.current_score
+                .partial_cmp(&b.1.current_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
         .map(|(dt, m)| (dt.to_string(), m.current_score))
         .unwrap_or_else(|| ("none".to_string(), 0.0));
 
@@ -1195,7 +1273,10 @@ async fn query_plan_handler(
     State(state): State<AppState>,
     Json(plan): Json<LogicalPlan>,
 ) -> Result<Json<PhysicalPlan>, ApiError> {
-    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let planner = state
+        .planner
+        .lock()
+        .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     let physical = planner
         .optimize(&plan)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
@@ -1208,7 +1289,10 @@ async fn query_explain_handler(
     State(state): State<AppState>,
     Json(plan): Json<LogicalPlan>,
 ) -> Result<Json<ExplainOutput>, ApiError> {
-    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let planner = state
+        .planner
+        .lock()
+        .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     let explain = planner
         .explain(&plan)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
@@ -1220,7 +1304,10 @@ async fn query_explain_handler(
 async fn get_planner_config_handler(
     State(state): State<AppState>,
 ) -> Result<Json<PlannerConfig>, ApiError> {
-    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let planner = state
+        .planner
+        .lock()
+        .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     Ok(Json(planner.config().clone()))
 }
 
@@ -1230,7 +1317,10 @@ async fn put_planner_config_handler(
     State(state): State<AppState>,
     Json(config): Json<PlannerConfig>,
 ) -> Result<Json<PlannerConfig>, ApiError> {
-    let mut planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let mut planner = state
+        .planner
+        .lock()
+        .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     planner.set_config(config);
     Ok(Json(planner.config().clone()))
 }
@@ -1240,7 +1330,10 @@ async fn put_planner_config_handler(
 async fn planner_stats_handler(
     State(state): State<AppState>,
 ) -> Result<Json<StatisticsCollector>, ApiError> {
-    let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let planner = state
+        .planner
+        .lock()
+        .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     Ok(Json(planner.stats().clone()))
 }
 
@@ -1364,18 +1457,17 @@ async fn optimize_query_handler(
     // Compute cost vector from the planner
     let cost_vector = if let Some(Json(logical_plan)) = body {
         // If a logical plan was provided, run the planner on it
-        let planner = state.planner.lock().map_err(|_| {
-            ApiError::Internal("Planner lock poisoned".to_string())
-        })?;
+        let planner = state
+            .planner
+            .lock()
+            .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
 
         match planner.explain(&logical_plan) {
-            Ok(explain) => {
-                explain
-                    .steps
-                    .iter()
-                    .map(|s| s.estimated_cost_ms)
-                    .collect::<Vec<f64>>()
-            }
+            Ok(explain) => explain
+                .steps
+                .iter()
+                .map(|s| s.estimated_cost_ms)
+                .collect::<Vec<f64>>(),
             Err(_) => vec![1.0, 0.0, 0.0],
         }
     } else {
@@ -1389,11 +1481,13 @@ async fn optimize_query_handler(
     };
 
     // Update the octad with new tensor data (cost vector)
-    let mut update_input = OctadInput::default();
-    update_input.tensor = Some(OctadTensorInput {
-        shape: vec![1, cost_vector.len()],
-        data: cost_vector,
-    });
+    let mut update_input = OctadInput {
+        tensor: Some(OctadTensorInput {
+            shape: vec![1, cost_vector.len()],
+            data: cost_vector,
+        }),
+        ..OctadInput::default()
+    };
     update_input
         .metadata
         .insert("optimized_at".to_string(), chrono::Utc::now().to_rfc3339());
@@ -1428,7 +1522,10 @@ async fn query_explain_analyze_handler(
     State(state): State<AppState>,
     Json(request): Json<ExplainAnalyzeRequest>,
 ) -> Result<Json<ExplainAnalyzeOutput>, ApiError> {
-    let mut planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+    let mut planner = state
+        .planner
+        .lock()
+        .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
     let explain = planner
         .explain(&request.plan)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
@@ -1442,7 +1539,8 @@ async fn query_explain_analyze_handler(
     // Record simulated or default step timings
     let now = chrono::Utc::now();
     for (i, step) in physical.steps.iter().enumerate() {
-        let actual_ms = request.simulated_timings
+        let actual_ms = request
+            .simulated_timings
             .as_ref()
             .and_then(|t| t.get(i).copied())
             .unwrap_or(step.cost.time_ms * 1.1); // Default: 10% slower than estimate
@@ -1474,8 +1572,9 @@ async fn prepared_create_handler(
 ) -> Result<(StatusCode, Json<PreparedStatement>), ApiError> {
     let id = state.plan_cache.prepare(&request.query, request.plan).await;
 
-    let stmt = state.plan_cache.get(&id).await
-        .ok_or_else(|| ApiError::Internal("Failed to retrieve prepared statement after creation".to_string()))?;
+    let stmt = state.plan_cache.get(&id).await.ok_or_else(|| {
+        ApiError::Internal("Failed to retrieve prepared statement after creation".to_string())
+    })?;
 
     Ok((StatusCode::CREATED, Json(stmt)))
 }
@@ -1487,7 +1586,10 @@ async fn prepared_get_handler(
     Path(id): Path<String>,
 ) -> Result<Json<PreparedStatement>, ApiError> {
     let prep_id = PreparedId::new(&id);
-    let stmt = state.plan_cache.get(&prep_id).await
+    let stmt = state
+        .plan_cache
+        .get(&prep_id)
+        .await
         .ok_or_else(|| ApiError::NotFound(format!("Prepared statement '{}' not found", id)))?;
     Ok(Json(stmt))
 }
@@ -1508,7 +1610,8 @@ async fn prepared_execute_handler(
 ) -> Result<Json<PhysicalPlan>, ApiError> {
     let prep_id = PreparedId::new(&id);
 
-    let stmt = state.plan_cache
+    let stmt = state
+        .plan_cache
         .execute_prepared(&prep_id, &request.params)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
@@ -1517,12 +1620,20 @@ async fn prepared_execute_handler(
     let physical = if let Some(cached) = stmt.cached_physical_plan {
         cached
     } else {
-        let planner = state.planner.lock().map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
-        planner.optimize(&stmt.logical_plan).map_err(|e| ApiError::Internal(e.to_string()))?
+        let planner = state
+            .planner
+            .lock()
+            .map_err(|_| ApiError::Internal("Planner lock poisoned".to_string()))?;
+        planner
+            .optimize(&stmt.logical_plan)
+            .map_err(|e| ApiError::Internal(e.to_string()))?
     };
 
     // Cache the physical plan for future use
-    state.plan_cache.cache_plan(&prep_id, physical.clone()).await;
+    state
+        .plan_cache
+        .cache_plan(&prep_id, physical.clone())
+        .await;
 
     Ok(Json(physical))
 }
@@ -1552,12 +1663,14 @@ async fn slow_queries_handler(
 async fn transaction_begin_handler(
     State(state): State<AppState>,
 ) -> Result<(StatusCode, Json<transaction::TransactionStatus>), ApiError> {
-    let txn_id = state.transaction_manager
+    let txn_id = state
+        .transaction_manager
         .begin()
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let status = state.transaction_manager
+    let status = state
+        .transaction_manager
         .status(&txn_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -1571,9 +1684,10 @@ async fn transaction_commit_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_str(&id);
+    let txn_id = transaction::TransactionId::from_string(&id);
 
-    let _ops = state.transaction_manager
+    let _ops = state
+        .transaction_manager
         .commit(&txn_id)
         .await
         .map_err(|e| match e {
@@ -1582,7 +1696,8 @@ async fn transaction_commit_handler(
         })?;
 
     // In a full implementation, ops would be applied to the octad store here
-    let status = state.transaction_manager
+    let status = state
+        .transaction_manager
         .status(&txn_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -1596,9 +1711,10 @@ async fn transaction_rollback_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_str(&id);
+    let txn_id = transaction::TransactionId::from_string(&id);
 
-    let _discarded = state.transaction_manager
+    let _discarded = state
+        .transaction_manager
         .rollback(&txn_id)
         .await
         .map_err(|e| match e {
@@ -1606,7 +1722,8 @@ async fn transaction_rollback_handler(
             _ => ApiError::BadRequest(e.to_string()),
         })?;
 
-    let status = state.transaction_manager
+    let status = state
+        .transaction_manager
         .status(&txn_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -1620,9 +1737,10 @@ async fn transaction_status_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_str(&id);
+    let txn_id = transaction::TransactionId::from_string(&id);
 
-    let status = state.transaction_manager
+    let status = state
+        .transaction_manager
         .status(&txn_id)
         .await
         .map_err(|e| match e {
@@ -1708,7 +1826,9 @@ async fn proof_generate_handler(
     };
 
     let membership_set = request.membership_set.as_ref().map(|set| {
-        set.iter().map(|s| s.as_bytes().to_vec()).collect::<Vec<_>>()
+        set.iter()
+            .map(|s| s.as_bytes().to_vec())
+            .collect::<Vec<_>>()
     });
 
     let bridge_request = ZkpBridgeRequest {
@@ -1816,8 +1936,7 @@ pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
     info!(addr = %http_addr, "Starting VeriSimDB HTTP server");
     let listener = TcpListener::bind(&http_addr).await?;
 
-    let http_server = axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal());
+    let http_server = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
 
     // Start gRPC server (if enabled)
     if config.grpc_port > 0 {
@@ -2232,7 +2351,7 @@ mod tests {
     use tower::ServiceExt;
 
     async fn create_test_state() -> AppState {
-        let mut config = ApiConfig {
+        let config = ApiConfig {
             vector_dimension: 3,
             ..Default::default()
         };
@@ -2244,11 +2363,8 @@ mod tests {
             use std::sync::atomic::{AtomicU64, Ordering};
             static COUNTER: AtomicU64 = AtomicU64::new(0);
             let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let tmp = std::env::temp_dir().join(format!(
-                "verisimdb-test-{}-{}",
-                std::process::id(),
-                id,
-            ));
+            let tmp =
+                std::env::temp_dir().join(format!("verisimdb-test-{}-{}", std::process::id(), id,));
             config.persistence_dir = Some(tmp.to_string_lossy().into_owned());
         }
 

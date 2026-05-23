@@ -84,9 +84,7 @@ defmodule VeriSim.Federation.Adapters.ArangoDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "ArangoDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("ArangoDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end

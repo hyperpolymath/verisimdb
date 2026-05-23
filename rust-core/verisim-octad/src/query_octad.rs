@@ -13,8 +13,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{OctadId, OctadInput, OctadDocumentInput, OctadVectorInput,
-            OctadGraphInput, OctadTensorInput, OctadSemanticInput};
+use crate::{
+    OctadDocumentInput, OctadGraphInput, OctadId, OctadInput, OctadSemanticInput, OctadTensorInput,
+    OctadVectorInput,
+};
 
 /// Metadata about a query execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,10 +102,11 @@ impl QueryOctadBuilder {
     }
 
     /// Build the OctadInput for storage
+    #[allow(clippy::field_reassign_with_default)]
     pub fn build(self) -> (OctadId, OctadInput) {
-        let id = self.query_id.unwrap_or_else(|| {
-            format!("query-{}", uuid::Uuid::new_v4())
-        });
+        let id = self
+            .query_id
+            .unwrap_or_else(|| format!("query-{}", uuid::Uuid::new_v4()));
 
         let mut input = OctadInput::default();
 

@@ -8,14 +8,14 @@ use tokio::runtime::Runtime;
 
 use verisim_document::{Document, DocumentStore, TantivyDocumentStore};
 use verisim_drift::{DriftDetector, DriftThresholds, DriftType};
-use verisim_graph::{GraphEdge, GraphNode, GraphObject, GraphStore, OxiGraphStore};
+use verisim_graph::{GraphEdge, GraphNode, GraphObject, GraphStore, SimpleGraphStore};
 use verisim_octad::{
-    OctadConfig, OctadDocumentInput, OctadId, OctadInput, OctadSnapshot, OctadStore,
-    OctadVectorInput, OctadSemanticInput, InMemoryOctadStore,
+    InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadInput, OctadSemanticInput,
+    OctadSnapshot, OctadStore, OctadVectorInput,
 };
-use verisim_semantic::{
-    InMemorySemanticStore, ProofBlob, ProofType, SemanticStore, SemanticType,
-};
+use verisim_provenance::InMemoryProvenanceStore;
+use verisim_semantic::{InMemorySemanticStore, ProofBlob, ProofType, SemanticStore, SemanticType};
+use verisim_spatial::InMemorySpatialStore;
 use verisim_temporal::{InMemoryVersionStore, TemporalStore};
 use verisim_tensor::{InMemoryTensorStore, ReduceOp, Tensor, TensorStore};
 use verisim_vector::{DistanceMetric, Embedding, HnswConfig, HnswVectorStore, VectorStore};
@@ -31,8 +31,13 @@ fn bench_document_create(c: &mut Criterion) {
     group.bench_function("create_document", |b| {
         let store = TantivyDocumentStore::in_memory().unwrap();
         b.to_async(&rt).iter(|| async {
-            let doc = Document::new("test-id", "Benchmark Title", "Benchmark body content for testing indexing performance.");
-            black_box(store.index(&doc).await.unwrap())
+            let doc = Document::new(
+                "test-id",
+                "Benchmark Title",
+                "Benchmark body content for testing indexing performance.",
+            );
+            store.index(&doc).await.unwrap();
+            black_box(())
         });
     });
 
@@ -60,9 +65,8 @@ fn bench_document_search(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1000));
 
     group.bench_function("search_text", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(store.search("machine learning", 10).await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(store.search("machine learning", 10).await.unwrap()) });
     });
 
     group.finish();
@@ -90,7 +94,8 @@ fn bench_vector_insert(c: &mut Criterion) {
                 };
                 let store_ref = &store;
                 async move {
-                    black_box(store_ref.upsert(&embedding).await.unwrap())
+                    store_ref.upsert(&embedding).await.unwrap();
+                    black_box(())
                 }
             });
         });
@@ -123,9 +128,8 @@ fn bench_vector_search(c: &mut Criterion) {
 
             let query = vec![0.5f32; dim];
 
-            b.to_async(&rt).iter(|| async {
-                black_box(store.search(&query, 10).await.unwrap())
-            });
+            b.to_async(&rt)
+                .iter(|| async { black_box(store.search(&query, 10).await.unwrap()) });
         });
     }
 
@@ -142,7 +146,7 @@ fn bench_graph_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("graph");
 
     group.bench_function("insert_edge", |b| {
-        let store = OxiGraphStore::in_memory().unwrap();
+        let store = SimpleGraphStore::in_memory().unwrap();
         let mut counter = 0u64;
 
         b.to_async(&rt).iter(|| {
@@ -150,33 +154,39 @@ fn bench_graph_operations(c: &mut Criterion) {
             let edge = GraphEdge {
                 subject: GraphNode::new(format!("https://example.org/node/{}", counter)),
                 predicate: GraphNode::new("https://example.org/relates_to"),
-                object: GraphObject::Node(GraphNode::new(format!("https://example.org/target/{}", counter))),
+                object: GraphObject::Node(GraphNode::new(format!(
+                    "https://example.org/target/{}",
+                    counter
+                ))),
             };
             let store_ref = &store;
             async move {
-                black_box(store_ref.insert(&edge).await.unwrap())
+                store_ref.insert(&edge).await.unwrap();
+                black_box(())
             }
         });
     });
 
     // Pre-populate for query benchmark
-    let query_store = OxiGraphStore::in_memory().unwrap();
+    let query_store = SimpleGraphStore::in_memory().unwrap();
     let query_node = GraphNode::new("https://example.org/hub");
     rt.block_on(async {
         for i in 0..100 {
             let edge = GraphEdge {
                 subject: query_node.clone(),
                 predicate: GraphNode::new("https://example.org/connects"),
-                object: GraphObject::Node(GraphNode::new(format!("https://example.org/target/{}", i))),
+                object: GraphObject::Node(GraphNode::new(format!(
+                    "https://example.org/target/{}",
+                    i
+                ))),
             };
             query_store.insert(&edge).await.unwrap();
         }
     });
 
     group.bench_function("query_outgoing", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(query_store.outgoing(&query_node).await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(query_store.outgoing(&query_node).await.unwrap()) });
     });
 
     group.finish();
@@ -190,12 +200,19 @@ fn bench_octad_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("octad");
 
-    let graph_store = Arc::new(OxiGraphStore::in_memory().unwrap());
-    let vector_store = Arc::new(HnswVectorStore::new(384, DistanceMetric::Cosine, HnswConfig::default()));
+    let graph_store = Arc::new(SimpleGraphStore::in_memory().unwrap());
+    let vector_store = Arc::new(HnswVectorStore::new(
+        384,
+        DistanceMetric::Cosine,
+        HnswConfig::default(),
+    ));
     let document_store = Arc::new(TantivyDocumentStore::in_memory().unwrap());
     let tensor_store = Arc::new(InMemoryTensorStore::new());
     let semantic_store = Arc::new(InMemorySemanticStore::new());
-    let temporal_store: Arc<InMemoryVersionStore<OctadSnapshot>> = Arc::new(InMemoryVersionStore::new());
+    let temporal_store: Arc<InMemoryVersionStore<OctadSnapshot>> =
+        Arc::new(InMemoryVersionStore::new());
+    let provenance_store = Arc::new(InMemoryProvenanceStore::new());
+    let spatial_store = Arc::new(InMemorySpatialStore::new());
 
     let config = OctadConfig::default();
 
@@ -207,6 +224,8 @@ fn bench_octad_operations(c: &mut Criterion) {
         tensor_store,
         semantic_store,
         temporal_store,
+        provenance_store,
+        spatial_store,
     );
 
     group.bench_function("create_octad", |b| {
@@ -250,9 +269,8 @@ fn bench_octad_operations(c: &mut Criterion) {
 
     group.bench_function("get_octad", |b| {
         let id = octad_ids[0].clone();
-        b.to_async(&rt).iter(|| async {
-            black_box(store.get(&id).await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(store.get(&id).await.unwrap()) });
     });
 
     group.finish();
@@ -278,15 +296,13 @@ fn bench_drift_detection(c: &mut Criterion) {
                         vec!["entity-bench".to_string()],
                     )
                     .await
-                    .unwrap()
+                    .unwrap(),
             )
         });
     });
 
     group.bench_function("health_check", |b| {
-        b.iter(|| {
-            black_box(detector.health_check().unwrap())
-        });
+        b.iter(|| black_box(detector.health_check().unwrap()));
     });
 
     group.finish();
@@ -300,12 +316,19 @@ fn bench_cross_modal_query(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("cross_modal");
 
-    let graph_store = Arc::new(OxiGraphStore::in_memory().unwrap());
-    let vector_store = Arc::new(HnswVectorStore::new(384, DistanceMetric::Cosine, HnswConfig::default()));
+    let graph_store = Arc::new(SimpleGraphStore::in_memory().unwrap());
+    let vector_store = Arc::new(HnswVectorStore::new(
+        384,
+        DistanceMetric::Cosine,
+        HnswConfig::default(),
+    ));
     let document_store = Arc::new(TantivyDocumentStore::in_memory().unwrap());
     let tensor_store = Arc::new(InMemoryTensorStore::new());
     let semantic_store = Arc::new(InMemorySemanticStore::new());
-    let temporal_store: Arc<InMemoryVersionStore<OctadSnapshot>> = Arc::new(InMemoryVersionStore::new());
+    let temporal_store: Arc<InMemoryVersionStore<OctadSnapshot>> =
+        Arc::new(InMemoryVersionStore::new());
+    let provenance_store = Arc::new(InMemoryProvenanceStore::new());
+    let spatial_store = Arc::new(InMemorySpatialStore::new());
 
     let config = OctadConfig::default();
 
@@ -317,6 +340,8 @@ fn bench_cross_modal_query(c: &mut Criterion) {
         tensor_store,
         semantic_store,
         temporal_store,
+        provenance_store,
+        spatial_store,
     );
 
     // Create 1000 octads with multiple modalities
@@ -349,15 +374,13 @@ fn bench_cross_modal_query(c: &mut Criterion) {
 
     group.bench_function("vector_similarity_search", |b| {
         let query = vec![0.5f32; 384];
-        b.to_async(&rt).iter(|| async {
-            black_box(store.search_similar(&query, 10).await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(store.search_similar(&query, 10).await.unwrap()) });
     });
 
     group.bench_function("fulltext_search", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(store.search_text("machine learning", 10).await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(store.search_text("machine learning", 10).await.unwrap()) });
     });
 
     group.finish();
@@ -376,7 +399,8 @@ fn bench_tensor_operations(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             let data: Vec<f64> = (0..4096).map(|i| (i as f64) * 0.001).collect();
             let tensor = Tensor::new("bench-tensor", vec![64, 64], data).unwrap();
-            black_box(store.put(&tensor).await.unwrap())
+            store.put(&tensor).await.unwrap();
+            black_box(())
         });
     });
 
@@ -391,9 +415,8 @@ fn bench_tensor_operations(c: &mut Criterion) {
     });
 
     group.bench_function("store_get", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(get_store.get("tensor-50").await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(get_store.get("tensor-50").await.unwrap()) });
     });
 
     // Reduce benchmark: sum along axis 0 of a 64x64 tensor
@@ -406,7 +429,12 @@ fn bench_tensor_operations(c: &mut Criterion) {
 
     group.bench_function("reduce_sum_axis0", |b| {
         b.to_async(&rt).iter(|| async {
-            black_box(reduce_store.reduce("reduce-tensor", 0, ReduceOp::Sum).await.unwrap())
+            black_box(
+                reduce_store
+                    .reduce("reduce-tensor", 0, ReduceOp::Sum)
+                    .await
+                    .unwrap(),
+            )
         });
     });
 
@@ -430,7 +458,8 @@ fn bench_semantic_operations(c: &mut Criterion) {
             let typ = SemanticType::new(&iri, "BenchType");
             let store_ref = &store;
             async move {
-                black_box(store_ref.register_type(&typ).await.unwrap())
+                store_ref.register_type(&typ).await.unwrap();
+                black_box(())
             }
         });
     });
@@ -449,7 +478,12 @@ fn bench_semantic_operations(c: &mut Criterion) {
 
     group.bench_function("get_type", |b| {
         b.to_async(&rt).iter(|| async {
-            black_box(type_store.get_type("https://example.org/Type50").await.unwrap())
+            black_box(
+                type_store
+                    .get_type("https://example.org/Type50")
+                    .await
+                    .unwrap(),
+            )
         });
     });
 
@@ -463,7 +497,7 @@ fn bench_semantic_operations(c: &mut Criterion) {
                 vec![1, 2, 3, 4, 5, 6, 7, 8],
             );
             let cbor = black_box(proof.to_cbor().unwrap());
-            black_box(store.store_proof(&proof).await.unwrap());
+            store.store_proof(&proof).await.unwrap();
             cbor
         });
     });
@@ -483,7 +517,12 @@ fn bench_semantic_operations(c: &mut Criterion) {
 
     group.bench_function("proof_verify", |b| {
         b.to_async(&rt).iter(|| async {
-            black_box(verify_store.verify_proofs("entity:verify-bench is-a Document").await.unwrap())
+            black_box(
+                verify_store
+                    .verify_proofs("entity:verify-bench is-a Document")
+                    .await
+                    .unwrap(),
+            )
         });
     });
 
@@ -507,7 +546,12 @@ fn bench_temporal_operations(c: &mut Criterion) {
             let data = format!("version data {}", counter);
             let store_ref = &store;
             async move {
-                black_box(store_ref.append(&entity, data, "bench-author", Some("bench commit")).await.unwrap())
+                black_box(
+                    store_ref
+                        .append(&entity, data, "bench-author", Some("bench commit"))
+                        .await
+                        .unwrap(),
+                )
             }
         });
     });
@@ -517,7 +561,12 @@ fn bench_temporal_operations(c: &mut Criterion) {
     rt.block_on(async {
         for v in 0..100 {
             version_store
-                .append("bench-entity", format!("data v{}", v), "bench-author", Some(&format!("commit {}", v)))
+                .append(
+                    "bench-entity",
+                    format!("data v{}", v),
+                    "bench-author",
+                    Some(&format!("commit {}", v)),
+                )
                 .await
                 .unwrap();
         }
@@ -530,15 +579,13 @@ fn bench_temporal_operations(c: &mut Criterion) {
     });
 
     group.bench_function("version_get_latest", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(version_store.latest("bench-entity").await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(version_store.latest("bench-entity").await.unwrap()) });
     });
 
     group.bench_function("history_10", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(version_store.history("bench-entity", 10).await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(version_store.history("bench-entity", 10).await.unwrap()) });
     });
 
     group.bench_function("history_100", |b| {
@@ -560,46 +607,21 @@ criterion_group!(
     bench_document_search
 );
 
-criterion_group!(
-    vector_benches,
-    bench_vector_insert,
-    bench_vector_search
-);
+criterion_group!(vector_benches, bench_vector_insert, bench_vector_search);
 
-criterion_group!(
-    graph_benches,
-    bench_graph_operations
-);
+criterion_group!(graph_benches, bench_graph_operations);
 
-criterion_group!(
-    octad_benches,
-    bench_octad_operations
-);
+criterion_group!(octad_benches, bench_octad_operations);
 
-criterion_group!(
-    drift_benches,
-    bench_drift_detection
-);
+criterion_group!(drift_benches, bench_drift_detection);
 
-criterion_group!(
-    cross_modal_benches,
-    bench_cross_modal_query
-);
+criterion_group!(cross_modal_benches, bench_cross_modal_query);
 
-criterion_group!(
-    tensor_benches,
-    bench_tensor_operations
-);
+criterion_group!(tensor_benches, bench_tensor_operations);
 
-criterion_group!(
-    semantic_benches,
-    bench_semantic_operations
-);
+criterion_group!(semantic_benches, bench_semantic_operations);
 
-criterion_group!(
-    temporal_benches,
-    bench_temporal_operations
-);
+criterion_group!(temporal_benches, bench_temporal_operations);
 
 criterion_main!(
     document_benches,

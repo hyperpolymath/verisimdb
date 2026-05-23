@@ -354,6 +354,8 @@ defmodule VeriSim.Federation.Adapters.Neo4jIntegrationTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp skip_if_unavailable(%{skip: true}), do: flunk("Neo4j not available — start test-infra stack")
+  defp skip_if_unavailable(%{skip: true}),
+    do: flunk("Neo4j not available — start test-infra stack")
+
   defp skip_if_unavailable(_context), do: :ok
 end

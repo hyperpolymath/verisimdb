@@ -3,7 +3,10 @@
 
 use chrono::{Duration, Utc};
 use proptest::prelude::*;
-use verisim_temporal::{diff, InMemoryTimeSeriesStore, InMemoryVersionStore, TemporalStore, TimePoint, TimeRange, TimeSeriesStore};
+use verisim_temporal::{
+    diff, InMemoryTimeSeriesStore, InMemoryVersionStore, TemporalStore, TimePoint, TimeRange,
+    TimeSeriesStore,
+};
 
 /// Generate arbitrary entity IDs
 fn arb_entity_id() -> impl Strategy<Value = String> {
@@ -141,32 +144,50 @@ async fn test_time_travel_query() {
     // Create version 1
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     let v1_time = Utc::now();
-    store.append(entity_id, "version 1".to_string(), "alice", Some("initial")).await.unwrap();
+    store
+        .append(entity_id, "version 1".to_string(), "alice", Some("initial"))
+        .await
+        .unwrap();
 
     // Create version 2
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     let v2_time = Utc::now();
-    store.append(entity_id, "version 2".to_string(), "bob", Some("update")).await.unwrap();
+    store
+        .append(entity_id, "version 2".to_string(), "bob", Some("update"))
+        .await
+        .unwrap();
 
     // Create version 3
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     let v3_time = Utc::now();
-    store.append(entity_id, "version 3".to_string(), "charlie", Some("final")).await.unwrap();
+    store
+        .append(entity_id, "version 3".to_string(), "charlie", Some("final"))
+        .await
+        .unwrap();
 
     // Query before any versions
     let before = store.at_time(entity_id, now).await.unwrap();
     assert!(before.is_none(), "Should have no version before creation");
 
     // Query at v1 time
-    let at_v1 = store.at_time(entity_id, v1_time + Duration::milliseconds(1)).await.unwrap();
+    let at_v1 = store
+        .at_time(entity_id, v1_time + Duration::milliseconds(1))
+        .await
+        .unwrap();
     assert_eq!(at_v1.unwrap().data, "version 1");
 
     // Query at v2 time
-    let at_v2 = store.at_time(entity_id, v2_time + Duration::milliseconds(1)).await.unwrap();
+    let at_v2 = store
+        .at_time(entity_id, v2_time + Duration::milliseconds(1))
+        .await
+        .unwrap();
     assert_eq!(at_v2.unwrap().data, "version 2");
 
     // Query at v3 time
-    let at_v3 = store.at_time(entity_id, v3_time + Duration::milliseconds(1)).await.unwrap();
+    let at_v3 = store
+        .at_time(entity_id, v3_time + Duration::milliseconds(1))
+        .await
+        .unwrap();
     assert_eq!(at_v3.unwrap().data, "version 3");
 
     // Query after all versions
@@ -185,12 +206,15 @@ async fn test_time_range_query() {
     // Create 5 versions with small delays
     for i in 1..=5 {
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        store.append(
-            entity_id,
-            format!("version {}", i),
-            "author",
-            Some(&format!("v{}", i))
-        ).await.unwrap();
+        store
+            .append(
+                entity_id,
+                format!("version {}", i),
+                "author",
+                Some(&format!("v{}", i)),
+            )
+            .await
+            .unwrap();
     }
 
     let end_time = Utc::now();
@@ -215,9 +239,18 @@ async fn test_diff_versions() {
     let entity_id = "doc-789";
 
     // Create versions
-    store.append(entity_id, "first".to_string(), "alice", None).await.unwrap();
-    store.append(entity_id, "second".to_string(), "bob", None).await.unwrap();
-    store.append(entity_id, "third".to_string(), "charlie", None).await.unwrap();
+    store
+        .append(entity_id, "first".to_string(), "alice", None)
+        .await
+        .unwrap();
+    store
+        .append(entity_id, "second".to_string(), "bob", None)
+        .await
+        .unwrap();
+    store
+        .append(entity_id, "third".to_string(), "charlie", None)
+        .await
+        .unwrap();
 
     // Diff v1 and v2
     let diff_1_2 = store.diff(entity_id, 1, 2).await.unwrap();

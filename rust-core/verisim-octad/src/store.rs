@@ -11,16 +11,16 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, instrument};
 
+use crate::transaction::{IsolationLevel, LockType, TransactionManager};
 use crate::{
     Coordinates, Document, DocumentStore, Embedding, GeometryType, GraphEdge, GraphNode,
-    GraphObject, GraphStore, Octad, OctadConfig, OctadDocumentInput, OctadError, OctadGraphInput,
-    OctadId, OctadInput, OctadProvenanceInput, OctadSemanticInput, OctadSpatialInput,
-    OctadStatus, OctadStore, OctadTensorInput, OctadVectorInput, ModalityStatus, Provenance,
+    GraphObject, GraphStore, ModalityStatus, Octad, OctadConfig, OctadDocumentInput, OctadError,
+    OctadGraphInput, OctadId, OctadInput, OctadProvenanceInput, OctadSemanticInput,
+    OctadSpatialInput, OctadStatus, OctadStore, OctadTensorInput, OctadVectorInput, Provenance,
     ProvenanceEventType, ProvenanceStore, SemanticAnnotation, SemanticStore, SemanticValue,
-    SpatialData, SpatialStore, Tensor, TensorStore, TemporalStore, VectorStore,
+    SpatialData, SpatialStore, TemporalStore, Tensor, TensorStore, VectorStore,
 };
-use crate::transaction::{IsolationLevel, LockType, TransactionManager};
-use verisim_wal::{WalEntry, WalModality, WalOperation, WalWriter, SyncMode};
+use verisim_wal::{SyncMode, WalEntry, WalModality, WalOperation, WalWriter};
 
 /// Snapshot of a Octad for versioning
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +89,7 @@ where
     ///
     /// Automatically creates a [`TransactionManager`] to provide ACID
     /// guarantees across all modality writes.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: OctadConfig,
         graph: Arc<G>,
@@ -131,12 +132,11 @@ where
         wal_dir: impl AsRef<std::path::Path>,
         sync_mode: SyncMode,
     ) -> Result<Self, OctadError> {
-        let writer = WalWriter::open(wal_dir, sync_mode).map_err(|e| {
-            OctadError::ModalityError {
+        let writer =
+            WalWriter::open(wal_dir, sync_mode).map_err(|e| OctadError::ModalityError {
                 modality: "wal".to_string(),
                 message: format!("Failed to open WAL: {e}"),
-            }
-        })?;
+            })?;
         self.wal = Some(Arc::new(tokio::sync::Mutex::new(writer)));
         Ok(self)
     }
@@ -164,10 +164,12 @@ where
                 payload: payload.to_vec(),
             };
             let mut writer = wal.lock().await;
-            writer.append(entry).map_err(|e| OctadError::ModalityError {
-                modality: "wal".to_string(),
-                message: format!("WAL append failed: {e}"),
-            })?;
+            writer
+                .append(entry)
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "wal".to_string(),
+                    message: format!("WAL append failed: {e}"),
+                })?;
         }
         Ok(())
     }
@@ -261,7 +263,7 @@ where
                 WalOperation::Insert | WalOperation::Update | WalOperation::Delete => {
                     entity_ops.insert(
                         entry.entity_id.clone(),
-                        (entry.operation.clone(), entry.payload.clone()),
+                        (entry.operation, entry.payload.clone()),
                     );
                     if !committed_entities.contains(&entry.entity_id) {
                         uncommitted_entities.insert(entry.entity_id.clone());
@@ -303,10 +305,7 @@ where
                             let now = Utc::now();
 
                             // Get existing version or start at 1
-                            let version = octads
-                                .get(entity_id)
-                                .map(|s| s.version + 1)
-                                .unwrap_or(1);
+                            let version = octads.get(entity_id).map(|s| s.version + 1).unwrap_or(1);
 
                             octads.insert(
                                 entity_id.clone(),
@@ -320,7 +319,10 @@ where
                             );
                             recovered += 1;
                         } else {
-                            tracing::warn!(entity_id, "WAL replay: failed to deserialize OctadInput");
+                            tracing::warn!(
+                                entity_id,
+                                "WAL replay: failed to deserialize OctadInput"
+                            );
                         }
                     }
                     WalOperation::Delete => {
@@ -332,7 +334,12 @@ where
             }
         }
 
-        info!(recovered, committed = committed_entities.len(), uncommitted = uncommitted_entities.len(), "WAL replay complete");
+        info!(
+            recovered,
+            committed = committed_entities.len(),
+            uncommitted = uncommitted_entities.len(),
+            "WAL replay complete"
+        );
 
         // Write a fresh checkpoint to mark recovery complete
         drop(octads); // Release write lock before checkpoint
@@ -391,10 +398,13 @@ where
                     self.config.base_iri, target_id
                 ))),
             };
-            self.graph.insert(&edge).await.map_err(|e| OctadError::ModalityError {
-                modality: "graph".to_string(),
-                message: e.to_string(),
-            })?;
+            self.graph
+                .insert(&edge)
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "graph".to_string(),
+                    message: e.to_string(),
+                })?;
         }
 
         debug!(id = %id, relationships = input.relationships.len(), "Graph modality populated");
@@ -416,10 +426,13 @@ where
         }
 
         let embedding = Embedding::new(id.as_str(), input.embedding.clone());
-        self.vector.upsert(&embedding).await.map_err(|e| OctadError::ModalityError {
-            modality: "vector".to_string(),
-            message: e.to_string(),
-        })?;
+        self.vector
+            .upsert(&embedding)
+            .await
+            .map_err(|e| OctadError::ModalityError {
+                modality: "vector".to_string(),
+                message: e.to_string(),
+            })?;
 
         debug!(id = %id, dimension = input.embedding.len(), "Vector modality populated");
         Ok(embedding)
@@ -436,14 +449,20 @@ where
             doc = doc.with_field(key, value);
         }
 
-        self.document.index(&doc).await.map_err(|e| OctadError::ModalityError {
-            modality: "document".to_string(),
-            message: e.to_string(),
-        })?;
-        self.document.commit().await.map_err(|e| OctadError::ModalityError {
-            modality: "document".to_string(),
-            message: e.to_string(),
-        })?;
+        self.document
+            .index(&doc)
+            .await
+            .map_err(|e| OctadError::ModalityError {
+                modality: "document".to_string(),
+                message: e.to_string(),
+            })?;
+        self.document
+            .commit()
+            .await
+            .map_err(|e| OctadError::ModalityError {
+                modality: "document".to_string(),
+                message: e.to_string(),
+            })?;
 
         debug!(id = %id, title = %input.title, "Document modality populated");
         Ok(doc)
@@ -455,17 +474,21 @@ where
         id: &OctadId,
         input: &OctadTensorInput,
     ) -> Result<Tensor, OctadError> {
-        let tensor = Tensor::new(id.as_str(), input.shape.clone(), input.data.clone()).map_err(
-            |e| OctadError::ModalityError {
+        let tensor =
+            Tensor::new(id.as_str(), input.shape.clone(), input.data.clone()).map_err(|e| {
+                OctadError::ModalityError {
+                    modality: "tensor".to_string(),
+                    message: e.to_string(),
+                }
+            })?;
+
+        self.tensor
+            .put(&tensor)
+            .await
+            .map_err(|e| OctadError::ModalityError {
                 modality: "tensor".to_string(),
                 message: e.to_string(),
-            },
-        )?;
-
-        self.tensor.put(&tensor).await.map_err(|e| OctadError::ModalityError {
-            modality: "tensor".to_string(),
-            message: e.to_string(),
-        })?;
+            })?;
 
         debug!(id = %id, shape = ?input.shape, "Tensor modality populated");
         Ok(tensor)
@@ -495,10 +518,13 @@ where
             provenance: Provenance::default(),
         };
 
-        self.semantic.annotate(&annotation).await.map_err(|e| OctadError::ModalityError {
-            modality: "semantic".to_string(),
-            message: e.to_string(),
-        })?;
+        self.semantic
+            .annotate(&annotation)
+            .await
+            .map_err(|e| OctadError::ModalityError {
+                modality: "semantic".to_string(),
+                message: e.to_string(),
+            })?;
 
         debug!(id = %id, types = ?input.types, "Semantic modality populated");
         Ok(annotation)
@@ -522,21 +548,25 @@ where
         };
 
         self.provenance
-            .record_event(id.as_str(), event_type, &input.actor, input.source.clone(), &input.description)
+            .record_event(
+                id.as_str(),
+                event_type,
+                &input.actor,
+                input.source.clone(),
+                &input.description,
+            )
             .await
             .map_err(|e| OctadError::ModalityError {
                 modality: "provenance".to_string(),
                 message: e.to_string(),
             })?;
 
-        let chain = self
-            .provenance
-            .get_chain(id.as_str())
-            .await
-            .map_err(|e| OctadError::ModalityError {
+        let chain = self.provenance.get_chain(id.as_str()).await.map_err(|e| {
+            OctadError::ModalityError {
                 modality: "provenance".to_string(),
                 message: e.to_string(),
-            })?;
+            }
+        })?;
 
         debug!(id = %id, chain_length = chain.len(), "Provenance modality populated");
         Ok(chain.len() as u64)
@@ -598,7 +628,12 @@ where
     }
 
     /// Create a snapshot for versioning
-    fn create_snapshot(&self, id: &OctadId, input: &OctadInput, status: &ModalityStatus) -> OctadSnapshot {
+    fn create_snapshot(
+        &self,
+        id: &OctadId,
+        input: &OctadInput,
+        status: &ModalityStatus,
+    ) -> OctadSnapshot {
         OctadSnapshot {
             id: id.clone(),
             input: input.clone(),
@@ -624,37 +659,49 @@ where
         };
 
         let embedding = if status.modality_status.vector {
-            self.vector.get(id.as_str()).await.map_err(|e| OctadError::ModalityError {
-                modality: "vector".to_string(),
-                message: e.to_string(),
-            })?
+            self.vector
+                .get(id.as_str())
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "vector".to_string(),
+                    message: e.to_string(),
+                })?
         } else {
             None
         };
 
         let document = if status.modality_status.document {
-            self.document.get(id.as_str()).await.map_err(|e| OctadError::ModalityError {
-                modality: "document".to_string(),
-                message: e.to_string(),
-            })?
+            self.document
+                .get(id.as_str())
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "document".to_string(),
+                    message: e.to_string(),
+                })?
         } else {
             None
         };
 
         let tensor = if status.modality_status.tensor {
-            self.tensor.get(id.as_str()).await.map_err(|e| OctadError::ModalityError {
-                modality: "tensor".to_string(),
-                message: e.to_string(),
-            })?
+            self.tensor
+                .get(id.as_str())
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "tensor".to_string(),
+                    message: e.to_string(),
+                })?
         } else {
             None
         };
 
         let semantic = if status.modality_status.semantic {
-            self.semantic.get_annotations(id.as_str()).await.map_err(|e| OctadError::ModalityError {
-                modality: "semantic".to_string(),
-                message: e.to_string(),
-            })?
+            self.semantic
+                .get_annotations(id.as_str())
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "semantic".to_string(),
+                    message: e.to_string(),
+                })?
         } else {
             None
         };
@@ -679,10 +726,13 @@ where
 
         // Load spatial data
         let spatial_data = if status.modality_status.spatial {
-            self.spatial.get(id.as_str()).await.map_err(|e| OctadError::ModalityError {
-                modality: "spatial".to_string(),
-                message: e.to_string(),
-            })?
+            self.spatial
+                .get(id.as_str())
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "spatial".to_string(),
+                    message: e.to_string(),
+                })?
         } else {
             None
         };
@@ -724,7 +774,13 @@ where
         // On crash recovery, PENDING entries without a matching COMMITTED
         // entry indicate incomplete operations that need rollback.
         let input_payload = serde_json::to_vec(&input).unwrap_or_default();
-        self.wal_append(WalOperation::Insert, WalModality::All, &entity_id_str, &input_payload).await?;
+        self.wal_append(
+            WalOperation::Insert,
+            WalModality::All,
+            &entity_id_str,
+            &input_payload,
+        )
+        .await?;
 
         // Begin ACID transaction — acquire exclusive locks on all requested
         // modalities before writing, ensuring atomicity across the octad.
@@ -936,10 +992,20 @@ where
         };
 
         // Store in registry
-        self.octads.write().await.insert(id.as_str().to_string(), status.clone());
+        self.octads
+            .write()
+            .await
+            .insert(id.as_str().to_string(), status.clone());
 
         // Write COMMITTED marker to WAL and checkpoint for crash recovery.
-        self.wal_append(WalOperation::Checkpoint, WalModality::All, &entity_id_str, b"COMMITTED").await.ok();
+        self.wal_append(
+            WalOperation::Checkpoint,
+            WalModality::All,
+            &entity_id_str,
+            b"COMMITTED",
+        )
+        .await
+        .ok();
         self.wal_checkpoint().await.ok();
 
         info!(id = %id, modalities = ?modality_status, "Created octad (transaction committed)");
@@ -972,7 +1038,13 @@ where
 
         // Write PENDING intent to WAL before modality writes
         let input_payload = serde_json::to_vec(&input).unwrap_or_default();
-        self.wal_append(WalOperation::Update, WalModality::All, &entity_id_str, &input_payload).await?;
+        self.wal_append(
+            WalOperation::Update,
+            WalModality::All,
+            &entity_id_str,
+            &input_payload,
+        )
+        .await?;
 
         // Begin ACID transaction for atomic update across all modalities
         let txn_id = self.txn_manager.begin(IsolationLevel::ReadCommitted).await;
@@ -1174,10 +1246,20 @@ where
         };
 
         // Update registry
-        self.octads.write().await.insert(id.as_str().to_string(), status.clone());
+        self.octads
+            .write()
+            .await
+            .insert(id.as_str().to_string(), status.clone());
 
         // Write COMMITTED marker to WAL and checkpoint
-        self.wal_append(WalOperation::Checkpoint, WalModality::All, &entity_id_str, b"COMMITTED").await.ok();
+        self.wal_append(
+            WalOperation::Checkpoint,
+            WalModality::All,
+            &entity_id_str,
+            b"COMMITTED",
+        )
+        .await
+        .ok();
         self.wal_checkpoint().await.ok();
 
         info!(id = %id, version = version, "Updated octad (transaction committed)");
@@ -1213,7 +1295,8 @@ where
         let existing = existing.ok_or_else(|| OctadError::NotFound(id.to_string()))?;
 
         // Write PENDING delete intent to WAL
-        self.wal_append(WalOperation::Delete, WalModality::All, &entity_id_str, b"").await?;
+        self.wal_append(WalOperation::Delete, WalModality::All, &entity_id_str, b"")
+            .await?;
 
         // Begin ACID transaction for atomic delete across all modalities
         let txn_id = self.txn_manager.begin(IsolationLevel::ReadCommitted).await;
@@ -1273,7 +1356,14 @@ where
         self.octads.write().await.remove(id.as_str());
 
         // Write COMMITTED marker to WAL and checkpoint
-        self.wal_append(WalOperation::Checkpoint, WalModality::All, &entity_id_str, b"COMMITTED").await.ok();
+        self.wal_append(
+            WalOperation::Checkpoint,
+            WalModality::All,
+            &entity_id_str,
+            b"COMMITTED",
+        )
+        .await
+        .ok();
         self.wal_checkpoint().await.ok();
 
         info!(id = %id, "Deleted octad (transaction committed)");
@@ -1285,10 +1375,14 @@ where
     }
 
     async fn search_similar(&self, embedding: &[f32], k: usize) -> Result<Vec<Octad>, OctadError> {
-        let results = self.vector.search(embedding, k).await.map_err(|e| OctadError::ModalityError {
-            modality: "vector".to_string(),
-            message: e.to_string(),
-        })?;
+        let results =
+            self.vector
+                .search(embedding, k)
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "vector".to_string(),
+                    message: e.to_string(),
+                })?;
 
         let mut octads = Vec::new();
         for result in results {
@@ -1302,10 +1396,13 @@ where
 
     async fn search_text(&self, query: &str, limit: usize) -> Result<Vec<Octad>, OctadError> {
         let results =
-            self.document.search(query, limit).await.map_err(|e| OctadError::ModalityError {
-                modality: "document".to_string(),
-                message: e.to_string(),
-            })?;
+            self.document
+                .search(query, limit)
+                .await
+                .map_err(|e| OctadError::ModalityError {
+                    modality: "document".to_string(),
+                    message: e.to_string(),
+                })?;
 
         let mut octads = Vec::new();
         for result in results {
@@ -1319,10 +1416,14 @@ where
 
     async fn query_related(&self, id: &OctadId, predicate: &str) -> Result<Vec<Octad>, OctadError> {
         let node = GraphNode::new(id.to_iri(&self.config.base_iri));
-        let edges = self.graph.outgoing(&node).await.map_err(|e| OctadError::ModalityError {
-            modality: "graph".to_string(),
-            message: e.to_string(),
-        })?;
+        let edges = self
+            .graph
+            .outgoing(&node)
+            .await
+            .map_err(|e| OctadError::ModalityError {
+                modality: "graph".to_string(),
+                message: e.to_string(),
+            })?;
 
         let predicate_iri = format!("{}/{}", self.config.base_iri, predicate);
         let mut octads = Vec::new();
@@ -1348,12 +1449,7 @@ where
 
     async fn list(&self, limit: usize, offset: usize) -> Result<Vec<Octad>, OctadError> {
         let octads = self.octads.read().await;
-        let ids: Vec<String> = octads
-            .keys()
-            .skip(offset)
-            .take(limit)
-            .cloned()
-            .collect();
+        let ids: Vec<String> = octads.keys().skip(offset).take(limit).cloned().collect();
         drop(octads);
 
         let mut result = Vec::with_capacity(ids.len());
@@ -1365,7 +1461,11 @@ where
         Ok(result)
     }
 
-    async fn at_time(&self, id: &OctadId, time: DateTime<Utc>) -> Result<Option<Octad>, OctadError> {
+    async fn at_time(
+        &self,
+        id: &OctadId,
+        time: DateTime<Utc>,
+    ) -> Result<Option<Octad>, OctadError> {
         let version = self
             .temporal
             .at_time(id.as_str(), time)
@@ -1403,7 +1503,7 @@ mod tests {
     use verisim_spatial::InMemorySpatialStore;
     use verisim_temporal::InMemoryVersionStore;
     use verisim_tensor::InMemoryTensorStore;
-    use verisim_vector::{DistanceMetric, BruteForceVectorStore};
+    use verisim_vector::{BruteForceVectorStore, DistanceMetric};
 
     fn create_test_store() -> InMemoryOctadStore<
         SimpleGraphStore,

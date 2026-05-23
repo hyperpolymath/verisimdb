@@ -143,7 +143,12 @@ impl DocumentSchema {
         let body = schema_builder.add_text_field("body", TEXT | STORED);
         let schema = schema_builder.build();
 
-        Self { id, title, body, schema }
+        Self {
+            id,
+            title,
+            body,
+            schema,
+        }
     }
 }
 
@@ -197,7 +202,8 @@ impl TantivyDocumentStore {
         let mut documents = HashMap::new();
         let searcher = reader.searcher();
         for segment_reader in searcher.segment_readers() {
-            let store_reader = segment_reader.get_store_reader(1)
+            let store_reader = segment_reader
+                .get_store_reader(1)
                 .map_err(|e| DocumentError::IndexError(format!("store reader: {e}")))?;
             for doc_id in 0..segment_reader.max_doc() {
                 if segment_reader.is_deleted(doc_id) {
@@ -216,10 +222,8 @@ impl TantivyDocumentStore {
                     let body_val = extract(schema.body);
 
                     if !id_val.is_empty() {
-                        documents.insert(
-                            id_val.clone(),
-                            Document::new(id_val, title_val, body_val),
-                        );
+                        documents
+                            .insert(id_val.clone(), Document::new(id_val, title_val, body_val));
                     }
                 }
             }
@@ -257,27 +261,25 @@ impl DocumentStore for TantivyDocumentStore {
         }
 
         // Store original document
-        self.documents.write().await.insert(doc.id.clone(), doc.clone());
+        self.documents
+            .write()
+            .await
+            .insert(doc.id.clone(), doc.clone());
 
         Ok(())
     }
 
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, DocumentError> {
         let searcher = self.reader.searcher();
-        let query_parser = QueryParser::for_index(
-            &self.index,
-            vec![self.schema.title, self.schema.body],
-        );
+        let query_parser =
+            QueryParser::for_index(&self.index, vec![self.schema.title, self.schema.body]);
 
         let parsed_query = query_parser.parse_query(query)?;
         let top_docs = searcher.search(&parsed_query, &TopDocs::with_limit(limit))?;
 
         // Create snippet generator for body field
-        let snippet_generator = SnippetGenerator::create(
-            &searcher,
-            &parsed_query,
-            self.schema.body,
-        )?;
+        let snippet_generator =
+            SnippetGenerator::create(&searcher, &parsed_query, self.schema.body)?;
 
         let mut results = Vec::new();
         for (score, doc_address) in top_docs {
@@ -341,7 +343,11 @@ mod tests {
     async fn test_index_and_search() {
         let store = TantivyDocumentStore::in_memory().unwrap();
 
-        let doc1 = Document::new("d1", "Rust Programming", "Rust is a systems programming language");
+        let doc1 = Document::new(
+            "d1",
+            "Rust Programming",
+            "Rust is a systems programming language",
+        );
         let doc2 = Document::new("d2", "Python Tutorial", "Python is great for beginners");
 
         store.index(&doc1).await.unwrap();
@@ -369,6 +375,9 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert!(results[0].snippet.is_some(), "Snippet should not be None");
         let snippet = results[0].snippet.as_ref().unwrap();
-        assert!(snippet.contains("safety"), "Snippet should contain the search term");
+        assert!(
+            snippet.contains("safety"),
+            "Snippet should contain the search term"
+        );
     }
 }

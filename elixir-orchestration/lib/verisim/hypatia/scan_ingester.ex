@@ -128,7 +128,10 @@ defmodule VeriSim.Hypatia.ScanIngester do
           end)
 
         successful = Enum.count(results, fn {_, result} -> match?({:ok, _}, result) end)
-        Logger.info("Hypatia: ingested #{successful}/#{length(results)} scan files from #{dir_path}")
+
+        Logger.info(
+          "Hypatia: ingested #{successful}/#{length(results)} scan files from #{dir_path}"
+        )
 
         {:ok, results}
 

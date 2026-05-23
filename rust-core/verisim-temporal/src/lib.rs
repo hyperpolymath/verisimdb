@@ -146,25 +146,52 @@ pub trait TemporalStore: Send + Sync {
     type Data: Clone + Send + Sync;
 
     /// Append a new version
-    async fn append(&self, entity_id: &str, data: Self::Data, author: &str, message: Option<&str>) -> Result<u64, TemporalError>;
+    async fn append(
+        &self,
+        entity_id: &str,
+        data: Self::Data,
+        author: &str,
+        message: Option<&str>,
+    ) -> Result<u64, TemporalError>;
 
     /// Get the latest version
     async fn latest(&self, entity_id: &str) -> Result<Option<Version<Self::Data>>, TemporalError>;
 
     /// Get a specific version
-    async fn at_version(&self, entity_id: &str, version: u64) -> Result<Option<Version<Self::Data>>, TemporalError>;
+    async fn at_version(
+        &self,
+        entity_id: &str,
+        version: u64,
+    ) -> Result<Option<Version<Self::Data>>, TemporalError>;
 
     /// Get version at a specific time
-    async fn at_time(&self, entity_id: &str, time: DateTime<Utc>) -> Result<Option<Version<Self::Data>>, TemporalError>;
+    async fn at_time(
+        &self,
+        entity_id: &str,
+        time: DateTime<Utc>,
+    ) -> Result<Option<Version<Self::Data>>, TemporalError>;
 
     /// Get all versions in a time range
-    async fn in_range(&self, entity_id: &str, range: &TimeRange) -> Result<Vec<Version<Self::Data>>, TemporalError>;
+    async fn in_range(
+        &self,
+        entity_id: &str,
+        range: &TimeRange,
+    ) -> Result<Vec<Version<Self::Data>>, TemporalError>;
 
     /// Get version history
-    async fn history(&self, entity_id: &str, limit: usize) -> Result<Vec<Version<Self::Data>>, TemporalError>;
+    async fn history(
+        &self,
+        entity_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Version<Self::Data>>, TemporalError>;
 
     /// Diff two versions
-    async fn diff(&self, entity_id: &str, v1: u64, v2: u64) -> Result<diff::Diff<Self::Data>, TemporalError>
+    async fn diff(
+        &self,
+        entity_id: &str,
+        v1: u64,
+        v2: u64,
+    ) -> Result<diff::Diff<Self::Data>, TemporalError>
     where
         Self::Data: PartialEq,
     {
@@ -175,11 +202,18 @@ pub trait TemporalStore: Send + Sync {
             version1.as_ref().map(|v| &v.data),
             version2.as_ref().map(|v| &v.data),
         )
-        .map_err(|_| TemporalError::NotFound(format!("No versions to compare for entity {}", entity_id)))
+        .map_err(|_| {
+            TemporalError::NotFound(format!("No versions to compare for entity {}", entity_id))
+        })
     }
 
     /// Diff two timestamps
-    async fn diff_time(&self, entity_id: &str, t1: DateTime<Utc>, t2: DateTime<Utc>) -> Result<diff::Diff<Self::Data>, TemporalError>
+    async fn diff_time(
+        &self,
+        entity_id: &str,
+        t1: DateTime<Utc>,
+        t2: DateTime<Utc>,
+    ) -> Result<diff::Diff<Self::Data>, TemporalError>
     where
         Self::Data: PartialEq,
     {
@@ -190,7 +224,9 @@ pub trait TemporalStore: Send + Sync {
             version1.as_ref().map(|v| &v.data),
             version2.as_ref().map(|v| &v.data),
         )
-        .map_err(|_| TemporalError::NotFound(format!("No versions to compare for entity {}", entity_id)))
+        .map_err(|_| {
+            TemporalError::NotFound(format!("No versions to compare for entity {}", entity_id))
+        })
     }
 }
 
@@ -199,7 +235,7 @@ type VersionHistory<T> = HashMap<String, BTreeMap<u64, Version<T>>>;
 
 /// In-memory versioned store
 pub struct InMemoryVersionStore<T> {
-    /// Map of entity_id -> (version -> Version<T>)
+    /// Map of entity_id -> (version -> `Version<T>`)
     versions: Arc<RwLock<VersionHistory<T>>>,
 }
 
@@ -221,8 +257,17 @@ impl<T: Clone + Send + Sync + 'static> Default for InMemoryVersionStore<T> {
 impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T> {
     type Data = T;
 
-    async fn append(&self, entity_id: &str, data: Self::Data, author: &str, message: Option<&str>) -> Result<u64, TemporalError> {
-        let mut store = self.versions.write().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn append(
+        &self,
+        entity_id: &str,
+        data: Self::Data,
+        author: &str,
+        message: Option<&str>,
+    ) -> Result<u64, TemporalError> {
+        let mut store = self
+            .versions
+            .write()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         let versions = store.entry(entity_id.to_string()).or_default();
 
         let next_version = versions.keys().last().map(|v| v + 1).unwrap_or(1);
@@ -236,21 +281,38 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
     }
 
     async fn latest(&self, entity_id: &str) -> Result<Option<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
+        let store = self
+            .versions
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .and_then(|versions| versions.values().last().cloned()))
     }
 
-    async fn at_version(&self, entity_id: &str, version: u64) -> Result<Option<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn at_version(
+        &self,
+        entity_id: &str,
+        version: u64,
+    ) -> Result<Option<Version<Self::Data>>, TemporalError> {
+        let store = self
+            .versions
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .and_then(|versions| versions.get(&version).cloned()))
     }
 
-    async fn at_time(&self, entity_id: &str, time: DateTime<Utc>) -> Result<Option<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn at_time(
+        &self,
+        entity_id: &str,
+        time: DateTime<Utc>,
+    ) -> Result<Option<Version<Self::Data>>, TemporalError> {
+        let store = self
+            .versions
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store.get(entity_id).and_then(|versions| {
             versions
                 .values()
@@ -260,8 +322,15 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
         }))
     }
 
-    async fn in_range(&self, entity_id: &str, range: &TimeRange) -> Result<Vec<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn in_range(
+        &self,
+        entity_id: &str,
+        range: &TimeRange,
+    ) -> Result<Vec<Version<Self::Data>>, TemporalError> {
+        let store = self
+            .versions
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
             .map(|versions| {
@@ -274,18 +343,18 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
             .unwrap_or_default())
     }
 
-    async fn history(&self, entity_id: &str, limit: usize) -> Result<Vec<Version<Self::Data>>, TemporalError> {
-        let store = self.versions.read().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn history(
+        &self,
+        entity_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Version<Self::Data>>, TemporalError> {
+        let store = self
+            .versions
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
-            .map(|versions| {
-                versions
-                    .values()
-                    .rev()
-                    .take(limit)
-                    .cloned()
-                    .collect()
-            })
+            .map(|versions| versions.values().rev().take(limit).cloned().collect())
             .unwrap_or_default())
     }
 }
@@ -296,13 +365,24 @@ pub trait TimeSeriesStore: Send + Sync {
     type Value: Clone + Send + Sync;
 
     /// Append a time point
-    async fn append(&self, series_id: &str, point: TimePoint<Self::Value>) -> Result<(), TemporalError>;
+    async fn append(
+        &self,
+        series_id: &str,
+        point: TimePoint<Self::Value>,
+    ) -> Result<(), TemporalError>;
 
     /// Query points in a time range
-    async fn query(&self, series_id: &str, range: &TimeRange) -> Result<Vec<TimePoint<Self::Value>>, TemporalError>;
+    async fn query(
+        &self,
+        series_id: &str,
+        range: &TimeRange,
+    ) -> Result<Vec<TimePoint<Self::Value>>, TemporalError>;
 
     /// Get the latest point
-    async fn latest(&self, series_id: &str) -> Result<Option<TimePoint<Self::Value>>, TemporalError>;
+    async fn latest(
+        &self,
+        series_id: &str,
+    ) -> Result<Option<TimePoint<Self::Value>>, TemporalError>;
 }
 
 /// In-memory time series store
@@ -328,14 +408,28 @@ impl<T: Clone + Send + Sync + 'static> Default for InMemoryTimeSeriesStore<T> {
 impl<T: Clone + Send + Sync + 'static> TimeSeriesStore for InMemoryTimeSeriesStore<T> {
     type Value = T;
 
-    async fn append(&self, series_id: &str, point: TimePoint<Self::Value>) -> Result<(), TemporalError> {
-        let mut store = self.series.write().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn append(
+        &self,
+        series_id: &str,
+        point: TimePoint<Self::Value>,
+    ) -> Result<(), TemporalError> {
+        let mut store = self
+            .series
+            .write()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         store.entry(series_id.to_string()).or_default().push(point);
         Ok(())
     }
 
-    async fn query(&self, series_id: &str, range: &TimeRange) -> Result<Vec<TimePoint<Self::Value>>, TemporalError> {
-        let store = self.series.read().map_err(|_| TemporalError::LockPoisoned)?;
+    async fn query(
+        &self,
+        series_id: &str,
+        range: &TimeRange,
+    ) -> Result<Vec<TimePoint<Self::Value>>, TemporalError> {
+        let store = self
+            .series
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(series_id)
             .map(|points| {
@@ -348,9 +442,17 @@ impl<T: Clone + Send + Sync + 'static> TimeSeriesStore for InMemoryTimeSeriesSto
             .unwrap_or_default())
     }
 
-    async fn latest(&self, series_id: &str) -> Result<Option<TimePoint<Self::Value>>, TemporalError> {
-        let store = self.series.read().map_err(|_| TemporalError::LockPoisoned)?;
-        Ok(store.get(series_id).and_then(|points| points.last().cloned()))
+    async fn latest(
+        &self,
+        series_id: &str,
+    ) -> Result<Option<TimePoint<Self::Value>>, TemporalError> {
+        let store = self
+            .series
+            .read()
+            .map_err(|_| TemporalError::LockPoisoned)?;
+        Ok(store
+            .get(series_id)
+            .and_then(|points| points.last().cloned()))
     }
 }
 
@@ -362,8 +464,14 @@ mod tests {
     async fn test_version_store() {
         let store: InMemoryVersionStore<String> = InMemoryVersionStore::new();
 
-        let v1 = store.append("entity1", "data v1".to_string(), "alice", Some("initial")).await.unwrap();
-        let v2 = store.append("entity1", "data v2".to_string(), "bob", Some("update")).await.unwrap();
+        let v1 = store
+            .append("entity1", "data v1".to_string(), "alice", Some("initial"))
+            .await
+            .unwrap();
+        let v2 = store
+            .append("entity1", "data v2".to_string(), "bob", Some("update"))
+            .await
+            .unwrap();
 
         assert_eq!(v1, 1);
         assert_eq!(v2, 2);

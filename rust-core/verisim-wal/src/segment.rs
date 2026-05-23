@@ -86,9 +86,7 @@ pub fn parse_segment_filename(name: &str) -> Option<u64> {
 /// Non-segment files in the directory are silently ignored.
 pub fn list_segments(wal_dir: &Path) -> WalResult<Vec<SegmentInfo>> {
     if !wal_dir.is_dir() {
-        return Err(WalError::DirectoryNotFound(
-            wal_dir.display().to_string(),
-        ));
+        return Err(WalError::DirectoryNotFound(wal_dir.display().to_string()));
     }
 
     let mut segments = Vec::new();
@@ -199,14 +197,8 @@ mod tests {
 
     #[test]
     fn test_parse_segment_filename_valid() {
-        assert_eq!(
-            parse_segment_filename("wal-0000000000000042.log"),
-            Some(42)
-        );
-        assert_eq!(
-            parse_segment_filename("wal-0000000000000000.log"),
-            Some(0)
-        );
+        assert_eq!(parse_segment_filename("wal-0000000000000042.log"), Some(42));
+        assert_eq!(parse_segment_filename("wal-0000000000000000.log"), Some(0));
     }
 
     #[test]

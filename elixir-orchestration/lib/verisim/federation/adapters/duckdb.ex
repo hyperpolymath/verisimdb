@@ -86,9 +86,7 @@ defmodule VeriSim.Federation.Adapters.DuckDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "DuckDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("DuckDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end
@@ -202,13 +200,14 @@ defmodule VeriSim.Federation.Adapters.DuckDB do
         LIMIT $5
         """
 
-        {sql, %{
-          "$1" => bounds[:min_lon] || bounds["min_lon"] || 0.0,
-          "$2" => bounds[:min_lat] || bounds["min_lat"] || 0.0,
-          "$3" => bounds[:max_lon] || bounds["max_lon"] || 0.0,
-          "$4" => bounds[:max_lat] || bounds["max_lat"] || 0.0,
-          "$5" => limit
-        }}
+        {sql,
+         %{
+           "$1" => bounds[:min_lon] || bounds["min_lon"] || 0.0,
+           "$2" => bounds[:min_lat] || bounds["min_lat"] || 0.0,
+           "$3" => bounds[:max_lon] || bounds["max_lon"] || 0.0,
+           "$4" => bounds[:max_lat] || bounds["max_lat"] || 0.0,
+           "$5" => limit
+         }}
 
       :graph in modalities && Map.has_key?(query_params, :graph_pattern) ->
         # Recursive CTE for graph traversal
@@ -247,11 +246,12 @@ defmodule VeriSim.Federation.Adapters.DuckDB do
         LIMIT $3
         """
 
-        {sql, %{
-          "$1" => range[:start] || range["start"] || "",
-          "$2" => range[:end] || range["end"] || "",
-          "$3" => limit
-        }}
+        {sql,
+         %{
+           "$1" => range[:start] || range["start"] || "",
+           "$2" => range[:end] || range["end"] || "",
+           "$3" => limit
+         }}
 
       :tensor in modalities && Map.has_key?(query_params, :vector_query) ->
         # DuckDB array operations for tensor similarity

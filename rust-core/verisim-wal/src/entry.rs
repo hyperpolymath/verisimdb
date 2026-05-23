@@ -158,11 +158,7 @@ impl WalEntry {
     pub fn serialize(&self) -> Vec<u8> {
         // Build the inner content (everything after entry_length and crc32).
         let entity_id_bytes = self.entity_id.as_bytes();
-        let inner_size = FIXED_FIELDS_SIZE
-            + 4
-            + entity_id_bytes.len()
-            + 4
-            + self.payload.len();
+        let inner_size = FIXED_FIELDS_SIZE + 4 + entity_id_bytes.len() + 4 + self.payload.len();
 
         let mut inner = Vec::with_capacity(inner_size);
 
@@ -416,7 +412,10 @@ mod tests {
             WalModality::Spatial,
             WalModality::All,
         ] {
-            assert_eq!(WalModality::from_byte(modality.to_byte()).unwrap(), modality);
+            assert_eq!(
+                WalModality::from_byte(modality.to_byte()).unwrap(),
+                modality
+            );
         }
     }
 

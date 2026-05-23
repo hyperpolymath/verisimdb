@@ -13,27 +13,85 @@ use rustyline::Context;
 
 /// All completable VQL keywords.
 const KEYWORDS: &[&str] = &[
-    "SELECT", "FROM", "WHERE", "PROOF", "LIMIT", "OFFSET", "ORDER", "BY",
-    "GROUP", "HAVING", "AS", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE",
-    "EXISTS", "CONTAINS", "SIMILAR", "TO", "TRAVERSE", "DEPTH", "THRESHOLD",
-    "DRIFT", "CONSISTENCY", "AT", "TIME", "EXPLAIN", "INSERT", "UPDATE",
-    "DELETE", "SET", "INTO", "VALUES", "CREATE", "DROP", "ALTER", "JOIN",
-    "ON", "WITH", "FEDERATION", "STORE", "OCTAD", "ALL", "ASC", "DESC",
-    "COUNT", "SUM", "AVG", "MIN", "MAX", "DISTINCT",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "PROOF",
+    "LIMIT",
+    "OFFSET",
+    "ORDER",
+    "BY",
+    "GROUP",
+    "HAVING",
+    "AS",
+    "AND",
+    "OR",
+    "NOT",
+    "IN",
+    "BETWEEN",
+    "LIKE",
+    "EXISTS",
+    "CONTAINS",
+    "SIMILAR",
+    "TO",
+    "TRAVERSE",
+    "DEPTH",
+    "THRESHOLD",
+    "DRIFT",
+    "CONSISTENCY",
+    "AT",
+    "TIME",
+    "EXPLAIN",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "SET",
+    "INTO",
+    "VALUES",
+    "CREATE",
+    "DROP",
+    "ALTER",
+    "JOIN",
+    "ON",
+    "WITH",
+    "FEDERATION",
+    "STORE",
+    "OCTAD",
+    "ALL",
+    "ASC",
+    "DESC",
+    "COUNT",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "DISTINCT",
 ];
 
 /// Modality names (also offered as completions).
 /// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
 /// Provenance, Spatial.
 const MODALITIES: &[&str] = &[
-    "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
-    "PROVENANCE", "SPATIAL",
+    "GRAPH",
+    "VECTOR",
+    "TENSOR",
+    "SEMANTIC",
+    "DOCUMENT",
+    "TEMPORAL",
+    "PROVENANCE",
+    "SPATIAL",
 ];
 
 /// Meta-commands starting with backslash.
 const META_COMMANDS: &[&str] = &[
-    "\\connect", "\\explain", "\\timing", "\\format", "\\status",
-    "\\help", "\\quit", "\\q",
+    "\\connect",
+    "\\explain",
+    "\\timing",
+    "\\format",
+    "\\status",
+    "\\help",
+    "\\quit",
+    "\\q",
 ];
 
 /// Tab-completer for VQL input.
@@ -78,7 +136,9 @@ impl Completer for VqlCompleter {
 
         // Determine the user's casing preference: if the prefix is all
         // uppercase, offer uppercase completions; otherwise lowercase.
-        let use_upper = prefix.chars().all(|c| c.is_uppercase() || !c.is_alphabetic());
+        let use_upper = prefix
+            .chars()
+            .all(|c| c.is_uppercase() || !c.is_alphabetic());
 
         // Modality names.
         for name in MODALITIES {

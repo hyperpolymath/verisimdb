@@ -161,7 +161,9 @@ defmodule VeriSim.Query.VQLCrossModalTest do
 
   describe "ModalityConsistency with cosine metric" do
     test "CONSISTENT condition with COSINE metric parses correctly" do
-      query = "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE > 0.8"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE > 0.8"
+
       ast = H.parse!(query)
 
       H.assert_has_where(ast)
@@ -180,7 +182,9 @@ defmodule VeriSim.Query.VQLCrossModalTest do
     end
 
     test "cosine consistency query executes without crashing" do
-      query = "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE > 0.8"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE > 0.8"
+
       result = H.execute_safely(query)
       assert elem(result, 0) in [:ok, :error, :unavailable]
     end
@@ -192,7 +196,9 @@ defmodule VeriSim.Query.VQLCrossModalTest do
 
   describe "ModalityConsistency with jaccard metric" do
     test "CONSISTENT condition with JACCARD metric parses correctly" do
-      query = "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(GRAPH, DOCUMENT) USING JACCARD > 0.5"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(GRAPH, DOCUMENT) USING JACCARD > 0.5"
+
       ast = H.parse!(query)
 
       H.assert_has_where(ast)
@@ -211,7 +217,9 @@ defmodule VeriSim.Query.VQLCrossModalTest do
     end
 
     test "jaccard consistency query executes without crashing" do
-      query = "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(GRAPH, DOCUMENT) USING JACCARD > 0.5"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(GRAPH, DOCUMENT) USING JACCARD > 0.5"
+
       result = H.execute_safely(query)
       assert elem(result, 0) in [:ok, :error, :unavailable]
     end
@@ -258,7 +266,9 @@ defmodule VeriSim.Query.VQLCrossModalTest do
 
   describe "compound cross-modal conditions" do
     test "drift AND consistency in same query parses correctly" do
-      query = "SELECT * FROM HEXAD 'entity-001' WHERE DRIFT(VECTOR, DOCUMENT) > 0.3 AND CONSISTENT(GRAPH, SEMANTIC) USING COSINE > 0.8"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' WHERE DRIFT(VECTOR, DOCUMENT) > 0.3 AND CONSISTENT(GRAPH, SEMANTIC) USING COSINE > 0.8"
+
       ast = H.parse!(query)
 
       H.assert_has_where(ast)

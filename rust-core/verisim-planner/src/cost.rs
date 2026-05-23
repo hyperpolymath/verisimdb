@@ -469,7 +469,12 @@ impl CostModel {
 /// or just "ContractName" (defaults to custom/ZKP).
 fn extract_proof_type(contract: &str) -> String {
     let known_types = [
-        "existence", "citation", "access", "integrity", "provenance", "zkp",
+        "existence",
+        "citation",
+        "access",
+        "integrity",
+        "provenance",
+        "zkp",
     ];
     let lower = contract.to_lowercase();
     for t in &known_types {
@@ -499,7 +504,9 @@ mod tests {
     fn test_base_selectivity_values() {
         assert!((BaseCost::for_modality(Modality::Graph).selectivity - 0.2).abs() < f64::EPSILON);
         assert!((BaseCost::for_modality(Modality::Vector).selectivity - 0.01).abs() < f64::EPSILON);
-        assert!((BaseCost::for_modality(Modality::Semantic).selectivity - 0.8).abs() < f64::EPSILON);
+        assert!(
+            (BaseCost::for_modality(Modality::Semantic).selectivity - 0.8).abs() < f64::EPSILON
+        );
     }
 
     #[test]
@@ -607,20 +614,32 @@ mod tests {
     fn test_proof_cost_zkp_is_expensive() {
         let pc = ProofCost::for_type("zkp");
         assert!(pc.total_ms() > 100.0, "ZKP proof should be > 100ms");
-        assert!(pc.circuit_ms > 0.0, "ZKP should have circuit generation cost");
+        assert!(
+            pc.circuit_ms > 0.0,
+            "ZKP should have circuit generation cost"
+        );
     }
 
     #[test]
     fn test_proof_cost_integrity_includes_circuit() {
         let pc = ProofCost::for_type("integrity");
-        assert!(pc.circuit_ms > 0.0, "Integrity proof includes Merkle circuit");
-        assert!(pc.verify_ms > pc.circuit_ms, "Verify > circuit for integrity");
+        assert!(
+            pc.circuit_ms > 0.0,
+            "Integrity proof includes Merkle circuit"
+        );
+        assert!(
+            pc.verify_ms > pc.circuit_ms,
+            "Verify > circuit for integrity"
+        );
     }
 
     #[test]
     fn test_proof_cost_unknown_defaults_to_custom() {
         let pc = ProofCost::for_type("MyCustomContract");
-        assert!(pc.total_ms() > 100.0, "Unknown proof defaults to expensive custom");
+        assert!(
+            pc.total_ms() > 100.0,
+            "Unknown proof defaults to expensive custom"
+        );
     }
 
     #[test]
@@ -706,11 +725,15 @@ mod tests {
     fn test_post_processing_order_by_scales_with_rows() {
         use crate::plan::PostProcessing;
         let small = PostProcessingCost::estimate(
-            &PostProcessing::OrderBy { fields: vec![("name".into(), true)] },
+            &PostProcessing::OrderBy {
+                fields: vec![("name".into(), true)],
+            },
             100,
         );
         let large = PostProcessingCost::estimate(
-            &PostProcessing::OrderBy { fields: vec![("name".into(), true)] },
+            &PostProcessing::OrderBy {
+                fields: vec![("name".into(), true)],
+            },
             10000,
         );
         assert!(large.time_ms > small.time_ms * 10.0, "O(n log n) scaling");
@@ -740,7 +763,9 @@ mod tests {
             cpu_cost: 40.0,
         };
         let pps = vec![
-            PostProcessing::OrderBy { fields: vec![("score".into(), false)] },
+            PostProcessing::OrderBy {
+                fields: vec![("score".into(), false)],
+            },
             PostProcessing::Limit { count: 10 },
         ];
         let total = CostModel::estimate_with_post_processing(&base, &pps);

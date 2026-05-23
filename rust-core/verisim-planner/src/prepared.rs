@@ -515,9 +515,7 @@ impl PlanCache {
 
         let expired_ids: Vec<PreparedId> = stmts
             .iter()
-            .filter(|(_, stmt)| {
-                now.signed_duration_since(stmt.created_at) > ttl
-            })
+            .filter(|(_, stmt)| now.signed_duration_since(stmt.created_at) > ttl)
             .map(|(id, _)| id.clone())
             .collect();
 
@@ -601,26 +599,71 @@ impl PlanCache {
     /// the case of identifiers and string literals.
     fn normalize_query(query: &str) -> String {
         // Step 1: Collapse all whitespace into single spaces and trim.
-        let collapsed: String = query
-            .split_whitespace()
-            .collect::<Vec<&str>>()
-            .join(" ");
+        let collapsed: String = query.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         // Step 2: Lowercase known keywords.
         // We split on whitespace, check each token against the keyword list,
         // and lowercase it if it matches. Non-keyword tokens keep original case.
         let keywords = [
             // SQL/VQL standard keywords
-            "SELECT", "WHERE", "FROM", "SEARCH", "LIMIT", "ORDER", "BY", "GROUP",
-            "AND", "OR", "NOT", "JOIN", "ON", "AS", "HAVING", "INSERT", "UPDATE",
-            "DELETE", "SET", "INTO", "VALUES", "WITH", "UNION", "INTERSECT", "EXCEPT",
-            "EXISTS", "BETWEEN", "LIKE", "IN", "IS", "NULL", "TRUE", "FALSE",
-            "ASC", "DESC", "DISTINCT", "ALL", "ANY", "SOME", "CASE", "WHEN", "THEN",
-            "ELSE", "END",
+            "SELECT",
+            "WHERE",
+            "FROM",
+            "SEARCH",
+            "LIMIT",
+            "ORDER",
+            "BY",
+            "GROUP",
+            "AND",
+            "OR",
+            "NOT",
+            "JOIN",
+            "ON",
+            "AS",
+            "HAVING",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "SET",
+            "INTO",
+            "VALUES",
+            "WITH",
+            "UNION",
+            "INTERSECT",
+            "EXCEPT",
+            "EXISTS",
+            "BETWEEN",
+            "LIKE",
+            "IN",
+            "IS",
+            "NULL",
+            "TRUE",
+            "FALSE",
+            "ASC",
+            "DESC",
+            "DISTINCT",
+            "ALL",
+            "ANY",
+            "SOME",
+            "CASE",
+            "WHEN",
+            "THEN",
+            "ELSE",
+            "END",
             // VeriSimDB-specific keywords
-            "PROOF", "VERIFY", "DRIFT", "OCTAD", "MODALITY", "TYPE",
+            "PROOF",
+            "VERIFY",
+            "DRIFT",
+            "OCTAD",
+            "MODALITY",
+            "TYPE",
             // Modality names (treated as keywords for normalization)
-            "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
+            "GRAPH",
+            "VECTOR",
+            "TENSOR",
+            "SEMANTIC",
+            "DOCUMENT",
+            "TEMPORAL",
         ];
 
         collapsed
@@ -732,7 +775,9 @@ mod tests {
         let cache = PlanCache::new(CacheConfig::default());
         let plan = sample_logical_plan();
 
-        let id = cache.prepare("SEARCH graph WHERE type = $t", plan.clone()).await;
+        let id = cache
+            .prepare("SEARCH graph WHERE type = $t", plan.clone())
+            .await;
         let stmt = cache.get(&id).await;
 
         assert!(stmt.is_some(), "prepared statement should be retrievable");
@@ -761,7 +806,10 @@ mod tests {
 
         // Different queries should produce different fingerprints.
         let fp_other = PlanCache::fingerprint("SEARCH vector WHERE k = 10");
-        assert_ne!(fp1, fp_other, "different queries must have different fingerprints");
+        assert_ne!(
+            fp1, fp_other,
+            "different queries must have different fingerprints"
+        );
     }
 
     // -- Test 3: Lookup by query (cache hit) --
@@ -784,7 +832,10 @@ mod tests {
         let cache = PlanCache::new(CacheConfig::default());
 
         let id = PreparedId::new("nonexistent");
-        assert!(cache.get(&id).await.is_none(), "missing ID should return None");
+        assert!(
+            cache.get(&id).await.is_none(),
+            "missing ID should return None"
+        );
 
         let found = cache.lookup_by_query("SELECT * FROM nowhere").await;
         assert!(found.is_none(), "unknown query should return None");
@@ -802,10 +853,16 @@ mod tests {
 
         let removed = cache.invalidate(&id).await;
         assert!(removed, "invalidate should return true for existing entry");
-        assert!(cache.get(&id).await.is_none(), "entry should be gone after invalidation");
+        assert!(
+            cache.get(&id).await.is_none(),
+            "entry should be gone after invalidation"
+        );
 
         let removed_again = cache.invalidate(&id).await;
-        assert!(!removed_again, "invalidate on missing entry should return false");
+        assert!(
+            !removed_again,
+            "invalidate on missing entry should return false"
+        );
     }
 
     // -- Test 6: Invalidate all --
@@ -815,7 +872,9 @@ mod tests {
         let cache = PlanCache::new(CacheConfig::default());
         let plan = sample_logical_plan();
 
-        let id1 = cache.prepare("SEARCH graph WHERE type = $t", plan.clone()).await;
+        let id1 = cache
+            .prepare("SEARCH graph WHERE type = $t", plan.clone())
+            .await;
         let id2 = cache.prepare("SEARCH vector WHERE k = 5", plan).await;
 
         assert!(cache.get(&id1).await.is_some());
@@ -846,7 +905,10 @@ mod tests {
         assert_eq!(stmt.use_count, 1, "first execute should set use_count to 1");
 
         let stmt2 = cache.execute_prepared(&id, &params).await.unwrap();
-        assert_eq!(stmt2.use_count, 2, "second execute should set use_count to 2");
+        assert_eq!(
+            stmt2.use_count, 2,
+            "second execute should set use_count to 2"
+        );
         assert!(
             stmt2.last_used >= stmt.last_used,
             "last_used should advance on execute"
@@ -865,7 +927,9 @@ mod tests {
         let cache = PlanCache::new(config);
         let plan = sample_logical_plan();
 
-        cache.prepare("SEARCH graph WHERE type = $t", plan.clone()).await;
+        cache
+            .prepare("SEARCH graph WHERE type = $t", plan.clone())
+            .await;
         cache.prepare("SEARCH vector WHERE k = 5", plan).await;
 
         // Sleep briefly to ensure the TTL check sees them as expired.
@@ -890,10 +954,14 @@ mod tests {
         let plan = sample_logical_plan();
 
         // Prepare two entries (at capacity).
-        let id1 = cache.prepare("SEARCH graph WHERE type = $t", plan.clone()).await;
+        let id1 = cache
+            .prepare("SEARCH graph WHERE type = $t", plan.clone())
+            .await;
         // Brief pause so id1 has older last_used than id2.
         tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-        let _id2 = cache.prepare("SEARCH vector WHERE k = 5", plan.clone()).await;
+        let _id2 = cache
+            .prepare("SEARCH vector WHERE k = 5", plan.clone())
+            .await;
 
         // Preparing a third should evict the LRU (id1).
         let _id3 = cache.prepare("SEARCH document WHERE text = $q", plan).await;
@@ -914,7 +982,9 @@ mod tests {
         let cache = PlanCache::new(CacheConfig::default());
         let plan = sample_logical_plan();
 
-        let id = cache.prepare("SEARCH graph WHERE type = $t AND name = $n", plan).await;
+        let id = cache
+            .prepare("SEARCH graph WHERE type = $t AND name = $n", plan)
+            .await;
 
         // Provide wrong parameter names.
         let mut params = HashMap::new();
@@ -965,7 +1035,10 @@ mod tests {
         assert!((stats.hit_ratio - 0.5).abs() < f64::EPSILON);
 
         // Generation should have incremented from prepare + any mutations.
-        assert!(stats.generation > 0, "generation should be non-zero after mutations");
+        assert!(
+            stats.generation > 0,
+            "generation should be non-zero after mutations"
+        );
     }
 
     // -- Test 12: Plan caching on prepared statement --
@@ -1053,7 +1126,7 @@ mod tests {
         let params = vec![
             ParamValue::String("hello".to_string()),
             ParamValue::Int(42),
-            ParamValue::Float(3.14),
+            ParamValue::Float(2.5),
             ParamValue::Bool(true),
             ParamValue::Vector(vec![0.1, 0.2, 0.3]),
             ParamValue::Null,
@@ -1074,7 +1147,9 @@ mod tests {
         let cache = PlanCache::new(CacheConfig::default());
         let plan = sample_logical_plan();
 
-        let id1 = cache.prepare("SEARCH graph WHERE type = $t", plan.clone()).await;
+        let id1 = cache
+            .prepare("SEARCH graph WHERE type = $t", plan.clone())
+            .await;
         let id2 = cache.prepare("SEARCH graph WHERE type = $t", plan).await;
 
         assert_eq!(id1, id2, "same query should produce same PreparedId");

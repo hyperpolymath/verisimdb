@@ -54,7 +54,7 @@ defmodule VeriSim.Telemetry.Reporter do
         telemetry_enabled: Collector.enabled?(),
         privacy_notice:
           "This report contains aggregate metrics only. " <>
-          "No query content, entity data, or PII is included."
+            "No query content, entity data, or PII is included."
       },
       modality_heatmap: modality_heatmap(snapshot),
       query_patterns: query_patterns(snapshot),

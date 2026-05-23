@@ -159,7 +159,11 @@ defmodule VeriSim.SchemaRegistry do
         label: "Document",
         supertypes: ["verisim:Entity"],
         constraints: [
-          %{name: "title_required", kind: {:required, "title"}, message: "Documents must have a title"}
+          %{
+            name: "title_required",
+            kind: {:required, "title"},
+            message: "Documents must have a title"
+          }
         ]
       },
       %{
@@ -197,6 +201,7 @@ defmodule VeriSim.SchemaRegistry do
 
   defp validate_constraint(entity, %{kind: {:required, property}, message: msg}) do
     properties = Map.get(entity, :properties, %{})
+
     if Map.has_key?(properties, property) do
       :ok
     else
@@ -206,8 +211,11 @@ defmodule VeriSim.SchemaRegistry do
 
   defp validate_constraint(entity, %{kind: {:pattern, property, pattern}, message: msg}) do
     properties = Map.get(entity, :properties, %{})
+
     case Map.get(properties, property) do
-      nil -> :ok
+      nil ->
+        :ok
+
       value ->
         if Regex.match?(~r/#{pattern}/, value) do
           :ok
@@ -219,15 +227,20 @@ defmodule VeriSim.SchemaRegistry do
 
   defp validate_constraint(entity, %{kind: {:range, property, min, max}, message: msg}) do
     properties = Map.get(entity, :properties, %{})
+
     case Map.get(properties, property) do
-      nil -> :ok
+      nil ->
+        :ok
+
       value when is_number(value) ->
         if (is_nil(min) or value >= min) and (is_nil(max) or value <= max) do
           :ok
         else
           {:error, msg}
         end
-      _ -> :ok
+
+      _ ->
+        :ok
     end
   end
 
@@ -241,10 +254,13 @@ defmodule VeriSim.SchemaRegistry do
 
   defp compute_hierarchy(iri, types, visited) do
     if iri in visited do
-      []  # Prevent cycles
+      # Prevent cycles
+      []
     else
       case Map.get(types, iri) do
-        nil -> []
+        nil ->
+          []
+
         type_def ->
           supertypes = type_def.supertypes || []
           [iri | Enum.flat_map(supertypes, &compute_hierarchy(&1, types, [iri | visited]))]

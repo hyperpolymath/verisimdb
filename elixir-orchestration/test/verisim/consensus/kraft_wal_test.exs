@@ -104,7 +104,9 @@ defmodule VeriSim.Consensus.KRaftWALTest do
       [recovered_entry] = recovered.log
       assert recovered_entry.term == 1
       assert recovered_entry.index == 1
-      assert recovered_entry.command == {:register_store, "s1", "http://localhost:9000", ["graph"]}
+
+      assert recovered_entry.command ==
+               {:register_store, "s1", "http://localhost:9000", ["graph"]}
     end
 
     test "appends multiple entries sequentially", %{wal_path: wal_path} do
@@ -183,6 +185,7 @@ defmodule VeriSim.Consensus.KRaftWALTest do
       KRaftWAL.append_entry(wal_path, entry)
 
       {:ok, recovered} = KRaftWAL.recover(wal_path)
+
       assert hd(recovered.log).command ==
                {:register_store, "store-1", "http://host:8080", ["graph", "vector"]}
     end

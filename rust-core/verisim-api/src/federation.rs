@@ -25,29 +25,24 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use tracing::{error, info, warn, instrument};
+use tracing::{error, info, instrument, warn};
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 /// Drift policy for federated queries.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DriftPolicy {
     Strict,
     Repair,
+    #[default]
     Tolerate,
     Latest,
-}
-
-impl Default for DriftPolicy {
-    fn default() -> Self {
-        DriftPolicy::Tolerate
-    }
 }
 
 /// A registered peer store in the federation.
@@ -55,7 +50,7 @@ impl Default for DriftPolicy {
 pub struct PeerStore {
     /// Unique store identifier.
     pub store_id: String,
-    /// HTTP endpoint URL (e.g., "https://store-2.verisimdb.example.com/api/v1").
+    /// HTTP endpoint URL (e.g., `https://store-2.verisimdb.example.com/api/v1`).
     pub endpoint: String,
     /// Modalities this store supports.
     pub modalities: Vec<String>,
@@ -304,7 +299,10 @@ async fn register_peer(
     // Validate store_id format (alphanumeric + dash + underscore, max 128)
     if request.store_id.is_empty()
         || request.store_id.len() > 128
-        || !request.store_id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '/')
+        || !request
+            .store_id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '/')
     {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -426,9 +424,7 @@ async fn federation_query(
             }
 
             let include = match request.drift_policy {
-                DriftPolicy::Strict => {
-                    store.trust_level >= (1.0 - state.strict_drift_threshold)
-                }
+                DriftPolicy::Strict => store.trust_level >= (1.0 - state.strict_drift_threshold),
                 DriftPolicy::Repair | DriftPolicy::Tolerate | DriftPolicy::Latest => true,
             };
 
@@ -448,10 +444,7 @@ async fn federation_query(
     };
     // RwLock dropped here — safe to make async HTTP calls
 
-    let stores_queried: Vec<String> = stores_to_query
-        .iter()
-        .map(|s| s.store_id.clone())
-        .collect();
+    let stores_queried: Vec<String> = stores_to_query.iter().map(|s| s.store_id.clone()).collect();
 
     let client = reqwest::Client::new();
     let text_query = request.text_query.clone();
@@ -469,7 +462,13 @@ async fn federation_query(
             let timeout = std::time::Duration::from_secs(10);
             match tokio::time::timeout(
                 timeout,
-                query_single_peer(&client, &store, text_q.as_deref(), vector_q.as_deref(), limit),
+                query_single_peer(
+                    &client,
+                    &store,
+                    text_q.as_deref(),
+                    vector_q.as_deref(),
+                    limit,
+                ),
             )
             .await
             {
@@ -497,7 +496,11 @@ async fn federation_query(
     }
 
     // Sort by score descending and apply global limit
-    all_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    all_results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     all_results.truncate(limit);
 
     Ok(Json(FederationQueryResponse {
@@ -530,7 +533,11 @@ async fn query_single_peer(
             .map_err(|e| format!("HTTP request to {} failed: {}", store_id, e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Peer {} returned status {}", store_id, resp.status()));
+            return Err(format!(
+                "Peer {} returned status {}",
+                store_id,
+                resp.status()
+            ));
         }
 
         resp.json()
@@ -548,7 +555,11 @@ async fn query_single_peer(
             .map_err(|e| format!("HTTP request to {} failed: {}", store_id, e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Peer {} returned status {}", store_id, resp.status()));
+            return Err(format!(
+                "Peer {} returned status {}",
+                store_id,
+                resp.status()
+            ));
         }
 
         resp.json()
@@ -565,7 +576,11 @@ async fn query_single_peer(
             .map_err(|e| format!("HTTP request to {} failed: {}", store_id, e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Peer {} returned status {}", store_id, resp.status()));
+            return Err(format!(
+                "Peer {} returned status {}",
+                store_id,
+                resp.status()
+            ));
         }
 
         resp.json()
@@ -614,7 +629,10 @@ mod tests {
     fn test_pattern_matching() {
         assert!(pattern_matches("*", "any-store"));
         assert!(pattern_matches("/universities/*", "/universities/oxford"));
-        assert!(pattern_matches("/universities/*", "/universities/cambridge"));
+        assert!(pattern_matches(
+            "/universities/*",
+            "/universities/cambridge"
+        ));
         assert!(!pattern_matches("/universities/*", "/hospitals/nhs"));
         assert!(pattern_matches("store-1", "store-1"));
         assert!(!pattern_matches("store-1", "store-2"));

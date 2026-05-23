@@ -93,9 +93,7 @@ defmodule VeriSim.Federation.Adapters.MongoDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "MongoDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("MongoDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end

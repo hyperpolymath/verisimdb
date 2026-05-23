@@ -57,8 +57,7 @@ defmodule VeriSim.Query.VQLTest do
     end
 
     test "parses multi-modality query" do
-      {:ok, ast} =
-        VQLBridge.parse("SELECT GRAPH.*, VECTOR.*, DOCUMENT.* FROM HEXAD 'abc-123'")
+      {:ok, ast} = VQLBridge.parse("SELECT GRAPH.*, VECTOR.*, DOCUMENT.* FROM HEXAD 'abc-123'")
 
       assert is_map(ast)
     end
@@ -70,36 +69,26 @@ defmodule VeriSim.Query.VQLTest do
 
     test "parses query with WHERE clause" do
       {:ok, ast} =
-        VQLBridge.parse(
-          "SELECT DOCUMENT.* FROM HEXAD 'abc-123' WHERE DOCUMENT.title = 'Test'"
-        )
+        VQLBridge.parse("SELECT DOCUMENT.* FROM HEXAD 'abc-123' WHERE DOCUMENT.title = 'Test'")
 
       assert is_map(ast)
     end
 
     test "parses query with LIMIT and OFFSET" do
-      {:ok, ast} =
-        VQLBridge.parse(
-          "SELECT GRAPH.* FROM HEXAD 'abc-123' LIMIT 10 OFFSET 5"
-        )
+      {:ok, ast} = VQLBridge.parse("SELECT GRAPH.* FROM HEXAD 'abc-123' LIMIT 10 OFFSET 5")
 
       assert is_map(ast)
     end
 
     test "parses query with ORDER BY" do
       {:ok, ast} =
-        VQLBridge.parse(
-          "SELECT DOCUMENT.* FROM HEXAD 'abc-123' ORDER BY DOCUMENT.title ASC"
-        )
+        VQLBridge.parse("SELECT DOCUMENT.* FROM HEXAD 'abc-123' ORDER BY DOCUMENT.title ASC")
 
       assert is_map(ast)
     end
 
     test "parses query with aggregate in projection" do
-      {:ok, ast} =
-        VQLBridge.parse(
-          "SELECT GRAPH.* FROM HEXAD 'abc-123' LIMIT 5"
-        )
+      {:ok, ast} = VQLBridge.parse("SELECT GRAPH.* FROM HEXAD 'abc-123' LIMIT 5")
 
       assert is_map(ast)
     end
@@ -108,9 +97,7 @@ defmodule VeriSim.Query.VQLTest do
   describe "VQLBridge — mutations via parse_statement/1" do
     test "parses INSERT with document data" do
       {:ok, ast} =
-        VQLBridge.parse_statement(
-          "INSERT HEXAD WITH DOCUMENT(title = 'Test', body = 'Content')"
-        )
+        VQLBridge.parse_statement("INSERT HEXAD WITH DOCUMENT(title = 'Test', body = 'Content')")
 
       assert is_map(ast)
       assert ast[:TAG] == "Mutation" or ast["TAG"] == "Mutation"
@@ -118,16 +105,13 @@ defmodule VeriSim.Query.VQLTest do
 
     test "parses UPDATE with set clause" do
       {:ok, ast} =
-        VQLBridge.parse_statement(
-          "UPDATE HEXAD 'abc-123' SET DOCUMENT.title = 'Updated'"
-        )
+        VQLBridge.parse_statement("UPDATE HEXAD 'abc-123' SET DOCUMENT.title = 'Updated'")
 
       assert is_map(ast)
     end
 
     test "parses DELETE" do
-      {:ok, ast} =
-        VQLBridge.parse_statement("DELETE HEXAD 'abc-123'")
+      {:ok, ast} = VQLBridge.parse_statement("DELETE HEXAD 'abc-123'")
 
       assert is_map(ast)
     end
@@ -212,9 +196,7 @@ defmodule VeriSim.Query.VQLTest do
   describe "condition classification" do
     test "simple condition is pushed down" do
       {:ok, ast} =
-        VQLBridge.parse(
-          "SELECT GRAPH.* FROM HEXAD 'abc-123' WHERE GRAPH.type = 'Person'"
-        )
+        VQLBridge.parse("SELECT GRAPH.* FROM HEXAD 'abc-123' WHERE GRAPH.type = 'Person'")
 
       # The where clause should be present and classified as pushdown
       assert is_map(ast)
@@ -227,8 +209,7 @@ defmodule VeriSim.Query.VQLTest do
 
   describe "provenance query routing" do
     test "parses provenance-only query" do
-      {:ok, ast} =
-        VQLBridge.parse("SELECT PROVENANCE.* FROM HEXAD 'abc-123'")
+      {:ok, ast} = VQLBridge.parse("SELECT PROVENANCE.* FROM HEXAD 'abc-123'")
 
       assert is_map(ast)
     end
@@ -240,8 +221,7 @@ defmodule VeriSim.Query.VQLTest do
 
   describe "spatial query routing" do
     test "parses spatial-only query" do
-      {:ok, ast} =
-        VQLBridge.parse("SELECT SPATIAL.* FROM HEXAD 'abc-123'")
+      {:ok, ast} = VQLBridge.parse("SELECT SPATIAL.* FROM HEXAD 'abc-123'")
 
       assert is_map(ast)
     end

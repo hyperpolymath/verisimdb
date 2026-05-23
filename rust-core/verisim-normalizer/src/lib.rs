@@ -16,7 +16,6 @@
 //!   auto-merge, custom), threshold-gated escalation, and full history tracking.
 
 #![allow(unused)] // Infrastructure code with planned future usage
-
 #![forbid(unsafe_code)]
 pub mod conflict;
 pub mod regeneration;
@@ -301,7 +300,8 @@ impl NormalizationStrategy for SemanticVectorStrategy {
         if !has_document && !has_semantic {
             return Err(NormalizerError::NormalizationFailed {
                 entity_id: octad.id.to_string(),
-                message: "Cannot regenerate vector: no document or semantic source available".into(),
+                message: "Cannot regenerate vector: no document or semantic source available"
+                    .into(),
             });
         }
 
@@ -609,6 +609,12 @@ pub struct QualityReconciliationStrategy {
 impl QualityReconciliationStrategy {
     /// Create with the default cascade of all other strategies
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for QualityReconciliationStrategy {
+    fn default() -> Self {
         Self {
             inner: vec![
                 Arc::new(SemanticVectorStrategy),
@@ -701,7 +707,7 @@ mod tests {
     use super::*;
     use verisim_document::Document;
     use verisim_drift::DriftThresholds;
-    use verisim_octad::{OctadStatus, ModalityStatus};
+    use verisim_octad::{ModalityStatus, OctadStatus};
     use verisim_vector::Embedding;
 
     fn create_test_octad() -> Octad {
@@ -718,7 +724,11 @@ mod tests {
             embedding: Some(Embedding::new("test-1", vec![0.1, 0.2, 0.3])),
             tensor: None,
             semantic: None,
-            document: Some(Document::new("test-1", "Test Document", "Test content for normalization")),
+            document: Some(Document::new(
+                "test-1",
+                "Test Document",
+                "Test content for normalization",
+            )),
             version_count: 1,
             provenance_chain_length: 0,
             spatial_data: None,
@@ -762,11 +772,7 @@ mod tests {
         let normalizer = create_default_normalizer(drift_detector).await;
 
         let octad = create_test_octad();
-        let event = DriftEvent::new(
-            DriftType::SemanticVectorDrift,
-            0.5,
-            "Test drift",
-        );
+        let event = DriftEvent::new(DriftType::SemanticVectorDrift, 0.5, "Test drift");
 
         let result = normalizer.handle_drift(&octad, &event).await.unwrap();
         assert!(result.is_some());
@@ -780,11 +786,7 @@ mod tests {
     async fn test_semantic_vector_strategy_empty_octad_errors() {
         let strategy = SemanticVectorStrategy;
         let octad = create_empty_octad();
-        let event = DriftEvent::new(
-            DriftType::SemanticVectorDrift,
-            0.8,
-            "Critical drift",
-        );
+        let event = DriftEvent::new(DriftType::SemanticVectorDrift, 0.8, "Critical drift");
 
         let result = strategy.normalize(&octad, &event).await;
         assert!(result.is_err());
@@ -794,11 +796,7 @@ mod tests {
     async fn test_graph_document_strategy_empty_octad_errors() {
         let strategy = GraphDocumentStrategy;
         let octad = create_empty_octad();
-        let event = DriftEvent::new(
-            DriftType::GraphDocumentDrift,
-            0.8,
-            "Critical drift",
-        );
+        let event = DriftEvent::new(DriftType::GraphDocumentDrift, 0.8, "Critical drift");
 
         let result = strategy.normalize(&octad, &event).await;
         assert!(result.is_err());
@@ -809,11 +807,7 @@ mod tests {
         let strategy = GraphDocumentStrategy;
         let mut octad = create_test_octad();
         octad.graph_node = None; // Only document present
-        let event = DriftEvent::new(
-            DriftType::GraphDocumentDrift,
-            0.5,
-            "Graph missing",
-        );
+        let event = DriftEvent::new(DriftType::GraphDocumentDrift, 0.5, "Graph missing");
 
         let result = strategy.normalize(&octad, &event).await.unwrap();
         assert!(result.success);

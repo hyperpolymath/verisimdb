@@ -7,12 +7,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use verisim_octad::{
-    InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadId,
-    OctadInput, OctadSnapshot, OctadStore,
-};
 use verisim_document::TantivyDocumentStore;
 use verisim_graph::SimpleGraphStore;
+use verisim_octad::{
+    InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadInput, OctadSnapshot, OctadStore,
+};
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
@@ -101,7 +100,10 @@ async fn concurrent_read_write() {
     // Seed 100 entities first
     let mut seed_ids = Vec::new();
     for i in 0..100 {
-        let octad = store.create(doc(&format!("Seed-{i}"), &format!("Seed body {i}"))).await.unwrap();
+        let octad = store
+            .create(doc(&format!("Seed-{i}"), &format!("Seed body {i}")))
+            .await
+            .unwrap();
         seed_ids.push(octad.id);
     }
 
@@ -110,10 +112,13 @@ async fn concurrent_read_write() {
         let store = store.clone();
         handles.push(tokio::spawn(async move {
             for i in 0..10 {
-                store.create(doc(
-                    &format!("Concurrent-W{writer_id}-{i}"),
-                    &format!("Body {writer_id}-{i}"),
-                )).await.unwrap();
+                store
+                    .create(doc(
+                        &format!("Concurrent-W{writer_id}-{i}"),
+                        &format!("Body {writer_id}-{i}"),
+                    ))
+                    .await
+                    .unwrap();
             }
         }));
     }
@@ -127,7 +132,7 @@ async fn concurrent_read_write() {
                 let result = store.get(id).await;
                 match result {
                     Ok(Some(_)) => {} // Expected
-                    Ok(None) => {} // Acceptable during concurrent writes
+                    Ok(None) => {}    // Acceptable during concurrent writes
                     Err(e) => panic!("Reader {reader_id} error on {id}: {e}"),
                 }
             }
@@ -166,6 +171,9 @@ async fn concurrent_create_delete() {
 
     // All should be gone
     for id in &ids {
-        assert!(store.get(id).await.unwrap().is_none(), "{id} should be deleted");
+        assert!(
+            store.get(id).await.unwrap().is_none(),
+            "{id} should be deleted"
+        );
     }
 }

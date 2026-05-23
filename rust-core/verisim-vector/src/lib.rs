@@ -152,9 +152,7 @@ impl BruteForceVectorStore {
                 let b_norm = Self::normalize(b);
                 a_norm.iter().zip(b_norm.iter()).map(|(x, y)| x * y).sum()
             }
-            DistanceMetric::DotProduct => {
-                a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
-            }
+            DistanceMetric::DotProduct => a.iter().zip(b.iter()).map(|(x, y)| x * y).sum(),
             DistanceMetric::Euclidean => {
                 let dist_sq: f32 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum();
                 1.0 / (1.0 + dist_sq.sqrt()) // Convert distance to similarity
@@ -189,7 +187,10 @@ impl VectorStore for BruteForceVectorStore {
             });
         }
 
-        let embeddings = self.embeddings.read().map_err(|_| VectorError::LockPoisoned)?;
+        let embeddings = self
+            .embeddings
+            .read()
+            .map_err(|_| VectorError::LockPoisoned)?;
 
         // Compute similarities for all embeddings (brute-force)
         let mut scored: Vec<_> = embeddings
@@ -204,7 +205,11 @@ impl VectorStore for BruteForceVectorStore {
             .collect();
 
         // Sort by similarity descending
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Return top k
         scored.truncate(k);
@@ -212,11 +217,19 @@ impl VectorStore for BruteForceVectorStore {
     }
 
     async fn get(&self, id: &str) -> Result<Option<Embedding>, VectorError> {
-        Ok(self.embeddings.read().map_err(|_| VectorError::LockPoisoned)?.get(id).cloned())
+        Ok(self
+            .embeddings
+            .read()
+            .map_err(|_| VectorError::LockPoisoned)?
+            .get(id)
+            .cloned())
     }
 
     async fn delete(&self, id: &str) -> Result<(), VectorError> {
-        self.embeddings.write().map_err(|_| VectorError::LockPoisoned)?.remove(id);
+        self.embeddings
+            .write()
+            .map_err(|_| VectorError::LockPoisoned)?
+            .remove(id);
         Ok(())
     }
 

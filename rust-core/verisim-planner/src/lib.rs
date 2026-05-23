@@ -28,8 +28,10 @@ pub use error::PlannerError;
 pub use explain::ExplainOutput;
 pub use optimizer::Planner;
 pub use plan::{LogicalPlan, PhysicalPlan};
-pub use profiler::{ExplainAnalyzeOutput, Profiler, ProfileStep, QueryProfile};
-pub use prepared::{CacheConfig, CacheError, CacheStats, ParamValue, PlanCache, PreparedId, PreparedStatement};
+pub use prepared::{
+    CacheConfig, CacheError, CacheStats, ParamValue, PlanCache, PreparedId, PreparedStatement,
+};
+pub use profiler::{ExplainAnalyzeOutput, ProfileStep, Profiler, QueryProfile};
 pub use slow_query::{SlowQueryConfig, SlowQueryEntry, SlowQueryLog, SlowQuerySummary};
 pub use stats::{AdaptiveTuner, StatisticsCollector, StoreStatistics};
 

@@ -9,13 +9,13 @@
 pub mod persistent;
 #[cfg(feature = "redb-backend")]
 pub use persistent::*;
-pub mod zkp;
-pub mod zkp_bridge;
+pub mod circuit_compiler;
+pub mod circuit_registry;
 pub mod proven_bridge;
 pub mod sanctify_bridge;
-pub mod circuit_registry;
-pub mod circuit_compiler;
 pub mod verification_keys;
+pub mod zkp;
+pub mod zkp_bridge;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,11 @@ pub enum ConstraintKind {
     /// Property must match pattern
     Pattern { property: String, regex: String },
     /// Property must be in range
-    Range { property: String, min: Option<i64>, max: Option<i64> },
+    Range {
+        property: String,
+        min: Option<i64>,
+        max: Option<i64>,
+    },
     /// Custom validation (reference to validator function)
     Custom(String),
 }
@@ -200,8 +204,7 @@ impl ProofBlob {
 
     /// Deserialize from CBOR
     pub fn from_cbor(data: &[u8]) -> Result<Self, SemanticError> {
-        ciborium::from_reader(data)
-            .map_err(|e| SemanticError::SerializationError(e.to_string()))
+        ciborium::from_reader(data).map_err(|e| SemanticError::SerializationError(e.to_string()))
     }
 
     /// Verify the proof data against the claim.
@@ -248,10 +251,14 @@ pub trait SemanticStore: Send + Sync {
     async fn annotate(&self, annotation: &SemanticAnnotation) -> Result<(), SemanticError>;
 
     /// Get annotations for an entity
-    async fn get_annotations(&self, entity_id: &str) -> Result<Option<SemanticAnnotation>, SemanticError>;
+    async fn get_annotations(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<SemanticAnnotation>, SemanticError>;
 
     /// Validate an annotation against type constraints
-    async fn validate(&self, annotation: &SemanticAnnotation) -> Result<Vec<String>, SemanticError>;
+    async fn validate(&self, annotation: &SemanticAnnotation)
+        -> Result<Vec<String>, SemanticError>;
 
     /// Store a proof blob
     async fn store_proof(&self, proof: &ProofBlob) -> Result<(), SemanticError>;
@@ -263,7 +270,10 @@ pub trait SemanticStore: Send + Sync {
     async fn verify_proofs(&self, claim: &str) -> Result<(usize, usize), SemanticError> {
         let proofs = self.get_proofs(claim).await?;
         let total = proofs.len();
-        let valid = proofs.iter().filter(|p| p.verify().unwrap_or(false)).count();
+        let valid = proofs
+            .iter()
+            .filter(|p| p.verify().unwrap_or(false))
+            .count();
         Ok((valid, total))
     }
 }
@@ -294,12 +304,20 @@ impl Default for InMemorySemanticStore {
 #[async_trait]
 impl SemanticStore for InMemorySemanticStore {
     async fn register_type(&self, typ: &SemanticType) -> Result<(), SemanticError> {
-        self.types.write().map_err(|_| SemanticError::LockPoisoned)?.insert(typ.iri.clone(), typ.clone());
+        self.types
+            .write()
+            .map_err(|_| SemanticError::LockPoisoned)?
+            .insert(typ.iri.clone(), typ.clone());
         Ok(())
     }
 
     async fn get_type(&self, iri: &str) -> Result<Option<SemanticType>, SemanticError> {
-        Ok(self.types.read().map_err(|_| SemanticError::LockPoisoned)?.get(iri).cloned())
+        Ok(self
+            .types
+            .read()
+            .map_err(|_| SemanticError::LockPoisoned)?
+            .get(iri)
+            .cloned())
     }
 
     async fn annotate(&self, annotation: &SemanticAnnotation) -> Result<(), SemanticError> {
@@ -308,15 +326,29 @@ impl SemanticStore for InMemorySemanticStore {
         if !violations.is_empty() {
             return Err(SemanticError::ConstraintViolation(violations.join("; ")));
         }
-        self.annotations.write().map_err(|_| SemanticError::LockPoisoned)?.insert(annotation.entity_id.clone(), annotation.clone());
+        self.annotations
+            .write()
+            .map_err(|_| SemanticError::LockPoisoned)?
+            .insert(annotation.entity_id.clone(), annotation.clone());
         Ok(())
     }
 
-    async fn get_annotations(&self, entity_id: &str) -> Result<Option<SemanticAnnotation>, SemanticError> {
-        Ok(self.annotations.read().map_err(|_| SemanticError::LockPoisoned)?.get(entity_id).cloned())
+    async fn get_annotations(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<SemanticAnnotation>, SemanticError> {
+        Ok(self
+            .annotations
+            .read()
+            .map_err(|_| SemanticError::LockPoisoned)?
+            .get(entity_id)
+            .cloned())
     }
 
-    async fn validate(&self, annotation: &SemanticAnnotation) -> Result<Vec<String>, SemanticError> {
+    async fn validate(
+        &self,
+        annotation: &SemanticAnnotation,
+    ) -> Result<Vec<String>, SemanticError> {
         let types = self.types.read().map_err(|_| SemanticError::LockPoisoned)?;
         let mut violations = Vec::new();
 
@@ -326,15 +358,21 @@ impl SemanticStore for InMemorySemanticStore {
                     match &constraint.kind {
                         ConstraintKind::Required(prop) => {
                             if !annotation.properties.contains_key(prop) {
-                                violations.push(format!("{}: {}", constraint.name, constraint.message));
+                                violations
+                                    .push(format!("{}: {}", constraint.name, constraint.message));
                             }
                         }
                         ConstraintKind::Pattern { property, regex } => {
-                            if let Some(SemanticValue::TypedLiteral { value, .. }) = annotation.properties.get(property) {
+                            if let Some(SemanticValue::TypedLiteral { value, .. }) =
+                                annotation.properties.get(property)
+                            {
                                 let re = regex::Regex::new(regex).ok();
                                 if let Some(re) = re {
                                     if !re.is_match(value) {
-                                        violations.push(format!("{}: {}", constraint.name, constraint.message));
+                                        violations.push(format!(
+                                            "{}: {}",
+                                            constraint.name, constraint.message
+                                        ));
                                     }
                                 }
                             }
@@ -349,7 +387,9 @@ impl SemanticStore for InMemorySemanticStore {
     }
 
     async fn store_proof(&self, proof: &ProofBlob) -> Result<(), SemanticError> {
-        self.proofs.write().map_err(|_| SemanticError::LockPoisoned)?
+        self.proofs
+            .write()
+            .map_err(|_| SemanticError::LockPoisoned)?
             .entry(proof.claim.clone())
             .or_default()
             .push(proof.clone());
@@ -357,7 +397,13 @@ impl SemanticStore for InMemorySemanticStore {
     }
 
     async fn get_proofs(&self, claim: &str) -> Result<Vec<ProofBlob>, SemanticError> {
-        Ok(self.proofs.read().map_err(|_| SemanticError::LockPoisoned)?.get(claim).cloned().unwrap_or_default())
+        Ok(self
+            .proofs
+            .read()
+            .map_err(|_| SemanticError::LockPoisoned)?
+            .get(claim)
+            .cloned()
+            .unwrap_or_default())
     }
 }
 

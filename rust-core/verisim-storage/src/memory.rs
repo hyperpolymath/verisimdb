@@ -105,10 +105,7 @@ impl StorageBackend for InMemoryBackend {
 
     async fn multi_get(&self, keys: &[&[u8]]) -> Result<Vec<Option<Vec<u8>>>, StorageError> {
         let map = self.data.read().await;
-        let results = keys
-            .iter()
-            .map(|key| map.get(*key).cloned())
-            .collect();
+        let results = keys.iter().map(|key| map.get(*key).cloned()).collect();
         Ok(results)
     }
 
@@ -131,10 +128,7 @@ impl StorageBackend for InMemoryBackend {
 
     async fn approximate_size(&self) -> Result<Option<u64>, StorageError> {
         let map = self.data.read().await;
-        let size: u64 = map
-            .iter()
-            .map(|(k, v)| (k.len() + v.len()) as u64)
-            .sum();
+        let size: u64 = map.iter().map(|(k, v)| (k.len() + v.len()) as u64).sum();
         Ok(Some(size))
     }
 }
@@ -154,13 +148,19 @@ mod tests {
 
         // Put and get.
         backend.put(b"key1", b"value1").await.unwrap();
-        assert_eq!(backend.get(b"key1").await.unwrap(), Some(b"value1".to_vec()));
+        assert_eq!(
+            backend.get(b"key1").await.unwrap(),
+            Some(b"value1".to_vec())
+        );
         assert!(backend.exists(b"key1").await.unwrap());
         assert_eq!(backend.len().await, 1);
 
         // Overwrite.
         backend.put(b"key1", b"updated").await.unwrap();
-        assert_eq!(backend.get(b"key1").await.unwrap(), Some(b"updated".to_vec()));
+        assert_eq!(
+            backend.get(b"key1").await.unwrap(),
+            Some(b"updated".to_vec())
+        );
         assert_eq!(backend.len().await, 1);
 
         // Delete existing key.

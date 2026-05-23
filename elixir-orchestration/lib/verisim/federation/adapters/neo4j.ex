@@ -89,9 +89,7 @@ defmodule VeriSim.Federation.Adapters.Neo4j do
     end
   rescue
     e ->
-      Logger.warning(
-        "Neo4j adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("Neo4j adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end

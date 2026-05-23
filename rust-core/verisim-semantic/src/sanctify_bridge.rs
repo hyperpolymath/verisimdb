@@ -168,8 +168,9 @@ pub struct SanctifyContract {
 
 /// Parse a sanctify report from JSON bytes.
 pub fn parse_sanctify_report(bytes: &[u8]) -> Result<SanctifyReport, SemanticError> {
-    serde_json::from_slice(bytes)
-        .map_err(|e| SemanticError::SerializationError(format!("Failed to parse sanctify report: {}", e)))
+    serde_json::from_slice(bytes).map_err(|e| {
+        SemanticError::SerializationError(format!("Failed to parse sanctify report: {}", e))
+    })
 }
 
 /// Validate a sanctify contract's structural integrity.
@@ -180,10 +181,14 @@ pub fn parse_sanctify_report(bytes: &[u8]) -> Result<SanctifyReport, SemanticErr
 /// - Resolution flags are consistent with issue counts
 pub fn validate_contract(contract: &SanctifyContract) -> Result<bool, SemanticError> {
     if contract.contract_id.is_empty() {
-        return Err(SemanticError::ConstraintViolation("Contract ID must not be empty".to_string()));
+        return Err(SemanticError::ConstraintViolation(
+            "Contract ID must not be empty".to_string(),
+        ));
     }
     if contract.octad_id.is_empty() {
-        return Err(SemanticError::ConstraintViolation("Octad ID must not be empty".to_string()));
+        return Err(SemanticError::ConstraintViolation(
+            "Octad ID must not be empty".to_string(),
+        ));
     }
 
     // Verify summary is consistent
@@ -260,7 +265,9 @@ mod tests {
                 column: Some(15),
                 description: "Unsanitized user input in SQL query".to_string(),
                 remedy: "Use prepared statements with PDO".to_string(),
-                code: Some("$query = \"SELECT * FROM users WHERE id = \" . $_GET['id']".to_string()),
+                code: Some(
+                    "$query = \"SELECT * FROM users WHERE id = \" . $_GET['id']".to_string(),
+                ),
             },
             SecurityIssue {
                 issue_type: IssueType::CrossSiteScripting,
@@ -318,11 +325,8 @@ mod tests {
     #[test]
     fn test_bind_contract() {
         let report = sample_report();
-        let contract = bind_contract_to_octad(
-            "audit-001".to_string(),
-            "octad-abc".to_string(),
-            report,
-        );
+        let contract =
+            bind_contract_to_octad("audit-001".to_string(), "octad-abc".to_string(), report);
         assert!(!contract.all_critical_resolved); // Has 1 critical
         assert!(!contract.all_high_resolved); // Has 1 high
         assert_eq!(contract.report.issues.len(), 3);
@@ -331,11 +335,8 @@ mod tests {
     #[test]
     fn test_validate_contract() {
         let report = sample_report();
-        let contract = bind_contract_to_octad(
-            "audit-001".to_string(),
-            "octad-abc".to_string(),
-            report,
-        );
+        let contract =
+            bind_contract_to_octad("audit-001".to_string(), "octad-abc".to_string(), report);
         // Valid contract (resolution flags match issue counts)
         assert!(validate_contract(&contract).unwrap());
     }
@@ -372,11 +373,8 @@ mod tests {
     #[test]
     fn test_contract_to_proof_blob() {
         let report = sample_report();
-        let contract = bind_contract_to_octad(
-            "audit-003".to_string(),
-            "octad-xyz".to_string(),
-            report,
-        );
+        let contract =
+            bind_contract_to_octad("audit-003".to_string(), "octad-xyz".to_string(), report);
         let blob = contract_to_proof_blob(&contract).unwrap();
         assert!(blob.claim.contains("security-audit:audit-003"));
         assert!(blob.claim.contains("octad:octad-xyz"));
@@ -401,11 +399,8 @@ mod tests {
             issues: vec![],
             summary: IssueSummary::default(),
         };
-        let contract = bind_contract_to_octad(
-            "clean-001".to_string(),
-            "octad-clean".to_string(),
-            report,
-        );
+        let contract =
+            bind_contract_to_octad("clean-001".to_string(), "octad-clean".to_string(), report);
         assert!(contract.all_critical_resolved);
         assert!(contract.all_high_resolved);
         assert!(validate_contract(&contract).unwrap());

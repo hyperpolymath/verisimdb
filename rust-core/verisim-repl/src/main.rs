@@ -175,8 +175,7 @@ fn main() {
 
                 // Multiline continuation: if the line ends with '\', append
                 // the line (minus the backslash) and continue reading.
-                if trimmed.ends_with('\\') {
-                    let without_continuation = &trimmed[..trimmed.len() - 1];
+                if let Some(without_continuation) = trimmed.strip_suffix('\\') {
                     if !query_buf.is_empty() {
                         query_buf.push(' ');
                     }
@@ -437,25 +436,10 @@ fn history_file_path() -> std::path::PathBuf {
 /// Print the welcome banner.
 fn print_banner(session: &Session) {
     println!();
-    println!(
-        "{}",
-        "  VeriSimDB VQL REPL".bright_cyan().bold()
-    );
-    println!(
-        "  {} {}",
-        "Version:".dimmed(),
-        VERSION
-    );
-    println!(
-        "  {} {}",
-        "Server: ".dimmed(),
-        session.client.base_url()
-    );
-    println!(
-        "  {} {}",
-        "Format: ".dimmed(),
-        session.format
-    );
+    println!("{}", "  VeriSimDB VQL REPL".bright_cyan().bold());
+    println!("  {} {}", "Version:".dimmed(), VERSION);
+    println!("  {} {}", "Server: ".dimmed(), session.client.base_url());
+    println!("  {} {}", "Format: ".dimmed(), session.format);
     println!();
     println!(
         "  Type {} for help, {} to exit.",
@@ -471,39 +455,32 @@ fn print_help() {
     println!("{}", "  VQL Meta-Commands".bright_cyan().bold());
     println!();
     println!(
-        "  {}  {}",
-        "\\connect <host:port>".bright_yellow(),
-        "Change server connection"
+        "  {}  Change server connection",
+        "\\connect <host:port>".bright_yellow()
     );
     println!(
-        "  {}  {}",
-        "\\explain <query>    ".bright_yellow(),
-        "Show EXPLAIN output for a query"
+        "  {}  Show EXPLAIN output for a query",
+        "\\explain <query>    ".bright_yellow()
     );
     println!(
-        "  {}  {}",
-        "\\timing             ".bright_yellow(),
-        "Toggle query timing display"
+        "  {}  Toggle query timing display",
+        "\\timing             ".bright_yellow()
     );
     println!(
-        "  {}  {}",
-        "\\format <fmt>       ".bright_yellow(),
-        "Set output format (table|json|csv)"
+        "  {}  Set output format (table|json|csv)",
+        "\\format <fmt>       ".bright_yellow()
     );
     println!(
-        "  {}  {}",
-        "\\status             ".bright_yellow(),
-        "Show server health status"
+        "  {}  Show server health status",
+        "\\status             ".bright_yellow()
     );
     println!(
-        "  {}  {}",
-        "\\help               ".bright_yellow(),
-        "Show this help message"
+        "  {}  Show this help message",
+        "\\help               ".bright_yellow()
     );
     println!(
-        "  {}  {}",
-        "\\quit / \\q          ".bright_yellow(),
-        "Exit the REPL"
+        "  {}  Exit the REPL",
+        "\\quit / \\q          ".bright_yellow()
     );
     println!();
     println!("{}", "  Query Input".bright_cyan().bold());

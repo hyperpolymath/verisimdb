@@ -87,16 +87,30 @@ impl LintRule {
     pub fn description(&self) -> &'static str {
         match self {
             LintRule::MissingLimit => "Query lacks LIMIT clause — may return unbounded results",
-            LintRule::SelectAllModalities => "Query selects all 8 modalities — consider selecting only what you need",
-            LintRule::MissingProof => "Semantic modality accessed without PROOF clause — data integrity not verified",
-            LintRule::UnboundedTraverse => "TRAVERSE without DEPTH limit — may explore entire graph",
-            LintRule::MissingThreshold => "DRIFT/CONSISTENCY check without THRESHOLD — using implicit default",
-            LintRule::OrderByWithoutLimit => "ORDER BY without LIMIT — sorting potentially unbounded result set",
+            LintRule::SelectAllModalities => {
+                "Query selects all 8 modalities — consider selecting only what you need"
+            }
+            LintRule::MissingProof => {
+                "Semantic modality accessed without PROOF clause — data integrity not verified"
+            }
+            LintRule::UnboundedTraverse => {
+                "TRAVERSE without DEPTH limit — may explore entire graph"
+            }
+            LintRule::MissingThreshold => {
+                "DRIFT/CONSISTENCY check without THRESHOLD — using implicit default"
+            }
+            LintRule::OrderByWithoutLimit => {
+                "ORDER BY without LIMIT — sorting potentially unbounded result set"
+            }
             LintRule::DangerousWrite => "DELETE/UPDATE without WHERE clause — affects all entities",
             LintRule::UnknownProofType => "Unrecognized proof type in PROOF clause",
             LintRule::RedundantWhere => "WHERE clause appears redundant (always true condition)",
-            LintRule::MultiModalityNoExplain => "Multi-modality query — consider running EXPLAIN first to review the plan",
-            LintRule::FederationWithoutStore => "FEDERATION query without STORE — will query all federated instances",
+            LintRule::MultiModalityNoExplain => {
+                "Multi-modality query — consider running EXPLAIN first to review the plan"
+            }
+            LintRule::FederationWithoutStore => {
+                "FEDERATION query without STORE — will query all federated instances"
+            }
         }
     }
 }
@@ -119,14 +133,27 @@ impl fmt::Display for LintDiagnostic {
 
 /// VQL modality names — all 8 octad modalities.
 const MODALITIES: &[&str] = &[
-    "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
-    "PROVENANCE", "SPATIAL",
+    "GRAPH",
+    "VECTOR",
+    "TENSOR",
+    "SEMANTIC",
+    "DOCUMENT",
+    "TEMPORAL",
+    "PROVENANCE",
+    "SPATIAL",
 ];
 
 /// Known VQL-DT proof types.
 const KNOWN_PROOF_TYPES: &[&str] = &[
-    "EXISTENCE", "CONSISTENCY", "INTEGRITY", "AUTHENTICITY",
-    "PROVENANCE", "ACCESS", "CITATION", "ZKP", "PLONK",
+    "EXISTENCE",
+    "CONSISTENCY",
+    "INTEGRITY",
+    "AUTHENTICITY",
+    "PROVENANCE",
+    "ACCESS",
+    "CITATION",
+    "ZKP",
+    "PLONK",
 ];
 
 /// Lint a VQL query string and return diagnostics.
@@ -167,10 +194,7 @@ pub fn lint_query(query: &str) -> Vec<LintDiagnostic> {
 
     // VQL002: SELECT all modalities
     if is_select {
-        let modality_count = MODALITIES
-            .iter()
-            .filter(|m| tokens.contains(m))
-            .count();
+        let modality_count = MODALITIES.iter().filter(|m| tokens.contains(m)).count();
         if modality_count >= 8 {
             diagnostics.push(LintDiagnostic {
                 rule: LintRule::SelectAllModalities,
@@ -207,7 +231,10 @@ pub fn lint_query(query: &str) -> Vec<LintDiagnostic> {
             rule: LintRule::MissingThreshold,
             severity: Severity::Hint,
             message: LintRule::MissingThreshold.description().to_string(),
-            offset: upper.find("DRIFT").or_else(|| upper.find("CONSISTENCY")).unwrap_or(0),
+            offset: upper
+                .find("DRIFT")
+                .or_else(|| upper.find("CONSISTENCY"))
+                .unwrap_or(0),
         });
     }
 
@@ -270,10 +297,7 @@ pub fn lint_query(query: &str) -> Vec<LintDiagnostic> {
 
     // VQL010: Multi-modality without EXPLAIN
     if is_select && !is_explain {
-        let modality_count = MODALITIES
-            .iter()
-            .filter(|m| tokens.contains(m))
-            .count();
+        let modality_count = MODALITIES.iter().filter(|m| tokens.contains(m)).count();
         if modality_count >= 3 {
             diagnostics.push(LintDiagnostic {
                 rule: LintRule::MultiModalityNoExplain,
@@ -313,9 +337,18 @@ pub fn format_diagnostics(query: &str, diagnostics: &[LintDiagnostic]) -> String
     }
 
     let mut output = String::new();
-    let error_count = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();
-    let warning_count = diagnostics.iter().filter(|d| d.severity == Severity::Warning).count();
-    let hint_count = diagnostics.iter().filter(|d| d.severity == Severity::Hint).count();
+    let error_count = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .count();
+    let warning_count = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Warning)
+        .count();
+    let hint_count = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Hint)
+        .count();
 
     for diag in diagnostics {
         output.push_str(&format!("  {} {}\n", diag.rule, diag.message));
@@ -348,7 +381,10 @@ mod tests {
     #[test]
     fn test_clean_query_no_errors() {
         let diagnostics = lint_query("SELECT GRAPH FROM OCTAD WHERE id = 'abc' LIMIT 10");
-        let errors: Vec<_> = diagnostics.iter().filter(|d| d.severity == Severity::Error).collect();
+        let errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
+            .collect();
         assert!(errors.is_empty());
     }
 
@@ -369,7 +405,9 @@ mod tests {
         let diagnostics = lint_query(
             "SELECT GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL PROVENANCE SPATIAL FROM OCTAD LIMIT 10"
         );
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::SelectAllModalities));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::SelectAllModalities));
     }
 
     #[test]
@@ -387,45 +425,60 @@ mod tests {
     #[test]
     fn test_unbounded_traverse() {
         let diagnostics = lint_query("SELECT GRAPH FROM OCTAD TRAVERSE relates_to LIMIT 10");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::UnboundedTraverse));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::UnboundedTraverse));
         assert!(diagnostics.iter().any(|d| d.severity == Severity::Error));
     }
 
     #[test]
     fn test_traverse_with_depth_ok() {
-        let diagnostics = lint_query("SELECT GRAPH FROM OCTAD TRAVERSE relates_to DEPTH 3 LIMIT 10");
-        assert!(!diagnostics.iter().any(|d| d.rule == LintRule::UnboundedTraverse));
+        let diagnostics =
+            lint_query("SELECT GRAPH FROM OCTAD TRAVERSE relates_to DEPTH 3 LIMIT 10");
+        assert!(!diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::UnboundedTraverse));
     }
 
     #[test]
     fn test_drift_without_threshold() {
         let diagnostics = lint_query("SELECT GRAPH FROM OCTAD WHERE DRIFT LIMIT 10");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::MissingThreshold));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::MissingThreshold));
     }
 
     #[test]
     fn test_order_without_limit() {
         let diagnostics = lint_query("SELECT GRAPH FROM OCTAD ORDER BY name");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::OrderByWithoutLimit));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::OrderByWithoutLimit));
     }
 
     #[test]
     fn test_dangerous_delete() {
         let diagnostics = lint_query("DELETE FROM OCTAD");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::DangerousWrite));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::DangerousWrite));
         assert!(diagnostics.iter().any(|d| d.severity == Severity::Error));
     }
 
     #[test]
     fn test_delete_with_where_ok() {
         let diagnostics = lint_query("DELETE FROM OCTAD WHERE id = 'abc'");
-        assert!(!diagnostics.iter().any(|d| d.rule == LintRule::DangerousWrite));
+        assert!(!diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::DangerousWrite));
     }
 
     #[test]
     fn test_unknown_proof_type() {
         let diagnostics = lint_query("SELECT SEMANTIC FROM OCTAD PROOF FOOBAR LIMIT 10");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::UnknownProofType));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::UnknownProofType));
     }
 
     #[test]
@@ -434,7 +487,9 @@ mod tests {
             let q = format!("SELECT SEMANTIC FROM OCTAD PROOF {} LIMIT 10", proof_type);
             let diagnostics = lint_query(&q);
             assert!(
-                !diagnostics.iter().any(|d| d.rule == LintRule::UnknownProofType),
+                !diagnostics
+                    .iter()
+                    .any(|d| d.rule == LintRule::UnknownProofType),
                 "Proof type {} should be recognized",
                 proof_type
             );
@@ -444,27 +499,34 @@ mod tests {
     #[test]
     fn test_redundant_where() {
         let diagnostics = lint_query("SELECT GRAPH FROM OCTAD WHERE 1=1 LIMIT 10");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::RedundantWhere));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::RedundantWhere));
     }
 
     #[test]
     fn test_multi_modality_hint() {
-        let diagnostics = lint_query(
-            "SELECT GRAPH VECTOR TENSOR FROM OCTAD LIMIT 10"
-        );
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::MultiModalityNoExplain));
+        let diagnostics = lint_query("SELECT GRAPH VECTOR TENSOR FROM OCTAD LIMIT 10");
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::MultiModalityNoExplain));
     }
 
     #[test]
     fn test_federation_without_store() {
         let diagnostics = lint_query("SELECT GRAPH FROM FEDERATION OCTAD LIMIT 10");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::FederationWithoutStore));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::FederationWithoutStore));
     }
 
     #[test]
     fn test_federation_with_store_ok() {
-        let diagnostics = lint_query("SELECT GRAPH FROM FEDERATION STORE 'remote-1' OCTAD LIMIT 10");
-        assert!(!diagnostics.iter().any(|d| d.rule == LintRule::FederationWithoutStore));
+        let diagnostics =
+            lint_query("SELECT GRAPH FROM FEDERATION STORE 'remote-1' OCTAD LIMIT 10");
+        assert!(!diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::FederationWithoutStore));
     }
 
     #[test]
@@ -479,13 +541,14 @@ mod tests {
 
     #[test]
     fn test_diagnostics_sorted_by_severity() {
-        let diagnostics = lint_query(
-            "DELETE FROM FEDERATION OCTAD"
-        );
+        let diagnostics = lint_query("DELETE FROM FEDERATION OCTAD");
         // Errors should come before warnings
         let severities: Vec<_> = diagnostics.iter().map(|d| d.severity).collect();
         for window in severities.windows(2) {
-            assert!(window[0] >= window[1], "Diagnostics should be sorted by severity");
+            assert!(
+                window[0] >= window[1],
+                "Diagnostics should be sorted by severity"
+            );
         }
     }
 
@@ -512,6 +575,8 @@ mod tests {
     #[test]
     fn test_update_without_where() {
         let diagnostics = lint_query("UPDATE OCTAD SET name = 'test'");
-        assert!(diagnostics.iter().any(|d| d.rule == LintRule::DangerousWrite));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.rule == LintRule::DangerousWrite));
     }
 }

@@ -26,3 +26,5 @@ verisim-temporal = { path = "../rust-core/verisim-temporal" }
 verisim-octad = { path = "../rust-core/verisim-octad" }
 verisim-drift = { path = "../rust-core/verisim-drift" }
 verisim-normalizer = { path = "../rust-core/verisim-normalizer" }
+verisim-provenance = { path = "../rust-core/verisim-provenance" }
+verisim-spatial = { path = "../rust-core/verisim-spatial" }

@@ -105,7 +105,7 @@ fn format_array_table(rows: &[Value]) -> String {
 
     let mut table = Table::new();
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(columns.iter().map(|c| Cell::new(c)));
+    table.set_header(columns.iter().map(Cell::new));
 
     for row in rows {
         let cells: Vec<Cell> = columns
@@ -119,7 +119,10 @@ fn format_array_table(rows: &[Value]) -> String {
     }
 
     let row_count = rows.len();
-    format!("{table}\n({row_count} row{})", if row_count == 1 { "" } else { "s" })
+    format!(
+        "{table}\n({row_count} row{})",
+        if row_count == 1 { "" } else { "s" }
+    )
 }
 
 /// Render a single JSON object as a two-column table (Field | Value).
@@ -245,7 +248,10 @@ mod tests {
 
     #[test]
     fn test_output_format_parse() {
-        assert_eq!("table".parse::<OutputFormat>().unwrap(), OutputFormat::Table);
+        assert_eq!(
+            "table".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Table
+        );
         assert_eq!("JSON".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
         assert_eq!("csv".parse::<OutputFormat>().unwrap(), OutputFormat::Csv);
         assert!("xml".parse::<OutputFormat>().is_err());

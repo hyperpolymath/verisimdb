@@ -43,8 +43,14 @@ impl TransactionId {
     }
 
     /// Create a TransactionId from an existing string (for API lookups).
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         Self(s.to_string())
+    }
+}
+
+impl Default for TransactionId {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -275,10 +281,7 @@ impl TransactionManager {
     }
 
     /// Rollback a transaction — discard all buffered operations.
-    pub async fn rollback(
-        &self,
-        txn_id: &TransactionId,
-    ) -> Result<usize, TransactionError> {
+    pub async fn rollback(&self, txn_id: &TransactionId) -> Result<usize, TransactionError> {
         let mut txns = self.transactions.write().await;
         let txn = txns
             .get_mut(txn_id)

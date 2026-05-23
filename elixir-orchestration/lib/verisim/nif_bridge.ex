@@ -40,9 +40,17 @@ defmodule VeriSim.NifBridge do
       |> Path.join("native/libverisim_nif")
 
     case :erlang.load_nif(String.to_charlist(nif_path), 0) do
-      :ok -> :ok
-      {:error, {:load_failed, _}} -> :ok  # NIF not available — stubs will be used
-      {:error, {:reload, _}} -> :ok        # Already loaded
+      :ok ->
+        :ok
+
+      # NIF not available — stubs will be used
+      {:error, {:load_failed, _}} ->
+        :ok
+
+      # Already loaded
+      {:error, {:reload, _}} ->
+        :ok
+
       {:error, reason} ->
         require Logger
         Logger.debug("VeriSim.NifBridge: NIF not loaded (#{inspect(reason)})")

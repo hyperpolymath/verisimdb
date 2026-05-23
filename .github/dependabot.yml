@@ -24,25 +24,13 @@ updates:
         update-types: ["version-update:semver-patch"]
 
   # Elixir/Mix
-  - package-ecosystem: "weeklymix"
-    directory: "/"
+  - package-ecosystem: "mix"
+    directory: "/elixir-orchestration"
     schedule:
-      interval: "daily"
+      interval: "weekly"
 
-  # Node.js/npm
+  # Node.js/npm — VQL playground
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/playground"
     schedule:
-      interval: "daily"
-
-  # Python/pip
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "daily"
-
-  # Nix flakes
-  - package-ecosystem: "nix"
-    directory: "/"
-    schedule:
-      interval: "daily"
+      interval: "weekly"

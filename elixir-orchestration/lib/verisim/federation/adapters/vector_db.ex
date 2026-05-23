@@ -106,9 +106,7 @@ defmodule VeriSim.Federation.Adapters.VectorDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "VectorDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("VectorDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end
@@ -469,8 +467,7 @@ defmodule VeriSim.Federation.Adapters.VectorDB do
 
         case Req.post(url, json: body, headers: headers, receive_timeout: timeout) do
           {:ok, %Req.Response{status: 200, body: resp}} ->
-            results =
-              get_in(resp, ["data", "Get", collection]) || []
+            results = get_in(resp, ["data", "Get", collection]) || []
 
             {:ok, results}
 

@@ -20,9 +20,9 @@
 #![forbid(unsafe_code)]
 #[cfg(feature = "redb-backend")]
 pub mod persistent;
+use async_trait::async_trait;
 #[cfg(feature = "redb-backend")]
 pub use persistent::*;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -151,7 +151,11 @@ pub struct SpatialData {
 
 impl SpatialData {
     /// Create spatial data for a point with default WGS84 SRID.
-    pub fn point(latitude: f64, longitude: f64, altitude: Option<f64>) -> Result<Self, SpatialError> {
+    pub fn point(
+        latitude: f64,
+        longitude: f64,
+        altitude: Option<f64>,
+    ) -> Result<Self, SpatialError> {
         Ok(Self {
             coordinates: Coordinates::new(latitude, longitude, altitude)?,
             geometry_type: GeometryType::Point,
@@ -161,11 +165,7 @@ impl SpatialData {
     }
 
     /// Create spatial data with a specified geometry type and SRID.
-    pub fn with_geometry(
-        coordinates: Coordinates,
-        geometry_type: GeometryType,
-        srid: u32,
-    ) -> Self {
+    pub fn with_geometry(coordinates: Coordinates, geometry_type: GeometryType, srid: u32) -> Self {
         Self {
             coordinates,
             geometry_type,
@@ -256,8 +256,7 @@ pub fn haversine_distance(a: &Coordinates, b: &Coordinates) -> f64 {
     let dlat = (b.latitude - a.latitude).to_radians();
     let dlon = (b.longitude - a.longitude).to_radians();
 
-    let h = (dlat / 2.0).sin().powi(2)
-        + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+    let h = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
 
     let c = 2.0 * h.sqrt().asin();
     EARTH_RADIUS_KM * c
@@ -451,7 +450,11 @@ mod tests {
     fn test_haversine_same_point() {
         let a = Coordinates::new_unchecked(51.5074, -0.1278, None);
         let dist = haversine_distance(&a, &a);
-        assert!(dist < 0.001, "Same point distance should be ~0, got {}", dist);
+        assert!(
+            dist < 0.001,
+            "Same point distance should be ~0, got {}",
+            dist
+        );
     }
 
     #[test]
@@ -514,7 +517,10 @@ mod tests {
 
         // London
         store
-            .index("london", SpatialData::point(51.5074, -0.1278, None).unwrap())
+            .index(
+                "london",
+                SpatialData::point(51.5074, -0.1278, None).unwrap(),
+            )
             .await
             .unwrap();
         // Paris
@@ -532,7 +538,11 @@ mod tests {
         let center = Coordinates::new(51.5074, -0.1278, None).unwrap();
         let results = store.search_radius(&center, 500.0, 10).await.unwrap();
 
-        assert_eq!(results.len(), 2, "Should find London and Paris within 500km");
+        assert_eq!(
+            results.len(),
+            2,
+            "Should find London and Paris within 500km"
+        );
         assert_eq!(results[0].entity_id, "london", "London should be closest");
     }
 
@@ -542,7 +552,10 @@ mod tests {
 
         // London
         store
-            .index("london", SpatialData::point(51.5074, -0.1278, None).unwrap())
+            .index(
+                "london",
+                SpatialData::point(51.5074, -0.1278, None).unwrap(),
+            )
             .await
             .unwrap();
         // Paris
@@ -565,7 +578,11 @@ mod tests {
         };
 
         let results = store.search_within(&bounds, 10).await.unwrap();
-        assert_eq!(results.len(), 2, "Should find London and Paris in W. Europe box");
+        assert_eq!(
+            results.len(),
+            2,
+            "Should find London and Paris in W. Europe box"
+        );
     }
 
     #[tokio::test]
@@ -573,7 +590,10 @@ mod tests {
         let store = InMemorySpatialStore::new();
 
         store
-            .index("london", SpatialData::point(51.5074, -0.1278, None).unwrap())
+            .index(
+                "london",
+                SpatialData::point(51.5074, -0.1278, None).unwrap(),
+            )
             .await
             .unwrap();
         store

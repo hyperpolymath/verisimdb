@@ -274,9 +274,16 @@ defmodule VeriSim.Federation.Resolver do
     # Add optional modality-specific query parameters
     query_params = maybe_add_param(query_params, :text_query, Keyword.get(opts, :text_query))
     query_params = maybe_add_param(query_params, :vector_query, Keyword.get(opts, :vector_query))
-    query_params = maybe_add_param(query_params, :graph_pattern, Keyword.get(opts, :graph_pattern))
-    query_params = maybe_add_param(query_params, :spatial_bounds, Keyword.get(opts, :spatial_bounds))
-    query_params = maybe_add_param(query_params, :temporal_range, Keyword.get(opts, :temporal_range))
+
+    query_params =
+      maybe_add_param(query_params, :graph_pattern, Keyword.get(opts, :graph_pattern))
+
+    query_params =
+      maybe_add_param(query_params, :spatial_bounds, Keyword.get(opts, :spatial_bounds))
+
+    query_params =
+      maybe_add_param(query_params, :temporal_range, Keyword.get(opts, :temporal_range))
+
     query_params = maybe_add_param(query_params, :filters, Keyword.get(opts, :filters))
 
     # Resolve pattern to matching stores
@@ -334,11 +341,13 @@ defmodule VeriSim.Federation.Resolver do
 
         case peer.adapter_module.health_check(peer_info) do
           {:ok, response_time} ->
-            {id, %{peer |
-              last_seen: DateTime.utc_now(),
-              response_time_ms: response_time,
-              trust_level: min(peer.trust_level + 0.05, 1.0)
-            }}
+            {id,
+             %{
+               peer
+               | last_seen: DateTime.utc_now(),
+                 response_time_ms: response_time,
+                 trust_level: min(peer.trust_level + 0.05, 1.0)
+             }}
 
           {:error, reason} ->
             Logger.debug(
@@ -346,9 +355,7 @@ defmodule VeriSim.Federation.Resolver do
                 "#{inspect(reason)}"
             )
 
-            {id, %{peer |
-              trust_level: max(peer.trust_level - 0.1, 0.0)
-            }}
+            {id, %{peer | trust_level: max(peer.trust_level - 0.1, 0.0)}}
         end
       end)
       |> Map.new()
@@ -434,9 +441,7 @@ defmodule VeriSim.Federation.Resolver do
               Logger.info("Federation: repair triggered on #{peer.store_id}")
 
             {:ok, %Req.Response{status: status}} ->
-              Logger.warning(
-                "Federation: repair request to #{peer.store_id} returned #{status}"
-              )
+              Logger.warning("Federation: repair request to #{peer.store_id} returned #{status}")
 
             {:error, reason} ->
               Logger.warning(

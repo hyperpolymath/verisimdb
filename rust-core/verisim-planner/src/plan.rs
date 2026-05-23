@@ -25,13 +25,20 @@ pub enum ConditionKind {
     /// Equality filter (field = value).
     Equality { field: String, value: String },
     /// Range filter (field BETWEEN low AND high).
-    Range { field: String, low: String, high: String },
+    Range {
+        field: String,
+        low: String,
+        high: String,
+    },
     /// Full-text search.
     Fulltext { query: String },
     /// Vector similarity (k-NN).
     Similarity { k: usize },
     /// Graph traversal.
-    Traversal { predicate: String, depth: Option<u32> },
+    Traversal {
+        predicate: String,
+        depth: Option<u32>,
+    },
     /// Temporal version lookup.
     AtTime { timestamp: String },
     /// ZKP proof verification.
@@ -64,7 +71,10 @@ pub enum PostProcessing {
     /// LIMIT result count.
     Limit { count: usize },
     /// GROUP BY + aggregation.
-    GroupBy { fields: Vec<String>, aggregates: Vec<String> },
+    GroupBy {
+        fields: Vec<String>,
+        aggregates: Vec<String>,
+    },
     /// Final projection.
     Project { columns: Vec<String> },
 }

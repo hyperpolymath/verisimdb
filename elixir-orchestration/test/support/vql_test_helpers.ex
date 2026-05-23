@@ -52,8 +52,11 @@ defmodule VeriSim.Test.VQLTestHelpers do
   """
   def parse_statement!(query_string) do
     case VQLBridge.parse_statement(query_string) do
-      {:ok, ast} -> ast
-      {:error, reason} -> raise "VQL statement parse failed: #{inspect(reason)}\n  Query: #{query_string}"
+      {:ok, ast} ->
+        ast
+
+      {:error, reason} ->
+        raise "VQL statement parse failed: #{inspect(reason)}\n  Query: #{query_string}"
     end
   end
 
@@ -117,10 +120,15 @@ defmodule VeriSim.Test.VQLTestHelpers do
       {:error, reason} when is_atom(reason) ->
         :rust_unavailable
 
-      {:error, {tag, _}} when tag in [
-        :connection_refused, :econnrefused, :connect_timeout,
-        :timeout, :req_error, :mint_error
-      ] ->
+      {:error, {tag, _}}
+      when tag in [
+             :connection_refused,
+             :econnrefused,
+             :connect_timeout,
+             :timeout,
+             :req_error,
+             :mint_error
+           ] ->
         :rust_unavailable
 
       {:unavailable, _} ->
@@ -159,9 +167,11 @@ defmodule VeriSim.Test.VQLTestHelpers do
 
   @doc "Build a SELECT query for multiple modalities from a octad."
   def multi_modality_query(modalities, entity_id \\ "test-entity-001") do
-    projection = modalities
+    projection =
+      modalities
       |> Enum.map(fn m -> "#{m |> to_string() |> String.upcase()}.*" end)
       |> Enum.join(", ")
+
     "SELECT #{projection} FROM HEXAD '#{entity_id}'"
   end
 
@@ -173,6 +183,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
   @doc "Build a federation query."
   def federation_query(pattern \\ "/*", drift_policy \\ nil) do
     base = "SELECT * FROM FEDERATION #{pattern}"
+
     if drift_policy do
       "#{base} WITH DRIFT #{drift_policy |> to_string() |> String.upcase()}"
     else
@@ -264,9 +275,15 @@ defmodule VeriSim.Test.VQLTestHelpers do
     source = ast[:source] || ast["source"]
 
     case {expected_type, source} do
-      {:octad, {:octad, _id}} -> :ok
-      {:federation, {:federation, _, _}} -> :ok
-      {:store, {:store, _id}} -> :ok
+      {:octad, {:octad, _id}} ->
+        :ok
+
+      {:federation, {:federation, _, _}} ->
+        :ok
+
+      {:store, {:store, _id}} ->
+        :ok
+
       _ ->
         raise ExUnit.AssertionError,
           message: "Source type mismatch",
@@ -278,6 +295,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
   @doc "Assert that an AST has a WHERE clause present."
   def assert_has_where(ast) do
     where = ast[:where] || ast["where"]
+
     unless where do
       raise ExUnit.AssertionError,
         message: "Expected WHERE clause to be present, got nil"
@@ -287,6 +305,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
   @doc "Assert that an AST has a PROOF clause present."
   def assert_has_proof(ast) do
     proof = ast[:proof] || ast["proof"]
+
     unless proof do
       raise ExUnit.AssertionError,
         message: "Expected PROOF clause to be present, got nil"
@@ -296,6 +315,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
   @doc "Assert that an AST has LIMIT set."
   def assert_limit(ast, expected_limit) do
     limit = ast[:limit] || ast["limit"]
+
     unless limit == expected_limit do
       raise ExUnit.AssertionError,
         message: "LIMIT mismatch",
@@ -307,6 +327,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
   @doc "Assert that an AST has OFFSET set."
   def assert_offset(ast, expected_offset) do
     offset = ast[:offset] || ast["offset"]
+
     unless offset == expected_offset do
       raise ExUnit.AssertionError,
         message: "OFFSET mismatch",

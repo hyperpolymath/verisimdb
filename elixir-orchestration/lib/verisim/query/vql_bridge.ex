@@ -146,7 +146,10 @@ defmodule VeriSim.Query.VQLBridge do
         {:ok, %{state | port: port}}
 
       {:error, reason} ->
-        Logger.warning("VQLBridge: parser process unavailable (#{reason}), falling back to built-in parser")
+        Logger.warning(
+          "VQLBridge: parser process unavailable (#{reason}), falling back to built-in parser"
+        )
+
         {:ok, state}
     end
   end
@@ -161,11 +164,13 @@ defmodule VeriSim.Query.VQLBridge do
   @impl true
   def handle_call({:typecheck, ast}, from, state) do
     id = state.next_id
-    message = Jason.encode!(%{
-      "id" => id,
-      "action" => "typecheck",
-      "ast" => ast
-    })
+
+    message =
+      Jason.encode!(%{
+        "id" => id,
+        "action" => "typecheck",
+        "ast" => ast
+      })
 
     send_to_port(state.port, message)
     pending = Map.put(state.pending, id, from)
@@ -174,8 +179,13 @@ defmodule VeriSim.Query.VQLBridge do
 
   @impl true
   def handle_call({action, query_string}, _from, %{port: nil} = state)
-      when action in [:parse, :parse_slipstream, :parse_dependent,
-                      :parse_mutation, :parse_statement] do
+      when action in [
+             :parse,
+             :parse_slipstream,
+             :parse_dependent,
+             :parse_mutation,
+             :parse_statement
+           ] do
     # Fallback: no external parser available, use built-in Elixir parser
     result = builtin_parse(query_string, action)
     {:reply, result, state}
@@ -183,14 +193,21 @@ defmodule VeriSim.Query.VQLBridge do
 
   @impl true
   def handle_call({action, query_string}, from, state)
-      when action in [:parse, :parse_slipstream, :parse_dependent,
-                      :parse_mutation, :parse_statement] do
+      when action in [
+             :parse,
+             :parse_slipstream,
+             :parse_dependent,
+             :parse_mutation,
+             :parse_statement
+           ] do
     id = state.next_id
-    message = Jason.encode!(%{
-      "id" => id,
-      "action" => Atom.to_string(action),
-      "query" => query_string
-    })
+
+    message =
+      Jason.encode!(%{
+        "id" => id,
+        "action" => Atom.to_string(action),
+        "query" => query_string
+      })
 
     # Send length-prefixed message to port
     send_to_port(state.port, message)
@@ -204,7 +221,9 @@ defmodule VeriSim.Query.VQLBridge do
     case Jason.decode(IO.iodata_to_binary(data)) do
       {:ok, %{"id" => id, "ok" => ast}} ->
         case Map.pop(state.pending, id) do
-          {nil, _} -> {:noreply, state}
+          {nil, _} ->
+            {:noreply, state}
+
           {from, pending} ->
             GenServer.reply(from, {:ok, atomize_keys(ast)})
             {:noreply, %{state | pending: pending}}
@@ -212,7 +231,9 @@ defmodule VeriSim.Query.VQLBridge do
 
       {:ok, %{"id" => id, "error" => reason}} ->
         case Map.pop(state.pending, id) do
-          {nil, _} -> {:noreply, state}
+          {nil, _} ->
+            {:noreply, state}
+
           {from, pending} ->
             GenServer.reply(from, {:error, reason})
             {:noreply, %{state | pending: pending}}
@@ -257,10 +278,12 @@ defmodule VeriSim.Query.VQLBridge do
 
     if runtime && File.exists?(script) do
       try do
-        port = Port.open(
-          {:spawn_executable, runtime},
-          [:binary, :exit_status, {:args, [script]}, {:line, 1_048_576}]
-        )
+        port =
+          Port.open(
+            {:spawn_executable, runtime},
+            [:binary, :exit_status, {:args, [script]}, {:line, 1_048_576}]
+          )
+
         {:ok, port}
       rescue
         e -> {:error, Exception.message(e)}
@@ -292,6 +315,7 @@ defmodule VeriSim.Query.VQLBridge do
     Map.new(map, fn
       {key, value} when is_binary(key) ->
         {String.to_existing_atom(key), atomize_keys(value)}
+
       {key, value} ->
         {key, atomize_keys(value)}
     end)
@@ -319,11 +343,13 @@ defmodule VeriSim.Query.VQLBridge do
       :parse_statement ->
         with {:ok, tokens} <- tokenize(query_string) do
           first = tokens |> List.first() |> to_string() |> String.upcase()
+
           case first do
             cmd when cmd in ["INSERT", "UPDATE", "DELETE"] ->
               with {:ok, mutation} <- parse_mutation_tokens(tokens) do
                 {:ok, %{TAG: "Mutation", _0: mutation}}
               end
+
             _ ->
               with {:ok, ast} <- parse_tokens(tokens) do
                 {:ok, %{TAG: "Query", _0: ast}}
@@ -336,9 +362,15 @@ defmodule VeriSim.Query.VQLBridge do
              {:ok, ast} <- parse_tokens(tokens) do
           case action do
             :parse_slipstream ->
-              if ast[:proof], do: {:error, "Slipstream queries cannot have PROOF clause"}, else: {:ok, ast}
+              if ast[:proof],
+                do: {:error, "Slipstream queries cannot have PROOF clause"},
+                else: {:ok, ast}
+
             :parse_dependent ->
-              if ast[:proof], do: {:ok, ast}, else: {:error, "Dependent-type queries require PROOF clause"}
+              if ast[:proof],
+                do: {:ok, ast},
+                else: {:error, "Dependent-type queries require PROOF clause"}
+
             :parse ->
               {:ok, ast}
           end
@@ -366,19 +398,20 @@ defmodule VeriSim.Query.VQLBridge do
          {:ok, order_by, rest} <- parse_order_by(rest),
          {:ok, limit, rest} <- parse_limit(rest),
          {:ok, offset, _rest} <- parse_offset(rest) do
-      {:ok, %{
-        modalities: modalities,
-        projections: projections,
-        aggregates: aggregates,
-        source: source,
-        where: where_clause,
-        groupBy: group_by,
-        having: having,
-        proof: proof,
-        orderBy: order_by,
-        limit: limit,
-        offset: offset
-      }}
+      {:ok,
+       %{
+         modalities: modalities,
+         projections: projections,
+         aggregates: aggregates,
+         source: source,
+         where: where_clause,
+         groupBy: group_by,
+         having: having,
+         proof: proof,
+         orderBy: order_by,
+         limit: limit,
+         offset: offset
+       }}
     end
   end
 
@@ -389,20 +422,37 @@ defmodule VeriSim.Query.VQLBridge do
 
   defp parse_select(_), do: {:error, "Expected SELECT"}
 
-  defp take_modalities(["GRAPH" | rest], acc), do: take_modalities(strip_comma(rest), [:graph | acc])
-  defp take_modalities(["VECTOR" | rest], acc), do: take_modalities(strip_comma(rest), [:vector | acc])
-  defp take_modalities(["TENSOR" | rest], acc), do: take_modalities(strip_comma(rest), [:tensor | acc])
-  defp take_modalities(["SEMANTIC" | rest], acc), do: take_modalities(strip_comma(rest), [:semantic | acc])
-  defp take_modalities(["DOCUMENT" | rest], acc), do: take_modalities(strip_comma(rest), [:document | acc])
-  defp take_modalities(["TEMPORAL" | rest], acc), do: take_modalities(strip_comma(rest), [:temporal | acc])
-  defp take_modalities(["PROVENANCE" | rest], acc), do: take_modalities(strip_comma(rest), [:provenance | acc])
-  defp take_modalities(["SPATIAL" | rest], acc), do: take_modalities(strip_comma(rest), [:spatial | acc])
+  defp take_modalities(["GRAPH" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:graph | acc])
+
+  defp take_modalities(["VECTOR" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:vector | acc])
+
+  defp take_modalities(["TENSOR" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:tensor | acc])
+
+  defp take_modalities(["SEMANTIC" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:semantic | acc])
+
+  defp take_modalities(["DOCUMENT" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:document | acc])
+
+  defp take_modalities(["TEMPORAL" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:temporal | acc])
+
+  defp take_modalities(["PROVENANCE" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:provenance | acc])
+
+  defp take_modalities(["SPATIAL" | rest], acc),
+    do: take_modalities(strip_comma(rest), [:spatial | acc])
+
   defp take_modalities(["*" | rest], acc), do: take_modalities(strip_comma(rest), [:all | acc])
   defp take_modalities(rest, acc), do: {Enum.reverse(acc), rest}
 
   defp strip_comma(["," <> token | rest]) when token != "" do
     [token | rest]
   end
+
   defp strip_comma(["," | rest]), do: rest
   defp strip_comma(rest), do: rest
 
@@ -422,13 +472,15 @@ defmodule VeriSim.Query.VQLBridge do
   defp parse_from(_), do: {:error, "Expected FROM clause"}
 
   defp parse_drift_policy(["WITH", "DRIFT", policy | rest]) do
-    drift = case String.upcase(policy) do
-      "STRICT" -> :strict
-      "REPAIR" -> :repair
-      "TOLERATE" -> :tolerate
-      "LATEST" -> :latest
-      _ -> nil
-    end
+    drift =
+      case String.upcase(policy) do
+        "STRICT" -> :strict
+        "REPAIR" -> :repair
+        "TOLERATE" -> :tolerate
+        "LATEST" -> :latest
+        _ -> nil
+      end
+
     {drift, rest}
   end
 
@@ -436,15 +488,17 @@ defmodule VeriSim.Query.VQLBridge do
 
   defp parse_where(["WHERE" | rest]) do
     # Simplified: collect everything until PROOF, LIMIT, OFFSET, or end
-    {condition_tokens, rest} = Enum.split_while(rest, fn token ->
-      token not in ["PROOF", "LIMIT", "OFFSET"]
-    end)
+    {condition_tokens, rest} =
+      Enum.split_while(rest, fn token ->
+        token not in ["PROOF", "LIMIT", "OFFSET"]
+      end)
 
-    condition = if condition_tokens == [] do
-      nil
-    else
-      %{raw: Enum.join(condition_tokens, " ")}
-    end
+    condition =
+      if condition_tokens == [] do
+        nil
+      else
+        %{raw: Enum.join(condition_tokens, " ")}
+      end
 
     {:ok, condition, rest}
   end
@@ -452,9 +506,10 @@ defmodule VeriSim.Query.VQLBridge do
   defp parse_where(rest), do: {:ok, nil, rest}
 
   defp parse_proof(["PROOF" | rest]) do
-    {proof_tokens, rest} = Enum.split_while(rest, fn token ->
-      token not in ["LIMIT", "OFFSET"]
-    end)
+    {proof_tokens, rest} =
+      Enum.split_while(rest, fn token ->
+        token not in ["LIMIT", "OFFSET"]
+      end)
 
     raw = Enum.join(proof_tokens, " ")
 
@@ -462,11 +517,12 @@ defmodule VeriSim.Query.VQLBridge do
     # "EXISTENCE(a) AND PROVENANCE(b)" → [%{raw: "EXISTENCE(a)"}, %{raw: "PROVENANCE(b)"}]
     specs = VeriSim.Query.VQLTypeChecker.parse_proof_specs(%{raw: raw})
 
-    proof = case specs do
-      [] -> %{raw: raw}
-      [single] -> single
-      multiple -> multiple
-    end
+    proof =
+      case specs do
+        [] -> %{raw: raw}
+        [single] -> single
+        multiple -> multiple
+      end
 
     {:ok, proof, rest}
   end
@@ -504,11 +560,20 @@ defmodule VeriSim.Query.VQLBridge do
 
   # Safe atom conversion using allowlist — prevents atom table exhaustion
   @safe_atoms %{
-    "graph" => :graph, "vector" => :vector, "tensor" => :tensor,
-    "semantic" => :semantic, "document" => :document, "temporal" => :temporal,
-    "provenance" => :provenance, "spatial" => :spatial,
+    "graph" => :graph,
+    "vector" => :vector,
+    "tensor" => :tensor,
+    "semantic" => :semantic,
+    "document" => :document,
+    "temporal" => :temporal,
+    "provenance" => :provenance,
+    "spatial" => :spatial,
     "all" => :all,
-    "count" => :count, "sum" => :sum, "avg" => :avg, "min" => :min, "max" => :max
+    "count" => :count,
+    "sum" => :sum,
+    "avg" => :avg,
+    "min" => :min,
+    "max" => :max
   }
 
   defp safe_to_atom(str) when is_binary(str) do
@@ -541,6 +606,7 @@ defmodule VeriSim.Query.VQLBridge do
             mod_atom = safe_to_atom(mod)
             mods = if mod_atom in mods, do: mods, else: [mod_atom | mods]
             take_select_items(strip_comma(rest), mods, projs, [agg | aggs])
+
           _ ->
             {{Enum.reverse(mods), nilify(projs), nilify(aggs)}, tokens}
         end
@@ -557,12 +623,15 @@ defmodule VeriSim.Query.VQLBridge do
           _ ->
             # Try as bare modality
             up = String.upcase(String.replace(token, ",", ""))
+
             cond do
               up in @modality_names ->
                 mod_atom = safe_to_atom(up)
                 take_select_items(strip_comma(rest), [mod_atom | mods], projs, aggs)
+
               up == "*" ->
                 take_select_items(strip_comma(rest), [:all | mods], projs, aggs)
+
               true ->
                 {{Enum.reverse(mods), nilify(projs), nilify(aggs)}, tokens}
             end
@@ -576,16 +645,22 @@ defmodule VeriSim.Query.VQLBridge do
   defp parse_aggregate_arg(["(" <> rest_token | rest]) do
     # Handle "(MODALITY.field)" — may be split across tokens
     inner = String.trim_trailing(rest_token, ")")
+
     case String.split(inner, ".", parts: 2) do
       [mod, field] when mod in @modality_names ->
-        rest = case rest do
-          [")" | r] -> r
-          _ -> rest
-        end
+        rest =
+          case rest do
+            [")" | r] -> r
+            _ -> rest
+          end
+
         {:ok, mod, field, rest}
-      _ -> :error
+
+      _ ->
+        :error
     end
   end
+
   defp parse_aggregate_arg(_), do: :error
 
   defp nilify([]), do: nil
@@ -601,10 +676,12 @@ defmodule VeriSim.Query.VQLBridge do
 
   defp take_field_refs([token | rest], acc) do
     clean = String.replace(token, ",", "")
+
     case String.split(clean, ".", parts: 2) do
       [mod_str, field] when mod_str in @modality_names ->
         ref = %{modality: safe_to_atom(mod_str), field: field}
         take_field_refs(strip_comma(rest), [ref | acc])
+
       _ ->
         {Enum.reverse(acc), [token | rest]}
     end
@@ -614,15 +691,17 @@ defmodule VeriSim.Query.VQLBridge do
 
   # HAVING parser (collects tokens until ORDER/PROOF/LIMIT/OFFSET/end)
   defp parse_having(["HAVING" | rest]) do
-    {condition_tokens, rest} = Enum.split_while(rest, fn token ->
-      String.upcase(token) not in ["ORDER", "PROOF", "LIMIT", "OFFSET"]
-    end)
+    {condition_tokens, rest} =
+      Enum.split_while(rest, fn token ->
+        String.upcase(token) not in ["ORDER", "PROOF", "LIMIT", "OFFSET"]
+      end)
 
-    condition = if condition_tokens == [] do
-      nil
-    else
-      %{raw: Enum.join(condition_tokens, " ")}
-    end
+    condition =
+      if condition_tokens == [] do
+        nil
+      else
+        %{raw: Enum.join(condition_tokens, " ")}
+      end
 
     {:ok, condition, rest}
   end
@@ -639,20 +718,23 @@ defmodule VeriSim.Query.VQLBridge do
 
   defp take_order_items([token | rest], acc) do
     clean = String.replace(token, ",", "")
+
     case String.split(clean, ".", parts: 2) do
       [mod_str, field] when mod_str in @modality_names ->
-        {direction, rest} = case rest do
-          ["ASC" | r] -> {:asc, strip_comma(r)}
-          ["DESC" | r] -> {:desc, strip_comma(r)}
-          ["ASC," <> _ | _] -> {:asc, strip_comma(rest)}
-          ["DESC," <> _ | _] -> {:desc, strip_comma(rest)}
-          _ -> {:asc, strip_comma(rest)}
-        end
+        {direction, rest} =
+          case rest do
+            ["ASC" | r] -> {:asc, strip_comma(r)}
+            ["DESC" | r] -> {:desc, strip_comma(r)}
+            ["ASC," <> _ | _] -> {:asc, strip_comma(rest)}
+            ["DESC," <> _ | _] -> {:desc, strip_comma(rest)}
+            _ -> {:asc, strip_comma(rest)}
+          end
 
         item = %{
           field: %{modality: safe_to_atom(mod_str), field: field},
           direction: direction
         }
+
         take_order_items(rest, [item | acc])
 
       _ ->
@@ -669,31 +751,37 @@ defmodule VeriSim.Query.VQLBridge do
   defp parse_mutation_tokens(["INSERT", "HEXAD", "WITH" | rest]) do
     {modality_data, rest} = take_modality_data(rest, [])
     {:ok, proof, _rest} = parse_proof(rest)
-    {:ok, %{
-      TAG: "Insert",
-      modalities: modality_data,
-      proof: proof
-    }}
+
+    {:ok,
+     %{
+       TAG: "Insert",
+       modalities: modality_data,
+       proof: proof
+     }}
   end
 
   defp parse_mutation_tokens(["UPDATE", "HEXAD", uuid, "SET" | rest]) do
     {sets, rest} = take_set_assignments(rest, [])
     {:ok, proof, _rest} = parse_proof(rest)
-    {:ok, %{
-      TAG: "Update",
-      octadId: uuid,
-      sets: sets,
-      proof: proof
-    }}
+
+    {:ok,
+     %{
+       TAG: "Update",
+       octadId: uuid,
+       sets: sets,
+       proof: proof
+     }}
   end
 
   defp parse_mutation_tokens(["DELETE", "HEXAD", uuid | rest]) do
     {:ok, proof, _rest} = parse_proof(rest)
-    {:ok, %{
-      TAG: "Delete",
-      octadId: uuid,
-      proof: proof
-    }}
+
+    {:ok,
+     %{
+       TAG: "Delete",
+       octadId: uuid,
+       proof: proof
+     }}
   end
 
   defp parse_mutation_tokens(_), do: {:error, "Expected INSERT, UPDATE, or DELETE"}
@@ -707,15 +795,18 @@ defmodule VeriSim.Query.VQLBridge do
             {inner_tokens, rest3} = collect_until_close_paren([inner_start | rest2], [])
             data = %{modality: safe_to_atom(mod), raw: Enum.join(inner_tokens, " ")}
             take_modality_data(strip_comma(rest3), [data | acc])
+
           _ ->
             {Enum.reverse(acc), tokens}
         end
+
       _ ->
         {Enum.reverse(acc), tokens}
     end
   end
 
   defp collect_until_close_paren([], acc), do: {Enum.reverse(acc), []}
+
   defp collect_until_close_paren([token | rest], acc) do
     if String.ends_with?(token, ")") do
       cleaned = String.trim_trailing(token, ")")
@@ -731,6 +822,7 @@ defmodule VeriSim.Query.VQLBridge do
       [field, "=", value | rest] ->
         assignment = %{field: field, value: value}
         take_set_assignments(strip_comma(rest), [assignment | acc])
+
       _ ->
         {Enum.reverse(acc), tokens}
     end

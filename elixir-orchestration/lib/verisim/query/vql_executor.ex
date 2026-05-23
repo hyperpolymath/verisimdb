@@ -113,6 +113,7 @@ defmodule VeriSim.Query.VQLExecutor do
           statement_type: statement_type,
           modalities: modalities
         })
+
       {:error, _} ->
         Telemetry.emit_query_exception(%{statement_type: statement_type})
     end
@@ -123,6 +124,7 @@ defmodule VeriSim.Query.VQLExecutor do
   # Classify a query string into a statement type for telemetry (no content captured).
   defp classify_statement_type(query_string) do
     upper = String.upcase(String.trim(query_string))
+
     cond do
       String.starts_with?(upper, "SELECT") -> "SELECT"
       String.starts_with?(upper, "INSERT") -> "INSERT"
@@ -139,6 +141,7 @@ defmodule VeriSim.Query.VQLExecutor do
   # Extract modality names from a query string for telemetry (names only, no content).
   defp extract_modalities_from_string(query_string) do
     upper = String.upcase(query_string)
+
     ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL PROVENANCE SPATIAL)
     |> Enum.filter(&String.contains?(upper, &1))
     |> Enum.map(&String.downcase/1)
@@ -163,18 +166,50 @@ defmodule VeriSim.Query.VQLExecutor do
 
     if proof_specs do
       # VQL-DT path: type-check → execute → verify proofs → bundle certificate
-      execute_dt_query(query_ast, proof_specs, modalities, source, where_clause,
-                       limit, offset, order_by, group_by, aggregates, projections, timeout)
+      execute_dt_query(
+        query_ast,
+        proof_specs,
+        modalities,
+        source,
+        where_clause,
+        limit,
+        offset,
+        order_by,
+        group_by,
+        aggregates,
+        projections,
+        timeout
+      )
     else
       # Slipstream path: no proofs, no type checking
-      execute_slipstream_query(modalities, source, where_clause,
-                               limit, offset, order_by, group_by, aggregates, projections, timeout)
+      execute_slipstream_query(
+        modalities,
+        source,
+        where_clause,
+        limit,
+        offset,
+        order_by,
+        group_by,
+        aggregates,
+        projections,
+        timeout
+      )
     end
   end
 
   # Slipstream execution — fast path, no proofs
-  defp execute_slipstream_query(modalities, source, where_clause,
-                                 limit, offset, order_by, group_by, aggregates, projections, timeout) do
+  defp execute_slipstream_query(
+         modalities,
+         source,
+         where_clause,
+         limit,
+         offset,
+         order_by,
+         group_by,
+         aggregates,
+         projections,
+         timeout
+       ) do
     {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
 
     result = execute_by_source(source, modalities, pushdown_conditions, limit, offset, timeout)
@@ -188,13 +223,26 @@ defmodule VeriSim.Query.VQLExecutor do
         |> maybe_project_columns(projections)
         |> then(&{:ok, &1})
 
-      error -> error
+      error ->
+        error
     end
   end
 
   # VQL-DT execution — type check, execute, verify proofs, bundle certificate
-  defp execute_dt_query(query_ast, proof_specs, modalities, source, where_clause,
-                         limit, offset, order_by, group_by, aggregates, projections, timeout) do
+  defp execute_dt_query(
+         query_ast,
+         proof_specs,
+         modalities,
+         source,
+         where_clause,
+         limit,
+         offset,
+         order_by,
+         group_by,
+         aggregates,
+         projections,
+         timeout
+       ) do
     alias VeriSim.Query.{VQLBridge, VQLTypeChecker}
 
     # Step 1: Type-check the query to get proof obligations and composition strategy.
@@ -202,36 +250,41 @@ defmodule VeriSim.Query.VQLExecutor do
     #   1. ReScript bidirectional type checker (VQLBridge.typecheck — full formal system)
     #   2. Elixir-native type checker (VQLTypeChecker — validates types, generates obligations)
     #   3. Bare AST extraction (last resort — no validation, just structuring)
-    type_info = case VQLBridge.typecheck(query_ast) do
-      {:ok, info} ->
-        info
+    type_info =
+      case VQLBridge.typecheck(query_ast) do
+        {:ok, info} ->
+          info
 
-      {:error, :type_checker_unavailable} ->
-        # ReScript subprocess not running. Use the Elixir-native type checker
-        # which validates proof types, modality compatibility, and composition.
-        Logger.info("VQL-DT: Using Elixir-native type checker (ReScript subprocess unavailable)")
+        {:error, :type_checker_unavailable} ->
+          # ReScript subprocess not running. Use the Elixir-native type checker
+          # which validates proof types, modality compatibility, and composition.
+          Logger.info(
+            "VQL-DT: Using Elixir-native type checker (ReScript subprocess unavailable)"
+          )
 
-        case VQLTypeChecker.typecheck(query_ast) do
-          {:ok, info} ->
-            info
+          case VQLTypeChecker.typecheck(query_ast) do
+            {:ok, info} ->
+              info
 
-          {:error, reason} ->
-            # Native type checker rejected the query — this is a real type error.
-            Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
-            nil
-        end
+            {:error, reason} ->
+              # Native type checker rejected the query — this is a real type error.
+              Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
+              nil
+          end
 
-      {:error, reason} ->
-        Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
-        nil
-    end
+        {:error, reason} ->
+          Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
+          nil
+      end
 
     if is_nil(type_info) do
       {:error, {:type_check_failed, "VQL-DT query type checking failed"}}
     else
       # Step 2: Execute the query (get data)
       {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
-      data_result = execute_by_source(source, modalities, pushdown_conditions, limit, offset, timeout)
+
+      data_result =
+        execute_by_source(source, modalities, pushdown_conditions, limit, offset, timeout)
 
       case data_result do
         {:ok, rows} ->
@@ -243,7 +296,9 @@ defmodule VeriSim.Query.VQLExecutor do
             |> maybe_project_columns(projections)
 
           # Step 3: Verify all proof obligations
-          obligations = type_info[:proof_obligations] || type_info["proof_obligations"] || proof_specs
+          obligations =
+            type_info[:proof_obligations] || type_info["proof_obligations"] || proof_specs
+
           proof_result = verify_multi_proof(query_ast, obligations)
 
           case proof_result do
@@ -253,7 +308,10 @@ defmodule VeriSim.Query.VQLExecutor do
               # verifier (e.g., hash commitments, Merkle proofs, entity existence
               # confirmations) so downstream consumers can independently verify.
               query_text = Map.get(query_ast, :raw, "") || ""
-              composition = type_info[:composition_strategy] || type_info["composition_strategy"] || :conjunction
+
+              composition =
+                type_info[:composition_strategy] || type_info["composition_strategy"] ||
+                  :conjunction
 
               # Step 4b: Generate independently verifiable certificates for
               # each proof obligation using VQLProofCertificate. Each artifact
@@ -264,6 +322,7 @@ defmodule VeriSim.Query.VQLExecutor do
                 |> Enum.zip(List.wrap(artifacts))
                 |> Enum.map(fn {obligation, artifact} ->
                   witness = if is_map(artifact), do: artifact, else: %{raw: artifact}
+
                   case VQLProofCertificate.generate_certificate(obligation, witness) do
                     {:ok, cert} -> cert
                     {:error, _} -> nil
@@ -278,17 +337,20 @@ defmodule VeriSim.Query.VQLExecutor do
                   obligations: obligations,
                   composition: composition,
                   verified_at: DateTime.utc_now(),
-                  query_hash: :crypto.hash(:sha256, to_string(query_text)) |> Base.encode16(case: :lower),
+                  query_hash:
+                    :crypto.hash(:sha256, to_string(query_text)) |> Base.encode16(case: :lower),
                   verifiable_certificates: verifiable_certificates
                 }
               }
+
               {:ok, proved_result}
 
             {:error, reason} ->
               {:error, {:proof_verification_failed, reason}}
           end
 
-        error -> error
+        error ->
+          error
       end
     end
   end
@@ -300,7 +362,15 @@ defmodule VeriSim.Query.VQLExecutor do
         execute_octad_query(entity_id, modalities, pushdown_conditions, limit, offset, timeout)
 
       {:federation, pattern, drift_policy} ->
-        execute_federation_query(pattern, drift_policy, modalities, pushdown_conditions, limit, offset, timeout)
+        execute_federation_query(
+          pattern,
+          drift_policy,
+          modalities,
+          pushdown_conditions,
+          limit,
+          offset,
+          timeout
+        )
 
       {:store, store_id} ->
         execute_store_query(store_id, modalities, pushdown_conditions, limit, offset, timeout)
@@ -316,31 +386,46 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp classify_conditions(nil), do: {nil, []}
   defp classify_conditions(%{raw: _} = condition), do: {condition, []}
+
   defp classify_conditions(condition) when is_map(condition) do
     case condition do
-      %{TAG: "CrossModalFieldCompare"} -> {nil, [condition]}
-      %{TAG: "ModalityDrift"} -> {nil, [condition]}
-      %{TAG: "ModalityExists"} -> {nil, [condition]}
-      %{TAG: "ModalityNotExists"} -> {nil, [condition]}
-      %{TAG: "ModalityConsistency"} -> {nil, [condition]}
+      %{TAG: "CrossModalFieldCompare"} ->
+        {nil, [condition]}
+
+      %{TAG: "ModalityDrift"} ->
+        {nil, [condition]}
+
+      %{TAG: "ModalityExists"} ->
+        {nil, [condition]}
+
+      %{TAG: "ModalityNotExists"} ->
+        {nil, [condition]}
+
+      %{TAG: "ModalityConsistency"} ->
+        {nil, [condition]}
+
       %{TAG: "And", _0: left, _1: right} ->
         {push_l, cross_l} = classify_conditions(left)
         {push_r, cross_r} = classify_conditions(right)
         pushdown = combine_pushdown(push_l, push_r, :and)
         {pushdown, cross_l ++ cross_r}
+
       %{TAG: "Or", _0: left, _1: right} ->
         {push_l, cross_l} = classify_conditions(left)
         {push_r, cross_r} = classify_conditions(right)
         pushdown = combine_pushdown(push_l, push_r, :or)
         {pushdown, cross_l ++ cross_r}
+
       %{TAG: "Not", _0: inner} ->
         {push, cross} = classify_conditions(inner)
         {push, cross}
+
       _ ->
         # Simple condition: pushdown
         {condition, []}
     end
   end
+
   defp classify_conditions(condition), do: {condition, []}
 
   defp combine_pushdown(nil, nil, _op), do: nil
@@ -354,6 +439,7 @@ defmodule VeriSim.Query.VQLExecutor do
   # ===========================================================================
 
   defp maybe_evaluate_cross_modal(rows, []), do: rows
+
   defp maybe_evaluate_cross_modal(rows, cross_modal_conditions) do
     Enum.filter(rows, fn octad ->
       Enum.all?(cross_modal_conditions, fn condition ->
@@ -364,8 +450,7 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp evaluate_cross_modal(octad, condition) do
     case condition do
-      %{TAG: "CrossModalFieldCompare",
-        _0: mod1, _1: field1, _2: op, _3: mod2, _4: field2} ->
+      %{TAG: "CrossModalFieldCompare", _0: mod1, _1: field1, _2: op, _3: mod2, _4: field2} ->
         val1 = get_modality_field(octad, mod1, field1)
         val2 = get_modality_field(octad, mod2, field2)
         compare_values_with_op(val1, op, val2)
@@ -383,7 +468,8 @@ defmodule VeriSim.Query.VQLExecutor do
       %{TAG: "ModalityConsistency", _0: mod1, _1: mod2, _2: metric} ->
         compute_consistency(octad, mod1, mod2, metric) > 0.0
 
-      _ -> true
+      _ ->
+        true
     end
   end
 
@@ -395,6 +481,7 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp has_modality_data?(octad, modality) do
     mod_str = modality_to_string(modality)
+
     case Map.get(octad, mod_str) do
       nil -> false
       data when data == %{} -> false
@@ -410,8 +497,12 @@ defmodule VeriSim.Query.VQLExecutor do
     mod2_str = modality_to_string(mod2)
 
     case {Map.get(octad, mod1_str), Map.get(octad, mod2_str)} do
-      {nil, _} -> 1.0  # Missing modality = maximum drift
-      {_, nil} -> 1.0
+      # Missing modality = maximum drift
+      {nil, _} ->
+        1.0
+
+      {_, nil} ->
+        1.0
 
       {data1, data2} ->
         # Try to get drift from the Rust drift detector via octad ID
@@ -440,6 +531,7 @@ defmodule VeriSim.Query.VQLExecutor do
       true -> []
     end
   end
+
   defp extract_embedding_from_modality(data) when is_list(data), do: data
   defp extract_embedding_from_modality(_), do: []
 
@@ -455,11 +547,14 @@ defmodule VeriSim.Query.VQLExecutor do
     end)
   end
 
-  defp compute_cosine_distance([], _), do: 0.5  # Unknown = moderate drift
+  # Unknown = moderate drift
+  defp compute_cosine_distance([], _), do: 0.5
   defp compute_cosine_distance(_, []), do: 0.5
+
   defp compute_cosine_distance(vec1, vec2) do
     # Cosine distance: 1 - cosine_similarity. Range: [0.0, 2.0], normalized to [0.0, 1.0].
-    {dot, mag1, mag2} = Enum.zip(vec1, vec2)
+    {dot, mag1, mag2} =
+      Enum.zip(vec1, vec2)
       |> Enum.reduce({0.0, 0.0, 0.0}, fn {a, b}, {d, m1, m2} ->
         {d + a * b, m1 + a * a, m2 + b * b}
       end)
@@ -471,7 +566,8 @@ defmodule VeriSim.Query.VQLExecutor do
       # Clamp and normalize to [0.0, 1.0]
       min(max(1.0 - similarity, 0.0), 1.0)
     else
-      1.0  # Zero vectors = max drift
+      # Zero vectors = max drift
+      1.0
     end
   end
 
@@ -485,8 +581,11 @@ defmodule VeriSim.Query.VQLExecutor do
     data2 = Map.get(octad, mod2_str)
 
     case {data1, data2} do
-      {nil, _} -> 0.0
-      {_, nil} -> 0.0
+      {nil, _} ->
+        0.0
+
+      {_, nil} ->
+        0.0
 
       {d1, d2} ->
         vec1 = extract_embedding_from_modality(d1)
@@ -506,15 +605,18 @@ defmodule VeriSim.Query.VQLExecutor do
             jaccard_similarity(d1, d2)
 
           _ ->
-            cosine_similarity(vec1, vec2)  # Default to cosine
+            # Default to cosine
+            cosine_similarity(vec1, vec2)
         end
     end
   end
 
   defp cosine_similarity([], _), do: 0.0
   defp cosine_similarity(_, []), do: 0.0
+
   defp cosine_similarity(vec1, vec2) do
-    {dot, mag1, mag2} = Enum.zip(vec1, vec2)
+    {dot, mag1, mag2} =
+      Enum.zip(vec1, vec2)
       |> Enum.reduce({0.0, 0.0, 0.0}, fn {a, b}, {d, m1, m2} ->
         {d + a * b, m1 + a * a, m2 + b * b}
       end)
@@ -525,8 +627,10 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp euclidean_similarity([], _), do: 0.0
   defp euclidean_similarity(_, []), do: 0.0
+
   defp euclidean_similarity(vec1, vec2) do
-    dist = Enum.zip(vec1, vec2)
+    dist =
+      Enum.zip(vec1, vec2)
       |> Enum.reduce(0.0, fn {a, b}, acc -> acc + (a - b) * (a - b) end)
       |> :math.sqrt()
 
@@ -536,6 +640,7 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp dot_product_similarity([], _), do: 0.0
   defp dot_product_similarity(_, []), do: 0.0
+
   defp dot_product_similarity(vec1, vec2) do
     dot = Enum.zip(vec1, vec2) |> Enum.reduce(0.0, fn {a, b}, acc -> acc + a * b end)
     # Normalize to [0.0, 1.0] using sigmoid
@@ -550,6 +655,7 @@ defmodule VeriSim.Query.VQLExecutor do
     union = MapSet.union(keys1, keys2) |> MapSet.size()
     if union > 0, do: intersection / union, else: 0.0
   end
+
   defp jaccard_similarity(_, _), do: 0.0
 
   defp compare_values_with_op(val1, op, val2) when is_number(val1) and is_number(val2) do
@@ -569,6 +675,7 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> false
     end
   end
+
   defp compare_values_with_op(val1, op, val2) when is_binary(val1) and is_binary(val2) do
     case op do
       "==" -> val1 == val2
@@ -578,6 +685,7 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> false
     end
   end
+
   defp compare_values_with_op(_val1, _op, _val2), do: false
 
   defp modality_to_string(mod) when is_binary(mod), do: String.downcase(mod)
@@ -614,13 +722,17 @@ defmodule VeriSim.Query.VQLExecutor do
         {:error, {:write_proof_failed, reason}}
 
       {:ok, _artifacts} ->
-        field_updates = Enum.map(sets, fn {field_ref, value} ->
-          {field_ref, value}
-        end)
+        field_updates =
+          Enum.map(sets, fn {field_ref, value} ->
+            {field_ref, value}
+          end)
 
         case RustClient.update_octad(octad_id, field_updates) do
-          {:ok, _} -> {:ok, %{octad_id: octad_id, operation: :update, fields_updated: length(sets)}}
-          {:error, reason} -> {:error, {:update_failed, reason}}
+          {:ok, _} ->
+            {:ok, %{octad_id: octad_id, operation: :update, fields_updated: length(sets)}}
+
+          {:error, reason} ->
+            {:error, {:update_failed, reason}}
         end
     end
   rescue
@@ -651,9 +763,10 @@ defmodule VeriSim.Query.VQLExecutor do
   defp verify_multi_proof(_query_ast, proof_specs) when is_list(proof_specs) do
     # Verify each proof in the composition, collecting proof artifacts.
     # Each verify_single_proof/1 returns {:ok, artifact} or {:error, reason}.
-    results = Enum.map(proof_specs, fn spec ->
-      verify_single_proof(spec)
-    end)
+    results =
+      Enum.map(proof_specs, fn spec ->
+        verify_single_proof(spec)
+      end)
 
     case Enum.find(results, &match?({:error, _}, &1)) do
       nil ->
@@ -665,12 +778,16 @@ defmodule VeriSim.Query.VQLExecutor do
         error
     end
   end
+
   defp verify_multi_proof(_query_ast, nil), do: {:ok, []}
+
   defp verify_multi_proof(_query_ast, proof_specs) do
     # Non-list proof specs are a safety violation — they must not silently pass.
     # This catch-all previously returned :ok, which meant malformed proof specs
     # (e.g., a bare map or atom) would bypass verification entirely.
-    {:error, {:invalid_proof_specs, "Expected a list of proof specifications, got: #{inspect(proof_specs)}"}}
+    {:error,
+     {:invalid_proof_specs,
+      "Expected a list of proof specifications, got: #{inspect(proof_specs)}"}}
   end
 
   defp verify_single_proof(proof_spec) do
@@ -688,10 +805,17 @@ defmodule VeriSim.Query.VQLExecutor do
         if entity_id do
           case RustClient.get_octad(entity_id) do
             {:ok, octad} ->
-              {:ok, %{type: :existence, entity_id: entity_id, verified: true,
-                       status: Map.get(octad, "status", %{})}}
+              {:ok,
+               %{
+                 type: :existence,
+                 entity_id: entity_id,
+                 verified: true,
+                 status: Map.get(octad, "status", %{})
+               }}
+
             {:error, :not_found} ->
               {:error, {:existence_failed, "Entity '#{entity_id}' does not exist"}}
+
             {:error, reason} ->
               {:error, {:existence_check_failed, reason}}
           end
@@ -718,16 +842,22 @@ defmodule VeriSim.Query.VQLExecutor do
           case RustClient.get("/auth/check/#{entity_id}") do
             {:ok, %{status: 200, body: %{"authorized" => true}}} ->
               {:ok, %{type: :access, entity_id: entity_id, authorized: true}}
+
             {:ok, %{status: 200, body: %{"authorized" => false}}} ->
               {:error, {:access_denied, "Not authorized to access '#{entity_id}'"}}
+
             {:ok, %{status: 403}} ->
               {:error, {:access_denied, "Not authorized to access '#{entity_id}'"}}
+
             {:error, reason} ->
               {:error, {:access_check_failed, reason}}
           end
         else
           # No specific entity — log a warning but allow for global queries.
-          Logger.warning("VQL-DT: Access proof without entity ID — global query, skipping entity-level check")
+          Logger.warning(
+            "VQL-DT: Access proof without entity ID — global query, skipping entity-level check"
+          )
+
           {:ok, %{type: :access, entity_id: nil, authorized: true, scope: :global}}
         end
 
@@ -741,12 +871,20 @@ defmodule VeriSim.Query.VQLExecutor do
                  privacy_level: "public"
                }) do
             {:ok, %{status: 200, body: %{"success" => true} = body}} ->
-              {:ok, %{type: :integrity, contract: contract_name, verified: true,
-                       proof_data: Map.get(body, "proof")}}
+              {:ok,
+               %{
+                 type: :integrity,
+                 contract: contract_name,
+                 verified: true,
+                 proof_data: Map.get(body, "proof")
+               }}
+
             {:ok, %{status: 200, body: %{"success" => false, "error" => reason}}} ->
               {:error, {:integrity_failed, reason}}
+
             {:ok, %{status: 200, body: %{"error" => reason}}} ->
               {:error, {:integrity_failed, reason}}
+
             {:error, reason} ->
               {:error, {:integrity_check_failed, reason}}
           end
@@ -762,8 +900,13 @@ defmodule VeriSim.Query.VQLExecutor do
         if entity_id do
           case RustClient.verify_provenance(entity_id) do
             {:ok, %{"has_provenance" => true, "chain_valid" => true} = body} ->
-              {:ok, %{type: :provenance, entity_id: entity_id, chain_valid: true,
-                       chain_length: Map.get(body, "chain_length", 0)}}
+              {:ok,
+               %{
+                 type: :provenance,
+                 entity_id: entity_id,
+                 chain_valid: true,
+                 chain_length: Map.get(body, "chain_length", 0)
+               }}
 
             {:ok, %{"has_provenance" => true, "chain_valid" => false}} ->
               {:error, {:provenance_chain_broken, entity_id}}
@@ -791,11 +934,19 @@ defmodule VeriSim.Query.VQLExecutor do
           case RustClient.get_drift_score(entity_id) do
             {:ok, score} when is_number(score) ->
               threshold = Map.get(proof_spec, :threshold, 0.3)
+
               if score <= threshold do
-                {:ok, %{type: :consistency, entity_id: entity_id, drift_score: score,
-                         threshold: threshold, consistent: true}}
+                {:ok,
+                 %{
+                   type: :consistency,
+                   entity_id: entity_id,
+                   drift_score: score,
+                   threshold: threshold,
+                   consistent: true
+                 }}
               else
-                {:error, {:consistency_failed,
+                {:error,
+                 {:consistency_failed,
                   "Entity '#{entity_id}' drift score #{score} exceeds threshold #{threshold}"}}
               end
 
@@ -817,33 +968,46 @@ defmodule VeriSim.Query.VQLExecutor do
             {:ok, octad} ->
               max_age_ms = Map.get(proof_spec, :max_age_ms, 3_600_000)
               temporal = Map.get(octad, "temporal", %{})
-              last_modified = Map.get(temporal, "last_modified") ||
-                              Map.get(temporal, "updated_at") ||
-                              Map.get(octad, "updated_at")
+
+              last_modified =
+                Map.get(temporal, "last_modified") ||
+                  Map.get(temporal, "updated_at") ||
+                  Map.get(octad, "updated_at")
 
               if last_modified do
-                age_ms = case DateTime.from_iso8601(to_string(last_modified)) do
-                  {:ok, dt, _} ->
-                    DateTime.diff(DateTime.utc_now(), dt, :millisecond)
-                  _ ->
-                    # If timestamp is a unix epoch, convert
-                    if is_number(last_modified) do
-                      now_ms = System.system_time(:millisecond)
-                      now_ms - trunc(last_modified)
-                    else
-                      max_age_ms + 1  # Unknown format — treat as stale
-                    end
-                end
+                age_ms =
+                  case DateTime.from_iso8601(to_string(last_modified)) do
+                    {:ok, dt, _} ->
+                      DateTime.diff(DateTime.utc_now(), dt, :millisecond)
+
+                    _ ->
+                      # If timestamp is a unix epoch, convert
+                      if is_number(last_modified) do
+                        now_ms = System.system_time(:millisecond)
+                        now_ms - trunc(last_modified)
+                      else
+                        # Unknown format — treat as stale
+                        max_age_ms + 1
+                      end
+                  end
 
                 if age_ms <= max_age_ms do
-                  {:ok, %{type: :freshness, entity_id: entity_id, age_ms: age_ms,
-                           max_age_ms: max_age_ms, fresh: true}}
+                  {:ok,
+                   %{
+                     type: :freshness,
+                     entity_id: entity_id,
+                     age_ms: age_ms,
+                     max_age_ms: max_age_ms,
+                     fresh: true
+                   }}
                 else
-                  {:error, {:freshness_expired,
+                  {:error,
+                   {:freshness_expired,
                     "Entity '#{entity_id}' is #{age_ms}ms old, exceeds max age #{max_age_ms}ms"}}
                 end
               else
-                {:error, {:no_temporal_data,
+                {:error,
+                 {:no_temporal_data,
                   "Entity '#{entity_id}' has no temporal/timestamp data for freshness check"}}
               end
 
@@ -868,10 +1032,17 @@ defmodule VeriSim.Query.VQLExecutor do
                  privacy_level: Map.get(proof_spec, :privacy_level, "public")
                }) do
             {:ok, %{status: 200, body: %{"success" => true} = body}} ->
-              {:ok, %{type: :custom, circuit: contract_name, verified: true,
-                       proof_data: Map.get(body, "proof")}}
+              {:ok,
+               %{
+                 type: :custom,
+                 circuit: contract_name,
+                 verified: true,
+                 proof_data: Map.get(body, "proof")
+               }}
+
             {:ok, %{status: 200, body: %{"error" => reason}}} ->
               {:error, {:custom_proof_failed, reason}}
+
             {:error, reason} ->
               {:error, {:custom_proof_failed, reason}}
           end
@@ -894,10 +1065,17 @@ defmodule VeriSim.Query.VQLExecutor do
 
         case RustClient.post("/proofs/generate", request) do
           {:ok, %{status: 200, body: %{"success" => true} = body}} ->
-            {:ok, %{type: :zkp, verified: true, privacy_level: privacy_level,
-                     proof_data: Map.get(body, "proof")}}
+            {:ok,
+             %{
+               type: :zkp,
+               verified: true,
+               privacy_level: privacy_level,
+               proof_data: Map.get(body, "proof")
+             }}
+
           {:ok, %{status: 200, body: %{"error" => reason}}} ->
             {:error, {:zkp_failed, reason}}
+
           {:error, reason} ->
             {:error, {:zkp_unavailable, reason}}
         end
@@ -905,10 +1083,11 @@ defmodule VeriSim.Query.VQLExecutor do
       :proven ->
         # Proven proofs verify against certificates from the proven library
         claim = Map.get(proof_spec, :claim, "")
+
         case RustClient.post("/proofs/generate", %{claim: claim, privacy_level: "public"}) do
           {:ok, %{status: 200, body: %{"success" => true} = body}} ->
-            {:ok, %{type: :proven, verified: true,
-                     proof_data: Map.get(body, "proof")}}
+            {:ok, %{type: :proven, verified: true, proof_data: Map.get(body, "proof")}}
+
           _ ->
             {:error, {:proven_unavailable, "proven certificate verification failed"}}
         end
@@ -931,6 +1110,7 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp extract_proof_type(%{proofType: type}), do: normalize_proof_type(type)
   defp extract_proof_type(%{TAG: tag}), do: normalize_proof_type(tag)
+
   defp extract_proof_type(%{raw: raw}) when is_binary(raw) do
     # Raw proof strings look like "EXISTENCE(entity-001)" or "EXISTENCE entity-001".
     # Extract just the proof type name (before any parens or whitespace).
@@ -939,6 +1119,7 @@ defmodule VeriSim.Query.VQLExecutor do
     |> List.first()
     |> normalize_proof_type()
   end
+
   defp extract_proof_type(_), do: :unknown
 
   defp normalize_proof_type("EXISTENCE"), do: :existence
@@ -954,6 +1135,7 @@ defmodule VeriSim.Query.VQLExecutor do
   defp normalize_proof_type("SANCTIFY"), do: :sanctify
   defp normalize_proof_type(%{TAG: tag}), do: normalize_proof_type(tag)
   defp normalize_proof_type(atom) when is_atom(atom), do: atom
+
   defp normalize_proof_type(str) when is_binary(str) do
     try do
       String.downcase(str) |> String.to_existing_atom()
@@ -961,10 +1143,12 @@ defmodule VeriSim.Query.VQLExecutor do
       ArgumentError -> :unknown
     end
   end
+
   defp normalize_proof_type(_), do: :unknown
 
   defp extract_contract_name(%{contractName: name}), do: name
   defp extract_contract_name(%{contract: name}), do: name
+
   defp extract_contract_name(%{raw: raw}) when is_binary(raw) do
     # Extract contract name from raw proof spec: "INTEGRITY(my_contract)"
     case Regex.run(~r/\(([^)]+)\)/, raw) do
@@ -972,6 +1156,7 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> nil
     end
   end
+
   defp extract_contract_name(_), do: nil
 
   defp validate_contract_exists(contract_name) do
@@ -981,10 +1166,13 @@ defmodule VeriSim.Query.VQLExecutor do
     case RustClient.search_text("contract:#{contract_name}", 1) do
       {:ok, results} when is_list(results) and length(results) > 0 ->
         {:ok, %{type: :contract_verified, contract: contract_name, verified: true}}
+
       {:ok, %{"results" => [_ | _]}} ->
         {:ok, %{type: :contract_verified, contract: contract_name, verified: true}}
+
       {:ok, _} ->
         {:error, {:contract_not_found, contract_name}}
+
       {:error, reason} ->
         {:error, {:contract_verification_failed, reason}}
     end
@@ -1020,7 +1208,15 @@ defmodule VeriSim.Query.VQLExecutor do
     end
   end
 
-  defp execute_federation_query(pattern, drift_policy, modalities, where_clause, limit, offset, timeout) do
+  defp execute_federation_query(
+         pattern,
+         drift_policy,
+         modalities,
+         where_clause,
+         limit,
+         offset,
+         timeout
+       ) do
     Logger.info("Federation query: pattern=#{inspect(pattern)}, drift=#{inspect(drift_policy)}")
 
     # Delegate to Rust federation API which handles peer discovery and fan-out
@@ -1034,15 +1230,18 @@ defmodule VeriSim.Query.VQLExecutor do
     }
 
     # Add query parameters if WHERE clause exists
-    federation_params = if where_clause do
-      text = case where_clause do
-        %{raw: raw} -> raw
-        _ -> nil
+    federation_params =
+      if where_clause do
+        text =
+          case where_clause do
+            %{raw: raw} -> raw
+            _ -> nil
+          end
+
+        if text, do: Map.put(federation_params, :text_query, text), else: federation_params
+      else
+        federation_params
       end
-      if text, do: Map.put(federation_params, :text_query, text), else: federation_params
-    else
-      federation_params
-    end
 
     case RustClient.post("/federation/query", federation_params) do
       {:ok, %{status: 200, body: body}} when is_list(body) ->
@@ -1117,48 +1316,79 @@ defmodule VeriSim.Query.VQLExecutor do
     search_limit = limit || 20
 
     # Search stored queries by text similarity
-    result = if text_query != "" do
-      case RustClient.post("/search/text", %{q: "type:vql_query #{text_query}", limit: search_limit}) do
-        {:ok, %{status: 200, body: %{"results" => results}}} -> {:ok, results}
-        {:ok, %{status: 200, body: body}} when is_list(body) -> {:ok, body}
-        {:ok, %{status: 200, body: body}} when is_map(body) -> {:ok, Map.get(body, "results", [])}
-        {:error, reason} -> {:error, {:reflect_query_failed, reason}}
-        _ -> {:ok, []}
+    result =
+      if text_query != "" do
+        case RustClient.post("/search/text", %{
+               q: "type:vql_query #{text_query}",
+               limit: search_limit
+             }) do
+          {:ok, %{status: 200, body: %{"results" => results}}} ->
+            {:ok, results}
+
+          {:ok, %{status: 200, body: body}} when is_list(body) ->
+            {:ok, body}
+
+          {:ok, %{status: 200, body: body}} when is_map(body) ->
+            {:ok, Map.get(body, "results", [])}
+
+          {:error, reason} ->
+            {:error, {:reflect_query_failed, reason}}
+
+          _ ->
+            {:ok, []}
+        end
+      else
+        # No text filter — list all stored queries
+        case RustClient.post("/search/text", %{q: "type:vql_query", limit: search_limit}) do
+          {:ok, %{status: 200, body: %{"results" => results}}} ->
+            {:ok, results}
+
+          {:ok, %{status: 200, body: body}} when is_list(body) ->
+            {:ok, body}
+
+          {:ok, %{status: 200, body: body}} when is_map(body) ->
+            {:ok, Map.get(body, "results", [])}
+
+          {:error, reason} ->
+            {:error, {:reflect_query_failed, reason}}
+
+          _ ->
+            {:ok, []}
+        end
       end
-    else
-      # No text filter — list all stored queries
-      case RustClient.post("/search/text", %{q: "type:vql_query", limit: search_limit}) do
-        {:ok, %{status: 200, body: %{"results" => results}}} -> {:ok, results}
-        {:ok, %{status: 200, body: body}} when is_list(body) -> {:ok, body}
-        {:ok, %{status: 200, body: body}} when is_map(body) -> {:ok, Map.get(body, "results", [])}
-        {:error, reason} -> {:error, {:reflect_query_failed, reason}}
-        _ -> {:ok, []}
-      end
-    end
 
     # Enrich results with query-specific metadata
     case result do
       {:ok, rows} ->
-        enriched = Enum.map(rows, fn row ->
-          row
-          |> Map.put("_source", "reflect")
-          |> Map.put("_type", "stored_query")
-          |> maybe_filter_modalities(modalities)
-        end)
+        enriched =
+          Enum.map(rows, fn row ->
+            row
+            |> Map.put("_source", "reflect")
+            |> Map.put("_type", "stored_query")
+            |> maybe_filter_modalities(modalities)
+          end)
+
         {:ok, enriched}
 
-      error -> error
+      error ->
+        error
     end
   end
 
   defp maybe_filter_modalities(row, [:all]), do: row
+
   defp maybe_filter_modalities(row, modalities) do
     mod_strings = Enum.map(modalities, &to_string/1)
     base_keys = ["id", "_source", "_type", "status"]
     keep_keys = base_keys ++ mod_strings
-    Map.take(row, keep_keys ++ Map.keys(row) |> Enum.filter(fn k ->
-      Enum.any?(mod_strings, &String.starts_with?(k, &1))
-    end))
+
+    Map.take(
+      row,
+      (keep_keys ++ Map.keys(row))
+      |> Enum.filter(fn k ->
+        Enum.any?(mod_strings, &String.starts_with?(k, &1))
+      end)
+    )
   end
 
   defp filter_octad(octad, modalities, _where_clause) do
@@ -1172,6 +1402,7 @@ defmodule VeriSim.Query.VQLExecutor do
   defp paginate_results(results, nil, nil), do: results
   defp paginate_results(results, limit, nil), do: Enum.take(results, limit)
   defp paginate_results(results, nil, offset), do: Enum.drop(results, offset)
+
   defp paginate_results(results, limit, offset) do
     results
     |> Enum.drop(offset)
@@ -1193,90 +1424,158 @@ defmodule VeriSim.Query.VQLExecutor do
   # AST-walking condition detectors: check TAG values for modality-specific conditions
 
   defp has_fulltext_condition?(nil), do: false
+
   defp has_fulltext_condition?(%{raw: raw}) when is_binary(raw) do
     upper = String.upcase(raw)
+
     String.contains?(upper, "FULLTEXT") or String.contains?(upper, "CONTAINS") or
-    String.contains?(upper, "MATCHES")
+      String.contains?(upper, "MATCHES")
   end
-  defp has_fulltext_condition?(%{TAG: tag}) when tag in ["FulltextContains", "FulltextMatches", "DocumentCondition"], do: true
-  defp has_fulltext_condition?(%{TAG: "And", _0: left, _1: right}), do: has_fulltext_condition?(left) or has_fulltext_condition?(right)
-  defp has_fulltext_condition?(%{TAG: "Or", _0: left, _1: right}), do: has_fulltext_condition?(left) or has_fulltext_condition?(right)
+
+  defp has_fulltext_condition?(%{TAG: tag})
+       when tag in ["FulltextContains", "FulltextMatches", "DocumentCondition"],
+       do: true
+
+  defp has_fulltext_condition?(%{TAG: "And", _0: left, _1: right}),
+    do: has_fulltext_condition?(left) or has_fulltext_condition?(right)
+
+  defp has_fulltext_condition?(%{TAG: "Or", _0: left, _1: right}),
+    do: has_fulltext_condition?(left) or has_fulltext_condition?(right)
+
   defp has_fulltext_condition?(%{TAG: "Not", _0: inner}), do: has_fulltext_condition?(inner)
   defp has_fulltext_condition?(_), do: false
 
   defp has_vector_condition?(nil), do: false
+
   defp has_vector_condition?(%{raw: raw}) when is_binary(raw) do
     upper = String.upcase(raw)
     String.contains?(upper, "SIMILAR") or String.contains?(upper, "NEAREST")
   end
-  defp has_vector_condition?(%{TAG: tag}) when tag in ["VectorSimilar", "VectorNearest", "VectorCondition"], do: true
-  defp has_vector_condition?(%{TAG: "And", _0: left, _1: right}), do: has_vector_condition?(left) or has_vector_condition?(right)
-  defp has_vector_condition?(%{TAG: "Or", _0: left, _1: right}), do: has_vector_condition?(left) or has_vector_condition?(right)
+
+  defp has_vector_condition?(%{TAG: tag})
+       when tag in ["VectorSimilar", "VectorNearest", "VectorCondition"],
+       do: true
+
+  defp has_vector_condition?(%{TAG: "And", _0: left, _1: right}),
+    do: has_vector_condition?(left) or has_vector_condition?(right)
+
+  defp has_vector_condition?(%{TAG: "Or", _0: left, _1: right}),
+    do: has_vector_condition?(left) or has_vector_condition?(right)
+
   defp has_vector_condition?(%{TAG: "Not", _0: inner}), do: has_vector_condition?(inner)
   defp has_vector_condition?(_), do: false
 
   defp has_graph_pattern?(nil), do: false
+
   defp has_graph_pattern?(%{raw: raw}) when is_binary(raw) do
     # Graph patterns use SPARQL-like syntax with arrow edges
     String.contains?(raw, "->") or String.contains?(raw, "-[")
   end
-  defp has_graph_pattern?(%{TAG: tag}) when tag in ["SparqlPattern", "PathPattern", "GraphCondition"], do: true
-  defp has_graph_pattern?(%{TAG: "And", _0: left, _1: right}), do: has_graph_pattern?(left) or has_graph_pattern?(right)
-  defp has_graph_pattern?(%{TAG: "Or", _0: left, _1: right}), do: has_graph_pattern?(left) or has_graph_pattern?(right)
+
+  defp has_graph_pattern?(%{TAG: tag})
+       when tag in ["SparqlPattern", "PathPattern", "GraphCondition"],
+       do: true
+
+  defp has_graph_pattern?(%{TAG: "And", _0: left, _1: right}),
+    do: has_graph_pattern?(left) or has_graph_pattern?(right)
+
+  defp has_graph_pattern?(%{TAG: "Or", _0: left, _1: right}),
+    do: has_graph_pattern?(left) or has_graph_pattern?(right)
+
   defp has_graph_pattern?(%{TAG: "Not", _0: inner}), do: has_graph_pattern?(inner)
   defp has_graph_pattern?(_), do: false
 
   # Provenance condition detection: actor, origin, chain_valid, event_type queries
   defp has_provenance_condition?(nil), do: false
+
   defp has_provenance_condition?(%{raw: raw}) when is_binary(raw) do
     upper = String.upcase(raw)
+
     String.contains?(upper, "PROVENANCE.") or String.contains?(upper, "CHAIN_VALID") or
-    String.contains?(upper, "CHAIN_LENGTH")
+      String.contains?(upper, "CHAIN_LENGTH")
   end
-  defp has_provenance_condition?(%{TAG: tag}) when tag in [
-    "ProvenanceActor", "ProvenanceOrigin", "ProvenanceChainValid",
-    "ProvenanceEventType", "ProvenanceCondition"
-  ], do: true
-  defp has_provenance_condition?(%{TAG: "And", _0: left, _1: right}), do: has_provenance_condition?(left) or has_provenance_condition?(right)
-  defp has_provenance_condition?(%{TAG: "Or", _0: left, _1: right}), do: has_provenance_condition?(left) or has_provenance_condition?(right)
+
+  defp has_provenance_condition?(%{TAG: tag})
+       when tag in [
+              "ProvenanceActor",
+              "ProvenanceOrigin",
+              "ProvenanceChainValid",
+              "ProvenanceEventType",
+              "ProvenanceCondition"
+            ],
+       do: true
+
+  defp has_provenance_condition?(%{TAG: "And", _0: left, _1: right}),
+    do: has_provenance_condition?(left) or has_provenance_condition?(right)
+
+  defp has_provenance_condition?(%{TAG: "Or", _0: left, _1: right}),
+    do: has_provenance_condition?(left) or has_provenance_condition?(right)
+
   defp has_provenance_condition?(%{TAG: "Not", _0: inner}), do: has_provenance_condition?(inner)
-  defp has_provenance_condition?(%{modality: mod}) when mod in [:provenance, "PROVENANCE", "provenance"], do: true
+
+  defp has_provenance_condition?(%{modality: mod})
+       when mod in [:provenance, "PROVENANCE", "provenance"],
+       do: true
+
   defp has_provenance_condition?(_), do: false
 
   # Spatial condition detection: radius, bounding box, nearest queries
   defp has_spatial_condition?(nil), do: false
+
   defp has_spatial_condition?(%{raw: raw}) when is_binary(raw) do
     upper = String.upcase(raw)
+
     String.contains?(upper, "WITHIN RADIUS") or String.contains?(upper, "WITHIN BOUNDS") or
-    String.contains?(upper, "SPATIAL.") or String.contains?(upper, "NEAREST")
+      String.contains?(upper, "SPATIAL.") or String.contains?(upper, "NEAREST")
   end
-  defp has_spatial_condition?(%{TAG: tag}) when tag in [
-    "SpatialRadius", "SpatialBounds", "SpatialNearest",
-    "SpatialCondition", "WithinRadius", "WithinBounds"
-  ], do: true
-  defp has_spatial_condition?(%{TAG: "And", _0: left, _1: right}), do: has_spatial_condition?(left) or has_spatial_condition?(right)
-  defp has_spatial_condition?(%{TAG: "Or", _0: left, _1: right}), do: has_spatial_condition?(left) or has_spatial_condition?(right)
+
+  defp has_spatial_condition?(%{TAG: tag})
+       when tag in [
+              "SpatialRadius",
+              "SpatialBounds",
+              "SpatialNearest",
+              "SpatialCondition",
+              "WithinRadius",
+              "WithinBounds"
+            ],
+       do: true
+
+  defp has_spatial_condition?(%{TAG: "And", _0: left, _1: right}),
+    do: has_spatial_condition?(left) or has_spatial_condition?(right)
+
+  defp has_spatial_condition?(%{TAG: "Or", _0: left, _1: right}),
+    do: has_spatial_condition?(left) or has_spatial_condition?(right)
+
   defp has_spatial_condition?(%{TAG: "Not", _0: inner}), do: has_spatial_condition?(inner)
-  defp has_spatial_condition?(%{modality: mod}) when mod in [:spatial, "SPATIAL", "spatial"], do: true
+
+  defp has_spatial_condition?(%{modality: mod}) when mod in [:spatial, "SPATIAL", "spatial"],
+    do: true
+
   defp has_spatial_condition?(_), do: false
 
   # AST-walking query extractors: pull actual values from parsed conditions
 
   defp extract_text_query(nil), do: ""
+
   defp extract_text_query(%{raw: raw}) when is_binary(raw) do
     # Extract text between quotes from raw WHERE clause: FULLTEXT CONTAINS 'search terms'
     case Regex.run(~r/'([^']*)'/, raw) do
-      [_, text] -> text
+      [_, text] ->
+        text
+
       _ ->
         # Try without quotes: FULLTEXT CONTAINS keyword
         case Regex.run(~r/(?:CONTAINS|MATCHES)\s+(.+?)(?:\s+AND|\s+OR|\s*$)/i, raw) do
           [_, text] -> String.trim(text)
-          _ -> raw  # Use the raw clause as search text
+          # Use the raw clause as search text
+          _ -> raw
         end
     end
   end
+
   defp extract_text_query(%{TAG: "FulltextContains", _0: text}), do: text
   defp extract_text_query(%{TAG: "FulltextMatches", _0: pattern}), do: pattern
+
   defp extract_text_query(%{TAG: "And", _0: left, _1: right}) do
     case {has_fulltext_condition?(left), has_fulltext_condition?(right)} do
       {true, _} -> extract_text_query(left)
@@ -1284,42 +1583,54 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> ""
     end
   end
+
   defp extract_text_query(_), do: ""
 
   defp extract_vector_query(nil), do: {[], 0.9}
+
   defp extract_vector_query(%{raw: raw}) when is_binary(raw) do
     # Extract vector literal [0.1, 0.2, ...] and optional WITHIN threshold
-    vector = case Regex.run(~r/\[([0-9.,\s-]+)\]/, raw) do
-      [_, nums] ->
-        nums
-        |> String.split(",")
-        |> Enum.map(&String.trim/1)
-        |> Enum.flat_map(fn s ->
-          case Float.parse(s) do
-            {f, _} -> [f]
-            :error -> []
-          end
-        end)
-      _ -> []
-    end
+    vector =
+      case Regex.run(~r/\[([0-9.,\s-]+)\]/, raw) do
+        [_, nums] ->
+          nums
+          |> String.split(",")
+          |> Enum.map(&String.trim/1)
+          |> Enum.flat_map(fn s ->
+            case Float.parse(s) do
+              {f, _} -> [f]
+              :error -> []
+            end
+          end)
 
-    threshold = case Regex.run(~r/WITHIN\s+([0-9.]+)/i, raw) do
-      [_, t] ->
-        case Float.parse(t) do
-          {f, _} -> f
-          :error -> 0.9
-        end
-      _ -> 0.9
-    end
+        _ ->
+          []
+      end
+
+    threshold =
+      case Regex.run(~r/WITHIN\s+([0-9.]+)/i, raw) do
+        [_, t] ->
+          case Float.parse(t) do
+            {f, _} -> f
+            :error -> 0.9
+          end
+
+        _ ->
+          0.9
+      end
 
     {vector, threshold}
   end
+
   defp extract_vector_query(%{TAG: "VectorSimilar", _0: _field, _1: vector, _2: threshold}) do
     {vector, threshold || 0.9}
   end
+
   defp extract_vector_query(%{TAG: "VectorNearest", _0: _field, _1: k}) do
-    {[], k}  # k-nearest doesn't have a vector, uses the field's own embedding
+    # k-nearest doesn't have a vector, uses the field's own embedding
+    {[], k}
   end
+
   defp extract_vector_query(%{TAG: "And", _0: left, _1: right}) do
     case {has_vector_condition?(left), has_vector_condition?(right)} do
       {true, _} -> extract_vector_query(left)
@@ -1327,19 +1638,24 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> {[], 0.9}
     end
   end
+
   defp extract_vector_query(_), do: {[], 0.9}
 
   defp extract_graph_query(nil), do: %{}
+
   defp extract_graph_query(%{raw: raw}) when is_binary(raw) do
     # Parse simple SPARQL-like patterns from raw WHERE clause
     %{raw_pattern: raw}
   end
+
   defp extract_graph_query(%{TAG: "SparqlPattern", _0: node1, _1: edge, _2: node2}) do
     %{subject: node1, predicate: edge, object: node2}
   end
+
   defp extract_graph_query(%{TAG: "PathPattern", _0: start, _1: edge, _2: finish}) do
     %{start: start, edge: edge, finish: finish, traversal: true}
   end
+
   defp extract_graph_query(%{TAG: "And", _0: left, _1: right}) do
     case {has_graph_pattern?(left), has_graph_pattern?(right)} do
       {true, _} -> extract_graph_query(left)
@@ -1347,6 +1663,7 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> %{}
     end
   end
+
   defp extract_graph_query(_), do: %{}
 
   # ---------------------------------------------------------------------------
@@ -1354,46 +1671,59 @@ defmodule VeriSim.Query.VQLExecutor do
   # ---------------------------------------------------------------------------
 
   defp extract_provenance_query(nil), do: %{}
+
   defp extract_provenance_query(%{raw: raw}) when is_binary(raw) do
     params = %{}
 
     # Extract actor filter: PROVENANCE.actor = 'someone'
-    params = case Regex.run(~r/(?:PROVENANCE\.)?actor\s*=\s*'([^']+)'/i, raw) do
-      [_, actor] -> Map.put(params, :actor, actor)
-      _ -> params
-    end
+    params =
+      case Regex.run(~r/(?:PROVENANCE\.)?actor\s*=\s*'([^']+)'/i, raw) do
+        [_, actor] -> Map.put(params, :actor, actor)
+        _ -> params
+      end
 
     # Extract origin filter: PROVENANCE.origin = 'source'
-    params = case Regex.run(~r/(?:PROVENANCE\.)?origin\s*=\s*'([^']+)'/i, raw) do
-      [_, origin] -> Map.put(params, :origin, origin)
-      _ -> params
-    end
+    params =
+      case Regex.run(~r/(?:PROVENANCE\.)?origin\s*=\s*'([^']+)'/i, raw) do
+        [_, origin] -> Map.put(params, :origin, origin)
+        _ -> params
+      end
 
     # Extract chain_valid filter: PROVENANCE.chain_valid = true
-    params = case Regex.run(~r/(?:PROVENANCE\.)?chain_valid\s*=\s*(true|false)/i, raw) do
-      [_, val] -> Map.put(params, :chain_valid, String.downcase(val) == "true")
-      _ -> params
-    end
+    params =
+      case Regex.run(~r/(?:PROVENANCE\.)?chain_valid\s*=\s*(true|false)/i, raw) do
+        [_, val] -> Map.put(params, :chain_valid, String.downcase(val) == "true")
+        _ -> params
+      end
 
     # Extract event_type filter: PROVENANCE.event_type = 'Modified'
-    params = case Regex.run(~r/(?:PROVENANCE\.)?event_type\s*=\s*'([^']+)'/i, raw) do
-      [_, et] -> Map.put(params, :event_type, et)
-      _ -> params
-    end
+    params =
+      case Regex.run(~r/(?:PROVENANCE\.)?event_type\s*=\s*'([^']+)'/i, raw) do
+        [_, et] -> Map.put(params, :event_type, et)
+        _ -> params
+      end
 
     params
   end
+
   defp extract_provenance_query(%{TAG: "ProvenanceActor", _0: actor}), do: %{actor: actor}
   defp extract_provenance_query(%{TAG: "ProvenanceOrigin", _0: origin}), do: %{origin: origin}
-  defp extract_provenance_query(%{TAG: "ProvenanceChainValid", _0: valid}), do: %{chain_valid: valid}
-  defp extract_provenance_query(%{TAG: "ProvenanceEventType", _0: event_type}), do: %{event_type: event_type}
+
+  defp extract_provenance_query(%{TAG: "ProvenanceChainValid", _0: valid}),
+    do: %{chain_valid: valid}
+
+  defp extract_provenance_query(%{TAG: "ProvenanceEventType", _0: event_type}),
+    do: %{event_type: event_type}
+
   defp extract_provenance_query(%{TAG: "And", _0: left, _1: right}) do
     Map.merge(extract_provenance_query(left), extract_provenance_query(right))
   end
+
   defp extract_provenance_query(%{modality: mod, field: field, value: value})
-    when mod in [:provenance, "PROVENANCE", "provenance"] do
+       when mod in [:provenance, "PROVENANCE", "provenance"] do
     %{String.to_existing_atom(field) => value}
   end
+
   defp extract_provenance_query(_), do: %{}
 
   defp execute_provenance_query(params, limit) do
@@ -1427,16 +1757,23 @@ defmodule VeriSim.Query.VQLExecutor do
         # Verify chain integrity across all provenance chains
         case RustClient.get("/provenance/verify-all") do
           {:ok, %{status: 200, body: body}} when is_list(body) ->
-            filtered = if params.chain_valid do
-              Enum.filter(body, &(&1["chain_valid"] == true))
-            else
-              Enum.filter(body, &(&1["chain_valid"] == false))
-            end
+            filtered =
+              if params.chain_valid do
+                Enum.filter(body, &(&1["chain_valid"] == true))
+              else
+                Enum.filter(body, &(&1["chain_valid"] == false))
+              end
+
             {:ok, wrap_provenance_results(filtered)}
+
           {:ok, %{status: 200, body: body}} when is_map(body) ->
             {:ok, wrap_provenance_results(Map.get(body, "results", []))}
-          {:error, reason} -> {:error, {:provenance_query_failed, reason}}
-          _ -> {:ok, []}
+
+          {:error, reason} ->
+            {:error, {:provenance_query_failed, reason}}
+
+          _ ->
+            {:ok, []}
         end
 
       true ->
@@ -1454,10 +1791,12 @@ defmodule VeriSim.Query.VQLExecutor do
       %{"provenance" => item, "_source" => "provenance"}
     end)
   end
+
   defp wrap_provenance_results(body) when is_map(body) do
     results = Map.get(body, "results", [body])
     wrap_provenance_results(results)
   end
+
   defp wrap_provenance_results(_), do: []
 
   # ---------------------------------------------------------------------------
@@ -1465,56 +1804,86 @@ defmodule VeriSim.Query.VQLExecutor do
   # ---------------------------------------------------------------------------
 
   defp extract_spatial_query(nil), do: %{}
+
   defp extract_spatial_query(%{raw: raw}) when is_binary(raw) do
     upper = String.upcase(raw)
 
     cond do
       # WITHIN RADIUS(lat, lon, radius_km)
       String.contains?(upper, "WITHIN RADIUS") ->
-        case Regex.run(~r/WITHIN\s+RADIUS\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.]+)\s*\)/i, raw) do
+        case Regex.run(
+               ~r/WITHIN\s+RADIUS\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.]+)\s*\)/i,
+               raw
+             ) do
           [_, lat, lon, radius] ->
-            %{type: :radius,
+            %{
+              type: :radius,
               latitude: parse_float_safe(lat),
               longitude: parse_float_safe(lon),
-              radius_km: parse_float_safe(radius)}
-          _ -> %{}
+              radius_km: parse_float_safe(radius)
+            }
+
+          _ ->
+            %{}
         end
 
       # WITHIN BOUNDS(min_lat, min_lon, max_lat, max_lon)
       String.contains?(upper, "WITHIN BOUNDS") ->
-        case Regex.run(~r/WITHIN\s+BOUNDS\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*\)/i, raw) do
+        case Regex.run(
+               ~r/WITHIN\s+BOUNDS\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*\)/i,
+               raw
+             ) do
           [_, min_lat, min_lon, max_lat, max_lon] ->
-            %{type: :bounds,
+            %{
+              type: :bounds,
               min_lat: parse_float_safe(min_lat),
               min_lon: parse_float_safe(min_lon),
               max_lat: parse_float_safe(max_lat),
-              max_lon: parse_float_safe(max_lon)}
-          _ -> %{}
+              max_lon: parse_float_safe(max_lon)
+            }
+
+          _ ->
+            %{}
         end
 
       # NEAREST(lat, lon, k)
       String.contains?(upper, "NEAREST") ->
         case Regex.run(~r/NEAREST\s*\(\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*,\s*([0-9]+)\s*\)/i, raw) do
           [_, lat, lon, k] ->
-            %{type: :nearest,
+            %{
+              type: :nearest,
               latitude: parse_float_safe(lat),
               longitude: parse_float_safe(lon),
-              k: String.to_integer(k)}
-          _ -> %{}
+              k: String.to_integer(k)
+            }
+
+          _ ->
+            %{}
         end
 
-      true -> %{}
+      true ->
+        %{}
     end
   end
+
   defp extract_spatial_query(%{TAG: "SpatialRadius", _0: lat, _1: lon, _2: radius}) do
     %{type: :radius, latitude: lat, longitude: lon, radius_km: radius}
   end
-  defp extract_spatial_query(%{TAG: "SpatialBounds", _0: min_lat, _1: min_lon, _2: max_lat, _3: max_lon}) do
+
+  defp extract_spatial_query(%{
+         TAG: "SpatialBounds",
+         _0: min_lat,
+         _1: min_lon,
+         _2: max_lat,
+         _3: max_lon
+       }) do
     %{type: :bounds, min_lat: min_lat, min_lon: min_lon, max_lat: max_lat, max_lon: max_lon}
   end
+
   defp extract_spatial_query(%{TAG: "SpatialNearest", _0: lat, _1: lon, _2: k}) do
     %{type: :nearest, latitude: lat, longitude: lon, k: k}
   end
+
   defp extract_spatial_query(%{TAG: "And", _0: left, _1: right}) do
     case {has_spatial_condition?(left), has_spatial_condition?(right)} do
       {true, _} -> extract_spatial_query(left)
@@ -1522,6 +1891,7 @@ defmodule VeriSim.Query.VQLExecutor do
       _ -> %{}
     end
   end
+
   defp extract_spatial_query(_), do: %{}
 
   defp execute_spatial_query(params, limit) do
@@ -1563,20 +1933,22 @@ defmodule VeriSim.Query.VQLExecutor do
         end
 
       _ ->
-        {:error, {:invalid_spatial_query, "Missing spatial query type (radius, bounds, or nearest)"}}
+        {:error,
+         {:invalid_spatial_query, "Missing spatial query type (radius, bounds, or nearest)"}}
     end
   end
 
   defp wrap_spatial_results(body) when is_list(body) do
     Enum.map(body, fn item ->
-      %{"spatial" => item, "_source" => "spatial",
-        "distance_km" => Map.get(item, "distance_km")}
+      %{"spatial" => item, "_source" => "spatial", "distance_km" => Map.get(item, "distance_km")}
     end)
   end
+
   defp wrap_spatial_results(body) when is_map(body) do
     results = Map.get(body, "results", [body])
     wrap_spatial_results(results)
   end
+
   defp wrap_spatial_results(_), do: []
 
   defp parse_float_safe(str) when is_binary(str) do
@@ -1585,6 +1957,7 @@ defmodule VeriSim.Query.VQLExecutor do
       :error -> 0.0
     end
   end
+
   defp parse_float_safe(num) when is_number(num), do: num / 1
   defp parse_float_safe(_), do: 0.0
 
@@ -1615,54 +1988,89 @@ defmodule VeriSim.Query.VQLExecutor do
         steps = [%{operation: "Parse VQL", cost_ms: 1, notes: "Already completed"} | steps]
 
         # Step 2: Type check (if proofs present)
-        steps = if proof_specs do
-          proof_count = length(proof_specs)
-          [%{operation: "Type check + proof verification", cost_ms: 5 * proof_count,
-             notes: "#{proof_count} proof obligation(s)"} | steps]
-        else
-          steps
-        end
+        steps =
+          if proof_specs do
+            proof_count = length(proof_specs)
+
+            [
+              %{
+                operation: "Type check + proof verification",
+                cost_ms: 5 * proof_count,
+                notes: "#{proof_count} proof obligation(s)"
+              }
+              | steps
+            ]
+          else
+            steps
+          end
 
         # Step 3: Route to stores
-        {source_type, source_cost, source_notes} = case source do
-          {:octad, id} -> {"Octad lookup", 2, "Direct ID: #{id}"}
-          {:federation, pattern, _} -> {"Federation fan-out", 100, "Pattern: #{inspect(pattern)}"}
-          {:store, id} -> {"Store query", 15, "Store: #{id}"}
-          :reflect -> {"REFLECT (meta-query)", 20, "Query the query store itself"}
-        end
+        {source_type, source_cost, source_notes} =
+          case source do
+            {:octad, id} ->
+              {"Octad lookup", 2, "Direct ID: #{id}"}
+
+            {:federation, pattern, _} ->
+              {"Federation fan-out", 100, "Pattern: #{inspect(pattern)}"}
+
+            {:store, id} ->
+              {"Store query", 15, "Store: #{id}"}
+
+            :reflect ->
+              {"REFLECT (meta-query)", 20, "Query the query store itself"}
+          end
+
         steps = [%{operation: source_type, cost_ms: source_cost, notes: source_notes} | steps]
 
         # Step 4: Modality queries
         modality_cost = length(modalities) * 10
-        steps = [%{operation: "Query #{length(modalities)} modality store(s)",
-                   cost_ms: modality_cost,
-                   modalities: Enum.map(modalities, &to_string/1)} | steps]
+
+        steps = [
+          %{
+            operation: "Query #{length(modalities)} modality store(s)",
+            cost_ms: modality_cost,
+            modalities: Enum.map(modalities, &to_string/1)
+          }
+          | steps
+        ]
 
         # Step 5: Where clause evaluation
         where_cost = if where_clause, do: 5, else: 0
-        steps = if where_clause do
-          query_type = determine_query_type(modalities, where_clause)
-          [%{operation: "Evaluate WHERE (#{query_type})", cost_ms: where_cost} | steps]
-        else
-          steps
-        end
+
+        steps =
+          if where_clause do
+            query_type = determine_query_type(modalities, where_clause)
+            [%{operation: "Evaluate WHERE (#{query_type})", cost_ms: where_cost} | steps]
+          else
+            steps
+          end
 
         # Step 6: Cross-modal evaluation (if any)
-        steps = if cross_modal != [] do
-          [%{operation: "Cross-modal evaluation", cost_ms: 20 * length(cross_modal),
-             conditions: length(cross_modal),
-             notes: "Post-fetch filter across modalities"} | steps]
-        else
-          steps
-        end
+        steps =
+          if cross_modal != [] do
+            [
+              %{
+                operation: "Cross-modal evaluation",
+                cost_ms: 20 * length(cross_modal),
+                conditions: length(cross_modal),
+                notes: "Post-fetch filter across modalities"
+              }
+              | steps
+            ]
+          else
+            steps
+          end
 
         # Step 7: Aggregation (if GROUP BY present)
-        steps = if group_by do
-          [%{operation: "Group + Aggregate", cost_ms: 8,
-             group_fields: length(group_by)} | steps]
-        else
-          steps
-        end
+        steps =
+          if group_by do
+            [
+              %{operation: "Group + Aggregate", cost_ms: 8, group_fields: length(group_by)}
+              | steps
+            ]
+          else
+            steps
+          end
 
         steps = Enum.reverse(steps)
         total = Enum.reduce(steps, 0, fn step, acc -> acc + Map.get(step, :cost_ms, 0) end)
@@ -1684,15 +2092,18 @@ defmodule VeriSim.Query.VQLExecutor do
 
   defp maybe_group_and_aggregate(rows, nil, _aggregates), do: rows
   defp maybe_group_and_aggregate(rows, _group_by, nil), do: rows
+
   defp maybe_group_and_aggregate(rows, group_by, aggregates) do
-    grouped = Enum.group_by(rows, fn row ->
-      Enum.map(group_by, fn %{modality: mod, field: field} ->
-        get_in(row, [to_string(mod), field])
+    grouped =
+      Enum.group_by(rows, fn row ->
+        Enum.map(group_by, fn %{modality: mod, field: field} ->
+          get_in(row, [to_string(mod), field])
+        end)
       end)
-    end)
 
     Enum.map(grouped, fn {group_key, group_rows} ->
-      base = group_by
+      base =
+        group_by
         |> Enum.zip(group_key)
         |> Enum.into(%{}, fn {%{modality: mod, field: field}, val} ->
           {"#{mod}.#{field}", val}
@@ -1704,18 +2115,28 @@ defmodule VeriSim.Query.VQLExecutor do
             Map.put(acc, "COUNT(*)", length(group_rows))
 
           {:aggregate_field, func, %{modality: mod, field: field}} ->
-            values = Enum.map(group_rows, fn row ->
-              get_in(row, [to_string(mod), field]) || 0
-            end)
+            values =
+              Enum.map(group_rows, fn row ->
+                get_in(row, [to_string(mod), field]) || 0
+              end)
 
-            result = case func do
-              :count -> length(values)
-              :sum -> Enum.sum(values)
-              :avg ->
-                if length(values) > 0, do: Enum.sum(values) / length(values), else: 0
-              :min -> Enum.min(values, fn -> 0 end)
-              :max -> Enum.max(values, fn -> 0 end)
-            end
+            result =
+              case func do
+                :count ->
+                  length(values)
+
+                :sum ->
+                  Enum.sum(values)
+
+                :avg ->
+                  if length(values) > 0, do: Enum.sum(values) / length(values), else: 0
+
+                :min ->
+                  Enum.min(values, fn -> 0 end)
+
+                :max ->
+                  Enum.max(values, fn -> 0 end)
+              end
 
             label = "#{String.upcase(to_string(func))}(#{mod}.#{field})"
             Map.put(acc, label, result)
@@ -1725,29 +2146,35 @@ defmodule VeriSim.Query.VQLExecutor do
   end
 
   defp maybe_order_by(rows, nil), do: rows
+
   defp maybe_order_by(rows, order_items) do
-    Enum.sort_by(rows, fn row ->
-      Enum.map(order_items, fn %{field: %{modality: mod, field: field}} ->
-        get_in(row, [to_string(mod), field]) || get_in(row, ["#{mod}.#{field}"])
-      end)
-    end, fn a, b ->
-      order_items
-      |> Enum.zip(Enum.zip(a, b))
-      |> Enum.reduce_while(:eq, fn {item, {va, vb}}, _acc ->
-        cmp = compare_values(va, vb)
-        direction = Map.get(item, :direction, :asc)
-        effective = if direction == :desc, do: invert_cmp(cmp), else: cmp
-        case effective do
-          :eq -> {:cont, :eq}
-          :lt -> {:halt, true}
-          :gt -> {:halt, false}
+    Enum.sort_by(
+      rows,
+      fn row ->
+        Enum.map(order_items, fn %{field: %{modality: mod, field: field}} ->
+          get_in(row, [to_string(mod), field]) || get_in(row, ["#{mod}.#{field}"])
+        end)
+      end,
+      fn a, b ->
+        order_items
+        |> Enum.zip(Enum.zip(a, b))
+        |> Enum.reduce_while(:eq, fn {item, {va, vb}}, _acc ->
+          cmp = compare_values(va, vb)
+          direction = Map.get(item, :direction, :asc)
+          effective = if direction == :desc, do: invert_cmp(cmp), else: cmp
+
+          case effective do
+            :eq -> {:cont, :eq}
+            :lt -> {:halt, true}
+            :gt -> {:halt, false}
+          end
+        end)
+        |> case do
+          :eq -> true
+          bool -> bool
         end
-      end)
-      |> case do
-        :eq -> true
-        bool -> bool
       end
-    end)
+    )
   end
 
   defp compare_values(a, b) when is_number(a) and is_number(b) do
@@ -1757,6 +2184,7 @@ defmodule VeriSim.Query.VQLExecutor do
       true -> :eq
     end
   end
+
   defp compare_values(a, b) when is_binary(a) and is_binary(b) do
     cond do
       a < b -> :lt
@@ -1764,6 +2192,7 @@ defmodule VeriSim.Query.VQLExecutor do
       true -> :eq
     end
   end
+
   defp compare_values(_a, _b), do: :eq
 
   defp invert_cmp(:lt), do: :gt
@@ -1771,6 +2200,7 @@ defmodule VeriSim.Query.VQLExecutor do
   defp invert_cmp(:eq), do: :eq
 
   defp maybe_project_columns(rows, nil), do: rows
+
   defp maybe_project_columns(rows, projections) do
     Enum.map(rows, fn row ->
       Enum.into(projections, %{}, fn %{modality: mod, field: field} ->
@@ -1785,6 +2215,7 @@ defmodule VeriSim.Query.VQLExecutor do
   # ---------------------------------------------------------------------------
 
   defp extract_modalities(query_ast), do: Map.get(query_ast, :modalities, [:all])
+
   defp extract_source(query_ast) do
     case Map.get(query_ast, :source, {:octad, "default"}) do
       %{TAG: "Reflect"} -> :reflect
@@ -1793,13 +2224,15 @@ defmodule VeriSim.Query.VQLExecutor do
       other -> other
     end
   end
+
   defp extract_where(query_ast), do: Map.get(query_ast, :where, nil)
 
   defp extract_proof(query_ast) do
     case Map.get(query_ast, :proof, nil) do
       nil -> nil
       proof when is_list(proof) -> proof
-      proof when is_map(proof) -> [proof]  # backward compat: single proof → list
+      # backward compat: single proof → list
+      proof when is_map(proof) -> [proof]
     end
   end
 

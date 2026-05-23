@@ -12,21 +12,73 @@ use std::borrow::Cow;
 
 /// VQL keywords that are highlighted in blue/bold.
 const VQL_KEYWORDS: &[&str] = &[
-    "SELECT", "FROM", "WHERE", "PROOF", "LIMIT", "OFFSET", "ORDER", "BY",
-    "GROUP", "HAVING", "AS", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE",
-    "EXISTS", "CONTAINS", "SIMILAR", "TO", "TRAVERSE", "DEPTH", "THRESHOLD",
-    "DRIFT", "CONSISTENCY", "AT", "TIME", "EXPLAIN", "INSERT", "UPDATE",
-    "DELETE", "SET", "INTO", "VALUES", "CREATE", "DROP", "ALTER", "JOIN",
-    "ON", "WITH", "FEDERATION", "STORE", "OCTAD", "ALL", "ASC", "DESC",
-    "COUNT", "SUM", "AVG", "MIN", "MAX", "DISTINCT",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "PROOF",
+    "LIMIT",
+    "OFFSET",
+    "ORDER",
+    "BY",
+    "GROUP",
+    "HAVING",
+    "AS",
+    "AND",
+    "OR",
+    "NOT",
+    "IN",
+    "BETWEEN",
+    "LIKE",
+    "EXISTS",
+    "CONTAINS",
+    "SIMILAR",
+    "TO",
+    "TRAVERSE",
+    "DEPTH",
+    "THRESHOLD",
+    "DRIFT",
+    "CONSISTENCY",
+    "AT",
+    "TIME",
+    "EXPLAIN",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "SET",
+    "INTO",
+    "VALUES",
+    "CREATE",
+    "DROP",
+    "ALTER",
+    "JOIN",
+    "ON",
+    "WITH",
+    "FEDERATION",
+    "STORE",
+    "OCTAD",
+    "ALL",
+    "ASC",
+    "DESC",
+    "COUNT",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "DISTINCT",
 ];
 
 /// VQL modality names highlighted in green.
 /// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
 /// Provenance, Spatial.
 const VQL_MODALITIES: &[&str] = &[
-    "GRAPH", "VECTOR", "TENSOR", "SEMANTIC", "DOCUMENT", "TEMPORAL",
-    "PROVENANCE", "SPATIAL",
+    "GRAPH",
+    "VECTOR",
+    "TENSOR",
+    "SEMANTIC",
+    "DOCUMENT",
+    "TEMPORAL",
+    "PROVENANCE",
+    "SPATIAL",
 ];
 
 /// Syntax highlighter for VQL input lines.
@@ -50,7 +102,12 @@ impl Highlighter for VqlHighlighter {
     }
 
     /// Indicate that we always want to repaint when the line changes.
-    fn highlight_char(&self, _line: &str, _pos: usize, _forced: rustyline::highlight::CmdKind) -> bool {
+    fn highlight_char(
+        &self,
+        _line: &str,
+        _pos: usize,
+        _forced: rustyline::highlight::CmdKind,
+    ) -> bool {
         true
     }
 

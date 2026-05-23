@@ -5,11 +5,9 @@
 //! Persistence tests are gated behind `#[ignore]` until store serialization is implemented.
 
 use std::sync::Arc;
-use verisim_octad::{
-    OctadBuilder, OctadConfig, OctadStore, InMemoryOctadStore,
-};
 use verisim_document::TantivyDocumentStore;
 use verisim_graph::SimpleGraphStore;
+use verisim_octad::{InMemoryOctadStore, OctadBuilder, OctadConfig, OctadStore};
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
@@ -35,7 +33,10 @@ fn create_test_store(vector_dim: usize) -> TestOctadStore {
     InMemoryOctadStore::new(
         config,
         Arc::new(SimpleGraphStore::in_memory().unwrap()),
-        Arc::new(BruteForceVectorStore::new(vector_dim, DistanceMetric::Cosine)),
+        Arc::new(BruteForceVectorStore::new(
+            vector_dim,
+            DistanceMetric::Cosine,
+        )),
         Arc::new(TantivyDocumentStore::in_memory().unwrap()),
         Arc::new(InMemoryTensorStore::new()),
         Arc::new(InMemorySemanticStore::new()),
@@ -126,9 +127,18 @@ async fn test_full_text_search() {
 
     // Create entities with different content
     let docs = vec![
-        ("Rust Programming", "Rust is a systems programming language focused on safety"),
-        ("Python Guide", "Python is a high-level programming language"),
-        ("Database Design", "Relational databases use SQL for querying"),
+        (
+            "Rust Programming",
+            "Rust is a systems programming language focused on safety",
+        ),
+        (
+            "Python Guide",
+            "Python is a high-level programming language",
+        ),
+        (
+            "Database Design",
+            "Relational databases use SQL for querying",
+        ),
     ];
 
     for (title, body) in &docs {
@@ -146,7 +156,10 @@ async fn test_full_text_search() {
 
     // Search for "programming" - should match multiple
     let results = store.search_text("programming", 10).await.unwrap();
-    assert!(results.len() >= 2, "Should match at least 2 programming docs");
+    assert!(
+        results.len() >= 2,
+        "Should match at least 2 programming docs"
+    );
 }
 
 /// Test temporal versioning
@@ -262,7 +275,7 @@ async fn test_tensor_persistence() {
 #[tokio::test]
 #[ignore = "persistence not yet implemented on InMemorySemanticStore"]
 async fn test_semantic_persistence() {
-    use verisim_semantic::{SemanticStore as _, SemanticType, Constraint, ConstraintKind};
+    use verisim_semantic::{Constraint, ConstraintKind, SemanticStore as _, SemanticType};
 
     let store = InMemorySemanticStore::new();
 
@@ -290,8 +303,14 @@ async fn test_temporal_persistence() {
 
     let store: InMemoryVersionStore<String> = InMemoryVersionStore::new();
 
-    store.append("entity1", "v1 data".to_string(), "alice", Some("first")).await.unwrap();
-    store.append("entity1", "v2 data".to_string(), "bob", Some("second")).await.unwrap();
+    store
+        .append("entity1", "v1 data".to_string(), "alice", Some("first"))
+        .await
+        .unwrap();
+    store
+        .append("entity1", "v2 data".to_string(), "bob", Some("second"))
+        .await
+        .unwrap();
 
     // TODO: Implement save_to_file/load_from_file on InMemoryVersionStore
     // store.save_to_file(temp_path).unwrap();
@@ -346,7 +365,10 @@ async fn test_high_dimension_vector_search() {
         embedding[(i * 7) % 768] = 0.5;
 
         let input = OctadBuilder::new()
-            .with_document(&format!("Entity {}", i), &format!("High-dim entity number {}", i))
+            .with_document(
+                &format!("Entity {}", i),
+                &format!("High-dim entity number {}", i),
+            )
             .with_embedding(embedding)
             .build();
 

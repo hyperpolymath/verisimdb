@@ -34,10 +34,10 @@ defmodule VeriSim.Api.Router do
 
   use Plug.Router
 
-  plug :match
-  plug Plug.Parsers, parsers: [:json], pass: ["application/json"], json_decoder: Jason
-  plug :set_cors_headers
-  plug :dispatch
+  plug(:match)
+  plug(Plug.Parsers, parsers: [:json], pass: ["application/json"], json_decoder: Jason)
+  plug(:set_cors_headers)
+  plug(:dispatch)
 
   # ── Health ────────────────────────────────────────────────────────────
 
@@ -58,6 +58,7 @@ defmodule VeriSim.Api.Router do
   get "/telemetry" do
     if VeriSim.Telemetry.Collector.enabled?() do
       json_string = VeriSim.Telemetry.Reporter.report_json()
+
       conn
       |> put_resp_content_type("application/json")
       |> send_resp(200, json_string)
@@ -65,7 +66,8 @@ defmodule VeriSim.Api.Router do
       json_response(conn, 200, %{
         telemetry_enabled: false,
         message: "Telemetry collection is disabled. Enable with VERISIM_TELEMETRY=true.",
-        privacy_notice: "When enabled, only aggregate counters are collected. No PII, no query content."
+        privacy_notice:
+          "When enabled, only aggregate counters are collected. No PII, no query content."
       })
     end
   end

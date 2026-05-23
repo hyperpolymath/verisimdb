@@ -69,13 +69,11 @@ impl StatisticsCollector {
     ///
     /// Uses exponential moving average (alpha=0.1) for latency,
     /// matching the drift detector's approach.
-    pub fn record_execution(
-        &mut self,
-        modality: Modality,
-        latency_ms: f64,
-        rows_returned: u64,
-    ) {
-        let entry = self.stats.entry(modality).or_insert_with(|| StoreStatistics::new(modality));
+    pub fn record_execution(&mut self, modality: Modality, latency_ms: f64, rows_returned: u64) {
+        let entry = self
+            .stats
+            .entry(modality)
+            .or_insert_with(|| StoreStatistics::new(modality));
         entry.query_count += 1;
 
         // Exponential moving average (alpha = 0.1)
@@ -127,8 +125,8 @@ impl AdaptiveTuner {
     /// Create a new adaptive tuner with default thresholds.
     pub fn new() -> Self {
         Self {
-            aggressive_threshold: 0.5,    // Actual < 50% of estimate → overestimating
-            conservative_threshold: 2.0,  // Actual > 200% of estimate → underestimating
+            aggressive_threshold: 0.5,   // Actual < 50% of estimate → overestimating
+            conservative_threshold: 2.0, // Actual > 200% of estimate → underestimating
             min_samples: 10,
         }
     }
@@ -248,7 +246,9 @@ mod tests {
 
         // First execution
         collector.record_execution(Modality::Graph, 100.0, 50);
-        assert!((collector.get(Modality::Graph).unwrap().avg_latency_ms - 100.0).abs() < f64::EPSILON);
+        assert!(
+            (collector.get(Modality::Graph).unwrap().avg_latency_ms - 100.0).abs() < f64::EPSILON
+        );
 
         // Second execution — EMA: 0.1 * 200 + 0.9 * 100 = 110
         collector.record_execution(Modality::Graph, 200.0, 100);
@@ -307,7 +307,7 @@ mod tests {
             collector.record_execution(Modality::Vector, 10.0, 5);
         }
         let config = crate::config::PlannerConfig::default();
-        let adjustments = tuner.suggest_adjustments(&collector, &config);
+        let _adjustments = tuner.suggest_adjustments(&collector, &config);
         // Vector already has Aggressive override, so if actual confirms it, no change.
         // But ratio 0.25 < 0.5, already aggressive, stays aggressive → no adjustment.
         // Let's test Graph instead where it's Conservative
@@ -370,8 +370,10 @@ mod tests {
         for _ in 0..15 {
             collector.record_execution(Modality::Document, 200.0, 50);
         }
-        let mut config = crate::config::PlannerConfig::default();
-        config.enable_adaptive = false;
+        let config = crate::config::PlannerConfig {
+            enable_adaptive: false,
+            ..crate::config::PlannerConfig::default()
+        };
         let new_config = tuner.apply(&collector, &config);
         // Should not change when adaptive is disabled
         assert_eq!(

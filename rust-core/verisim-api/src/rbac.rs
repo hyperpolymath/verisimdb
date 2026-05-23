@@ -15,7 +15,7 @@
 //! # Integration with auth middleware
 //!
 //! After the [`auth_middleware`](crate::auth::auth_middleware) extracts a
-//! [`ClientIdentity`](crate::auth::ClientIdentity), call
+//! [`ClientIdentity`], call
 //! [`check_authorization`] to verify that the client's role permits the
 //! requested operation on the target resource.
 
@@ -222,9 +222,8 @@ impl RbacPolicy {
         self.entity_acls
             .get(entity_id)
             .map(|acls| {
-                acls.iter().any(|(cid, perms)| {
-                    cid == client_id && perms.contains(&permission)
-                })
+                acls.iter()
+                    .any(|(cid, perms)| cid == client_id && perms.contains(&permission))
             })
             .unwrap_or(false)
     }
@@ -545,7 +544,10 @@ pub fn check_access(
                 permission = %permission,
                 "Access ALLOWED via entity ACL"
             );
-            record(AccessDecision::Allowed, Some("entity ACL grant".to_string()));
+            record(
+                AccessDecision::Allowed,
+                Some("entity ACL grant".to_string()),
+            );
             return Ok(());
         }
     }
@@ -581,7 +583,10 @@ pub fn check_access(
                 permission = %permission,
                 "Access ALLOWED via modality permission"
             );
-            record(AccessDecision::Allowed, Some(format!("modality '{}' grant", modality)));
+            record(
+                AccessDecision::Allowed,
+                Some(format!("modality '{}' grant", modality)),
+            );
             return Ok(());
         }
         // If the role has a modality_permissions entry for this modality
@@ -616,7 +621,10 @@ pub fn check_access(
             permission = %permission,
             "Access ALLOWED via global permission"
         );
-        record(AccessDecision::Allowed, Some("global role grant".to_string()));
+        record(
+            AccessDecision::Allowed,
+            Some("global role grant".to_string()),
+        );
         return Ok(());
     }
 
@@ -690,18 +698,8 @@ mod tests {
         // Execute
         assert!(check_access(&admin, "/query/plan", &Method::POST, &rbac).is_ok());
         // Admin
-        assert!(check_access(
-            &admin,
-            "/normalizer/trigger/entity-1",
-            &Method::POST,
-            &rbac
-        ).is_ok());
-        assert!(check_access(
-            &admin,
-            "/planner/config",
-            &Method::PUT,
-            &rbac
-        ).is_ok());
+        assert!(check_access(&admin, "/normalizer/trigger/entity-1", &Method::POST, &rbac).is_ok());
+        assert!(check_access(&admin, "/planner/config", &Method::PUT, &rbac).is_ok());
     }
 
     // ------------------------------------------------------------------
@@ -836,21 +834,11 @@ mod tests {
         let reader = identity("special-reader", ClientRole::Reader);
 
         // Normally a reader cannot write.
-        let result = check_access(
-            &reader,
-            "/octads/other-octad",
-            &Method::PUT,
-            &rbac,
-        );
+        let result = check_access(&reader, "/octads/other-octad", &Method::PUT, &rbac);
         assert!(result.is_err());
 
         // But the entity ACL grants write on "secret-octad".
-        assert!(check_access(
-            &reader,
-            "/octads/secret-octad",
-            &Method::PUT,
-            &rbac,
-        ).is_ok());
+        assert!(check_access(&reader, "/octads/secret-octad", &Method::PUT, &rbac,).is_ok());
     }
 
     // ------------------------------------------------------------------
@@ -868,10 +856,16 @@ mod tests {
         let _ = check_access(&reader, "/octads", &Method::POST, &rbac);
 
         let entries = rbac.audit_log.entries();
-        assert!(entries.len() >= 2, "Expected at least 2 audit entries, got {}", entries.len());
+        assert!(
+            entries.len() >= 2,
+            "Expected at least 2 audit entries, got {}",
+            entries.len()
+        );
 
         // First entry: admin allowed read.
-        let allowed_entry = entries.iter().find(|e| e.decision == AccessDecision::Allowed);
+        let allowed_entry = entries
+            .iter()
+            .find(|e| e.decision == AccessDecision::Allowed);
         assert!(allowed_entry.is_some(), "Expected an ALLOWED entry");
         let allowed = allowed_entry.unwrap();
         assert_eq!(allowed.client_id, "audit-admin");
@@ -879,7 +873,9 @@ mod tests {
         assert_eq!(allowed.required_permission, Permission::Read);
 
         // Second entry: reader denied write.
-        let denied_entry = entries.iter().find(|e| e.decision == AccessDecision::Denied);
+        let denied_entry = entries
+            .iter()
+            .find(|e| e.decision == AccessDecision::Denied);
         assert!(denied_entry.is_some(), "Expected a DENIED entry");
         let denied = denied_entry.unwrap();
         assert_eq!(denied.client_id, "audit-reader");
@@ -923,21 +919,54 @@ mod tests {
     #[test]
     fn test_required_permission_derivation() {
         // Read
-        assert_eq!(required_permission(&Method::GET, "/octads"), Permission::Read);
-        assert_eq!(required_permission(&Method::HEAD, "/octads"), Permission::Read);
-        assert_eq!(required_permission(&Method::OPTIONS, "/anything"), Permission::Read);
+        assert_eq!(
+            required_permission(&Method::GET, "/octads"),
+            Permission::Read
+        );
+        assert_eq!(
+            required_permission(&Method::HEAD, "/octads"),
+            Permission::Read
+        );
+        assert_eq!(
+            required_permission(&Method::OPTIONS, "/anything"),
+            Permission::Read
+        );
 
         // Write
-        assert_eq!(required_permission(&Method::POST, "/octads"), Permission::Write);
-        assert_eq!(required_permission(&Method::PUT, "/octads/abc"), Permission::Write);
-        assert_eq!(required_permission(&Method::DELETE, "/octads/abc"), Permission::Write);
+        assert_eq!(
+            required_permission(&Method::POST, "/octads"),
+            Permission::Write
+        );
+        assert_eq!(
+            required_permission(&Method::PUT, "/octads/abc"),
+            Permission::Write
+        );
+        assert_eq!(
+            required_permission(&Method::DELETE, "/octads/abc"),
+            Permission::Write
+        );
 
         // Execute
-        assert_eq!(required_permission(&Method::POST, "/query/plan"), Permission::Execute);
-        assert_eq!(required_permission(&Method::POST, "/query/explain"), Permission::Execute);
-        assert_eq!(required_permission(&Method::POST, "/search/vector"), Permission::Execute);
-        assert_eq!(required_permission(&Method::POST, "/search/text?q=foo"), Permission::Execute);
-        assert_eq!(required_permission(&Method::POST, "/queries/similar"), Permission::Execute);
+        assert_eq!(
+            required_permission(&Method::POST, "/query/plan"),
+            Permission::Execute
+        );
+        assert_eq!(
+            required_permission(&Method::POST, "/query/explain"),
+            Permission::Execute
+        );
+        assert_eq!(
+            required_permission(&Method::POST, "/search/vector"),
+            Permission::Execute
+        );
+        assert_eq!(
+            required_permission(&Method::POST, "/search/text?q=foo"),
+            Permission::Execute
+        );
+        assert_eq!(
+            required_permission(&Method::POST, "/queries/similar"),
+            Permission::Execute
+        );
 
         // Admin
         assert_eq!(
@@ -959,7 +988,10 @@ mod tests {
         assert_eq!(entity_from_path("/octads/my-entity"), Some("my-entity"));
         assert_eq!(entity_from_path("/octads/abc/sub"), Some("abc"));
         assert_eq!(entity_from_path("/drift/entity/drift-id"), Some("drift-id"));
-        assert_eq!(entity_from_path("/normalizer/trigger/norm-id"), Some("norm-id"));
+        assert_eq!(
+            entity_from_path("/normalizer/trigger/norm-id"),
+            Some("norm-id")
+        );
         assert_eq!(entity_from_path("/octads"), None);
         assert_eq!(entity_from_path("/search/text"), None);
 
@@ -1057,12 +1089,7 @@ mod tests {
 
         // Write to entity-alpha by a DIFFERENT client → denied.
         let other_reader = identity("reader-y", ClientRole::Reader);
-        let result = check_access(
-            &other_reader,
-            "/octads/entity-alpha",
-            &Method::PUT,
-            &rbac,
-        );
+        let result = check_access(&other_reader, "/octads/entity-alpha", &Method::PUT, &rbac);
         assert!(result.is_err());
     }
 

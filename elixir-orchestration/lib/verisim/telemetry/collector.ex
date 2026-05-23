@@ -142,17 +142,23 @@ defmodule VeriSim.Telemetry.Collector do
     case :ets.lookup(@table, min_key) do
       [{^min_key, current}] when value < current / 1000 ->
         :ets.insert(@table, {min_key, trunc(value * 1000)})
+
       [] ->
         :ets.insert(@table, {min_key, trunc(value * 1000)})
-      _ -> :ok
+
+      _ ->
+        :ok
     end
 
     case :ets.lookup(@table, max_key) do
       [{^max_key, current}] when value > current / 1000 ->
         :ets.insert(@table, {max_key, trunc(value * 1000)})
+
       [] ->
         :ets.insert(@table, {max_key, trunc(value * 1000)})
-      _ -> :ok
+
+      _ ->
+        :ok
     end
 
     {:noreply, state}

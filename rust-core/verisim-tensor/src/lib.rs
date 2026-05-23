@@ -7,10 +7,10 @@
 #![forbid(unsafe_code)]
 #[cfg(feature = "redb-backend")]
 pub mod persistent;
-#[cfg(feature = "redb-backend")]
-pub use persistent::*;
 use async_trait::async_trait;
 use ndarray::{Array, ArrayD, IxDyn};
+#[cfg(feature = "redb-backend")]
+pub use persistent::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -20,7 +20,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum TensorError {
     #[error("Shape mismatch: expected {expected:?}, got {actual:?}")]
-    ShapeMismatch { expected: Vec<usize>, actual: Vec<usize> },
+    ShapeMismatch {
+        expected: Vec<usize>,
+        actual: Vec<usize>,
+    },
 
     #[error("Tensor not found: {0}")]
     NotFound(String),
@@ -62,7 +65,11 @@ pub struct Tensor {
 
 impl Tensor {
     /// Create a new tensor from shape and data
-    pub fn new(id: impl Into<String>, shape: Vec<usize>, data: Vec<f64>) -> Result<Self, TensorError> {
+    pub fn new(
+        id: impl Into<String>,
+        shape: Vec<usize>,
+        data: Vec<f64>,
+    ) -> Result<Self, TensorError> {
         let expected_len: usize = shape.iter().product();
         if data.len() != expected_len {
             return Err(TensorError::InvalidOperation(format!(
@@ -109,8 +116,7 @@ impl Tensor {
     pub fn to_ndarray(&self) -> ArrayD<f64> {
         let shape = IxDyn(&self.shape);
         // Use C order (row-major) to match data layout documented on line 49
-        Array::from_shape_vec(shape, self.data.clone())
-            .expect("Shape should match data length")
+        Array::from_shape_vec(shape, self.data.clone()).expect("Shape should match data length")
     }
 
     /// Create from ndarray
@@ -195,25 +201,45 @@ impl Default for InMemoryTensorStore {
 #[async_trait]
 impl TensorStore for InMemoryTensorStore {
     async fn put(&self, tensor: &Tensor) -> Result<(), TensorError> {
-        self.tensors.write().map_err(|_| TensorError::LockPoisoned)?.insert(tensor.id.clone(), tensor.clone());
+        self.tensors
+            .write()
+            .map_err(|_| TensorError::LockPoisoned)?
+            .insert(tensor.id.clone(), tensor.clone());
         Ok(())
     }
 
     async fn get(&self, id: &str) -> Result<Option<Tensor>, TensorError> {
-        Ok(self.tensors.read().map_err(|_| TensorError::LockPoisoned)?.get(id).cloned())
+        Ok(self
+            .tensors
+            .read()
+            .map_err(|_| TensorError::LockPoisoned)?
+            .get(id)
+            .cloned())
     }
 
     async fn delete(&self, id: &str) -> Result<(), TensorError> {
-        self.tensors.write().map_err(|_| TensorError::LockPoisoned)?.remove(id);
+        self.tensors
+            .write()
+            .map_err(|_| TensorError::LockPoisoned)?
+            .remove(id);
         Ok(())
     }
 
     async fn list(&self) -> Result<Vec<String>, TensorError> {
-        Ok(self.tensors.read().map_err(|_| TensorError::LockPoisoned)?.keys().cloned().collect())
+        Ok(self
+            .tensors
+            .read()
+            .map_err(|_| TensorError::LockPoisoned)?
+            .keys()
+            .cloned()
+            .collect())
     }
 
     async fn map(&self, id: &str, op: fn(f64) -> f64) -> Result<Tensor, TensorError> {
-        let tensor = self.tensors.read().map_err(|_| TensorError::LockPoisoned)?
+        let tensor = self
+            .tensors
+            .read()
+            .map_err(|_| TensorError::LockPoisoned)?
             .get(id)
             .cloned()
             .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
@@ -229,7 +255,10 @@ impl TensorStore for InMemoryTensorStore {
     }
 
     async fn reduce(&self, id: &str, axis: usize, op: ReduceOp) -> Result<Tensor, TensorError> {
-        let tensor = self.tensors.read().map_err(|_| TensorError::LockPoisoned)?
+        let tensor = self
+            .tensors
+            .read()
+            .map_err(|_| TensorError::LockPoisoned)?
             .get(id)
             .cloned()
             .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
@@ -246,24 +275,21 @@ impl TensorStore for InMemoryTensorStore {
         let reduced = match op {
             ReduceOp::Sum => arr.sum_axis(ndarray::Axis(axis)),
             ReduceOp::Mean => arr.mean_axis(ndarray::Axis(axis)).expect("non-empty axis"),
-            ReduceOp::Max => {
-                arr.map_axis(ndarray::Axis(axis), |lane| {
-                    lane.iter().copied().fold(f64::NEG_INFINITY, f64::max)
-                })
-            }
-            ReduceOp::Min => {
-                arr.map_axis(ndarray::Axis(axis), |lane| {
-                    lane.iter().copied().fold(f64::INFINITY, f64::min)
-                })
-            }
+            ReduceOp::Max => arr.map_axis(ndarray::Axis(axis), |lane| {
+                lane.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+            }),
+            ReduceOp::Min => arr.map_axis(ndarray::Axis(axis), |lane| {
+                lane.iter().copied().fold(f64::INFINITY, f64::min)
+            }),
             ReduceOp::Prod => {
-                arr.map_axis(ndarray::Axis(axis), |lane| {
-                    lane.iter().copied().product()
-                })
+                arr.map_axis(ndarray::Axis(axis), |lane| lane.iter().copied().product())
             }
         };
 
-        Ok(Tensor::from_ndarray(format!("{}_reduced", tensor.id), &reduced))
+        Ok(Tensor::from_ndarray(
+            format!("{}_reduced", tensor.id),
+            &reduced,
+        ))
     }
 }
 

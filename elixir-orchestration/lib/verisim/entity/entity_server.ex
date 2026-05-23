@@ -183,7 +183,9 @@ defmodule VeriSim.EntityServer do
             Logger.warning("High drift detected for #{state.id}: #{score}")
             DriftMonitor.report_drift(state.id, score)
           end
+
           %{state | drift_score: score}
+
         {:error, _} ->
           state
       end
@@ -196,9 +198,7 @@ defmodule VeriSim.EntityServer do
   def handle_info({:normalization_complete, result, modalities}, state) do
     new_status = if result == :success, do: :active, else: :stale
 
-    Logger.info(
-      "Normalization #{result} for #{state.id}, modalities: #{inspect(modalities)}"
-    )
+    Logger.info("Normalization #{result} for #{state.id}, modalities: #{inspect(modalities)}")
 
     new_state =
       %{state | status: new_status}
@@ -230,8 +230,10 @@ defmodule VeriSim.EntityServer do
     Enum.reduce(changes, state, fn
       {:modality, modality, value}, acc ->
         put_in(acc, [:modalities, modality], value)
+
       {key, value}, acc when is_atom(key) ->
         Map.put(acc, key, value)
+
       _, acc ->
         acc
     end)

@@ -51,9 +51,7 @@ defmodule VeriSim.Query.VQLDTTest do
     test "parse_statement handles PROOF clause in AST" do
       # The built-in parser should handle PROOF clauses
       result =
-        VQLBridge.parse_statement(
-          "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)"
-        )
+        VQLBridge.parse_statement("SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)")
 
       case result do
         {:ok, ast} ->

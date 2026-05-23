@@ -93,7 +93,11 @@ impl ExplainOutput {
                 }
             })
             .collect();
-        cost_breakdown.sort_by(|a, b| b.percentage.partial_cmp(&a.percentage).unwrap_or(std::cmp::Ordering::Equal));
+        cost_breakdown.sort_by(|a, b| {
+            b.percentage
+                .partial_cmp(&a.percentage)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Generate performance hints
         let mut hints = Vec::new();
@@ -119,7 +123,9 @@ impl ExplainOutput {
                         step.step,
                         step.modality,
                         step.cost.time_ms,
-                        step.optimization_hint.as_deref().unwrap_or("consider optimization")
+                        step.optimization_hint
+                            .as_deref()
+                            .unwrap_or("consider optimization")
                     ),
                 });
             }
@@ -140,9 +146,7 @@ impl ExplainOutput {
         }
 
         // Sequential when parallel is possible
-        if plan.steps.len() >= 2
-            && plan.strategy == crate::plan::ExecutionStrategy::Sequential
-        {
+        if plan.steps.len() >= 2 && plan.strategy == crate::plan::ExecutionStrategy::Sequential {
             hints.push(PerformanceHint {
                 severity: "suggestion".to_string(),
                 message: "Multiple modalities could benefit from parallel execution".to_string(),
@@ -153,7 +157,14 @@ impl ExplainOutput {
         let total_cost_ms = plan.total_cost.time_ms;
 
         // Build text output
-        let text_output = Self::render_text(&steps, &cost_breakdown, &hints, &strategy, total_cost_ms, config);
+        let text_output = Self::render_text(
+            &steps,
+            &cost_breakdown,
+            &hints,
+            &strategy,
+            total_cost_ms,
+            config,
+        );
 
         ExplainOutput {
             steps,

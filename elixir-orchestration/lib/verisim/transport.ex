@@ -85,6 +85,7 @@ defmodule VeriSim.Transport do
   def create_octad(input) do
     if use_nif?() do
       json = Jason.encode!(input)
+
       case NifBridge.create_octad(json) do
         result when is_binary(result) -> {:ok, Jason.decode!(result)}
         {:error, reason} -> {:error, reason}
@@ -142,6 +143,7 @@ defmodule VeriSim.Transport do
   def search_vector(vector, k \\ 10) do
     if use_nif?() do
       embedding_json = Jason.encode!(vector)
+
       case NifBridge.search_vector(embedding_json, k) do
         result when is_binary(result) -> {:ok, Jason.decode!(result)}
         {:error, reason} -> {:error, reason}

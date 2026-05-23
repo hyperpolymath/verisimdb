@@ -7,7 +7,7 @@
 //! timings, actual row counts, and estimation accuracy for every step. Results
 //! are fed back into the [`StatisticsCollector`] via
 //! [`record_execution`](StatisticsCollector::record_execution) so the
-//! [`AdaptiveTuner`] can refine future cost estimates.
+//! [`AdaptiveTuner`](crate::AdaptiveTuner) can refine future cost estimates.
 
 use std::fmt;
 
@@ -154,8 +154,14 @@ impl QueryProfile {
 
 impl fmt::Display for QueryProfile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "QueryProfile(plan={}, steps={}, estimated={:.1}ms, actual={:.1}ms)",
-            self.plan_id, self.steps.len(), self.total_estimated_ms, self.total_actual_ms)
+        write!(
+            f,
+            "QueryProfile(plan={}, steps={}, estimated={:.1}ms, actual={:.1}ms)",
+            self.plan_id,
+            self.steps.len(),
+            self.total_estimated_ms,
+            self.total_actual_ms
+        )
     }
 }
 
@@ -256,7 +262,7 @@ impl Profiler {
     /// are filled with zero actual values (and will generate accuracy hints).
     ///
     /// This method also feeds each step's actual latency and row count into
-    /// the provided [`StatisticsCollector`] so the [`AdaptiveTuner`] can
+    /// the provided [`StatisticsCollector`] so the [`AdaptiveTuner`](crate::AdaptiveTuner) can
     /// refine future estimates.
     pub fn finish(self, stats: &mut StatisticsCollector) -> QueryProfile {
         let mut steps: Vec<ProfileStep> = Vec::with_capacity(self.plan.steps.len());
@@ -541,11 +547,19 @@ mod tests {
 
         // Step 0 time accuracy: 35 / 40 = 0.875
         let ratio_0 = profile.steps[0].time_accuracy_ratio();
-        assert!((ratio_0 - 0.875).abs() < 0.001, "Expected 0.875, got {}", ratio_0);
+        assert!(
+            (ratio_0 - 0.875).abs() < 0.001,
+            "Expected 0.875, got {}",
+            ratio_0
+        );
 
         // Step 1 time accuracy: 450 / 225 = 2.0
         let ratio_1 = profile.steps[1].time_accuracy_ratio();
-        assert!((ratio_1 - 2.0).abs() < 0.001, "Expected 2.0, got {}", ratio_1);
+        assert!(
+            (ratio_1 - 2.0).abs() < 0.001,
+            "Expected 2.0, got {}",
+            ratio_1
+        );
 
         // Row accuracy for step 0: 10 / 10 = 1.0 (perfect)
         let row_ratio_0 = profile.steps[0].row_accuracy_ratio();
@@ -584,7 +598,10 @@ mod tests {
             "Expected hints for large estimation errors"
         );
 
-        let has_slow_hint = profile.optimization_hints.iter().any(|h| h.contains("slower"));
+        let has_slow_hint = profile
+            .optimization_hints
+            .iter()
+            .any(|h| h.contains("slower"));
         assert!(
             has_slow_hint,
             "Expected a 'slower than estimated' hint, got: {:?}",
@@ -614,14 +631,20 @@ mod tests {
 
         let profile = profiler.finish(&mut stats);
 
-        let has_row_over = profile.optimization_hints.iter().any(|h| h.contains("more rows"));
+        let has_row_over = profile
+            .optimization_hints
+            .iter()
+            .any(|h| h.contains("more rows"));
         assert!(
             has_row_over,
             "Expected 'more rows than estimated' hint, got: {:?}",
             profile.optimization_hints
         );
 
-        let has_row_under = profile.optimization_hints.iter().any(|h| h.contains("fewer rows"));
+        let has_row_under = profile
+            .optimization_hints
+            .iter()
+            .any(|h| h.contains("fewer rows"));
         assert!(
             has_row_under,
             "Expected 'fewer rows than estimated' hint, got: {:?}",
@@ -778,7 +801,7 @@ mod tests {
 
         let base = Utc::now();
         // Both steps are much faster than estimated
-        let (s0, e0) = make_timestamps(base, 5.0);  // estimated 40ms
+        let (s0, e0) = make_timestamps(base, 5.0); // estimated 40ms
         let (s1, e1) = make_timestamps(base, 20.0); // estimated 225ms
 
         profiler.record_step(0, 5.0, 10, s0, e0);
@@ -786,7 +809,10 @@ mod tests {
 
         let profile = profiler.finish(&mut stats);
 
-        let has_fast_hint = profile.optimization_hints.iter().any(|h| h.contains("faster"));
+        let has_fast_hint = profile
+            .optimization_hints
+            .iter()
+            .any(|h| h.contains("faster"));
         assert!(
             has_fast_hint,
             "Expected 'faster than estimated' hint, got: {:?}",

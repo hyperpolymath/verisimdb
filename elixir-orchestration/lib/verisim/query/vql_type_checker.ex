@@ -131,15 +131,16 @@ defmodule VeriSim.Query.VQLTypeChecker do
          :ok <- validate_modality_compatibility(proof_specs, modalities),
          {:ok, obligations} <- generate_obligations(proof_specs),
          {:ok, composition} <- determine_composition(obligations) do
-      total_ms = Enum.reduce(obligations, 0, & &1.estimated_time_ms + &2)
+      total_ms = Enum.reduce(obligations, 0, &(&1.estimated_time_ms + &2))
 
-      {:ok, %{
-        proof_obligations: obligations,
-        composition_strategy: composition,
-        inferred_types: %{},
-        total_estimated_ms: total_ms,
-        is_parallelizable: composition == :independent
-      }}
+      {:ok,
+       %{
+         proof_obligations: obligations,
+         composition_strategy: composition,
+         inferred_types: %{},
+         total_estimated_ms: total_ms,
+         is_parallelizable: composition == :independent
+       }}
     end
   end
 
@@ -161,9 +162,11 @@ defmodule VeriSim.Query.VQLTypeChecker do
       [%{proofType: "INTEGRITY", contractName: "my_contract", raw: "INTEGRITY(my_contract)"}]
   """
   def parse_proof_specs(nil), do: []
+
   def parse_proof_specs(specs) when is_list(specs) do
     Enum.flat_map(specs, &parse_proof_specs/1)
   end
+
   def parse_proof_specs(%{raw: raw}) when is_binary(raw) do
     # Split on AND/OR connectors (case-insensitive), preserving each proof spec
     raw
@@ -172,6 +175,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
     |> Enum.reject(&(&1 == ""))
     |> Enum.map(fn spec_str ->
       {proof_type, contract_name} = parse_single_proof_spec(spec_str)
+
       %{
         proofType: proof_type,
         contractName: contract_name,
@@ -179,6 +183,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
       }
     end)
   end
+
   def parse_proof_specs(%{proofType: _} = spec), do: [spec]
   def parse_proof_specs(%{TAG: _} = spec), do: [spec]
   def parse_proof_specs(_), do: []
@@ -193,17 +198,21 @@ defmodule VeriSim.Query.VQLTypeChecker do
   defp validate_proof_specs([]) do
     {:error, {:missing_proof, "VQL-DT query requires at least one PROOF specification"}}
   end
+
   defp validate_proof_specs(specs) do
     Enum.reduce_while(specs, :ok, fn spec, _acc ->
       proof_type = normalize_proof_type(spec)
+
       cond do
         proof_type == :unknown ->
           raw = Map.get(spec, :raw, Map.get(spec, :proofType, inspect(spec)))
           {:halt, {:error, {:unknown_proof_type, "Unknown proof type: #{raw}"}}}
 
         needs_contract?(proof_type) and not has_contract?(spec) ->
-          {:halt, {:error, {:missing_contract,
-            "#{proof_type_name(proof_type)} proof requires a contract/entity reference"}}}
+          {:halt,
+           {:error,
+            {:missing_contract,
+             "#{proof_type_name(proof_type)} proof requires a contract/entity reference"}}}
 
         true ->
           {:cont, :ok}
@@ -224,9 +233,12 @@ defmodule VeriSim.Query.VQLTypeChecker do
         {:cont, :ok}
       else
         required_str = required |> Enum.map(&to_string/1) |> Enum.join(", ")
-        {:halt, {:error, {:modality_mismatch,
-          "#{proof_type_name(proof_type)} proof requires #{required_str} modality " <>
-          "but query only selects #{inspect(modalities)}"}}}
+
+        {:halt,
+         {:error,
+          {:modality_mismatch,
+           "#{proof_type_name(proof_type)} proof requires #{required_str} modality " <>
+             "but query only selects #{inspect(modalities)}"}}}
       end
     end)
   end
@@ -236,27 +248,29 @@ defmodule VeriSim.Query.VQLTypeChecker do
   # ---------------------------------------------------------------------------
 
   defp generate_obligations(proof_specs) do
-    obligations = Enum.map(proof_specs, fn spec ->
-      proof_type = normalize_proof_type(spec)
-      contract = extract_contract(spec)
+    obligations =
+      Enum.map(proof_specs, fn spec ->
+        proof_type = normalize_proof_type(spec)
+        contract = extract_contract(spec)
 
-      %{
-        type: proof_type,
-        proofType: proof_type |> Atom.to_string() |> String.upcase(),
-        contract: contract,
-        contractName: contract,
-        witness_fields: Map.get(@proof_witness_fields, proof_type, []),
-        circuit: circuit_for(proof_type, spec),
-        estimated_time_ms: Map.get(@proof_time_estimates_ms, proof_type, 200),
-        required_modalities: Map.get(@proof_required_modalities, proof_type, [])
-      }
-    end)
+        %{
+          type: proof_type,
+          proofType: proof_type |> Atom.to_string() |> String.upcase(),
+          contract: contract,
+          contractName: contract,
+          witness_fields: Map.get(@proof_witness_fields, proof_type, []),
+          circuit: circuit_for(proof_type, spec),
+          estimated_time_ms: Map.get(@proof_time_estimates_ms, proof_type, 200),
+          required_modalities: Map.get(@proof_required_modalities, proof_type, [])
+        }
+      end)
 
     {:ok, obligations}
   end
 
   defp determine_composition([]), do: {:ok, :independent}
   defp determine_composition([_single]), do: {:ok, :independent}
+
   defp determine_composition(obligations) do
     types = Enum.map(obligations, & &1.type) |> MapSet.new()
 
@@ -286,6 +300,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
     case Regex.run(~r/^([A-Z_]+)\(([^)]*)\)$/, String.trim(spec_str)) do
       [_, proof_type, contract] ->
         {proof_type, String.trim(contract)}
+
       _ ->
         # Try space-separated: "EXISTENCE entity-001"
         case String.split(String.trim(spec_str), ~r/\s+/, parts: 2) do
@@ -299,16 +314,19 @@ defmodule VeriSim.Query.VQLTypeChecker do
   defp normalize_proof_type(%{proofType: type}), do: do_normalize(type)
   defp normalize_proof_type(%{TAG: tag}), do: do_normalize(tag)
   defp normalize_proof_type(%{type: type}) when is_atom(type), do: type
+
   defp normalize_proof_type(%{raw: raw}) when is_binary(raw) do
     raw
     |> String.split(~r/[\s(]/, parts: 2)
     |> List.first()
     |> do_normalize()
   end
+
   defp normalize_proof_type(_), do: :unknown
 
   defp do_normalize(str) when is_binary(str) do
     str_down = String.downcase(str)
+
     try do
       atom = String.to_existing_atom(str_down)
       if atom in @known_proof_types, do: atom, else: :unknown
@@ -316,19 +334,23 @@ defmodule VeriSim.Query.VQLTypeChecker do
       ArgumentError -> :unknown
     end
   end
+
   defp do_normalize(atom) when is_atom(atom) do
     if atom in @known_proof_types, do: atom, else: :unknown
   end
+
   defp do_normalize(_), do: :unknown
 
   defp extract_contract(%{contractName: name}) when is_binary(name) and name != "", do: name
   defp extract_contract(%{contract: name}) when is_binary(name) and name != "", do: name
+
   defp extract_contract(%{raw: raw}) when is_binary(raw) do
     case Regex.run(~r/\(([^)]+)\)/, raw) do
       [_, name] -> String.trim(name)
       _ -> nil
     end
   end
+
   defp extract_contract(_), do: nil
 
   defp needs_contract?(type) when type in [:integrity, :citation, :custom, :sanctify], do: true
@@ -342,6 +364,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
   defp circuit_for(:custom, spec) do
     extract_contract(spec) || "custom-circuit"
   end
+
   defp circuit_for(type, _spec), do: Map.get(@proof_circuits, type)
 
   defp proof_type_name(type) do

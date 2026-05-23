@@ -57,10 +57,7 @@ impl Planner {
             return Err(PlannerError::EmptyPlan);
         }
 
-        debug!(
-            node_count = logical.nodes.len(),
-            "Optimizing logical plan"
-        );
+        debug!(node_count = logical.nodes.len(), "Optimizing logical plan");
 
         // 1. Estimate cost for each node
         let mut node_costs: Vec<(usize, CostEstimate, Option<String>)> = logical
@@ -79,9 +76,11 @@ impl Planner {
         node_costs.sort_by(|a, b| {
             let pri_a = logical.nodes[a.0].modality.execution_priority();
             let pri_b = logical.nodes[b.0].modality.execution_priority();
-            pri_a
-                .cmp(&pri_b)
-                .then_with(|| a.1.time_ms.partial_cmp(&b.1.time_ms).unwrap_or(std::cmp::Ordering::Equal))
+            pri_a.cmp(&pri_b).then_with(|| {
+                a.1.time_ms
+                    .partial_cmp(&b.1.time_ms)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
         });
 
         // 3. Select execution strategy
@@ -116,11 +115,8 @@ impl Planner {
                 }
             );
 
-            let pushed_predicates: Vec<String> = node
-                .conditions
-                .iter()
-                .map(|c| format!("{:?}", c))
-                .collect();
+            let pushed_predicates: Vec<String> =
+                node.conditions.iter().map(|c| format!("{:?}", c)).collect();
 
             steps.push(PlanStep {
                 step: step_num + 1,
@@ -137,10 +133,8 @@ impl Planner {
         // 5. Combine total cost (modality queries + post-processing)
         let is_parallel = strategy == ExecutionStrategy::Parallel;
         let modality_cost = CostEstimate::combine(&cost_estimates, is_parallel);
-        let total_cost = CostModel::estimate_with_post_processing(
-            &modality_cost,
-            &logical.post_processing,
-        );
+        let total_cost =
+            CostModel::estimate_with_post_processing(&modality_cost, &logical.post_processing);
 
         // 6. Generate optimization notes
         if is_parallel {
@@ -153,7 +147,10 @@ impl Planner {
         }
 
         if total_cost.time_ms > 500.0 {
-            notes.push("High estimated cost — consider adding LIMIT or more selective predicates".to_string());
+            notes.push(
+                "High estimated cost — consider adding LIMIT or more selective predicates"
+                    .to_string(),
+            );
         }
 
         // Check if any step has poor selectivity

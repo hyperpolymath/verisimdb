@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: MPL-2.0
+# Elixir CI for the orchestration layer: compile, format check, test, audit.
+name: elixir-ci
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "elixir-orchestration/**"
+      - ".github/workflows/elixir-ci.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "elixir-orchestration/**"
+      - ".github/workflows/elixir-ci.yml"
+  workflow_dispatch:
+
+env:
+  MIX_ENV: test
+
+concurrency:
+  group: elixir-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: compile + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: elixir-orchestration
+    strategy:
+      matrix:
+        include:
+          - elixir: "1.17"
+            otp: "27"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            elixir-orchestration/deps
+            elixir-orchestration/_build
+          key: ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('elixir-orchestration/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix test
+
+  audit:
+    name: hex audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: elixir-orchestration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17"
+          otp-version: "27"
+      - run: mix deps.get
+      - run: mix hex.audit
+      - run: mix deps.unlock --check-unused

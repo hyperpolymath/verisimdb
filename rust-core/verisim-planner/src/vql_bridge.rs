@@ -295,10 +295,7 @@ pub enum VqlSimpleCondition {
     /// Full-text search: `CONTAINS "search text"`.
     FulltextContains(String),
     /// Vector similarity: `SIMILAR TO [embedding] THRESHOLD threshold`.
-    VectorSimilar {
-        embedding: Vec<f64>,
-        threshold: f64,
-    },
+    VectorSimilar { embedding: Vec<f64>, threshold: f64 },
     /// Graph pattern: `TRAVERSE predicate DEPTH depth`.
     GraphPattern {
         predicate: String,
@@ -431,9 +428,7 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
             })
         }
         "ModalityDrift" => {
-            let mod_val = obj
-                .get("_0")
-                .ok_or("ModalityDrift missing _0 (modality)")?;
+            let mod_val = obj.get("_0").ok_or("ModalityDrift missing _0 (modality)")?;
             let modality: VqlModality =
                 serde_json::from_value(mod_val.clone()).map_err(|e| e.to_string())?;
             let threshold = obj
@@ -695,10 +690,7 @@ impl VqlAst {
             .map(|&m| PlanNode {
                 modality: m,
                 conditions: condition_map.remove(&m).unwrap_or_default(),
-                projections: projection_map
-                    .get(&m)
-                    .cloned()
-                    .unwrap_or_default(),
+                projections: projection_map.get(&m).cloned().unwrap_or_default(),
                 early_limit: None,
             })
             .collect();
@@ -753,7 +745,9 @@ impl VqlAst {
         if let Some(skip) = query.offset {
             if skip > 0 {
                 // Find existing Limit and adjust, or add one.
-                let has_limit = post_processing.iter().any(|p| matches!(p, PostProcessing::Limit { .. }));
+                let has_limit = post_processing
+                    .iter()
+                    .any(|p| matches!(p, PostProcessing::Limit { .. }));
                 if !has_limit {
                     // No limit — add a large synthetic limit so offset is meaningful.
                     post_processing.push(PostProcessing::Limit {
@@ -773,11 +767,7 @@ impl VqlAst {
             if let Some(ref projs) = query.projections {
                 let columns: Vec<String> = projs
                     .iter()
-                    .map(|p| {
-                        p.alias
-                            .clone()
-                            .unwrap_or_else(|| field_ref_name(&p.field))
-                    })
+                    .map(|p| p.alias.clone().unwrap_or_else(|| field_ref_name(&p.field)))
                     .collect();
                 if !columns.is_empty() {
                     post_processing.push(PostProcessing::Project { columns });
@@ -876,17 +866,17 @@ fn flatten_conditions(
                 describe_condition(rhs)
             );
             for &m in active_modalities {
-                out.entry(m)
-                    .or_default()
-                    .push(ConditionKind::Predicate { expression: desc.clone() });
+                out.entry(m).or_default().push(ConditionKind::Predicate {
+                    expression: desc.clone(),
+                });
             }
         }
         VqlCondition::Not(inner) => {
             let desc = format!("NOT({})", describe_condition(inner));
             for &m in active_modalities {
-                out.entry(m)
-                    .or_default()
-                    .push(ConditionKind::Predicate { expression: desc.clone() });
+                out.entry(m).or_default().push(ConditionKind::Predicate {
+                    expression: desc.clone(),
+                });
             }
         }
         VqlCondition::Simple(simple) => {
@@ -900,9 +890,9 @@ fn flatten_conditions(
                     // Add it as a predicate on all active modalities.
                     let desc = format!("target_modality={m}: {condition_kind:?}");
                     for &am in active_modalities {
-                        out.entry(am)
-                            .or_default()
-                            .push(ConditionKind::Predicate { expression: desc.clone() });
+                        out.entry(am).or_default().push(ConditionKind::Predicate {
+                            expression: desc.clone(),
+                        });
                     }
                 }
                 None => {
@@ -942,9 +932,7 @@ fn map_simple_condition(
             // that carries the embedding, but we work with existing types.
             Ok((
                 Some(Modality::Vector),
-                ConditionKind::Similarity {
-                    k: embedding.len(),
-                },
+                ConditionKind::Similarity { k: embedding.len() },
             ))
         }
         VqlSimpleCondition::GraphPattern { predicate, depth } => Ok((
@@ -959,7 +947,10 @@ fn map_simple_condition(
             operator,
             value,
         } => {
-            let target = field.modality.as_ref().and_then(|vm| vql_modality_to_planner(vm).ok());
+            let target = field
+                .modality
+                .as_ref()
+                .and_then(|vm| vql_modality_to_planner(vm).ok());
             let field_name = field.field.clone();
             let value_str = match value {
                 serde_json::Value::String(s) => s.clone(),
@@ -1006,10 +997,7 @@ fn map_simple_condition(
                     .unwrap_or_else(|| "?".to_string()),
                 right.field,
             );
-            Ok((
-                None,
-                ConditionKind::Predicate { expression: desc },
-            ))
+            Ok((None, ConditionKind::Predicate { expression: desc }))
         }
         VqlSimpleCondition::ModalityDrift {
             modality,
@@ -1017,26 +1005,17 @@ fn map_simple_condition(
         } => {
             let m = vql_modality_to_planner(modality)?;
             let desc = format!("drift({m}) > {threshold}");
-            Ok((
-                Some(m),
-                ConditionKind::Predicate { expression: desc },
-            ))
+            Ok((Some(m), ConditionKind::Predicate { expression: desc }))
         }
         VqlSimpleCondition::ModalityExists(modality) => {
             let m = vql_modality_to_planner(modality)?;
             let desc = format!("exists({m})");
-            Ok((
-                Some(m),
-                ConditionKind::Predicate { expression: desc },
-            ))
+            Ok((Some(m), ConditionKind::Predicate { expression: desc }))
         }
         VqlSimpleCondition::ModalityNotExists(modality) => {
             let m = vql_modality_to_planner(modality)?;
             let desc = format!("not_exists({m})");
-            Ok((
-                Some(m),
-                ConditionKind::Predicate { expression: desc },
-            ))
+            Ok((Some(m), ConditionKind::Predicate { expression: desc }))
         }
         VqlSimpleCondition::ModalityConsistency {
             modalities,
@@ -1048,10 +1027,7 @@ fn map_simple_condition(
                 .map(|m| m.to_string())
                 .collect();
             let desc = format!("consistency({}) > {threshold}", names.join(", "));
-            Ok((
-                None,
-                ConditionKind::Predicate { expression: desc },
-            ))
+            Ok((None, ConditionKind::Predicate { expression: desc }))
         }
     }
 }
@@ -1167,7 +1143,10 @@ mod tests {
         assert_eq!(plan.nodes[1].conditions.len(), 0);
 
         // Post-processing: Limit.
-        assert!(plan.post_processing.iter().any(|p| matches!(p, PostProcessing::Limit { count: 10 })));
+        assert!(plan
+            .post_processing
+            .iter()
+            .any(|p| matches!(p, PostProcessing::Limit { count: 10 })));
     }
 
     #[test]
@@ -1425,7 +1404,10 @@ mod tests {
             .conditions
             .iter()
             .any(|c| matches!(c, ConditionKind::Similarity { .. }));
-        assert!(has_similarity, "vector node should have similarity condition");
+        assert!(
+            has_similarity,
+            "vector node should have similarity condition"
+        );
 
         // Graph node should NOT have similarity (it targets Vector).
         let graph_node = plan
@@ -1437,7 +1419,10 @@ mod tests {
             .conditions
             .iter()
             .any(|c| matches!(c, ConditionKind::Similarity { .. }));
-        assert!(!has_similarity, "graph node should not have similarity condition");
+        assert!(
+            !has_similarity,
+            "graph node should not have similarity condition"
+        );
 
         // Proof spec should create a Semantic ProofVerification condition.
         // Semantic is not in active modalities (only Graph, Vector), but the
@@ -1518,7 +1503,9 @@ mod tests {
         let plan = parse_and_plan(json).expect("should parse Store source");
         assert!(matches!(
             plan.source,
-            QuerySource::Store { modality: Modality::Vector }
+            QuerySource::Store {
+                modality: Modality::Vector
+            }
         ));
     }
 

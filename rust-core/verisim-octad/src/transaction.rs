@@ -52,8 +52,14 @@ use uuid::Uuid;
 /// Originally six modalities; extended with `provenance` and `spatial` when
 /// VeriSimDB evolved from octad to octad model.
 pub const MODALITIES: &[&str] = &[
-    "graph", "vector", "tensor", "semantic", "document", "temporal",
-    "provenance", "spatial",
+    "graph",
+    "vector",
+    "tensor",
+    "semantic",
+    "document",
+    "temporal",
+    "provenance",
+    "spatial",
 ];
 
 // ---------------------------------------------------------------------------
@@ -153,20 +159,15 @@ pub enum TransactionState {
 /// Transaction isolation level.
 ///
 /// Determines what data other concurrent transactions can see.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IsolationLevel {
     /// Reads only committed data. A transaction may see different snapshots
     /// of the same entity if another transaction commits between reads.
+    #[default]
     ReadCommitted,
     /// Full serializability: the transaction operates as if it were the only
     /// one running. Version conflicts cause the transaction to abort.
     Serializable,
-}
-
-impl Default for IsolationLevel {
-    fn default() -> Self {
-        Self::ReadCommitted
-    }
 }
 
 /// Type of lock held on an entity/modality pair.
@@ -545,10 +546,8 @@ impl VersionTable {
 
     /// Set the version for an entity/modality pair.
     fn set(&mut self, entity_id: &str, modality: &str, version: u64) {
-        self.versions.insert(
-            (entity_id.to_string(), modality.to_string()),
-            version,
-        );
+        self.versions
+            .insert((entity_id.to_string(), modality.to_string()), version);
     }
 
     /// Increment and return the new version for an entity/modality pair.
@@ -602,10 +601,7 @@ impl TransactionManager {
             "Transaction started"
         );
 
-        self.active_transactions
-            .write()
-            .await
-            .insert(txn_id, txn);
+        self.active_transactions.write().await.insert(txn_id, txn);
 
         txn_id
     }
@@ -633,8 +629,7 @@ impl TransactionManager {
         if txn.isolation_level == IsolationLevel::Serializable {
             let version_table = self.version_table.read().await;
             for stamp in &txn.read_set {
-                let current_version =
-                    version_table.get(&stamp.entity_id, &stamp.modality);
+                let current_version = version_table.get(&stamp.entity_id, &stamp.modality);
                 if current_version != stamp.version_at_read {
                     // Another transaction committed a write to this entity/modality
                     // after we read it. Must abort.
@@ -696,10 +691,7 @@ impl TransactionManager {
     ///
     /// Returns the undo log entries in reverse order so the caller can apply
     /// compensating actions to the modality stores.
-    pub async fn rollback(
-        &self,
-        transaction_id: Uuid,
-    ) -> Result<Vec<UndoEntry>, TransactionError> {
+    pub async fn rollback(&self, transaction_id: Uuid) -> Result<Vec<UndoEntry>, TransactionError> {
         let mut txns = self.active_transactions.write().await;
         let txn = txns
             .get_mut(&transaction_id)
@@ -782,9 +774,8 @@ impl TransactionManager {
                     lock_type,
                 };
                 // Avoid duplicates (upgrade replaces)
-                txn.locks.retain(|l| {
-                    !(l.entity_id == entry.entity_id && l.modality == entry.modality)
-                });
+                txn.locks
+                    .retain(|l| !(l.entity_id == entry.entity_id && l.modality == entry.modality));
                 txn.locks.push(entry);
             }
         }
@@ -884,10 +875,7 @@ impl TransactionManager {
     /// Get a snapshot of a transaction's current state.
     ///
     /// Returns `None` if the transaction does not exist.
-    pub async fn get_transaction_state(
-        &self,
-        transaction_id: Uuid,
-    ) -> Option<TransactionState> {
+    pub async fn get_transaction_state(&self, transaction_id: Uuid) -> Option<TransactionState> {
         self.active_transactions
             .read()
             .await
@@ -922,22 +910,12 @@ impl TransactionManager {
 
     /// Check whether a specific entity/modality pair is currently locked.
     pub async fn is_locked(&self, entity_id: &str, modality: &str) -> bool {
-        self.lock_table
-            .read()
-            .await
-            .is_locked(entity_id, modality)
+        self.lock_table.read().await.is_locked(entity_id, modality)
     }
 
     /// Get the lock holders for an entity/modality pair.
-    pub async fn lock_holders(
-        &self,
-        entity_id: &str,
-        modality: &str,
-    ) -> Vec<(Uuid, LockType)> {
-        self.lock_table
-            .read()
-            .await
-            .holders(entity_id, modality)
+    pub async fn lock_holders(&self, entity_id: &str, modality: &str) -> Vec<(Uuid, LockType)> {
+        self.lock_table.read().await.holders(entity_id, modality)
     }
 
     /// Remove completed (Committed or RolledBack) transactions from memory.
@@ -1020,10 +998,7 @@ mod tests {
         mgr.commit(txn_id).await.unwrap();
 
         let result = mgr.commit(txn_id).await;
-        assert!(matches!(
-            result,
-            Err(TransactionError::InvalidState { .. })
-        ));
+        assert!(matches!(result, Err(TransactionError::InvalidState { .. })));
     }
 
     // -- Test 4: Commit after rollback is rejected --
@@ -1036,10 +1011,7 @@ mod tests {
         mgr.rollback(txn_id).await.unwrap();
 
         let result = mgr.commit(txn_id).await;
-        assert!(matches!(
-            result,
-            Err(TransactionError::InvalidState { .. })
-        ));
+        assert!(matches!(result, Err(TransactionError::InvalidState { .. })));
     }
 
     // -- Test 5: Nonexistent transaction --
@@ -1263,18 +1235,12 @@ mod tests {
         let result = mgr
             .acquire_lock(txn_id, "e1", "nosuch", LockType::Shared)
             .await;
-        assert!(matches!(
-            result,
-            Err(TransactionError::InvalidModality(_))
-        ));
+        assert!(matches!(result, Err(TransactionError::InvalidModality(_))));
 
         let result = mgr
             .record_undo(txn_id, "e1", "invalid_modality", None, 0)
             .await;
-        assert!(matches!(
-            result,
-            Err(TransactionError::InvalidModality(_))
-        ));
+        assert!(matches!(result, Err(TransactionError::InvalidModality(_))));
     }
 
     // -- Test 16: Deadlock detection --

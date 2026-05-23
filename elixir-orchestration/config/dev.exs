@@ -6,5 +6,4 @@ import Config
 config :verisim,
   rust_core_url: "http://localhost:8080/api/v1"
 
-config :logger, :console,
-  level: :debug
+config :logger, :console, level: :debug
