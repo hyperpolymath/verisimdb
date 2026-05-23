@@ -31,15 +31,15 @@ type storeLocation = {
 
 type hexadMapping = {
   hexadId: hexadId,
-  locations: Js.Dict.t<storeLocation>, // modalityType -> storeLocation
+  locations: Dict.t<storeLocation>, // modalityType -> storeLocation
   primaryStore: option<storeId>,
   created: Js.Date.t,
   modified: Js.Date.t,
 }
 
 type registryState = {
-  mappings: Js.Dict.t<hexadMapping>, // hexadId -> hexadMapping
-  stores: Js.Dict.t<storeLocation>, // storeId -> storeLocation
+  mappings: Dict.t<hexadMapping>, // hexadId -> hexadMapping
+  stores: Dict.t<storeLocation>, // storeId -> storeLocation
   config: registryConfig,
 }
 
@@ -61,8 +61,8 @@ and consistencyMode =
 
 let createRegistry = (~config: registryConfig): registryState => {
   {
-    mappings: Js.Dict.empty(),
-    stores: Js.Dict.empty(),
+    mappings: Dict.empty(),
+    stores: Dict.empty(),
     config: config,
   }
 }
@@ -92,8 +92,8 @@ let registerStore = (
     responseTimeMs: None,
   }
 
-  let newStores = Js.Dict.fromArray(Js.Dict.entries(registry.stores))
-  Js.Dict.set(newStores, storeId, location)
+  let newStores = Dict.fromArray(Dict.entries(registry.stores))
+  Dict.set(newStores, storeId, location)
 
   {...registry, stores: newStores}
 }
@@ -102,7 +102,7 @@ let registerStore = (
 let mapHexad = (
   registry: registryState,
   hexadId: hexadId,
-  locations: Js.Dict.t<storeLocation>,
+  locations: Dict.t<storeLocation>,
 ): registryState => {
   let mapping: hexadMapping = {
     hexadId: hexadId,
@@ -112,8 +112,8 @@ let mapHexad = (
     modified: Js.Date.make(),
   }
 
-  let newMappings = Js.Dict.fromArray(Js.Dict.entries(registry.mappings))
-  Js.Dict.set(newMappings, hexadId, mapping)
+  let newMappings = Dict.fromArray(Dict.entries(registry.mappings))
+  Dict.set(newMappings, hexadId, mapping)
 
   {...registry, mappings: newMappings}
 }
@@ -123,7 +123,7 @@ let getHexadLocations = (
   registry: registryState,
   hexadId: hexadId,
 ): option<hexadMapping> => {
-  Js.Dict.get(registry.mappings, hexadId)
+  Dict.get(registry.mappings, hexadId)
 }
 
 // Find stores that have a specific modality
@@ -132,7 +132,7 @@ let findStoresByModality = (
   modality: modalityType,
 ): array<storeLocation> => {
   registry.stores
-  ->Js.Dict.values
+  ->Dict.values
   ->Belt.Array.keep(store => {
     store.modalities->Belt.Array.some(m => m == modality)
   })
@@ -175,7 +175,7 @@ let updateStoreHealth = (
   responseTimeMs: int,
   success: bool,
 ): registryState => {
-  switch Js.Dict.get(registry.stores, storeId) {
+  switch Dict.get(registry.stores, storeId) {
   | None => registry
   | Some(store) => {
       let newTrust = if success {
@@ -191,8 +191,8 @@ let updateStoreHealth = (
         responseTimeMs: Some(responseTimeMs),
       }
 
-      let newStores = Js.Dict.fromArray(Js.Dict.entries(registry.stores))
-      Js.Dict.set(newStores, storeId, updatedStore)
+      let newStores = Dict.fromArray(Dict.entries(registry.stores))
+      Dict.set(newStores, storeId, updatedStore)
 
       {...registry, stores: newStores}
     }
@@ -205,12 +205,12 @@ let pruneDeadStores = (registry: registryState): registryState => {
   let maxDowntime = Belt.Int.toFloat(registry.config.maxStoreDowntimeMs)
 
   let liveStores = registry.stores
-    ->Js.Dict.entries
+    ->Dict.entries
     ->Belt.Array.keep(((_, store)) => {
       let timeSinceLastSeen = now -. Js.Date.getTime(store.lastSeen)
       timeSinceLastSeen < maxDowntime
     })
-    ->Js.Dict.fromArray
+    ->Dict.fromArray
 
   {...registry, stores: liveStores}
 }
@@ -238,17 +238,17 @@ let resolvePattern = (
   pattern: string,
 ): array<storeLocation> => {
   // Simple pattern matching - in production would use regex
-  if Js.String2.endsWith(pattern, "/*") {
-    let prefix = Js.String2.slice(pattern, ~from=0, ~to_=Js.String2.length(pattern) - 2)
+  if String.endsWith(pattern, "/*") {
+    let prefix = String.slice(pattern, ~from=0, ~to_=String.length(pattern) - 2)
 
     registry.stores
-    ->Js.Dict.values
+    ->Dict.values
     ->Belt.Array.keep(store => {
-      Js.String2.startsWith(store.storeId, prefix)
+      String.startsWith(store.storeId, prefix)
     })
   } else {
     // Exact match
-    switch Js.Dict.get(registry.stores, pattern) {
+    switch Dict.get(registry.stores, pattern) {
     | None => []
     | Some(store) => [store]
     }
@@ -287,7 +287,7 @@ let executeFederatedQuery = async (
                   storeId: store.storeId,
                   hexadId: switch Js.Json.classify(item) {
                   | Js.Json.JSONObject(obj) =>
-                    switch Js.Dict.get(obj, "id") {
+                    switch Dict.get(obj, "id") {
                     | Some(id) =>
                       switch Js.Json.classify(id) {
                       | Js.Json.JSONString(s) => s
@@ -338,10 +338,10 @@ let checkReplicationStatus = (
   hexadId: hexadId,
 ): replicationStatus => {
   // Check if hexad replicas are consistent by examining mapping and store health
-  switch Js.Dict.get(registry.mappings, hexadId) {
+  switch Dict.get(registry.mappings, hexadId) {
   | None => UpToDate // No mapping = nothing to replicate
   | Some(mapping) => {
-      let locationEntries = Js.Dict.values(mapping.locations)
+      let locationEntries = Dict.values(mapping.locations)
       let storeCount = Belt.Array.length(locationEntries)
 
       if storeCount <= 1 {
@@ -349,7 +349,7 @@ let checkReplicationStatus = (
       } else {
         // Check how many stores are alive and responsive
         let aliveCount = locationEntries->Belt.Array.keep(loc => {
-          switch Js.Dict.get(registry.stores, loc.storeId) {
+          switch Dict.get(registry.stores, loc.storeId) {
           | None => false
           | Some(store) => {
               let now = Js.Date.now()
@@ -365,7 +365,7 @@ let checkReplicationStatus = (
         } else {
           // All stores alive — check for trust divergence as proxy for data divergence
           let trusts = locationEntries->Belt.Array.map(loc => {
-            switch Js.Dict.get(registry.stores, loc.storeId) {
+            switch Dict.get(registry.stores, loc.storeId) {
             | None => 0.0
             | Some(store) => store.trustLevel
             }
@@ -392,7 +392,7 @@ let replicateHexad = async (
   targetStores: array<storeId>,
 ): Promise.t<Result.t<unit, string>> => {
   // Look up source store endpoint
-  let sourceEndpoint = switch Js.Dict.get(registry.stores, sourceStore) {
+  let sourceEndpoint = switch Dict.get(registry.stores, sourceStore) {
   | None => None
   | Some(store) => Some(store.endpoint)
   }
@@ -421,7 +421,7 @@ let replicateHexad = async (
           let errors = ref([])
 
           let pushPromises = targetStores->Belt.Array.map(targetId => {
-            switch Js.Dict.get(registry.stores, targetId) {
+            switch Dict.get(registry.stores, targetId) {
             | None => {
                 errors := Belt.Array.concat(errors.contents, ["Target '" ++ targetId ++ "' not found"])
                 Promise.resolve()
@@ -528,10 +528,10 @@ let detectByzantineFaults = (
   registry: registryState,
   hexadId: hexadId,
 ): array<storeId> => {
-  switch Js.Dict.get(registry.mappings, hexadId) {
+  switch Dict.get(registry.mappings, hexadId) {
   | None => []
   | Some(mapping) => {
-      let locations = Js.Dict.values(mapping.locations)
+      let locations = Dict.values(mapping.locations)
       let storeCount = Belt.Array.length(locations)
 
       if storeCount < 2 {
@@ -539,7 +539,7 @@ let detectByzantineFaults = (
       } else {
         // Compute median trust level
         let trusts = locations->Belt.Array.map(loc => {
-          switch Js.Dict.get(registry.stores, loc.storeId) {
+          switch Dict.get(registry.stores, loc.storeId) {
           | None => 0.0
           | Some(store) => store.trustLevel
           }
@@ -552,7 +552,7 @@ let detectByzantineFaults = (
 
         // Flag stores that deviate significantly from the median (> 0.3 difference)
         locations->Belt.Array.keepMap(loc => {
-          let trust = switch Js.Dict.get(registry.stores, loc.storeId) {
+          let trust = switch Dict.get(registry.stores, loc.storeId) {
           | None => 0.0
           | Some(store) => store.trustLevel
           }
@@ -599,7 +599,7 @@ let modalityFromString = (s: string): option<modalityType> => {
 }
 
 let serializeStoreLocation = (store: storeLocation): Js.Json.t => {
-  Js.Dict.fromArray([
+  Dict.fromArray([
     ("storeId", Js.Json.string(store.storeId)),
     ("endpoint", Js.Json.string(store.endpoint)),
     ("modalities", Js.Json.array(store.modalities->Belt.Array.map(m => Js.Json.string(modalityToString(m))))),
@@ -614,19 +614,19 @@ let serializeStoreLocation = (store: storeLocation): Js.Json.t => {
 
 let serializeRegistry = (registry: registryState): Js.Json.t => {
   // Serialize stores
-  let storesJson = Js.Dict.empty()
-  registry.stores->Js.Dict.entries->Belt.Array.forEach(((id, store)) => {
-    Js.Dict.set(storesJson, id, serializeStoreLocation(store))
+  let storesJson = Dict.empty()
+  registry.stores->Dict.entries->Belt.Array.forEach(((id, store)) => {
+    Dict.set(storesJson, id, serializeStoreLocation(store))
   })
 
   // Serialize mappings
-  let mappingsJson = Js.Dict.empty()
-  registry.mappings->Js.Dict.entries->Belt.Array.forEach(((id, mapping)) => {
-    let locsJson = Js.Dict.empty()
-    mapping.locations->Js.Dict.entries->Belt.Array.forEach(((key, loc)) => {
-      Js.Dict.set(locsJson, key, serializeStoreLocation(loc))
+  let mappingsJson = Dict.empty()
+  registry.mappings->Dict.entries->Belt.Array.forEach(((id, mapping)) => {
+    let locsJson = Dict.empty()
+    mapping.locations->Dict.entries->Belt.Array.forEach(((key, loc)) => {
+      Dict.set(locsJson, key, serializeStoreLocation(loc))
     })
-    Js.Dict.set(mappingsJson, id, Js.Dict.fromArray([
+    Dict.set(mappingsJson, id, Dict.fromArray([
       ("hexadId", Js.Json.string(mapping.hexadId)),
       ("locations", Js.Json.object_(locsJson)),
       ("primaryStore", switch mapping.primaryStore {
@@ -639,7 +639,7 @@ let serializeRegistry = (registry: registryState): Js.Json.t => {
   })
 
   // Serialize config
-  let configJson = Js.Dict.fromArray([
+  let configJson = Dict.fromArray([
     ("minTrustLevel", Js.Json.number(registry.config.minTrustLevel)),
     ("maxStoreDowntimeMs", Js.Json.number(Belt.Int.toFloat(registry.config.maxStoreDowntimeMs))),
     ("replicationFactor", Js.Json.number(Belt.Int.toFloat(registry.config.replicationFactor))),
@@ -650,7 +650,7 @@ let serializeRegistry = (registry: registryState): Js.Json.t => {
     })),
   ])->Js.Json.object_
 
-  Js.Dict.fromArray([
+  Dict.fromArray([
     ("stores", Js.Json.object_(storesJson)),
     ("mappings", Js.Json.object_(mappingsJson)),
     ("config", configJson),
@@ -660,14 +660,14 @@ let serializeRegistry = (registry: registryState): Js.Json.t => {
 let deserializeStoreLocation = (json: Js.Json.t): option<storeLocation> => {
   switch Js.Json.classify(json) {
   | Js.Json.JSONObject(obj) => {
-      let getString = key => switch Js.Dict.get(obj, key) {
+      let getString = key => switch Dict.get(obj, key) {
       | Some(v) => switch Js.Json.classify(v) {
         | Js.Json.JSONString(s) => Some(s)
         | _ => None
         }
       | None => None
       }
-      let getFloat = key => switch Js.Dict.get(obj, key) {
+      let getFloat = key => switch Dict.get(obj, key) {
       | Some(v) => switch Js.Json.classify(v) {
         | Js.Json.JSONNumber(n) => Some(n)
         | _ => None
@@ -677,7 +677,7 @@ let deserializeStoreLocation = (json: Js.Json.t): option<storeLocation> => {
 
       switch (getString("storeId"), getString("endpoint")) {
       | (Some(sid), Some(ep)) => {
-          let modalities = switch Js.Dict.get(obj, "modalities") {
+          let modalities = switch Dict.get(obj, "modalities") {
           | Some(arr) => switch Js.Json.classify(arr) {
             | Js.Json.JSONArray(items) =>
               items->Belt.Array.keepMap(item => {
@@ -719,17 +719,17 @@ let deserializeRegistry = (json: Js.Json.t): option<registryState> => {
   switch Js.Json.classify(json) {
   | Js.Json.JSONObject(root) => {
       // Deserialize config
-      let config = switch Js.Dict.get(root, "config") {
+      let config = switch Dict.get(root, "config") {
       | Some(configJson) => switch Js.Json.classify(configJson) {
         | Js.Json.JSONObject(obj) => {
-            let getFloat = key => switch Js.Dict.get(obj, key) {
+            let getFloat = key => switch Dict.get(obj, key) {
             | Some(v) => switch Js.Json.classify(v) {
               | Js.Json.JSONNumber(n) => Some(n)
               | _ => None
               }
             | None => None
             }
-            let getString = key => switch Js.Dict.get(obj, key) {
+            let getString = key => switch Dict.get(obj, key) {
             | Some(v) => switch Js.Json.classify(v) {
               | Js.Json.JSONString(s) => Some(s)
               | _ => None
@@ -758,13 +758,13 @@ let deserializeRegistry = (json: Js.Json.t): option<registryState> => {
       }
 
       // Deserialize stores
-      let stores = Js.Dict.empty()
-      switch Js.Dict.get(root, "stores") {
+      let stores = Dict.empty()
+      switch Dict.get(root, "stores") {
       | Some(storesJson) => switch Js.Json.classify(storesJson) {
         | Js.Json.JSONObject(storesObj) =>
-          storesObj->Js.Dict.entries->Belt.Array.forEach(((id, storeJson)) => {
+          storesObj->Dict.entries->Belt.Array.forEach(((id, storeJson)) => {
             switch deserializeStoreLocation(storeJson) {
-            | Some(store) => Js.Dict.set(stores, id, store)
+            | Some(store) => Dict.set(stores, id, store)
             | None => ()
             }
           })
@@ -774,14 +774,14 @@ let deserializeRegistry = (json: Js.Json.t): option<registryState> => {
       }
 
       // Deserialize mappings
-      let mappings = Js.Dict.empty()
-      switch Js.Dict.get(root, "mappings") {
+      let mappings = Dict.empty()
+      switch Dict.get(root, "mappings") {
       | Some(mappingsJson) => switch Js.Json.classify(mappingsJson) {
         | Js.Json.JSONObject(mappingsObj) =>
-          mappingsObj->Js.Dict.entries->Belt.Array.forEach(((id, mapJson)) => {
+          mappingsObj->Dict.entries->Belt.Array.forEach(((id, mapJson)) => {
             switch Js.Json.classify(mapJson) {
             | Js.Json.JSONObject(mapObj) => {
-                let getString = key => switch Js.Dict.get(mapObj, key) {
+                let getString = key => switch Dict.get(mapObj, key) {
                 | Some(v) => switch Js.Json.classify(v) {
                   | Js.Json.JSONString(s) => Some(s)
                   | _ => None
@@ -789,13 +789,13 @@ let deserializeRegistry = (json: Js.Json.t): option<registryState> => {
                 | None => None
                 }
 
-                let locations = Js.Dict.empty()
-                switch Js.Dict.get(mapObj, "locations") {
+                let locations = Dict.empty()
+                switch Dict.get(mapObj, "locations") {
                 | Some(locsJson) => switch Js.Json.classify(locsJson) {
                   | Js.Json.JSONObject(locsObj) =>
-                    locsObj->Js.Dict.entries->Belt.Array.forEach(((key, locJson)) => {
+                    locsObj->Dict.entries->Belt.Array.forEach(((key, locJson)) => {
                       switch deserializeStoreLocation(locJson) {
-                      | Some(loc) => Js.Dict.set(locations, key, loc)
+                      | Some(loc) => Dict.set(locations, key, loc)
                       | None => ()
                       }
                     })
@@ -804,7 +804,7 @@ let deserializeRegistry = (json: Js.Json.t): option<registryState> => {
                 | None => ()
                 }
 
-                let primaryStore = switch Js.Dict.get(mapObj, "primaryStore") {
+                let primaryStore = switch Dict.get(mapObj, "primaryStore") {
                 | Some(v) => switch Js.Json.classify(v) {
                   | Js.Json.JSONString(s) => Some(s)
                   | Js.Json.JSONNull => None
@@ -813,7 +813,7 @@ let deserializeRegistry = (json: Js.Json.t): option<registryState> => {
                 | None => None
                 }
 
-                Js.Dict.set(mappings, id, {
+                Dict.set(mappings, id, {
                   hexadId: getString("hexadId")->Belt.Option.getWithDefault(id),
                   locations: locations,
                   primaryStore: primaryStore,

@@ -11,7 +11,7 @@ let clauseStarters = [
 let formatVql = (query: string): string => {
   let upper = String.toUpperCase
   let tokens =
-    Js.String2.splitByRe(query, %re("/(\s+|'[^']*'|\"[^\"]*\")/"))
+    String.splitByRe(query, %re("/(\s+|'[^']*'|\"[^\"]*\")/"))
     ->Array.filterMap(t => t)
     ->Array.filter(t => String.trim(t) !== "")
 

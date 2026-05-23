@@ -20,7 +20,7 @@ type logEntry = {
 and command =
   | RegisterStore({storeId: string, endpoint: string, modalities: array<string>})
   | UnregisterStore({storeId: string})
-  | MapHexad({hexadId: string, locations: Js.Dict.t<Js.Json.t>})
+  | MapHexad({hexadId: string, locations: Dict.t<Js.Json.t>})
   | UnmapHexad({hexadId: string})
   | UpdateTrust({storeId: string, newTrust: float})
   | NoOp
@@ -38,8 +38,8 @@ type nodeState = {
   commitIndex: index,
   lastApplied: index,
   // Leader state
-  nextIndex: Js.Dict.t<index>,
-  matchIndex: Js.Dict.t<index>,
+  nextIndex: Dict.t<index>,
+  matchIndex: Dict.t<index>,
 }
 
 type voteRequest = {
@@ -81,8 +81,8 @@ let createNode = (~nodeId: nodeId): nodeState => {
     log: [],
     commitIndex: 0,
     lastApplied: 0,
-    nextIndex: Js.Dict.empty(),
-    matchIndex: Js.Dict.empty(),
+    nextIndex: Dict.empty(),
+    matchIndex: Dict.empty(),
   }
 }
 
@@ -132,12 +132,12 @@ let becomeCandidate = (state: nodeState): nodeState => {
 
 let becomeLeader = (state: nodeState, peers: array<nodeId>): nodeState => {
   // Initialize nextIndex and matchIndex for all peers
-  let nextIndex = Js.Dict.empty()
-  let matchIndex = Js.Dict.empty()
+  let nextIndex = Dict.empty()
+  let matchIndex = Dict.empty()
 
   peers->Belt.Array.forEach(peer => {
-    Js.Dict.set(nextIndex, peer, getLastLogIndex(state) + 1)
-    Js.Dict.set(matchIndex, peer, 0)
+    Dict.set(nextIndex, peer, getLastLogIndex(state) + 1)
+    Dict.set(matchIndex, peer, 0)
   })
 
   {
@@ -283,7 +283,7 @@ let createAppendEntriesRequest = (
 ): option<appendEntriesRequest> => {
   switch state.role {
   | Leader => {
-      let nextIdx = Js.Dict.get(state.nextIndex, followerId)->Belt.Option.getWithDefault(1)
+      let nextIdx = Dict.get(state.nextIndex, followerId)->Belt.Option.getWithDefault(1)
 
       let prevLogIndex = nextIdx - 1
       let prevLogTerm = if prevLogIndex == 0 {
@@ -319,7 +319,7 @@ let updateCommitIndex = (state: nodeState, peers: array<nodeId>): nodeState => {
       // Find highest N where majority of matchIndex[i] >= N
       let matchIndices = peers
         ->Belt.Array.map(peer => {
-          Js.Dict.get(state.matchIndex, peer)->Belt.Option.getWithDefault(0)
+          Dict.get(state.matchIndex, peer)->Belt.Option.getWithDefault(0)
         })
         ->Belt.Array.concat([getLastLogIndex(state)])
         ->Belt.SortArray.stableSortBy((a, b) => b - a)

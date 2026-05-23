@@ -265,11 +265,11 @@ let handleAppendEntriesResponse = (
   } else if state.raft.role == Leader {
     if response.success {
       // Update nextIndex and matchIndex for the follower
-      let nextIndex = Js.Dict.fromArray(Js.Dict.entries(state.raft.nextIndex))
-      let matchIndex = Js.Dict.fromArray(Js.Dict.entries(state.raft.matchIndex))
+      let nextIndex = Dict.fromArray(Dict.entries(state.raft.nextIndex))
+      let matchIndex = Dict.fromArray(Dict.entries(state.raft.matchIndex))
 
-      Js.Dict.set(nextIndex, fromPeer, response.matchIndex + 1)
-      Js.Dict.set(matchIndex, fromPeer, response.matchIndex)
+      Dict.set(nextIndex, fromPeer, response.matchIndex + 1)
+      Dict.set(matchIndex, fromPeer, response.matchIndex)
 
       let raft = {...state.raft, nextIndex: nextIndex, matchIndex: matchIndex}
       // Try to advance commit index
@@ -278,10 +278,10 @@ let handleAppendEntriesResponse = (
       {...state, raft: raft}
     } else {
       // Decrement nextIndex for the follower and retry
-      let nextIndex = Js.Dict.fromArray(Js.Dict.entries(state.raft.nextIndex))
+      let nextIndex = Dict.fromArray(Dict.entries(state.raft.nextIndex))
       let currentNext =
-        Js.Dict.get(nextIndex, fromPeer)->Belt.Option.getWithDefault(1)
-      Js.Dict.set(nextIndex, fromPeer, Js.Math.max_int(currentNext - 1, 1))
+        Dict.get(nextIndex, fromPeer)->Belt.Option.getWithDefault(1)
+      Dict.set(nextIndex, fromPeer, Js.Math.max_int(currentNext - 1, 1))
 
       {...state, raft: {...state.raft, nextIndex: nextIndex}}
     }
@@ -354,7 +354,7 @@ let proposeUpdateTrust = (
 let proposeMapHexad = (
   state: clusterState,
   hexadId: string,
-  locations: Js.Dict.t<Js.Json.t>,
+  locations: Dict.t<Js.Json.t>,
 ): (clusterState, clientResult) => {
   propose(
     state,
@@ -377,8 +377,8 @@ let applyCommand = (registry: Registry.registryState, command: MetadataLog.comma
 
   | UnregisterStore({storeId}) => {
       // Remove store from registry
-      let newStores = Js.Dict.fromArray(
-        Js.Dict.entries(registry.stores)->Belt.Array.keep(((id, _)) => id != storeId),
+      let newStores = Dict.fromArray(
+        Dict.entries(registry.stores)->Belt.Array.keep(((id, _)) => id != storeId),
       )
       {...registry, stores: newStores}
     }
@@ -386,12 +386,12 @@ let applyCommand = (registry: Registry.registryState, command: MetadataLog.comma
   | MapHexad({hexadId, locations}) => {
       // Convert JSON locations to storeLocation dict
       // In production, would deserialize properly
-      Registry.map(registry, hexadId, Js.Dict.empty())
+      Registry.map(registry, hexadId, Dict.empty())
     }
 
   | UnmapHexad({hexadId}) => {
-      let newMappings = Js.Dict.fromArray(
-        Js.Dict.entries(registry.mappings)->Belt.Array.keep(((id, _)) => id != hexadId),
+      let newMappings = Dict.fromArray(
+        Dict.entries(registry.mappings)->Belt.Array.keep(((id, _)) => id != hexadId),
       )
       {...registry, mappings: newMappings}
     }
@@ -520,8 +520,8 @@ let diagnostics = (state: clusterState): clusterDiagnostics => {
     logLength: Belt.Array.length(state.raft.log),
     peerCount: Belt.Array.length(state.config.peers),
     leaderId: state.leaderId,
-    registeredStores: Belt.Array.length(Js.Dict.keys(state.registry.stores)),
-    mappedHexads: Belt.Array.length(Js.Dict.keys(state.registry.mappings)),
+    registeredStores: Belt.Array.length(Dict.keys(state.registry.stores)),
+    mappedHexads: Belt.Array.length(Dict.keys(state.registry.mappings)),
     totalCommitted: state.totalCommitted,
     totalApplied: state.totalApplied,
     electionCount: state.electionCount,
