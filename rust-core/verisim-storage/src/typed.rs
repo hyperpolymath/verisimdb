@@ -251,7 +251,7 @@ mod tests {
 
         // Boolean.
         store.put("flag", &true).await.unwrap();
-        assert_eq!(store.get::<bool>("flag").await.unwrap().unwrap(), true);
+        assert!(store.get::<bool>("flag").await.unwrap().unwrap());
 
         // Vec.
         store.put("list", &vec![1, 2, 3]).await.unwrap();

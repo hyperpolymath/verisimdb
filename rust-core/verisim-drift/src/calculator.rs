@@ -22,7 +22,9 @@ impl Default for DriftCalculator {
 impl DriftCalculator {
     /// Create a new drift calculator with custom threshold
     pub fn new(similarity_threshold: f64) -> Self {
-        Self { similarity_threshold }
+        Self {
+            similarity_threshold,
+        }
     }
 
     /// Calculate semantic-vector drift score
@@ -87,11 +89,17 @@ impl DriftCalculator {
         let mut matched = 0;
         for entity in document_entities {
             // Check if entity appears in graph relationships
-            if graph_targets.iter().any(|t| t.contains(entity) || entity.contains(*t)) {
+            if graph_targets
+                .iter()
+                .any(|t| t.contains(entity) || entity.contains(*t))
+            {
                 matched += 1;
             }
             // Also check if entity is mentioned in document
-            if !document_text.to_lowercase().contains(&entity.to_lowercase()) {
+            if !document_text
+                .to_lowercase()
+                .contains(&entity.to_lowercase())
+            {
                 // Entity in list but not in document text - potential issue
             }
         }
@@ -154,10 +162,7 @@ impl DriftCalculator {
 
         // Check for suspiciously large time gaps (might indicate data loss)
         if version_timestamps.len() >= 2 {
-            let mut deltas: Vec<i64> = version_timestamps
-                .windows(2)
-                .map(|w| w[1] - w[0])
-                .collect();
+            let mut deltas: Vec<i64> = version_timestamps.windows(2).map(|w| w[1] - w[0]).collect();
             deltas.sort();
             if deltas.len() >= 3 {
                 let median = deltas[deltas.len() / 2];
@@ -360,6 +365,7 @@ impl DriftCalculator {
     }
 
     /// Calculate overall quality drift score including all 8 modality drift types
+    #[allow(clippy::too_many_arguments)]
     pub fn quality_drift_octad(
         &self,
         semantic_vector: f64,
@@ -410,6 +416,7 @@ impl DriftCalculator {
     }
 
     /// Determine drift type from all octad scores (including provenance + spatial)
+    #[allow(clippy::too_many_arguments)]
     pub fn primary_drift_type_octad(
         &self,
         semantic_vector: f64,
@@ -483,7 +490,8 @@ impl TensorStats {
         let sum: f64 = valid.iter().sum();
         let mean = sum / valid.len() as f64;
 
-        let variance: f64 = valid.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / valid.len() as f64;
+        let variance: f64 =
+            valid.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / valid.len() as f64;
         let std_dev = variance.sqrt();
 
         let min = valid.iter().copied().fold(f64::INFINITY, f64::min);
@@ -506,7 +514,11 @@ fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f64 {
         return 0.0;
     }
 
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| (*x as f64) * (*y as f64)).sum();
+    let dot: f64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(x, y)| (*x as f64) * (*y as f64))
+        .sum();
     let norm_a: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
     let norm_b: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
 
@@ -558,7 +570,11 @@ mod tests {
         let calc = DriftCalculator::default();
 
         let document_text = "Alice knows Bob and Charlie";
-        let document_entities = vec!["Alice".to_string(), "Bob".to_string(), "Charlie".to_string()];
+        let document_entities = vec![
+            "Alice".to_string(),
+            "Bob".to_string(),
+            "Charlie".to_string(),
+        ];
         let graph_relationships = vec![
             ("knows".to_string(), "Bob".to_string()),
             ("knows".to_string(), "Charlie".to_string()),
@@ -578,12 +594,20 @@ mod tests {
         let timestamps = vec![1000, 2000, 3000, 4000];
         let hashes = vec![1, 2, 3, 4];
         let drift = calc.temporal_consistency_drift(&timestamps, &hashes);
-        assert!(drift < 0.1, "Expected low drift for normal sequence, got {}", drift);
+        assert!(
+            drift < 0.1,
+            "Expected low drift for normal sequence, got {}",
+            drift
+        );
 
         // Out of order timestamps
         let timestamps = vec![1000, 3000, 2000, 4000];
         let drift = calc.temporal_consistency_drift(&timestamps, &hashes);
-        assert!(drift > 0.0, "Expected drift for out-of-order timestamps, got {}", drift);
+        assert!(
+            drift > 0.0,
+            "Expected drift for out-of-order timestamps, got {}",
+            drift
+        );
     }
 
     #[test]
@@ -603,7 +627,11 @@ mod tests {
         });
 
         let drift = calc.tensor_drift(&data, &expected_shape, &actual_shape, expected_stats);
-        assert!(drift < 0.3, "Expected low drift for matching tensor, got {}", drift);
+        assert!(
+            drift < 0.3,
+            "Expected low drift for matching tensor, got {}",
+            drift
+        );
 
         // Test with NaN values
         let data_with_nan = vec![1.0, f64::NAN, 3.0, 4.0];
@@ -633,7 +661,10 @@ mod tests {
 
         // Some metrics bad
         let drift = calc.quality_drift(0.8, 0.2, 0.1, 0.1, 0.1);
-        assert!(drift > 0.1, "Expected higher drift with semantic-vector issues");
+        assert!(
+            drift > 0.1,
+            "Expected higher drift with semantic-vector issues"
+        );
     }
 
     #[test]

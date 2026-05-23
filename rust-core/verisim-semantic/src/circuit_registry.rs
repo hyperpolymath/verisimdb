@@ -93,11 +93,7 @@ pub struct CompiledCircuit {
 
 impl CompiledCircuit {
     /// Verify a witness against this circuit's constraints
-    pub fn verify(
-        &self,
-        witness: &[f64],
-        public_inputs: &[f64],
-    ) -> Result<bool, CircuitError> {
+    pub fn verify(&self, witness: &[f64], public_inputs: &[f64]) -> Result<bool, CircuitError> {
         if public_inputs.len() != self.ir.num_public_inputs {
             return Err(CircuitError::InvalidWitness(format!(
                 "Expected {} public inputs, got {}",
@@ -163,7 +159,10 @@ impl CircuitRegistry {
         name: &str,
         circuit: CompiledCircuit,
     ) -> Result<(), CircuitError> {
-        let mut circuits = self.circuits.write().map_err(|_| CircuitError::LockPoisoned)?;
+        let mut circuits = self
+            .circuits
+            .write()
+            .map_err(|_| CircuitError::LockPoisoned)?;
 
         if circuits.contains_key(name) {
             return Err(CircuitError::AlreadyExists(name.to_string()));
@@ -175,7 +174,10 @@ impl CircuitRegistry {
 
     /// Get a circuit by name
     pub fn get_circuit(&self, name: &str) -> Result<Option<CompiledCircuit>, CircuitError> {
-        let circuits = self.circuits.read().map_err(|_| CircuitError::LockPoisoned)?;
+        let circuits = self
+            .circuits
+            .read()
+            .map_err(|_| CircuitError::LockPoisoned)?;
         Ok(circuits.get(name).cloned())
     }
 
@@ -186,7 +188,10 @@ impl CircuitRegistry {
         witness: &[f64],
         public_inputs: &[f64],
     ) -> Result<bool, CircuitError> {
-        let circuits = self.circuits.read().map_err(|_| CircuitError::LockPoisoned)?;
+        let circuits = self
+            .circuits
+            .read()
+            .map_err(|_| CircuitError::LockPoisoned)?;
 
         let circuit = circuits
             .get(name)
@@ -197,13 +202,19 @@ impl CircuitRegistry {
 
     /// List all registered circuit names
     pub fn list_circuits(&self) -> Result<Vec<String>, CircuitError> {
-        let circuits = self.circuits.read().map_err(|_| CircuitError::LockPoisoned)?;
+        let circuits = self
+            .circuits
+            .read()
+            .map_err(|_| CircuitError::LockPoisoned)?;
         Ok(circuits.keys().cloned().collect())
     }
 
     /// Remove a circuit
     pub fn unregister_circuit(&self, name: &str) -> Result<bool, CircuitError> {
-        let mut circuits = self.circuits.write().map_err(|_| CircuitError::LockPoisoned)?;
+        let mut circuits = self
+            .circuits
+            .write()
+            .map_err(|_| CircuitError::LockPoisoned)?;
         Ok(circuits.remove(name).is_some())
     }
 }
@@ -234,21 +245,18 @@ mod tests {
         // Wire 2: y (witness)
         // Constraint: wire0 * wire2 = wire1 (x * y = z)
         let constraint = R1CSConstraint {
-            a: HashMap::from([(0, 1.0)]),  // A = x
-            b: HashMap::from([(2, 1.0)]),  // B = y (witness)
-            c: HashMap::from([(1, 1.0)]),  // C = z
+            a: HashMap::from([(0, 1.0)]), // A = x
+            b: HashMap::from([(2, 1.0)]), // B = y (witness)
+            c: HashMap::from([(1, 1.0)]), // C = z
         };
 
         let ir = CircuitIR {
             name: "multiply".to_string(),
-            num_public_inputs: 2,  // x and z
-            num_witness_wires: 1,  // y
+            num_public_inputs: 2, // x and z
+            num_witness_wires: 1, // y
             num_wires: 3,
             constraints: vec![constraint],
-            parameter_map: HashMap::from([
-                ("x".to_string(), 0),
-                ("z".to_string(), 1),
-            ]),
+            parameter_map: HashMap::from([("x".to_string(), 0), ("z".to_string(), 1)]),
         };
 
         let circuit_bytes = serde_json::to_vec(&ir).unwrap();
@@ -271,13 +279,17 @@ mod tests {
         // x=3, z=12 → y must be 4 (3 * 4 = 12)
         // Assignment: [x=3, z=12, y=4] → 3 * 4 = 12 ✓
         let public_inputs = &[3.0, 12.0]; // x, z
-        let witness = &[4.0];              // y
+        let witness = &[4.0]; // y
 
-        let valid = registry.verify_with_circuit("multiply", witness, public_inputs).unwrap();
+        let valid = registry
+            .verify_with_circuit("multiply", witness, public_inputs)
+            .unwrap();
         assert!(valid);
 
         // Wrong witness: 3 * 5 = 15 ≠ 12
-        let invalid = registry.verify_with_circuit("multiply", &[5.0], public_inputs).unwrap();
+        let invalid = registry
+            .verify_with_circuit("multiply", &[5.0], public_inputs)
+            .unwrap();
         assert!(!invalid);
     }
 
@@ -293,7 +305,9 @@ mod tests {
         let registry = CircuitRegistry::new();
         let circuit = make_test_circuit();
 
-        registry.register_circuit("multiply", circuit.clone()).unwrap();
+        registry
+            .register_circuit("multiply", circuit.clone())
+            .unwrap();
         let result = registry.register_circuit("multiply", circuit);
         assert!(matches!(result, Err(CircuitError::AlreadyExists(_))));
     }

@@ -32,14 +32,14 @@ use serde::{Deserialize, Serialize};
 
 use super::circuit_registry::{CircuitError, CircuitRegistry};
 use super::zkp::{
-    commit, hash, merkle_proof, merkle_root, verify_merkle_proof,
-    verify_proof, VerifiableProofData,
+    commit, hash, merkle_proof, merkle_root, verify_merkle_proof, verify_proof, VerifiableProofData,
 };
 
 /// Privacy level for proof generation
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrivacyLevel {
     /// Data and proof are both visible to the verifier.
+    #[default]
     Public,
     /// Data is hidden behind a hash commitment; proof proves
     /// the committer knows the value without revealing it.
@@ -48,12 +48,6 @@ pub enum PrivacyLevel {
     /// statement's truth. Uses blinded Merkle proofs with
     /// committed witnesses. (Full ZK-SNARK integration pending.)
     ZeroKnowledge,
-}
-
-impl Default for PrivacyLevel {
-    fn default() -> Self {
-        Self::Public
-    }
 }
 
 impl std::fmt::Display for PrivacyLevel {
@@ -159,9 +153,7 @@ pub fn generate_zkp_with_circuit(
         let satisfied = registry.verify_with_circuit(circuit_name, witness, public_inputs)?;
 
         let circuit = registry.get_circuit(circuit_name)?;
-        let constraints_checked = circuit
-            .map(|c| c.ir.constraints.len())
-            .unwrap_or(0);
+        let constraints_checked = circuit.map(|c| c.ir.constraints.len()).unwrap_or(0);
 
         proof.circuit_result = Some(CircuitVerificationResult {
             circuit_name: circuit_name.clone(),
@@ -205,29 +197,28 @@ fn generate_private_proof(request: &ZkpProofRequest) -> Result<ZkpProof, Circuit
     let commitment = commit(&request.claim, &nonce);
 
     // If a membership set is provided, generate a Merkle inclusion proof
-    let (proof_data, root) = if let (Some(ref set), Some(index)) =
-        (&request.membership_set, request.membership_index)
-    {
-        let root = merkle_root(set);
-        match merkle_proof(set, index) {
-            Some(mp) => (VerifiableProofData::MerkleInclusion(mp), Some(root)),
-            None => {
-                return Err(CircuitError::InvalidWitness(format!(
-                    "Membership index {} out of bounds for set of size {}",
-                    index,
-                    set.len()
-                )));
+    let (proof_data, root) =
+        if let (Some(ref set), Some(index)) = (&request.membership_set, request.membership_index) {
+            let root = merkle_root(set);
+            match merkle_proof(set, index) {
+                Some(mp) => (VerifiableProofData::MerkleInclusion(mp), Some(root)),
+                None => {
+                    return Err(CircuitError::InvalidWitness(format!(
+                        "Membership index {} out of bounds for set of size {}",
+                        index,
+                        set.len()
+                    )));
+                }
             }
-        }
-    } else {
-        // No membership set: commitment-only proof
-        (
-            VerifiableProofData::Commitment {
-                commitment: commitment.commitment,
-            },
-            None,
-        )
-    };
+        } else {
+            // No membership set: commitment-only proof
+            (
+                VerifiableProofData::Commitment {
+                    commitment: commitment.commitment,
+                },
+                None,
+            )
+        };
 
     Ok(ZkpProof {
         privacy_level: PrivacyLevel::Private,
@@ -253,40 +244,39 @@ fn generate_zk_proof(request: &ZkpProofRequest) -> Result<ZkpProof, CircuitError
     // Build a blinded membership set:
     // Each leaf is H(original_leaf || shared_nonce) so the verifier
     // cannot recover the original leaves, only verify structure.
-    let (proof_data, root) = if let (Some(ref set), Some(index)) =
-        (&request.membership_set, request.membership_index)
-    {
-        // Blind all leaves
-        let blinded_leaves: Vec<Vec<u8>> = set
-            .iter()
-            .map(|leaf| {
-                let blinded = commit(leaf, &nonce);
-                blinded.commitment.to_vec()
-            })
-            .collect();
+    let (proof_data, root) =
+        if let (Some(ref set), Some(index)) = (&request.membership_set, request.membership_index) {
+            // Blind all leaves
+            let blinded_leaves: Vec<Vec<u8>> = set
+                .iter()
+                .map(|leaf| {
+                    let blinded = commit(leaf, &nonce);
+                    blinded.commitment.to_vec()
+                })
+                .collect();
 
-        let root = merkle_root(&blinded_leaves);
-        match merkle_proof(&blinded_leaves, index) {
-            Some(mp) => (VerifiableProofData::MerkleInclusion(mp), Some(root)),
-            None => {
-                return Err(CircuitError::InvalidWitness(format!(
-                    "Membership index {} out of bounds for set of size {}",
-                    index,
-                    set.len()
-                )));
+            let root = merkle_root(&blinded_leaves);
+            match merkle_proof(&blinded_leaves, index) {
+                Some(mp) => (VerifiableProofData::MerkleInclusion(mp), Some(root)),
+                None => {
+                    return Err(CircuitError::InvalidWitness(format!(
+                        "Membership index {} out of bounds for set of size {}",
+                        index,
+                        set.len()
+                    )));
+                }
             }
-        }
-    } else {
-        // No membership set: commitment with reveal proof
-        // The verifier can check H(claim || nonce) == commitment
-        // without seeing the claim (they only see the commitment)
-        (
-            VerifiableProofData::Commitment {
-                commitment: commitment.commitment,
-            },
-            None,
-        )
-    };
+        } else {
+            // No membership set: commitment with reveal proof
+            // The verifier can check H(claim || nonce) == commitment
+            // without seeing the claim (they only see the commitment)
+            (
+                VerifiableProofData::Commitment {
+                    commitment: commitment.commitment,
+                },
+                None,
+            )
+        };
 
     Ok(ZkpProof {
         privacy_level: PrivacyLevel::ZeroKnowledge,
@@ -353,7 +343,7 @@ fn generate_nonce(claim: &[u8]) -> Vec<u8> {
     let separator = b"verisimdb-zkp-nonce-v1";
     let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
-    hasher.update(&h);
+    hasher.update(h);
     hasher.update(separator);
     h = hasher.finalize().into();
     h.to_vec()
@@ -516,12 +506,7 @@ mod tests {
 
     #[test]
     fn test_zk_proof_blinded_root_differs_from_plain() {
-        let claims = vec![
-            b"a".to_vec(),
-            b"b".to_vec(),
-            b"c".to_vec(),
-            b"d".to_vec(),
-        ];
+        let claims = vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec(), b"d".to_vec()];
 
         // Private proof: plain Merkle root
         let private_req = ZkpProofRequest {
@@ -572,7 +557,7 @@ mod tests {
     #[test]
     fn test_generate_with_circuit_registry() {
         use super::super::circuit_registry::{
-            CircuitIR, CompiledCircuit, R1CSConstraint, sha256_hex,
+            sha256_hex, CircuitIR, CompiledCircuit, R1CSConstraint,
         };
         use std::collections::HashMap;
 
@@ -604,7 +589,7 @@ mod tests {
             claim: b"verified-computation".to_vec(),
             privacy_level: PrivacyLevel::Public,
             circuit_name: Some("test-mul".to_string()),
-            witness: Some(vec![4.0]),           // y = 4
+            witness: Some(vec![4.0]),             // y = 4
             public_inputs: Some(vec![3.0, 12.0]), // x = 3, z = 12
             membership_set: None,
             membership_index: None,

@@ -89,7 +89,7 @@ pub fn merkle_root(leaves: &[Vec<u8>]) -> [u8; 32] {
 
     // Pad to even number if necessary
     while current_level.len() > 1 {
-        if current_level.len() % 2 != 0 {
+        if !current_level.len().is_multiple_of(2) {
             let last = *current_level.last().unwrap();
             current_level.push(last);
         }
@@ -117,14 +117,18 @@ pub fn merkle_proof(leaves: &[Vec<u8>], index: usize) -> Option<MerkleProof> {
 
     while hashed.len() > 1 {
         // Pad to even
-        if hashed.len() % 2 != 0 {
+        if !hashed.len().is_multiple_of(2) {
             let last = *hashed.last().unwrap();
             hashed.push(last);
         }
 
         // Find sibling
-        let sibling_idx = if idx % 2 == 0 { idx + 1 } else { idx - 1 };
-        let is_left = idx % 2 != 0; // sibling is on left if we're on the right
+        let sibling_idx = if idx.is_multiple_of(2) {
+            idx + 1
+        } else {
+            idx - 1
+        };
+        let is_left = !idx.is_multiple_of(2); // sibling is on left if we're on the right
 
         path.push(MerklePathElement {
             hash: hashed[sibling_idx],
@@ -170,9 +174,7 @@ pub fn verify_merkle_proof(proof: &MerkleProof) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VerifiableProofData {
     /// Hash commitment: prover committed to a value.
-    Commitment {
-        commitment: [u8; 32],
-    },
+    Commitment { commitment: [u8; 32] },
     /// Hash reveal: prover reveals the secret for a prior commitment.
     Reveal {
         commitment: [u8; 32],
@@ -181,9 +183,7 @@ pub enum VerifiableProofData {
     /// Merkle inclusion: value is a member of a committed set.
     MerkleInclusion(MerkleProof),
     /// Content integrity: SHA-256 hash of the original content.
-    ContentIntegrity {
-        content_hash: [u8; 32],
-    },
+    ContentIntegrity { content_hash: [u8; 32] },
 }
 
 /// Verify a verifiable proof against its claim.
@@ -193,10 +193,7 @@ pub fn verify_proof(data: &VerifiableProofData, claim: &[u8]) -> bool {
             // Commitments are valid by construction — they're verified at reveal time.
             true
         }
-        VerifiableProofData::Reveal {
-            commitment,
-            secret,
-        } => {
+        VerifiableProofData::Reveal { commitment, secret } => {
             let expected = commit(claim, secret);
             constant_time_eq(commitment, &expected.commitment)
         }

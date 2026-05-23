@@ -86,7 +86,10 @@ pub struct GraphEdge {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GraphObject {
     Node(GraphNode),
-    Literal { value: String, datatype: Option<String> },
+    Literal {
+        value: String,
+        datatype: Option<String>,
+    },
 }
 
 /// Graph store trait for cross-modal consistency.
@@ -111,7 +114,11 @@ pub trait GraphStore: Send + Sync {
     async fn delete(&self, edge: &GraphEdge) -> Result<(), GraphError>;
 
     /// Get all nodes connected to a given node within N hops
-    async fn neighborhood(&self, node: &GraphNode, hops: usize) -> Result<Vec<GraphNode>, GraphError>;
+    async fn neighborhood(
+        &self,
+        node: &GraphNode,
+        hops: usize,
+    ) -> Result<Vec<GraphNode>, GraphError>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -131,7 +138,11 @@ impl TripleKey {
             GraphObject::Node(n) => n.iri.clone(),
             GraphObject::Literal { value, .. } => format!("literal::{}", value),
         };
-        Self(edge.subject.iri.clone(), edge.predicate.iri.clone(), obj_key)
+        Self(
+            edge.subject.iri.clone(),
+            edge.predicate.iri.clone(),
+            obj_key,
+        )
     }
 }
 
@@ -206,14 +217,14 @@ impl GraphStore for SimpleGraphStore {
     }
 
     async fn outgoing(&self, node: &GraphNode) -> Result<Vec<GraphEdge>, GraphError> {
-        let subject_idx = self.subject_idx.read().map_err(|_| GraphError::LockPoisoned)?;
+        let subject_idx = self
+            .subject_idx
+            .read()
+            .map_err(|_| GraphError::LockPoisoned)?;
         let edges = self.edges.read().map_err(|_| GraphError::LockPoisoned)?;
 
         let result = match subject_idx.get(&node.iri) {
-            Some(keys) => keys
-                .iter()
-                .filter_map(|k| edges.get(k).cloned())
-                .collect(),
+            Some(keys) => keys.iter().filter_map(|k| edges.get(k).cloned()).collect(),
             None => Vec::new(),
         };
 
@@ -221,14 +232,14 @@ impl GraphStore for SimpleGraphStore {
     }
 
     async fn incoming(&self, node: &GraphNode) -> Result<Vec<GraphEdge>, GraphError> {
-        let object_idx = self.object_idx.read().map_err(|_| GraphError::LockPoisoned)?;
+        let object_idx = self
+            .object_idx
+            .read()
+            .map_err(|_| GraphError::LockPoisoned)?;
         let edges = self.edges.read().map_err(|_| GraphError::LockPoisoned)?;
 
         let result = match object_idx.get(&node.iri) {
-            Some(keys) => keys
-                .iter()
-                .filter_map(|k| edges.get(k).cloned())
-                .collect(),
+            Some(keys) => keys.iter().filter_map(|k| edges.get(k).cloned()).collect(),
             None => Vec::new(),
         };
 
@@ -275,7 +286,11 @@ impl GraphStore for SimpleGraphStore {
         Ok(())
     }
 
-    async fn neighborhood(&self, node: &GraphNode, hops: usize) -> Result<Vec<GraphNode>, GraphError> {
+    async fn neighborhood(
+        &self,
+        node: &GraphNode,
+        hops: usize,
+    ) -> Result<Vec<GraphNode>, GraphError> {
         let mut visited = HashSet::new();
         let mut frontier = vec![node.clone()];
         visited.insert(node.iri.clone());

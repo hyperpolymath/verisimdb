@@ -28,9 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_env_filter(env_filter)
             .init();
     } else {
-        tracing_subscriber::fmt()
-            .with_env_filter(env_filter)
-            .init();
+        tracing_subscriber::fmt().with_env_filter(env_filter).init();
     }
 
     // IPv6-only by default; VERISIM_ENABLE_IPV4=true for dual-stack (0.0.0.0)
@@ -79,7 +77,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(1024),
     };
 
-    let storage_mode = if cfg!(feature = "persistent") { "persistent" } else { "in-memory" };
+    let storage_mode = if cfg!(feature = "persistent") {
+        "persistent"
+    } else {
+        "in-memory"
+    };
 
     tracing::info!(
         host = %config.host,

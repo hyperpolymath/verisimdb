@@ -5,22 +5,18 @@
 //! via a GraphQL schema at `/graphql`.
 
 use async_graphql::{
-    Context, EmptySubscription, InputObject, Object, Schema, SimpleObject,
-    http::GraphiQLSource,
+    http::GraphiQLSource, Context, EmptySubscription, InputObject, Object, Schema, SimpleObject,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use tracing::error;
 use axum::{
     extract::State as AxumState,
     response::{Html, IntoResponse},
     routing::{get, post},
     Router,
 };
+use tracing::error;
 
-use verisim_planner::{
-    ExplainOutput as PlannerExplainOutput,
-    LogicalPlan,
-};
+use verisim_planner::{ExplainOutput as PlannerExplainOutput, LogicalPlan};
 
 use crate::AppState;
 
@@ -245,11 +241,10 @@ impl QueryRoot {
     /// Get drift status for all drift types.
     async fn drift_status(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<DriftStatus>> {
         let state = ctx.data::<AppState>()?;
-        let all_metrics = state.drift_detector.all_metrics()
-            .map_err(|e| {
-                error!(error = %e, "GraphQL drift status query failed");
-                async_graphql::Error::new("Internal server error")
-            })?;
+        let all_metrics = state.drift_detector.all_metrics().map_err(|e| {
+            error!(error = %e, "GraphQL drift status query failed");
+            async_graphql::Error::new("Internal server error")
+        })?;
 
         Ok(all_metrics
             .iter()
@@ -264,9 +259,15 @@ impl QueryRoot {
     }
 
     /// Get current planner configuration.
-    async fn planner_config(&self, ctx: &Context<'_>) -> async_graphql::Result<PlannerConfigOutput> {
+    async fn planner_config(
+        &self,
+        ctx: &Context<'_>,
+    ) -> async_graphql::Result<PlannerConfigOutput> {
         let state = ctx.data::<AppState>()?;
-        let planner = state.planner.lock().map_err(|_| { error!("Planner lock poisoned in GraphQL"); async_graphql::Error::new("Internal server error") })?;
+        let planner = state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in GraphQL");
+            async_graphql::Error::new("Internal server error")
+        })?;
         let cfg = planner.config();
         Ok(PlannerConfigOutput {
             global_mode: format!("{:?}", cfg.global_mode),
@@ -279,7 +280,10 @@ impl QueryRoot {
     /// Get planner statistics.
     async fn planner_stats(&self, ctx: &Context<'_>) -> async_graphql::Result<PlannerStats> {
         let state = ctx.data::<AppState>()?;
-        let planner = state.planner.lock().map_err(|_| { error!("Planner lock poisoned in GraphQL"); async_graphql::Error::new("Internal server error") })?;
+        let planner = state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in GraphQL");
+            async_graphql::Error::new("Internal server error")
+        })?;
 
         let stores: Vec<StoreStats> = verisim_planner::Modality::ALL
             .iter()
@@ -357,14 +361,10 @@ impl MutationRoot {
         }
 
         use verisim_octad::OctadStore;
-        let h = state
-            .octad_store
-            .create(octad_input)
-            .await
-            .map_err(|e| {
-                error!(error = %e, "GraphQL octad creation failed");
-                async_graphql::Error::new("Internal server error")
-            })?;
+        let h = state.octad_store.create(octad_input).await.map_err(|e| {
+            error!(error = %e, "GraphQL octad creation failed");
+            async_graphql::Error::new("Internal server error")
+        })?;
 
         Ok(Octad {
             id: h.id.to_string(),
@@ -386,14 +386,10 @@ impl MutationRoot {
         let octad_id = verisim_octad::OctadId::new(&id);
 
         use verisim_octad::OctadStore;
-        state
-            .octad_store
-            .delete(&octad_id)
-            .await
-            .map_err(|e| {
-                error!(error = %e, "GraphQL octad deletion failed");
-                async_graphql::Error::new("Internal server error")
-            })?;
+        state.octad_store.delete(&octad_id).await.map_err(|e| {
+            error!(error = %e, "GraphQL octad deletion failed");
+            async_graphql::Error::new("Internal server error")
+        })?;
 
         Ok(true)
     }
@@ -408,7 +404,10 @@ impl MutationRoot {
         let logical: LogicalPlan = serde_json::from_str(&plan_json)
             .map_err(|e| async_graphql::Error::new(format!("Invalid plan JSON: {}", e)))?;
 
-        let planner = state.planner.lock().map_err(|_| { error!("Planner lock poisoned in GraphQL"); async_graphql::Error::new("Internal server error") })?;
+        let planner = state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in GraphQL");
+            async_graphql::Error::new("Internal server error")
+        })?;
         let physical = planner
             .optimize(&logical)
             .map_err(|e| async_graphql::Error::new(e.to_string()))?;
@@ -423,7 +422,10 @@ impl MutationRoot {
         input: PlannerConfigInput,
     ) -> async_graphql::Result<PlannerConfigOutput> {
         let state = ctx.data::<AppState>()?;
-        let mut planner = state.planner.lock().map_err(|_| { error!("Planner lock poisoned in GraphQL"); async_graphql::Error::new("Internal server error") })?;
+        let mut planner = state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in GraphQL");
+            async_graphql::Error::new("Internal server error")
+        })?;
 
         let mut cfg = planner.config().clone();
         if let Some(mode) = &input.global_mode {

@@ -112,14 +112,19 @@ impl ProvenCertificate {
 
 /// Parse a proven certificate from JSON bytes.
 pub fn parse_proven_certificate(bytes: &[u8]) -> Result<ProvenCertificate, SemanticError> {
-    serde_json::from_slice(bytes)
-        .map_err(|e| SemanticError::SerializationError(format!("Failed to parse proven certificate: {}", e)))
+    serde_json::from_slice(bytes).map_err(|e| {
+        SemanticError::SerializationError(format!("Failed to parse proven certificate: {}", e))
+    })
 }
 
 /// Parse a proven certificate from CBOR bytes.
 pub fn parse_proven_certificate_cbor(bytes: &[u8]) -> Result<ProvenCertificate, SemanticError> {
-    ciborium::from_reader(bytes)
-        .map_err(|e| SemanticError::SerializationError(format!("Failed to parse proven certificate (CBOR): {}", e)))
+    ciborium::from_reader(bytes).map_err(|e| {
+        SemanticError::SerializationError(format!(
+            "Failed to parse proven certificate (CBOR): {}",
+            e
+        ))
+    })
 }
 
 /// Verify the structural integrity of a proven certificate.
@@ -157,8 +162,8 @@ pub fn verify_proven_certificate(cert: &ProvenCertificate) -> Result<bool, Seman
 /// Convert a proven certificate into a VeriSimDB ProofBlob for storage
 /// in the semantic modality.
 pub fn certificate_to_proof_blob(cert: &ProvenCertificate) -> Result<ProofBlob, SemanticError> {
-    let data = serde_json::to_vec(cert)
-        .map_err(|e| SemanticError::SerializationError(e.to_string()))?;
+    let data =
+        serde_json::to_vec(cert).map_err(|e| SemanticError::SerializationError(e.to_string()))?;
 
     Ok(ProofBlob {
         claim: cert.statement.clone(),
@@ -178,11 +183,8 @@ pub fn create_certificate(
     valid: bool,
     message: Option<String>,
 ) -> ProvenCertificate {
-    let signature = ProvenCertificate::compute_signature(
-        &prover,
-        &statement,
-        proof_term.as_deref(),
-    );
+    let signature =
+        ProvenCertificate::compute_signature(&prover, &statement, proof_term.as_deref());
 
     ProvenCertificate {
         version: "1.0".to_string(),
@@ -237,7 +239,8 @@ mod tests {
     #[test]
     fn test_verify_invalid_signature() {
         let mut cert = sample_certificate();
-        cert.signature = "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        cert.signature =
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string();
         assert!(!verify_proven_certificate(&cert).unwrap());
     }
 
@@ -272,6 +275,9 @@ mod tests {
     fn test_prover_kind_display() {
         assert_eq!(ProverKind::Z3.to_string(), "z3");
         assert_eq!(ProverKind::Lean.to_string(), "lean");
-        assert_eq!(ProverKind::Custom("myprover".to_string()).to_string(), "custom:myprover");
+        assert_eq!(
+            ProverKind::Custom("myprover".to_string()).to_string(),
+            "custom:myprover"
+        );
     }
 }

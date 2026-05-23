@@ -15,8 +15,8 @@ use crate::AppState;
 #[path = "proto/verisim.rs"]
 pub mod proto;
 
-use proto::veri_sim_planner_server::{VeriSimPlanner, VeriSimPlannerServer};
 use proto::veri_sim_octad_server::{VeriSimOctad, VeriSimOctadServer};
+use proto::veri_sim_planner_server::{VeriSimPlanner, VeriSimPlannerServer};
 
 // ============================================================================
 // Planner gRPC Service
@@ -42,8 +42,10 @@ impl VeriSimPlanner for PlannerService {
         let logical: LogicalPlan = serde_json::from_str(&req.plan_json)
             .map_err(|e| Status::invalid_argument(format!("Invalid plan JSON: {}", e)))?;
 
-        let planner = self.state.planner.lock()
-            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
+        let planner = self.state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in gRPC");
+            Status::internal("Internal server error")
+        })?;
         let physical = planner
             .optimize(&logical)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
@@ -79,8 +81,10 @@ impl VeriSimPlanner for PlannerService {
         let logical: LogicalPlan = serde_json::from_str(&req.plan_json)
             .map_err(|e| Status::invalid_argument(format!("Invalid plan JSON: {}", e)))?;
 
-        let planner = self.state.planner.lock()
-            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
+        let planner = self.state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in gRPC");
+            Status::internal("Internal server error")
+        })?;
         let explain = planner
             .explain(&logical)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
@@ -132,8 +136,10 @@ impl VeriSimPlanner for PlannerService {
         &self,
         _request: Request<proto::Empty>,
     ) -> Result<Response<proto::PlannerConfigResponse>, Status> {
-        let planner = self.state.planner.lock()
-            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
+        let planner = self.state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in gRPC");
+            Status::internal("Internal server error")
+        })?;
         let cfg = planner.config();
 
         Ok(Response::new(proto::PlannerConfigResponse {
@@ -149,8 +155,10 @@ impl VeriSimPlanner for PlannerService {
         request: Request<proto::PlannerConfigRequest>,
     ) -> Result<Response<proto::PlannerConfigResponse>, Status> {
         let req = request.into_inner();
-        let mut planner = self.state.planner.lock()
-            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
+        let mut planner = self.state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in gRPC");
+            Status::internal("Internal server error")
+        })?;
 
         let mut cfg = planner.config().clone();
         if !req.global_mode.is_empty() {
@@ -182,8 +190,10 @@ impl VeriSimPlanner for PlannerService {
         &self,
         _request: Request<proto::Empty>,
     ) -> Result<Response<proto::StatsResponse>, Status> {
-        let planner = self.state.planner.lock()
-            .map_err(|_| { error!("Planner lock poisoned in gRPC"); Status::internal("Internal server error") })?;
+        let planner = self.state.planner.lock().map_err(|_| {
+            error!("Planner lock poisoned in gRPC");
+            Status::internal("Internal server error")
+        })?;
 
         let stores: Vec<proto::StoreStatsMsg> = verisim_planner::Modality::ALL
             .iter()
@@ -246,15 +256,10 @@ impl VeriSimOctad for OctadService {
         }
 
         use verisim_octad::OctadStore;
-        let h = self
-            .state
-            .octad_store
-            .create(input)
-            .await
-            .map_err(|e| {
-                error!(error = %e, "gRPC octad creation failed");
-                Status::internal("Internal server error")
-            })?;
+        let h = self.state.octad_store.create(input).await.map_err(|e| {
+            error!(error = %e, "gRPC octad creation failed");
+            Status::internal("Internal server error")
+        })?;
 
         Ok(Response::new(octad_to_proto(&h)))
     }
@@ -348,7 +353,11 @@ impl VeriSimOctad for OctadService {
         request: Request<proto::TextSearchRequest>,
     ) -> Result<Response<proto::SearchResponse>, Status> {
         let req = request.into_inner();
-        let limit = if req.limit > 0 { req.limit as usize } else { 10 };
+        let limit = if req.limit > 0 {
+            req.limit as usize
+        } else {
+            10
+        };
 
         use verisim_octad::OctadStore;
         let octads = self

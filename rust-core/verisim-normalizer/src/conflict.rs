@@ -554,11 +554,7 @@ impl ConflictResolver {
     ///
     /// - [`ConflictError::NotFound`] if no active conflict with the given ID exists.
     /// - [`ConflictError::AlreadyResolved`] if the conflict is already Resolved or Dismissed.
-    pub async fn dismiss(
-        &self,
-        conflict_id: &str,
-        reason: &str,
-    ) -> Result<(), ConflictError> {
+    pub async fn dismiss(&self, conflict_id: &str, reason: &str) -> Result<(), ConflictError> {
         let mut active = self.active_conflicts.write().await;
         let conflict = active
             .iter_mut()
@@ -1041,7 +1037,10 @@ mod tests {
             .await;
 
         resolver
-            .dismiss(&conflict.id, "False positive -- data was updated concurrently")
+            .dismiss(
+                &conflict.id,
+                "False positive -- data was updated concurrently",
+            )
             .await
             .unwrap();
 
@@ -1190,10 +1189,7 @@ mod tests {
         // Override: Document vs Vector conflicts use ModalityPriority
         config.per_modality_policies.insert(
             (Modality::Document, Modality::Vector),
-            ConflictPolicy::ModalityPriority(vec![
-                Modality::Document,
-                Modality::Vector,
-            ]),
+            ConflictPolicy::ModalityPriority(vec![Modality::Document, Modality::Vector]),
         );
 
         let resolver = ConflictResolver::new(config);
@@ -1260,10 +1256,7 @@ mod tests {
     async fn test_not_found_error() {
         let resolver = ConflictResolver::new(test_config());
 
-        let err = resolver
-            .resolve("nonexistent-id", None)
-            .await
-            .unwrap_err();
+        let err = resolver.resolve("nonexistent-id", None).await.unwrap_err();
         assert!(matches!(err, ConflictError::NotFound(_)));
         assert!(err.to_string().contains("nonexistent-id"));
     }
@@ -1451,10 +1444,13 @@ mod tests {
         let deserialized: ConflictConfig = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.default_policy, config.default_policy);
-        assert!((deserialized.auto_resolve_threshold - config.auto_resolve_threshold).abs()
-            < f64::EPSILON);
-        assert!((deserialized.require_manual_above - config.require_manual_above).abs()
-            < f64::EPSILON);
+        assert!(
+            (deserialized.auto_resolve_threshold - config.auto_resolve_threshold).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (deserialized.require_manual_above - config.require_manual_above).abs() < f64::EPSILON
+        );
         assert_eq!(deserialized.max_history_entries, config.max_history_entries);
         assert!(deserialized.per_modality_policies.is_empty());
     }
@@ -1501,7 +1497,10 @@ mod tests {
             )
             .await;
 
-        resolver.dismiss(&conflict.id, "First dismissal").await.unwrap();
+        resolver
+            .dismiss(&conflict.id, "First dismissal")
+            .await
+            .unwrap();
 
         // Second dismissal should fail (not found -- moved to history)
         let err = resolver

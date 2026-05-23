@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::circuit_registry::{
-    CircuitError, CircuitIR, CompiledCircuit, GateType, R1CSConstraint, sha256_hex,
+    sha256_hex, CircuitError, CircuitIR, CompiledCircuit, GateType, R1CSConstraint,
 };
 
 /// A wire in the circuit definition (from the DSL)
@@ -69,12 +69,9 @@ pub fn compile_circuit(def: &CircuitDef) -> Result<CompiledCircuit, CircuitError
     let mut constraints = Vec::new();
 
     for gate in &def.gates {
-        let output_idx = wire_map
-            .get(&gate.output)
-            .copied()
-            .ok_or_else(|| {
-                CircuitError::CompilationFailed(format!("Unknown output wire: {}", gate.output))
-            })?;
+        let output_idx = wire_map.get(&gate.output).copied().ok_or_else(|| {
+            CircuitError::CompilationFailed(format!("Unknown output wire: {}", gate.output))
+        })?;
 
         match gate.gate_type {
             GateType::And => {
@@ -179,8 +176,8 @@ pub fn compile_circuit(def: &CircuitDef) -> Result<CompiledCircuit, CircuitError
     };
 
     // Compute circuit hash for integrity
-    let circuit_bytes = serde_json::to_vec(&ir)
-        .map_err(|e| CircuitError::CompilationFailed(e.to_string()))?;
+    let circuit_bytes =
+        serde_json::to_vec(&ir).map_err(|e| CircuitError::CompilationFailed(e.to_string()))?;
     let hash = sha256_hex(&circuit_bytes);
 
     // Generate a verification key (Merkle commitment of constraints)
@@ -228,9 +225,21 @@ mod tests {
         let def = CircuitDef {
             name: "test-multiply".to_string(),
             wires: vec![
-                WireDef { name: "x".into(), is_public: true, is_output: false },
-                WireDef { name: "y".into(), is_public: false, is_output: false },
-                WireDef { name: "z".into(), is_public: false, is_output: true },
+                WireDef {
+                    name: "x".into(),
+                    is_public: true,
+                    is_output: false,
+                },
+                WireDef {
+                    name: "y".into(),
+                    is_public: false,
+                    is_output: false,
+                },
+                WireDef {
+                    name: "z".into(),
+                    is_public: false,
+                    is_output: true,
+                },
             ],
             gates: vec![GateDef {
                 gate_type: GateType::And, // multiplication for R1CS
@@ -252,9 +261,21 @@ mod tests {
         let def = CircuitDef {
             name: "mul-check".to_string(),
             wires: vec![
-                WireDef { name: "a".into(), is_public: true, is_output: false },
-                WireDef { name: "b".into(), is_public: true, is_output: false },
-                WireDef { name: "c".into(), is_public: false, is_output: false },
+                WireDef {
+                    name: "a".into(),
+                    is_public: true,
+                    is_output: false,
+                },
+                WireDef {
+                    name: "b".into(),
+                    is_public: true,
+                    is_output: false,
+                },
+                WireDef {
+                    name: "c".into(),
+                    is_public: false,
+                    is_output: false,
+                },
             ],
             gates: vec![GateDef {
                 gate_type: GateType::And,
@@ -279,9 +300,11 @@ mod tests {
     fn test_unknown_wire_error() {
         let def = CircuitDef {
             name: "bad".to_string(),
-            wires: vec![
-                WireDef { name: "a".into(), is_public: true, is_output: false },
-            ],
+            wires: vec![WireDef {
+                name: "a".into(),
+                is_public: true,
+                is_output: false,
+            }],
             gates: vec![GateDef {
                 gate_type: GateType::And,
                 inputs: vec!["a".into(), "nonexistent".into()],

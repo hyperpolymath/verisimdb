@@ -74,7 +74,11 @@ impl RedbBackend {
         }
 
         let db = Database::create(&path).map_err(|e| {
-            StorageError::BackendUnavailable(format!("failed to open redb at {}: {}", path.display(), e))
+            StorageError::BackendUnavailable(format!(
+                "failed to open redb at {}: {}",
+                path.display(),
+                e
+            ))
         })?;
 
         debug!(path = %path.display(), "opened redb backend");
@@ -125,9 +129,9 @@ impl StorageBackend for RedbBackend {
         let key = key.to_vec();
 
         tokio::task::spawn_blocking(move || -> Result<Option<Vec<u8>>, StorageError> {
-            let txn = db.begin_read().map_err(|e| {
-                StorageError::BackendUnavailable(format!("read txn: {e}"))
-            })?;
+            let txn = db
+                .begin_read()
+                .map_err(|e| StorageError::BackendUnavailable(format!("read txn: {e}")))?;
 
             let table = match txn.open_table(MAIN_TABLE) {
                 Ok(t) => t,
@@ -151,20 +155,19 @@ impl StorageBackend for RedbBackend {
         let value = value.to_vec();
 
         tokio::task::spawn_blocking(move || -> Result<(), StorageError> {
-            let txn = db.begin_write().map_err(|e| {
-                StorageError::BackendUnavailable(format!("write txn: {e}"))
-            })?;
+            let txn = db
+                .begin_write()
+                .map_err(|e| StorageError::BackendUnavailable(format!("write txn: {e}")))?;
             {
-                let mut table = txn.open_table(MAIN_TABLE).map_err(|e| {
-                    StorageError::BackendUnavailable(format!("open table: {e}"))
-                })?;
-                table.insert(key.as_slice(), value.as_slice()).map_err(|e| {
-                    StorageError::CorruptedData(format!("insert: {e}"))
-                })?;
+                let mut table = txn
+                    .open_table(MAIN_TABLE)
+                    .map_err(|e| StorageError::BackendUnavailable(format!("open table: {e}")))?;
+                table
+                    .insert(key.as_slice(), value.as_slice())
+                    .map_err(|e| StorageError::CorruptedData(format!("insert: {e}")))?;
             }
-            txn.commit().map_err(|e| {
-                StorageError::CorruptedData(format!("commit: {e}"))
-            })?;
+            txn.commit()
+                .map_err(|e| StorageError::CorruptedData(format!("commit: {e}")))?;
             Ok(())
         })
         .await
@@ -176,21 +179,21 @@ impl StorageBackend for RedbBackend {
         let key = key.to_vec();
 
         tokio::task::spawn_blocking(move || -> Result<bool, StorageError> {
-            let txn = db.begin_write().map_err(|e| {
-                StorageError::BackendUnavailable(format!("write txn: {e}"))
-            })?;
+            let txn = db
+                .begin_write()
+                .map_err(|e| StorageError::BackendUnavailable(format!("write txn: {e}")))?;
             let existed;
             {
-                let mut table = txn.open_table(MAIN_TABLE).map_err(|e| {
-                    StorageError::BackendUnavailable(format!("open table: {e}"))
-                })?;
-                existed = table.remove(key.as_slice()).map_err(|e| {
-                    StorageError::CorruptedData(format!("remove: {e}"))
-                })?.is_some();
+                let mut table = txn
+                    .open_table(MAIN_TABLE)
+                    .map_err(|e| StorageError::BackendUnavailable(format!("open table: {e}")))?;
+                existed = table
+                    .remove(key.as_slice())
+                    .map_err(|e| StorageError::CorruptedData(format!("remove: {e}")))?
+                    .is_some();
             }
-            txn.commit().map_err(|e| {
-                StorageError::CorruptedData(format!("commit: {e}"))
-            })?;
+            txn.commit()
+                .map_err(|e| StorageError::CorruptedData(format!("commit: {e}")))?;
             Ok(existed)
         })
         .await
@@ -211,9 +214,9 @@ impl StorageBackend for RedbBackend {
         let prefix = prefix.to_vec();
 
         tokio::task::spawn_blocking(move || -> Result<Vec<(Vec<u8>, Vec<u8>)>, StorageError> {
-            let txn = db.begin_read().map_err(|e| {
-                StorageError::BackendUnavailable(format!("read txn: {e}"))
-            })?;
+            let txn = db
+                .begin_read()
+                .map_err(|e| StorageError::BackendUnavailable(format!("read txn: {e}")))?;
             let table = match txn.open_table(MAIN_TABLE) {
                 Ok(t) => t,
                 Err(_) => return Ok(Vec::new()), // Table doesn't exist yet
@@ -222,14 +225,13 @@ impl StorageBackend for RedbBackend {
             let mut results = Vec::new();
 
             // Scan from the prefix key onward; stop when keys no longer match
-            let iter = table.range(prefix.as_slice()..).map_err(|e| {
-                StorageError::CorruptedData(format!("range scan: {e}"))
-            })?;
+            let iter = table
+                .range(prefix.as_slice()..)
+                .map_err(|e| StorageError::CorruptedData(format!("range scan: {e}")))?;
 
             for entry in iter {
-                let entry = entry.map_err(|e| {
-                    StorageError::CorruptedData(format!("scan entry: {e}"))
-                })?;
+                let entry =
+                    entry.map_err(|e| StorageError::CorruptedData(format!("scan entry: {e}")))?;
                 let k = entry.0.value().to_vec();
                 let v = entry.1.value().to_vec();
 
@@ -254,9 +256,9 @@ impl StorageBackend for RedbBackend {
         let owned_keys: Vec<Vec<u8>> = keys.iter().map(|k| k.to_vec()).collect();
 
         tokio::task::spawn_blocking(move || -> Result<Vec<Option<Vec<u8>>>, StorageError> {
-            let txn = db.begin_read().map_err(|e| {
-                StorageError::BackendUnavailable(format!("read txn: {e}"))
-            })?;
+            let txn = db
+                .begin_read()
+                .map_err(|e| StorageError::BackendUnavailable(format!("read txn: {e}")))?;
             let table = match txn.open_table(MAIN_TABLE) {
                 Ok(t) => t,
                 Err(_) => return Ok(owned_keys.iter().map(|_| None).collect()),
@@ -267,9 +269,7 @@ impl StorageBackend for RedbBackend {
                 match table.get(key.as_slice()) {
                     Ok(Some(v)) => results.push(Some(v.value().to_vec())),
                     Ok(None) => results.push(None),
-                    Err(e) => {
-                        return Err(StorageError::CorruptedData(format!("multi_get: {e}")))
-                    }
+                    Err(e) => return Err(StorageError::CorruptedData(format!("multi_get: {e}"))),
                 }
             }
             Ok(results)
@@ -286,22 +286,21 @@ impl StorageBackend for RedbBackend {
             .collect();
 
         tokio::task::spawn_blocking(move || -> Result<(), StorageError> {
-            let txn = db.begin_write().map_err(|e| {
-                StorageError::BackendUnavailable(format!("write txn: {e}"))
-            })?;
+            let txn = db
+                .begin_write()
+                .map_err(|e| StorageError::BackendUnavailable(format!("write txn: {e}")))?;
             {
-                let mut table = txn.open_table(MAIN_TABLE).map_err(|e| {
-                    StorageError::BackendUnavailable(format!("open table: {e}"))
-                })?;
+                let mut table = txn
+                    .open_table(MAIN_TABLE)
+                    .map_err(|e| StorageError::BackendUnavailable(format!("open table: {e}")))?;
                 for (k, v) in &owned {
-                    table.insert(k.as_slice(), v.as_slice()).map_err(|e| {
-                        StorageError::CorruptedData(format!("batch insert: {e}"))
-                    })?;
+                    table
+                        .insert(k.as_slice(), v.as_slice())
+                        .map_err(|e| StorageError::CorruptedData(format!("batch insert: {e}")))?;
                 }
             }
-            txn.commit().map_err(|e| {
-                StorageError::CorruptedData(format!("batch commit: {e}"))
-            })?;
+            txn.commit()
+                .map_err(|e| StorageError::CorruptedData(format!("batch commit: {e}")))?;
             Ok(())
         })
         .await
@@ -355,12 +354,18 @@ mod tests {
 
         // Put and get
         backend.put(b"key1", b"value1").await.unwrap();
-        assert_eq!(backend.get(b"key1").await.unwrap(), Some(b"value1".to_vec()));
+        assert_eq!(
+            backend.get(b"key1").await.unwrap(),
+            Some(b"value1".to_vec())
+        );
         assert!(backend.exists(b"key1").await.unwrap());
 
         // Overwrite
         backend.put(b"key1", b"updated").await.unwrap();
-        assert_eq!(backend.get(b"key1").await.unwrap(), Some(b"updated".to_vec()));
+        assert_eq!(
+            backend.get(b"key1").await.unwrap(),
+            Some(b"updated".to_vec())
+        );
 
         // Delete existing key
         assert!(backend.delete(b"key1").await.unwrap());
@@ -467,7 +472,10 @@ mod tests {
         // Write data and drop
         {
             let backend = RedbBackend::open(&path).unwrap();
-            backend.put(b"persistent-key", b"persistent-value").await.unwrap();
+            backend
+                .put(b"persistent-key", b"persistent-value")
+                .await
+                .unwrap();
         }
 
         // Reopen and verify data survived
@@ -493,16 +501,10 @@ mod tests {
         );
 
         // All 0xFF bytes — no upper bound
-        assert_eq!(
-            RedbBackend::prefix_upper_bound(b"\xff\xff"),
-            None
-        );
+        assert_eq!(RedbBackend::prefix_upper_bound(b"\xff\xff"), None);
 
         // Empty prefix — no upper bound
-        assert_eq!(
-            RedbBackend::prefix_upper_bound(b""),
-            None
-        );
+        assert_eq!(RedbBackend::prefix_upper_bound(b""), None);
 
         // Single byte
         assert_eq!(

@@ -8,22 +8,13 @@ use std::fmt;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Diff<T> {
     /// No changes between versions
-    NoChange {
-        value: T,
-    },
+    NoChange { value: T },
     /// Value changed from old to new
-    Changed {
-        old: T,
-        new: T,
-    },
+    Changed { old: T, new: T },
     /// Value was added (didn't exist before)
-    Added {
-        value: T,
-    },
+    Added { value: T },
     /// Value was removed (existed before, doesn't now)
-    Removed {
-        value: T,
-    },
+    Removed { value: T },
 }
 
 impl<T> Diff<T> {
@@ -172,21 +163,37 @@ mod tests {
         let new_val = "new".to_string();
         let diff = compare_values(Some(&old_val), Some(&new_val)).unwrap();
         assert!(diff.has_change());
-        assert_eq!(diff, Diff::Changed { old: "old".to_string(), new: "new".to_string() });
+        assert_eq!(
+            diff,
+            Diff::Changed {
+                old: "old".to_string(),
+                new: "new".to_string()
+            }
+        );
     }
 
     #[test]
     fn test_compare_values_added() {
         let new_val = "new".to_string();
         let diff = compare_values(None, Some(&new_val)).unwrap();
-        assert_eq!(diff, Diff::Added { value: "new".to_string() });
+        assert_eq!(
+            diff,
+            Diff::Added {
+                value: "new".to_string()
+            }
+        );
     }
 
     #[test]
     fn test_compare_values_removed() {
         let old_val = "old".to_string();
         let diff = compare_values(Some(&old_val), None).unwrap();
-        assert_eq!(diff, Diff::Removed { value: "old".to_string() });
+        assert_eq!(
+            diff,
+            Diff::Removed {
+                value: "old".to_string()
+            }
+        );
     }
 
     #[test]

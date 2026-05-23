@@ -154,8 +154,7 @@ impl RedbGraphStore {
 
     /// Serialise a GraphEdge to JSON bytes.
     fn serialise_edge(edge: &GraphEdge) -> Result<Vec<u8>, GraphError> {
-        serde_json::to_vec(edge)
-            .map_err(|e| GraphError::StoreError(format!("serialise edge: {e}")))
+        serde_json::to_vec(edge).map_err(|e| GraphError::StoreError(format!("serialise edge: {e}")))
     }
 
     /// Scan an index table for all triple keys matching a given IRI prefix,
@@ -165,7 +164,9 @@ impl RedbGraphStore {
         index_table: TableDefinition<&[u8], &[u8]>,
         iri: &str,
     ) -> Result<Vec<GraphEdge>, GraphError> {
-        let txn = db.begin_read().map_err(|e| GraphError::StoreError(format!("read txn: {e}")))?;
+        let txn = db
+            .begin_read()
+            .map_err(|e| GraphError::StoreError(format!("read txn: {e}")))?;
 
         let idx = match txn.open_table(index_table) {
             Ok(t) => t,
@@ -178,9 +179,9 @@ impl RedbGraphStore {
         };
 
         let prefix = Self::iri_prefix(iri);
-        let iter = idx.range(prefix.as_slice()..).map_err(|e| {
-            GraphError::StoreError(format!("index scan: {e}"))
-        })?;
+        let iter = idx
+            .range(prefix.as_slice()..)
+            .map_err(|e| GraphError::StoreError(format!("index scan: {e}")))?;
 
         let mut edges = Vec::new();
         for entry in iter {
@@ -196,9 +197,10 @@ impl RedbGraphStore {
             let triple_key = &idx_key[prefix.len()..];
 
             // Look up the edge in the triples table
-            if let Some(edge_bytes) = triples.get(triple_key).map_err(|e| {
-                GraphError::StoreError(format!("triple lookup: {e}"))
-            })? {
+            if let Some(edge_bytes) = triples
+                .get(triple_key)
+                .map_err(|e| GraphError::StoreError(format!("triple lookup: {e}")))?
+            {
                 edges.push(Self::deserialise_edge(edge_bytes.value())?);
             }
         }
@@ -217,47 +219,46 @@ impl GraphStore for RedbGraphStore {
             let tkey = Self::triple_key(&edge);
             let edge_bytes = Self::serialise_edge(&edge)?;
 
-            let txn = db.begin_write().map_err(|e| {
-                GraphError::StoreError(format!("write txn: {e}"))
-            })?;
+            let txn = db
+                .begin_write()
+                .map_err(|e| GraphError::StoreError(format!("write txn: {e}")))?;
 
             {
                 // Insert the triple
-                let mut triples = txn.open_table(TRIPLES).map_err(|e| {
-                    GraphError::StoreError(format!("open triples: {e}"))
-                })?;
-                triples.insert(tkey.as_slice(), edge_bytes.as_slice()).map_err(|e| {
-                    GraphError::StoreError(format!("insert triple: {e}"))
-                })?;
+                let mut triples = txn
+                    .open_table(TRIPLES)
+                    .map_err(|e| GraphError::StoreError(format!("open triples: {e}")))?;
+                triples
+                    .insert(tkey.as_slice(), edge_bytes.as_slice())
+                    .map_err(|e| GraphError::StoreError(format!("insert triple: {e}")))?;
             }
 
             {
                 // Update subject index
-                let mut subject_idx = txn.open_table(SUBJECT_IDX).map_err(|e| {
-                    GraphError::StoreError(format!("open subject_idx: {e}"))
-                })?;
+                let mut subject_idx = txn
+                    .open_table(SUBJECT_IDX)
+                    .map_err(|e| GraphError::StoreError(format!("open subject_idx: {e}")))?;
                 let skey = Self::subject_index_key(&edge.subject.iri, &tkey);
-                subject_idx.insert(skey.as_slice(), &[] as &[u8]).map_err(|e| {
-                    GraphError::StoreError(format!("insert subject_idx: {e}"))
-                })?;
+                subject_idx
+                    .insert(skey.as_slice(), &[] as &[u8])
+                    .map_err(|e| GraphError::StoreError(format!("insert subject_idx: {e}")))?;
             }
 
             {
                 // Update object index (node objects only)
                 if let GraphObject::Node(n) = &edge.object {
-                    let mut object_idx = txn.open_table(OBJECT_IDX).map_err(|e| {
-                        GraphError::StoreError(format!("open object_idx: {e}"))
-                    })?;
+                    let mut object_idx = txn
+                        .open_table(OBJECT_IDX)
+                        .map_err(|e| GraphError::StoreError(format!("open object_idx: {e}")))?;
                     let okey = Self::object_index_key(&n.iri, &tkey);
-                    object_idx.insert(okey.as_slice(), &[] as &[u8]).map_err(|e| {
-                        GraphError::StoreError(format!("insert object_idx: {e}"))
-                    })?;
+                    object_idx
+                        .insert(okey.as_slice(), &[] as &[u8])
+                        .map_err(|e| GraphError::StoreError(format!("insert object_idx: {e}")))?;
                 }
             }
 
-            txn.commit().map_err(|e| {
-                GraphError::StoreError(format!("commit: {e}"))
-            })?;
+            txn.commit()
+                .map_err(|e| GraphError::StoreError(format!("commit: {e}")))?;
 
             Ok(())
         })
@@ -269,22 +270,18 @@ impl GraphStore for RedbGraphStore {
         let db = Arc::clone(&self.db);
         let iri = node.iri.clone();
 
-        tokio::task::spawn_blocking(move || {
-            Self::scan_index_for_edges(&db, SUBJECT_IDX, &iri)
-        })
-        .await
-        .map_err(|e| GraphError::StoreError(format!("task join: {e}")))?
+        tokio::task::spawn_blocking(move || Self::scan_index_for_edges(&db, SUBJECT_IDX, &iri))
+            .await
+            .map_err(|e| GraphError::StoreError(format!("task join: {e}")))?
     }
 
     async fn incoming(&self, node: &GraphNode) -> Result<Vec<GraphEdge>, GraphError> {
         let db = Arc::clone(&self.db);
         let iri = node.iri.clone();
 
-        tokio::task::spawn_blocking(move || {
-            Self::scan_index_for_edges(&db, OBJECT_IDX, &iri)
-        })
-        .await
-        .map_err(|e| GraphError::StoreError(format!("task join: {e}")))?
+        tokio::task::spawn_blocking(move || Self::scan_index_for_edges(&db, OBJECT_IDX, &iri))
+            .await
+            .map_err(|e| GraphError::StoreError(format!("task join: {e}")))?
     }
 
     async fn exists(&self, edge: &GraphEdge) -> Result<bool, GraphError> {
@@ -292,9 +289,9 @@ impl GraphStore for RedbGraphStore {
         let tkey = Self::triple_key(edge);
 
         tokio::task::spawn_blocking(move || -> Result<bool, GraphError> {
-            let txn = db.begin_read().map_err(|e| {
-                GraphError::StoreError(format!("read txn: {e}"))
-            })?;
+            let txn = db
+                .begin_read()
+                .map_err(|e| GraphError::StoreError(format!("read txn: {e}")))?;
 
             let table = match txn.open_table(TRIPLES) {
                 Ok(t) => t,
@@ -318,47 +315,46 @@ impl GraphStore for RedbGraphStore {
         tokio::task::spawn_blocking(move || -> Result<(), GraphError> {
             let tkey = Self::triple_key(&edge);
 
-            let txn = db.begin_write().map_err(|e| {
-                GraphError::StoreError(format!("write txn: {e}"))
-            })?;
+            let txn = db
+                .begin_write()
+                .map_err(|e| GraphError::StoreError(format!("write txn: {e}")))?;
 
             {
                 // Remove from triples table
-                let mut triples = txn.open_table(TRIPLES).map_err(|e| {
-                    GraphError::StoreError(format!("open triples: {e}"))
-                })?;
-                triples.remove(tkey.as_slice()).map_err(|e| {
-                    GraphError::StoreError(format!("remove triple: {e}"))
-                })?;
+                let mut triples = txn
+                    .open_table(TRIPLES)
+                    .map_err(|e| GraphError::StoreError(format!("open triples: {e}")))?;
+                triples
+                    .remove(tkey.as_slice())
+                    .map_err(|e| GraphError::StoreError(format!("remove triple: {e}")))?;
             }
 
             {
                 // Remove from subject index
-                let mut subject_idx = txn.open_table(SUBJECT_IDX).map_err(|e| {
-                    GraphError::StoreError(format!("open subject_idx: {e}"))
-                })?;
+                let mut subject_idx = txn
+                    .open_table(SUBJECT_IDX)
+                    .map_err(|e| GraphError::StoreError(format!("open subject_idx: {e}")))?;
                 let skey = Self::subject_index_key(&edge.subject.iri, &tkey);
-                subject_idx.remove(skey.as_slice()).map_err(|e| {
-                    GraphError::StoreError(format!("remove subject_idx: {e}"))
-                })?;
+                subject_idx
+                    .remove(skey.as_slice())
+                    .map_err(|e| GraphError::StoreError(format!("remove subject_idx: {e}")))?;
             }
 
             {
                 // Remove from object index (node objects only)
                 if let GraphObject::Node(n) = &edge.object {
-                    let mut object_idx = txn.open_table(OBJECT_IDX).map_err(|e| {
-                        GraphError::StoreError(format!("open object_idx: {e}"))
-                    })?;
+                    let mut object_idx = txn
+                        .open_table(OBJECT_IDX)
+                        .map_err(|e| GraphError::StoreError(format!("open object_idx: {e}")))?;
                     let okey = Self::object_index_key(&n.iri, &tkey);
-                    object_idx.remove(okey.as_slice()).map_err(|e| {
-                        GraphError::StoreError(format!("remove object_idx: {e}"))
-                    })?;
+                    object_idx
+                        .remove(okey.as_slice())
+                        .map_err(|e| GraphError::StoreError(format!("remove object_idx: {e}")))?;
                 }
             }
 
-            txn.commit().map_err(|e| {
-                GraphError::StoreError(format!("commit: {e}"))
-            })?;
+            txn.commit()
+                .map_err(|e| GraphError::StoreError(format!("commit: {e}")))?;
 
             Ok(())
         })
@@ -366,7 +362,11 @@ impl GraphStore for RedbGraphStore {
         .map_err(|e| GraphError::StoreError(format!("task join: {e}")))?
     }
 
-    async fn neighborhood(&self, node: &GraphNode, hops: usize) -> Result<Vec<GraphNode>, GraphError> {
+    async fn neighborhood(
+        &self,
+        node: &GraphNode,
+        hops: usize,
+    ) -> Result<Vec<GraphNode>, GraphError> {
         use std::collections::HashSet;
 
         let mut visited = HashSet::new();

@@ -127,10 +127,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> TemporalSt
         Ok(next_version)
     }
 
-    async fn latest(
-        &self,
-        entity_id: &str,
-    ) -> Result<Option<Version<Self::Data>>, TemporalError> {
+    async fn latest(&self, entity_id: &str) -> Result<Option<Version<Self::Data>>, TemporalError> {
         let store = self
             .versions
             .read()
@@ -220,7 +217,9 @@ mod tests {
 
         // Write data in one session.
         {
-            let store = RedbVersionStore::<serde_json::Value>::open(&path).await.unwrap();
+            let store = RedbVersionStore::<serde_json::Value>::open(&path)
+                .await
+                .unwrap();
             let v1 = store
                 .append(
                     "entity-1",
@@ -246,7 +245,9 @@ mod tests {
 
         // Reopen and verify data survived.
         {
-            let store = RedbVersionStore::<serde_json::Value>::open(&path).await.unwrap();
+            let store = RedbVersionStore::<serde_json::Value>::open(&path)
+                .await
+                .unwrap();
 
             let latest = store.latest("entity-1").await.unwrap().unwrap();
             assert_eq!(latest.version, 2);

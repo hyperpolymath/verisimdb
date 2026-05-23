@@ -301,10 +301,7 @@ mod tests {
         let metered = MetricsBackend::new(inner);
 
         metered
-            .batch_put(&[
-                (b"a" as &[u8], b"111" as &[u8]),
-                (b"b", b"2222"),
-            ])
+            .batch_put(&[(b"a" as &[u8], b"111" as &[u8]), (b"b", b"2222")])
             .await
             .unwrap();
 
@@ -363,10 +360,7 @@ mod tests {
         metered.put(b"k", b"v").await.unwrap();
         metered.flush().await.unwrap();
         // Data should survive flush.
-        assert_eq!(
-            metered.get(b"k").await.unwrap(),
-            Some(b"v".to_vec())
-        );
+        assert_eq!(metered.get(b"k").await.unwrap(), Some(b"v".to_vec()));
     }
 
     #[tokio::test]

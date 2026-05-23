@@ -19,10 +19,10 @@
 #![forbid(unsafe_code)]
 #[cfg(feature = "redb-backend")]
 pub mod persistent;
-#[cfg(feature = "redb-backend")]
-pub use persistent::*;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+#[cfg(feature = "redb-backend")]
+pub use persistent::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -41,17 +41,11 @@ pub enum ProvenanceError {
     /// Hash chain integrity violation — records have been tampered with or
     /// a parent_hash does not match the SHA-256 of the preceding record
     #[error("Provenance chain corrupted for entity {entity}: {reason}")]
-    ChainCorrupted {
-        entity: String,
-        reason: String,
-    },
+    ChainCorrupted { entity: String, reason: String },
 
     /// A record's computed hash does not match its stored content_hash
     #[error("Hash mismatch at index {index} for entity {entity}")]
-    HashMismatch {
-        entity: String,
-        index: usize,
-    },
+    HashMismatch { entity: String, index: usize },
 
     /// Generic I/O or storage error
     #[error("Provenance I/O error: {0}")]
@@ -327,13 +321,22 @@ pub trait ProvenanceStore: Send + Sync {
     async fn verify_chain(&self, entity_id: &str) -> Result<bool, ProvenanceError>;
 
     /// Get the origin (first) record for an entity.
-    async fn get_origin(&self, entity_id: &str) -> Result<Option<ProvenanceRecord>, ProvenanceError>;
+    async fn get_origin(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<ProvenanceRecord>, ProvenanceError>;
 
     /// Get the latest (most recent) record for an entity.
-    async fn get_latest(&self, entity_id: &str) -> Result<Option<ProvenanceRecord>, ProvenanceError>;
+    async fn get_latest(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<ProvenanceRecord>, ProvenanceError>;
 
     /// Search for provenance records by actor across all entities.
-    async fn search_by_actor(&self, actor: &str) -> Result<Vec<(String, ProvenanceRecord)>, ProvenanceError>;
+    async fn search_by_actor(
+        &self,
+        actor: &str,
+    ) -> Result<Vec<(String, ProvenanceRecord)>, ProvenanceError>;
 
     /// Delete the provenance chain for an entity (for testing / admin use).
     async fn delete_chain(&self, entity_id: &str) -> Result<(), ProvenanceError>;
@@ -410,17 +413,26 @@ impl ProvenanceStore for InMemoryProvenanceStore {
         }
     }
 
-    async fn get_origin(&self, entity_id: &str) -> Result<Option<ProvenanceRecord>, ProvenanceError> {
+    async fn get_origin(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<ProvenanceRecord>, ProvenanceError> {
         let chains = self.chains.read().await;
         Ok(chains.get(entity_id).and_then(|c| c.origin().cloned()))
     }
 
-    async fn get_latest(&self, entity_id: &str) -> Result<Option<ProvenanceRecord>, ProvenanceError> {
+    async fn get_latest(
+        &self,
+        entity_id: &str,
+    ) -> Result<Option<ProvenanceRecord>, ProvenanceError> {
         let chains = self.chains.read().await;
         Ok(chains.get(entity_id).and_then(|c| c.latest().cloned()))
     }
 
-    async fn search_by_actor(&self, actor: &str) -> Result<Vec<(String, ProvenanceRecord)>, ProvenanceError> {
+    async fn search_by_actor(
+        &self,
+        actor: &str,
+    ) -> Result<Vec<(String, ProvenanceRecord)>, ProvenanceError> {
         let chains = self.chains.read().await;
         let mut results = Vec::new();
         for (entity_id, chain) in chains.iter() {
@@ -473,7 +485,12 @@ mod tests {
     #[test]
     fn test_provenance_chain_integrity() {
         let mut chain = ProvenanceChain::new("entity-1");
-        chain.append(ProvenanceEventType::Created, "alice", None, "Created entity");
+        chain.append(
+            ProvenanceEventType::Created,
+            "alice",
+            None,
+            "Created entity",
+        );
         chain.append(ProvenanceEventType::Modified, "bob", None, "Updated title");
         chain.append(
             ProvenanceEventType::Normalized,
@@ -578,15 +595,33 @@ mod tests {
         let store = InMemoryProvenanceStore::new();
 
         store
-            .record_event("e1", ProvenanceEventType::Created, "alice", None, "Created e1")
+            .record_event(
+                "e1",
+                ProvenanceEventType::Created,
+                "alice",
+                None,
+                "Created e1",
+            )
             .await
             .unwrap();
         store
-            .record_event("e2", ProvenanceEventType::Created, "bob", None, "Created e2")
+            .record_event(
+                "e2",
+                ProvenanceEventType::Created,
+                "bob",
+                None,
+                "Created e2",
+            )
             .await
             .unwrap();
         store
-            .record_event("e3", ProvenanceEventType::Imported, "alice", None, "Imported e3")
+            .record_event(
+                "e3",
+                ProvenanceEventType::Imported,
+                "alice",
+                None,
+                "Imported e3",
+            )
             .await
             .unwrap();
 

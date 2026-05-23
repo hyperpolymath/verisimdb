@@ -7,11 +7,9 @@
 //! integration in [`InMemoryOctadStore`].
 
 use std::sync::Arc;
-use verisim_octad::{
-    OctadBuilder, OctadConfig, OctadId, OctadStore, InMemoryOctadStore,
-};
 use verisim_document::TantivyDocumentStore;
 use verisim_graph::SimpleGraphStore;
+use verisim_octad::{InMemoryOctadStore, OctadBuilder, OctadConfig, OctadId, OctadStore};
 use verisim_provenance::InMemoryProvenanceStore;
 use verisim_semantic::InMemorySemanticStore;
 use verisim_spatial::InMemorySpatialStore;
@@ -39,7 +37,10 @@ fn create_test_store(vector_dim: usize) -> TestOctadStore {
     InMemoryOctadStore::new(
         config,
         Arc::new(SimpleGraphStore::in_memory().unwrap()),
-        Arc::new(BruteForceVectorStore::new(vector_dim, DistanceMetric::Cosine)),
+        Arc::new(BruteForceVectorStore::new(
+            vector_dim,
+            DistanceMetric::Cosine,
+        )),
         Arc::new(TantivyDocumentStore::in_memory().unwrap()),
         Arc::new(InMemoryTensorStore::new()),
         Arc::new(InMemorySemanticStore::new()),
@@ -107,7 +108,10 @@ async fn test_create_vector_dimension_mismatch_rolls_back() {
         .build();
 
     let result = store.create(input).await;
-    assert!(result.is_err(), "Create with wrong vector dimension should fail");
+    assert!(
+        result.is_err(),
+        "Create with wrong vector dimension should fail"
+    );
 
     // Verify no octads exist (the document write should have been rolled back)
     let all = store.list(100, 0).await.unwrap();
@@ -213,13 +217,24 @@ async fn test_update_with_invalid_vector_dimension_rolls_back() {
         .build();
 
     let result = store.update(&octad.id, bad_update).await;
-    assert!(result.is_err(), "Update with wrong vector dimension should fail");
+    assert!(
+        result.is_err(),
+        "Update with wrong vector dimension should fail"
+    );
 
     // Original entity should still be intact
     let original = store.get(&octad.id).await.unwrap().unwrap();
-    assert_eq!(original.status.version, 1, "Version should not change on failed update");
+    assert_eq!(
+        original.status.version, 1,
+        "Version should not change on failed update"
+    );
     assert!(
-        original.document.as_ref().unwrap().title.contains("Original"),
+        original
+            .document
+            .as_ref()
+            .unwrap()
+            .title
+            .contains("Original"),
         "Original data should survive failed update"
     );
 }

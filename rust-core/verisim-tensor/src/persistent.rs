@@ -37,14 +37,19 @@ impl RedbTensorStore {
         }
 
         info!(count = cache.len(), "Loaded tensor store from redb");
-        Ok(Self { store, cache: Arc::new(RwLock::new(cache)) })
+        Ok(Self {
+            store,
+            cache: Arc::new(RwLock::new(cache)),
+        })
     }
 }
 
 #[async_trait]
 impl TensorStore for RedbTensorStore {
     async fn put(&self, tensor: &Tensor) -> Result<(), TensorError> {
-        self.store.put(&tensor.id, tensor).await
+        self.store
+            .put(&tensor.id, tensor)
+            .await
             .map_err(|e| TensorError::SerializationError(format!("put: {}", e)))?;
         let mut c = self.cache.write().map_err(|_| TensorError::LockPoisoned)?;
         c.insert(tensor.id.clone(), tensor.clone());
@@ -57,7 +62,9 @@ impl TensorStore for RedbTensorStore {
     }
 
     async fn delete(&self, id: &str) -> Result<(), TensorError> {
-        self.store.delete(id).await
+        self.store
+            .delete(id)
+            .await
             .map_err(|e| TensorError::SerializationError(format!("delete: {}", e)))?;
         let mut c = self.cache.write().map_err(|_| TensorError::LockPoisoned)?;
         c.remove(id);
@@ -71,18 +78,23 @@ impl TensorStore for RedbTensorStore {
 
     async fn map(&self, id: &str, op: fn(f64) -> f64) -> Result<Tensor, TensorError> {
         let c = self.cache.read().map_err(|_| TensorError::LockPoisoned)?;
-        let tensor = c.get(id).ok_or_else(|| TensorError::NotFound(id.to_string()))?;
+        let tensor = c
+            .get(id)
+            .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
         let new_data: Vec<f64> = tensor.data.iter().map(|&v| op(v)).collect();
         Tensor::new(format!("{}_mapped", id), tensor.shape.clone(), new_data)
     }
 
     async fn reduce(&self, id: &str, axis: usize, op: ReduceOp) -> Result<Tensor, TensorError> {
         let c = self.cache.read().map_err(|_| TensorError::LockPoisoned)?;
-        let tensor = c.get(id).ok_or_else(|| TensorError::NotFound(id.to_string()))?;
+        let tensor = c
+            .get(id)
+            .ok_or_else(|| TensorError::NotFound(id.to_string()))?;
         let arr = tensor.to_ndarray();
         let reduced = match op {
             ReduceOp::Sum => arr.sum_axis(ndarray::Axis(axis)),
-            ReduceOp::Mean => arr.mean_axis(ndarray::Axis(axis))
+            ReduceOp::Mean => arr
+                .mean_axis(ndarray::Axis(axis))
                 .ok_or_else(|| TensorError::InvalidOperation("mean on empty axis".into()))?,
             ReduceOp::Max => arr.map_axis(ndarray::Axis(axis), |lane| {
                 lane.iter().copied().fold(f64::NEG_INFINITY, f64::max)
@@ -90,11 +102,14 @@ impl TensorStore for RedbTensorStore {
             ReduceOp::Min => arr.map_axis(ndarray::Axis(axis), |lane| {
                 lane.iter().copied().fold(f64::INFINITY, f64::min)
             }),
-            ReduceOp::Prod => arr.map_axis(ndarray::Axis(axis), |lane| {
-                lane.iter().copied().product()
-            }),
+            ReduceOp::Prod => {
+                arr.map_axis(ndarray::Axis(axis), |lane| lane.iter().copied().product())
+            }
         };
-        Ok(Tensor::from_ndarray(format!("{}_reduced", id), &reduced.into_dyn()))
+        Ok(Tensor::from_ndarray(
+            format!("{}_reduced", id),
+            &reduced.into_dyn(),
+        ))
     }
 }
 

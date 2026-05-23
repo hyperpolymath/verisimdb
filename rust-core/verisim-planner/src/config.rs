@@ -150,12 +150,8 @@ mod tests {
         assert!(
             (OptimizationMode::Conservative.selectivity_multiplier() - 2.0).abs() < f64::EPSILON
         );
-        assert!(
-            (OptimizationMode::Balanced.selectivity_multiplier() - 1.0).abs() < f64::EPSILON
-        );
-        assert!(
-            (OptimizationMode::Aggressive.selectivity_multiplier() - 0.5).abs() < f64::EPSILON
-        );
+        assert!((OptimizationMode::Balanced.selectivity_multiplier() - 1.0).abs() < f64::EPSILON);
+        assert!((OptimizationMode::Aggressive.selectivity_multiplier() - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]

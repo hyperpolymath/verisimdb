@@ -179,10 +179,8 @@ impl SemanticStore for RedbSemanticStore {
                     match &constraint.kind {
                         ConstraintKind::Required(prop) => {
                             if !annotation.properties.contains_key(prop) {
-                                violations.push(format!(
-                                    "{}: {}",
-                                    constraint.name, constraint.message
-                                ));
+                                violations
+                                    .push(format!("{}: {}", constraint.name, constraint.message));
                             }
                         }
                         ConstraintKind::Pattern { property, regex } => {
@@ -255,14 +253,12 @@ mod tests {
         {
             let store = RedbSemanticStore::open(&path).await.unwrap();
 
-            let person_type =
-                SemanticType::new("https://example.org/Person", "Person").with_constraint(
-                    Constraint {
-                        name: "name_required".to_string(),
-                        kind: ConstraintKind::Required("name".to_string()),
-                        message: "Person must have a name".to_string(),
-                    },
-                );
+            let person_type = SemanticType::new("https://example.org/Person", "Person")
+                .with_constraint(Constraint {
+                    name: "name_required".to_string(),
+                    kind: ConstraintKind::Required("name".to_string()),
+                    message: "Person must have a name".to_string(),
+                });
             store.register_type(&person_type).await.unwrap();
 
             let mut properties = HashMap::new();
@@ -293,10 +289,7 @@ mod tests {
         {
             let store = RedbSemanticStore::open(&path).await.unwrap();
 
-            let typ = store
-                .get_type("https://example.org/Person")
-                .await
-                .unwrap();
+            let typ = store.get_type("https://example.org/Person").await.unwrap();
             assert!(typ.is_some());
             assert_eq!(typ.unwrap().label, "Person");
 

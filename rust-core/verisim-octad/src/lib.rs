@@ -21,26 +21,30 @@ pub use verisim_provenance::{
     InMemoryProvenanceStore, ProvenanceChain, ProvenanceError, ProvenanceEventType,
     ProvenanceRecord, ProvenanceStore,
 };
-pub use verisim_semantic::{ProofBlob, Provenance, SemanticAnnotation, SemanticStore, SemanticType, SemanticValue};
-pub use verisim_spatial::{
-    BoundingBox, Coordinates, GeometryType, InMemorySpatialStore, SpatialData,
-    SpatialSearchResult, SpatialStore,
+pub use verisim_semantic::{
+    ProofBlob, Provenance, SemanticAnnotation, SemanticStore, SemanticType, SemanticValue,
 };
-pub use verisim_tensor::{Tensor, TensorStore};
+pub use verisim_spatial::{
+    BoundingBox, Coordinates, GeometryType, InMemorySpatialStore, SpatialData, SpatialSearchResult,
+    SpatialStore,
+};
 pub use verisim_temporal::{TemporalStore, TimeRange, Version};
+pub use verisim_tensor::{Tensor, TensorStore};
 pub use verisim_vector::{Embedding, VectorStore};
 
 // In-memory store implementation
 mod store;
-pub use store::{OctadSnapshot, InMemoryOctadStore};
+pub use store::{InMemoryOctadStore, OctadSnapshot};
 
 // Homoiconicity: queries as octads
 pub mod query_octad;
-pub use query_octad::{QueryOctadBuilder, QueryExecution};
+pub use query_octad::{QueryExecution, QueryOctadBuilder};
 
 // ACID transaction manager for cross-modality atomicity
 pub mod transaction;
-pub use transaction::{IsolationLevel, LockType, TransactionManager, TransactionError, TransactionState};
+pub use transaction::{
+    IsolationLevel, LockType, TransactionError, TransactionManager, TransactionState,
+};
 
 // WAL types (re-exported for external use)
 pub use verisim_wal::{SyncMode, WalEntry, WalModality, WalOperation, WalWriter};
@@ -149,14 +153,30 @@ impl ModalityStatus {
     /// Get list of missing modalities
     pub fn missing(&self) -> Vec<&'static str> {
         let mut missing = Vec::new();
-        if !self.graph { missing.push("graph"); }
-        if !self.vector { missing.push("vector"); }
-        if !self.tensor { missing.push("tensor"); }
-        if !self.semantic { missing.push("semantic"); }
-        if !self.document { missing.push("document"); }
-        if !self.temporal { missing.push("temporal"); }
-        if !self.provenance { missing.push("provenance"); }
-        if !self.spatial { missing.push("spatial"); }
+        if !self.graph {
+            missing.push("graph");
+        }
+        if !self.vector {
+            missing.push("vector");
+        }
+        if !self.tensor {
+            missing.push("tensor");
+        }
+        if !self.semantic {
+            missing.push("semantic");
+        }
+        if !self.document {
+            missing.push("document");
+        }
+        if !self.temporal {
+            missing.push("temporal");
+        }
+        if !self.provenance {
+            missing.push("provenance");
+        }
+        if !self.spatial {
+            missing.push("spatial");
+        }
         missing
     }
 }
@@ -181,7 +201,6 @@ pub struct OctadInput {
     /// Additional metadata
     pub metadata: HashMap<String, String>,
 }
-
 
 /// Graph modality input
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -312,7 +331,8 @@ pub trait OctadStore: Send + Sync {
     async fn query_related(&self, id: &OctadId, predicate: &str) -> Result<Vec<Octad>, OctadError>;
 
     /// Get version at a specific point in time
-    async fn at_time(&self, id: &OctadId, time: DateTime<Utc>) -> Result<Option<Octad>, OctadError>;
+    async fn at_time(&self, id: &OctadId, time: DateTime<Utc>)
+        -> Result<Option<Octad>, OctadError>;
 
     /// List octads with pagination
     async fn list(&self, limit: usize, offset: usize) -> Result<Vec<Octad>, OctadError>;
@@ -427,7 +447,9 @@ impl OctadBuilder {
 
     /// Add metadata
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
-        self.input.metadata.insert(key.to_string(), value.to_string());
+        self.input
+            .metadata
+            .insert(key.to_string(), value.to_string());
         self
     }
 
@@ -451,7 +473,10 @@ mod tests {
     fn test_octad_id() {
         let id = OctadId::new("test-123");
         assert_eq!(id.as_str(), "test-123");
-        assert_eq!(id.to_iri("https://example.org"), "https://example.org/test-123");
+        assert_eq!(
+            id.to_iri("https://example.org"),
+            "https://example.org/test-123"
+        );
     }
 
     #[test]

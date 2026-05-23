@@ -384,7 +384,12 @@ impl DriftDetector {
     }
 
     /// Record a drift measurement
-    pub async fn record(&self, drift_type: DriftType, score: f64, entities: Vec<String>) -> Result<Option<DriftEvent>, DriftError> {
+    pub async fn record(
+        &self,
+        drift_type: DriftType,
+        score: f64,
+        entities: Vec<String>,
+    ) -> Result<Option<DriftEvent>, DriftError> {
         // Update metrics
         {
             let mut metrics = self.metrics.write().map_err(|_| DriftError::LockPoisoned)?;
@@ -522,7 +527,11 @@ mod tests {
         // Record high score (above threshold of 0.3 for semantic_vector)
         // Score 0.6 triggers Warning severity (> 0.5)
         let event = detector
-            .record(DriftType::SemanticVectorDrift, 0.6, vec!["entity1".to_string()])
+            .record(
+                DriftType::SemanticVectorDrift,
+                0.6,
+                vec!["entity1".to_string()],
+            )
             .await
             .unwrap();
         assert!(event.is_some());

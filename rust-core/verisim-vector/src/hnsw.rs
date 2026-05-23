@@ -82,9 +82,8 @@ struct Node {
     vector: Vec<f32>,
     metadata: HashMap<String, String>,
     /// Neighbors per layer (layer index -> vec of node indices).
+    /// `neighbors.len() - 1` is the node's assigned level.
     neighbors: Vec<Vec<usize>>,
-    /// Assigned level for this node.
-    level: usize,
     /// Soft-delete flag.
     deleted: bool,
 }
@@ -263,7 +262,6 @@ impl Graph {
             vector,
             metadata,
             neighbors: (0..=level).map(|_| Vec::new()).collect(),
-            level,
             deleted: false,
         };
         self.nodes.push(node);
@@ -283,13 +281,8 @@ impl Graph {
         let top = self.current_max_level;
         if top > level {
             for l in (level + 1..=top).rev() {
-                let nearest = self.search_layer(
-                    &self.nodes[node_idx].vector,
-                    &current_ep,
-                    1,
-                    l,
-                    metric,
-                );
+                let nearest =
+                    self.search_layer(&self.nodes[node_idx].vector, &current_ep, 1, l, metric);
                 if let Some(&(_, idx)) = nearest.first() {
                     current_ep = vec![idx];
                 }
@@ -566,9 +559,7 @@ mod tests {
     #[tokio::test]
     async fn test_hnsw_dimension_mismatch() {
         let store = HnswVectorStore::with_defaults(3, DistanceMetric::Cosine);
-        let result = store
-            .upsert(&Embedding::new("e1", vec![1.0, 0.0]))
-            .await;
+        let result = store.upsert(&Embedding::new("e1", vec![1.0, 0.0])).await;
         assert!(result.is_err());
     }
 

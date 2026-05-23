@@ -54,11 +54,7 @@ impl VerificationKeyEntry {
 
     /// Check if a given key matches the active or previous key
     pub fn matches(&self, key: &[u8]) -> bool {
-        self.active_key == key
-            || self
-                .previous_key
-                .as_ref()
-                .is_some_and(|prev| prev == key)
+        self.active_key == key || self.previous_key.as_ref().is_some_and(|prev| prev == key)
     }
 }
 
@@ -104,11 +100,7 @@ impl VerificationKeyStore {
     }
 
     /// Store a verification key for a circuit
-    pub fn store_key(
-        &self,
-        circuit_name: &str,
-        key: Vec<u8>,
-    ) -> Result<(), CircuitError> {
+    pub fn store_key(&self, circuit_name: &str, key: Vec<u8>) -> Result<(), CircuitError> {
         let mut keys = self.keys.write().map_err(|_| CircuitError::LockPoisoned)?;
 
         if let Some(entry) = keys.get_mut(circuit_name) {

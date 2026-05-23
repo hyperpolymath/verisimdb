@@ -88,7 +88,10 @@ mod tests {
 
     #[test]
     fn test_key_too_large_display() {
-        let err = StorageError::KeyTooLarge { size: 2048, max: 1024 };
+        let err = StorageError::KeyTooLarge {
+            size: 2048,
+            max: 1024,
+        };
         assert!(err.to_string().contains("key too large"));
         assert!(err.to_string().contains("2048"));
         assert!(err.to_string().contains("1024"));
@@ -96,7 +99,10 @@ mod tests {
 
     #[test]
     fn test_value_too_large_display() {
-        let err = StorageError::ValueTooLarge { size: 4096, max: 2048 };
+        let err = StorageError::ValueTooLarge {
+            size: 4096,
+            max: 2048,
+        };
         assert!(err.to_string().contains("value too large"));
         assert!(err.to_string().contains("4096"));
         assert!(err.to_string().contains("2048"));

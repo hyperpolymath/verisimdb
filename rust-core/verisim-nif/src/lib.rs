@@ -28,7 +28,7 @@
 //! ```
 
 #![forbid(unsafe_code)]
-use rustler::{Env, Error, NifResult, Term};
+use rustler::{Error, NifResult};
 use serde_json::Value;
 use std::sync::OnceLock;
 use tokio::runtime::Runtime;
@@ -201,16 +201,4 @@ fn trigger_normalise(octad_id: String) -> NifResult<String> {
 // NIF registration
 // ---------------------------------------------------------------------------
 
-rustler::init!(
-    "Elixir.VeriSim.NifBridge",
-    [
-        create_octad,
-        get_octad,
-        delete_octad,
-        search_text,
-        search_vector,
-        list_octads,
-        get_drift_score,
-        trigger_normalise,
-    ]
-);
+rustler::init!("Elixir.VeriSim.NifBridge");

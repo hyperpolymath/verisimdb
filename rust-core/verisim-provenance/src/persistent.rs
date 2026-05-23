@@ -234,11 +234,23 @@ mod tests {
 
         let store = RedbProvenanceStore::open(&path).await.unwrap();
         store
-            .record_event("e1", ProvenanceEventType::Created, "alice", None, "Created e1")
+            .record_event(
+                "e1",
+                ProvenanceEventType::Created,
+                "alice",
+                None,
+                "Created e1",
+            )
             .await
             .unwrap();
         store
-            .record_event("e2", ProvenanceEventType::Created, "bob", None, "Created e2")
+            .record_event(
+                "e2",
+                ProvenanceEventType::Created,
+                "bob",
+                None,
+                "Created e2",
+            )
             .await
             .unwrap();
         store

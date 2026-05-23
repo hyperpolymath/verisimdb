@@ -100,13 +100,10 @@ impl Modality {
     /// Returns `None` if the modality is not populated.
     pub fn summarize(self, octad: &Octad) -> Option<String> {
         match self {
-            Modality::Document => octad.document.as_ref().map(|d| {
-                format!(
-                    "document(title='{}', body_len={})",
-                    d.title,
-                    d.body.len()
-                )
-            }),
+            Modality::Document => octad
+                .document
+                .as_ref()
+                .map(|d| format!("document(title='{}', body_len={})", d.title, d.body.len())),
             Modality::Semantic => octad.semantic.as_ref().map(|s| {
                 format!(
                     "semantic(types={}, properties={})",
@@ -114,15 +111,18 @@ impl Modality {
                     s.properties.len()
                 )
             }),
-            Modality::Graph => octad.graph_node.as_ref().map(|g| {
-                format!("graph(iri='{}', local_name='{}')", g.iri, g.local_name)
-            }),
-            Modality::Vector => octad.embedding.as_ref().map(|e| {
-                format!("vector(dim={})", e.vector.len())
-            }),
-            Modality::Tensor => octad.tensor.as_ref().map(|t| {
-                format!("tensor(shape={:?}, len={})", t.shape, t.data.len())
-            }),
+            Modality::Graph => octad
+                .graph_node
+                .as_ref()
+                .map(|g| format!("graph(iri='{}', local_name='{}')", g.iri, g.local_name)),
+            Modality::Vector => octad
+                .embedding
+                .as_ref()
+                .map(|e| format!("vector(dim={})", e.vector.len())),
+            Modality::Tensor => octad
+                .tensor
+                .as_ref()
+                .map(|t| format!("tensor(shape={:?}, len={})", t.shape, t.data.len())),
             Modality::Temporal => {
                 if octad.version_count > 0 {
                     Some(format!("temporal(versions={})", octad.version_count))
@@ -132,7 +132,10 @@ impl Modality {
             }
             Modality::Provenance => {
                 if octad.provenance_chain_length > 0 {
-                    Some(format!("provenance(chain_length={})", octad.provenance_chain_length))
+                    Some(format!(
+                        "provenance(chain_length={})",
+                        octad.provenance_chain_length
+                    ))
                 } else {
                     None
                 }
@@ -140,9 +143,7 @@ impl Modality {
             Modality::Spatial => octad.spatial_data.as_ref().map(|s| {
                 format!(
                     "spatial(lat={}, lon={}, type={})",
-                    s.coordinates.latitude,
-                    s.coordinates.longitude,
-                    s.geometry_type
+                    s.coordinates.latitude, s.coordinates.longitude, s.geometry_type
                 )
             }),
         }
@@ -397,9 +398,9 @@ impl NormalizationQueue {
         modality: Modality,
     ) -> Option<PendingNormalization> {
         let mut pending = self.pending.write().await;
-        let idx = pending.iter().position(|p| {
-            p.entity_id == entity_id && p.drifted_modality == modality
-        });
+        let idx = pending
+            .iter()
+            .position(|p| p.entity_id == entity_id && p.drifted_modality == modality);
         idx.map(|i| pending.remove(i))
     }
 
@@ -528,11 +529,7 @@ impl ModalityRegenerator for SummaryRegenerator {
                 format!("{}(w={:.2}) [{}]", m, w, s)
             })
             .collect();
-        Ok(format!(
-            "Merged into {} from: {}",
-            target,
-            parts.join(", ")
-        ))
+        Ok(format!("Merged into {} from: {}", target, parts.join(", ")))
     }
 
     async fn measure_drift(
@@ -930,7 +927,7 @@ mod tests {
     use chrono::Utc;
     use verisim_document::Document;
     use verisim_graph::GraphNode;
-    use verisim_octad::{OctadId, OctadStatus, ModalityStatus};
+    use verisim_octad::{ModalityStatus, OctadId, OctadStatus};
     use verisim_semantic::{Provenance, SemanticAnnotation};
     use verisim_vector::Embedding;
 
@@ -1018,7 +1015,11 @@ mod tests {
         let order = Modality::DEFAULT_AUTHORITY_ORDER;
         assert_eq!(order[0], Modality::Document, "Document should be rank 1");
         assert_eq!(order[1], Modality::Semantic, "Semantic should be rank 2");
-        assert_eq!(order[2], Modality::Provenance, "Provenance should be rank 3");
+        assert_eq!(
+            order[2],
+            Modality::Provenance,
+            "Provenance should be rank 3"
+        );
         assert_eq!(order[3], Modality::Graph, "Graph should be rank 4");
         assert_eq!(order[4], Modality::Vector, "Vector should be rank 5");
         assert_eq!(order[5], Modality::Tensor, "Tensor should be rank 6");
@@ -1108,9 +1109,7 @@ mod tests {
         let h = rich_octad();
 
         // Vector drifted -- Document is highest authority and is present.
-        let result = engine
-            .regenerate(&h, Modality::Vector, 0.8)
-            .await;
+        let result = engine.regenerate(&h, Modality::Vector, 0.8).await;
 
         match result {
             RegenerationResult::Repaired { event } => {
@@ -1135,9 +1134,7 @@ mod tests {
         let h = rich_octad();
 
         // Document itself drifted -- next authority is Semantic.
-        let result = engine
-            .regenerate(&h, Modality::Document, 0.7)
-            .await;
+        let result = engine.regenerate(&h, Modality::Document, 0.7).await;
 
         match result {
             RegenerationResult::Repaired { event } => {
@@ -1157,9 +1154,7 @@ mod tests {
         let engine = RegenerationEngine::with_defaults();
         let h = empty_octad();
 
-        let result = engine
-            .regenerate(&h, Modality::Vector, 0.9)
-            .await;
+        let result = engine.regenerate(&h, Modality::Vector, 0.9).await;
 
         match result {
             RegenerationResult::Failed { error } => {
@@ -1179,9 +1174,7 @@ mod tests {
         let h = doc_only_octad();
 
         // Graph drifted, only Document is available.
-        let result = engine
-            .regenerate(&h, Modality::Graph, 0.6)
-            .await;
+        let result = engine.regenerate(&h, Modality::Graph, 0.6).await;
 
         match result {
             RegenerationResult::Repaired { event } => {
@@ -1196,15 +1189,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_merge_combines_multiple_sources() {
-        let mut config = RegenerationConfig::default();
-        config.default_strategy = RegenerationStrategy::Merge;
+        let config = RegenerationConfig {
+            default_strategy: RegenerationStrategy::Merge,
+            ..RegenerationConfig::default()
+        };
 
         let engine = RegenerationEngine::new(config);
         let h = rich_octad();
 
-        let result = engine
-            .regenerate(&h, Modality::Tensor, 0.5)
-            .await;
+        let result = engine.regenerate(&h, Modality::Tensor, 0.5).await;
 
         match result {
             RegenerationResult::Repaired { event } => {
@@ -1220,15 +1213,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_merge_fails_no_sources() {
-        let mut config = RegenerationConfig::default();
-        config.default_strategy = RegenerationStrategy::Merge;
+        let config = RegenerationConfig {
+            default_strategy: RegenerationStrategy::Merge,
+            ..RegenerationConfig::default()
+        };
 
         let engine = RegenerationEngine::new(config);
         let h = empty_octad();
 
-        let result = engine
-            .regenerate(&h, Modality::Vector, 0.9)
-            .await;
+        let result = engine.regenerate(&h, Modality::Vector, 0.9).await;
 
         match result {
             RegenerationResult::Failed { error } => {
@@ -1252,9 +1245,7 @@ mod tests {
 
         assert!(engine.queue().is_empty().await);
 
-        let result = engine
-            .regenerate(&h, Modality::Tensor, 0.7)
-            .await;
+        let result = engine.regenerate(&h, Modality::Tensor, 0.7).await;
 
         match result {
             RegenerationResult::PendingResolution { entity_id, reason } => {
@@ -1273,8 +1264,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_user_resolve_queue_drain() {
-        let mut config = RegenerationConfig::default();
-        config.default_strategy = RegenerationStrategy::UserResolve;
+        let config = RegenerationConfig {
+            default_strategy: RegenerationStrategy::UserResolve,
+            ..RegenerationConfig::default()
+        };
 
         let engine = RegenerationEngine::new(config);
         let h = rich_octad();
@@ -1291,8 +1284,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_user_resolve_queue_selective_resolve() {
-        let mut config = RegenerationConfig::default();
-        config.default_strategy = RegenerationStrategy::UserResolve;
+        let config = RegenerationConfig {
+            default_strategy: RegenerationStrategy::UserResolve,
+            ..RegenerationConfig::default()
+        };
 
         let engine = RegenerationEngine::new(config);
         let h = rich_octad();
@@ -1301,10 +1296,7 @@ mod tests {
         engine.regenerate(&h, Modality::Graph, 0.6).await;
 
         // Resolve only the graph item.
-        let resolved = engine
-            .queue()
-            .resolve("rich-1", Modality::Graph)
-            .await;
+        let resolved = engine.queue().resolve("rich-1", Modality::Graph).await;
         assert!(resolved.is_some());
         assert_eq!(resolved.unwrap().drifted_modality, Modality::Graph);
 
@@ -1325,9 +1317,7 @@ mod tests {
         let engine = RegenerationEngine::new(config);
         let h = rich_octad();
 
-        let result = engine
-            .regenerate(&h, Modality::Vector, 0.3)
-            .await;
+        let result = engine.regenerate(&h, Modality::Vector, 0.3).await;
         assert!(
             matches!(result, RegenerationResult::NoActionNeeded),
             "Score 0.3 should be below threshold 0.5"
@@ -1343,9 +1333,7 @@ mod tests {
         let engine = RegenerationEngine::new(config);
         let h = rich_octad();
 
-        let result = engine
-            .regenerate(&h, Modality::Vector, 0.5)
-            .await;
+        let result = engine.regenerate(&h, Modality::Vector, 0.5).await;
         assert!(
             matches!(result, RegenerationResult::NoActionNeeded),
             "Score exactly at threshold should be no-action (requires > threshold)"
@@ -1361,9 +1349,7 @@ mod tests {
         let engine = RegenerationEngine::new(config);
         let h = rich_octad();
 
-        let result = engine
-            .regenerate(&h, Modality::Vector, 0.51)
-            .await;
+        let result = engine.regenerate(&h, Modality::Vector, 0.51).await;
         assert!(
             matches!(result, RegenerationResult::Repaired { .. }),
             "Score 0.51 should trigger action with threshold 0.5"
@@ -1379,9 +1365,7 @@ mod tests {
 
         assert!(engine.events().await.is_empty());
 
-        engine
-            .regenerate(&h, Modality::Vector, 0.8)
-            .await;
+        engine.regenerate(&h, Modality::Vector, 0.8).await;
 
         let events = engine.events().await;
         assert_eq!(events.len(), 1);
@@ -1401,9 +1385,7 @@ mod tests {
         let engine = RegenerationEngine::with_defaults();
         let h = empty_octad();
 
-        engine
-            .regenerate(&h, Modality::Vector, 0.9)
-            .await;
+        engine.regenerate(&h, Modality::Vector, 0.9).await;
 
         let events = engine.events().await;
         assert_eq!(events.len(), 1);
@@ -1446,9 +1428,7 @@ mod tests {
         let engine = RegenerationEngine::new(config);
         let h = rich_octad(); // has temporal (version_count=3)
 
-        let result = engine
-            .regenerate(&h, Modality::Document, 0.8)
-            .await;
+        let result = engine.regenerate(&h, Modality::Document, 0.8).await;
 
         match result {
             RegenerationResult::Repaired { event } => {
@@ -1523,7 +1503,10 @@ mod tests {
         let config = RegenerationConfig::default();
         assert_eq!(config.drift_threshold, 0.3);
         assert_eq!(config.max_concurrent, 10);
-        assert_eq!(config.default_strategy, RegenerationStrategy::FromAuthoritative);
+        assert_eq!(
+            config.default_strategy,
+            RegenerationStrategy::FromAuthoritative
+        );
         assert!(config.modality_strategies.is_empty());
         assert_eq!(config.authority_order.len(), 8);
     }

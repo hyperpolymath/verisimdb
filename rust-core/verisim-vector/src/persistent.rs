@@ -51,9 +51,8 @@ impl RedbVectorStore {
         dimension: usize,
         metric: DistanceMetric,
     ) -> Result<Self, VectorError> {
-        let backend = RedbBackend::open(path.as_ref()).map_err(|e| {
-            VectorError::IndexError(format!("Failed to open redb: {}", e))
-        })?;
+        let backend = RedbBackend::open(path.as_ref())
+            .map_err(|e| VectorError::IndexError(format!("Failed to open redb: {}", e)))?;
         let store = TypedStore::new(backend, "vec");
 
         let mut index = HashMap::new();
@@ -111,15 +110,9 @@ impl RedbVectorStore {
                 let b_norm = Self::normalize(b);
                 a_norm.iter().zip(b_norm.iter()).map(|(x, y)| x * y).sum()
             }
-            DistanceMetric::DotProduct => {
-                a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
-            }
+            DistanceMetric::DotProduct => a.iter().zip(b.iter()).map(|(x, y)| x * y).sum(),
             DistanceMetric::Euclidean => {
-                let dist_sq: f32 = a
-                    .iter()
-                    .zip(b.iter())
-                    .map(|(x, y)| (x - y).powi(2))
-                    .sum();
+                let dist_sq: f32 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).powi(2)).sum();
                 1.0 / (1.0 + dist_sq.sqrt())
             }
         }
@@ -167,7 +160,11 @@ impl VectorStore for RedbVectorStore {
             })
             .collect();
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
 
         Ok(results)

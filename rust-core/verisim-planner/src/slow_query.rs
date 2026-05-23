@@ -254,10 +254,7 @@ impl SlowQueryLog {
 
         let total = entries.len();
         let sum_ms: f64 = entries.iter().map(|e| e.actual_ms).sum();
-        let max_ms = entries
-            .iter()
-            .map(|e| e.actual_ms)
-            .fold(0.0_f64, f64::max);
+        let max_ms = entries.iter().map(|e| e.actual_ms).fold(0.0_f64, f64::max);
         let min_ms = entries
             .iter()
             .map(|e| e.actual_ms)
@@ -359,8 +356,12 @@ mod tests {
         let plan = make_plan(vec![(Modality::Semantic, 50.0)]);
         let step_times = vec![(Modality::Semantic, 150.0, 5)];
 
-        let was_slow =
-            log.record(Some("SELECT SEMANTIC FROM OCTAD"), 150.0, &plan, &step_times);
+        let was_slow = log.record(
+            Some("SELECT SEMANTIC FROM OCTAD"),
+            150.0,
+            &plan,
+            &step_times,
+        );
         assert!(was_slow);
         assert_eq!(log.count(), 1);
 
@@ -412,7 +413,12 @@ mod tests {
 
         for i in 0..5 {
             let step_times = vec![(Modality::Vector, 20.0 + i as f64, 1)];
-            log.record(Some(&format!("query-{i}")), 20.0 + i as f64, &plan, &step_times);
+            log.record(
+                Some(&format!("query-{i}")),
+                20.0 + i as f64,
+                &plan,
+                &step_times,
+            );
         }
 
         assert_eq!(log.count(), 3);
@@ -424,14 +430,8 @@ mod tests {
     #[test]
     fn test_bottleneck_detection() {
         let log = SlowQueryLog::with_defaults();
-        let plan = make_plan(vec![
-            (Modality::Vector, 30.0),
-            (Modality::Semantic, 200.0),
-        ]);
-        let step_times = vec![
-            (Modality::Vector, 25.0, 10),
-            (Modality::Semantic, 180.0, 5),
-        ];
+        let plan = make_plan(vec![(Modality::Vector, 30.0), (Modality::Semantic, 200.0)]);
+        let step_times = vec![(Modality::Vector, 25.0, 10), (Modality::Semantic, 180.0, 5)];
 
         log.record(Some("multi-modality query"), 205.0, &plan, &step_times);
 
@@ -545,6 +545,9 @@ mod tests {
         let entries = log.recent(1);
         let json = serde_json::to_string(&entries[0]).unwrap();
         let parsed: SlowQueryEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.query_text, Some("SELECT TEMPORAL FROM OCTAD".to_string()));
+        assert_eq!(
+            parsed.query_text,
+            Some("SELECT TEMPORAL FROM OCTAD".to_string())
+        );
     }
 }

@@ -220,5 +220,8 @@ async fn test_realistic_document_lifecycle() {
     store.commit().await.unwrap();
 
     // Verify deletion by ID
-    assert!(store.get("paper-123").await.unwrap().is_none(), "Document should be deleted");
+    assert!(
+        store.get("paper-123").await.unwrap().is_none(),
+        "Document should be deleted"
+    );
 }

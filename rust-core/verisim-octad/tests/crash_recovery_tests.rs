@@ -6,12 +6,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use verisim_octad::{
-    InMemoryOctadStore, OctadConfig, OctadInput, OctadDocumentInput,
-    OctadSnapshot, OctadStore,
-};
 use verisim_document::TantivyDocumentStore;
 use verisim_graph::SimpleGraphStore;
+use verisim_octad::{
+    InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadInput, OctadSnapshot, OctadStore,
+};
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
@@ -110,7 +109,10 @@ async fn ten_entities_survive_crash() {
     {
         let store = create_store(wal.to_str().unwrap());
         for i in 0..10 {
-            let octad = store.create(doc(&format!("E{i}"), &format!("B{i}"))).await.unwrap();
+            let octad = store
+                .create(doc(&format!("E{i}"), &format!("B{i}")))
+                .await
+                .unwrap();
             ids.push(octad.id);
         }
         // Crash
@@ -144,7 +146,10 @@ async fn delete_survives_crash() {
     {
         let store = create_store(wal.to_str().unwrap());
         let _n: usize = store.replay_wal(&wal).await.unwrap();
-        assert!(store.get(&entity_id).await.unwrap().is_none(), "Should stay deleted");
+        assert!(
+            store.get(&entity_id).await.unwrap().is_none(),
+            "Should stay deleted"
+        );
     }
 }
 

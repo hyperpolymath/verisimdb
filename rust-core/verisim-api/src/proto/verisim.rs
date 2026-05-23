@@ -199,10 +199,10 @@ pub mod veri_sim_planner_client {
         dead_code,
         missing_docs,
         clippy::wildcard_imports,
-        clippy::let_unit_value,
+        clippy::let_unit_value
     )]
-    use tonic::codegen::*;
     use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
     #[derive(Debug, Clone)]
     pub struct VeriSimPlannerClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -246,9 +246,8 @@ pub mod veri_sim_planner_client {
                     <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            <T as tonic::codegen::Service<http::Request<tonic::body::Body>>>::Error:
+                Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             VeriSimPlannerClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -287,22 +286,13 @@ pub mod veri_sim_planner_client {
         pub async fn optimize_plan(
             &mut self,
             request: impl tonic::IntoRequest<super::LogicalPlanRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::PhysicalPlanResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+        ) -> std::result::Result<tonic::Response<super::PhysicalPlanResponse>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimPlanner/OptimizePlan",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimPlanner/OptimizePlan");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimPlanner", "OptimizePlan"));
@@ -312,22 +302,12 @@ pub mod veri_sim_planner_client {
         pub async fn explain_plan(
             &mut self,
             request: impl tonic::IntoRequest<super::LogicalPlanRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ExplainResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+        ) -> std::result::Result<tonic::Response<super::ExplainResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimPlanner/ExplainPlan",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimPlanner/ExplainPlan");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimPlanner", "ExplainPlan"));
@@ -337,22 +317,13 @@ pub mod veri_sim_planner_client {
         pub async fn get_config(
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
-        ) -> std::result::Result<
-            tonic::Response<super::PlannerConfigResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+        ) -> std::result::Result<tonic::Response<super::PlannerConfigResponse>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimPlanner/GetConfig",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimPlanner/GetConfig");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimPlanner", "GetConfig"));
@@ -362,22 +333,13 @@ pub mod veri_sim_planner_client {
         pub async fn set_config(
             &mut self,
             request: impl tonic::IntoRequest<super::PlannerConfigRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::PlannerConfigResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+        ) -> std::result::Result<tonic::Response<super::PlannerConfigResponse>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimPlanner/SetConfig",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimPlanner/SetConfig");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimPlanner", "SetConfig"));
@@ -388,18 +350,11 @@ pub mod veri_sim_planner_client {
             &mut self,
             request: impl tonic::IntoRequest<super::Empty>,
         ) -> std::result::Result<tonic::Response<super::StatsResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimPlanner/GetStats",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimPlanner/GetStats");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimPlanner", "GetStats"));
@@ -414,7 +369,7 @@ pub mod veri_sim_planner_server {
         dead_code,
         missing_docs,
         clippy::wildcard_imports,
-        clippy::let_unit_value,
+        clippy::let_unit_value
     )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with VeriSimPlannerServer.
@@ -424,10 +379,7 @@ pub mod veri_sim_planner_server {
         async fn optimize_plan(
             &self,
             request: tonic::Request<super::LogicalPlanRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::PhysicalPlanResponse>,
-            tonic::Status,
-        >;
+        ) -> std::result::Result<tonic::Response<super::PhysicalPlanResponse>, tonic::Status>;
         /// Generate EXPLAIN output for a logical plan.
         async fn explain_plan(
             &self,
@@ -437,18 +389,12 @@ pub mod veri_sim_planner_server {
         async fn get_config(
             &self,
             request: tonic::Request<super::Empty>,
-        ) -> std::result::Result<
-            tonic::Response<super::PlannerConfigResponse>,
-            tonic::Status,
-        >;
+        ) -> std::result::Result<tonic::Response<super::PlannerConfigResponse>, tonic::Status>;
         /// Update planner configuration.
         async fn set_config(
             &self,
             request: tonic::Request<super::PlannerConfigRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::PlannerConfigResponse>,
-            tonic::Status,
-        >;
+        ) -> std::result::Result<tonic::Response<super::PlannerConfigResponse>, tonic::Status>;
         /// Get per-modality statistics snapshot.
         async fn get_stats(
             &self,
@@ -476,10 +422,7 @@ pub mod veri_sim_planner_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -534,15 +477,11 @@ pub mod veri_sim_planner_server {
                 "/verisim.VeriSimPlanner/OptimizePlan" => {
                     #[allow(non_camel_case_types)]
                     struct OptimizePlanSvc<T: VeriSimPlanner>(pub Arc<T>);
-                    impl<
-                        T: VeriSimPlanner,
-                    > tonic::server::UnaryService<super::LogicalPlanRequest>
-                    for OptimizePlanSvc<T> {
+                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::LogicalPlanRequest>
+                        for OptimizePlanSvc<T>
+                    {
                         type Response = super::PhysicalPlanResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::LogicalPlanRequest>,
@@ -579,15 +518,11 @@ pub mod veri_sim_planner_server {
                 "/verisim.VeriSimPlanner/ExplainPlan" => {
                     #[allow(non_camel_case_types)]
                     struct ExplainPlanSvc<T: VeriSimPlanner>(pub Arc<T>);
-                    impl<
-                        T: VeriSimPlanner,
-                    > tonic::server::UnaryService<super::LogicalPlanRequest>
-                    for ExplainPlanSvc<T> {
+                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::LogicalPlanRequest>
+                        for ExplainPlanSvc<T>
+                    {
                         type Response = super::ExplainResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::LogicalPlanRequest>,
@@ -624,17 +559,10 @@ pub mod veri_sim_planner_server {
                 "/verisim.VeriSimPlanner/GetConfig" => {
                     #[allow(non_camel_case_types)]
                     struct GetConfigSvc<T: VeriSimPlanner>(pub Arc<T>);
-                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::Empty>
-                    for GetConfigSvc<T> {
+                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::Empty> for GetConfigSvc<T> {
                         type Response = super::PlannerConfigResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::Empty>,
-                        ) -> Self::Future {
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(&mut self, request: tonic::Request<super::Empty>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as VeriSimPlanner>::get_config(&inner, request).await
@@ -667,15 +595,11 @@ pub mod veri_sim_planner_server {
                 "/verisim.VeriSimPlanner/SetConfig" => {
                     #[allow(non_camel_case_types)]
                     struct SetConfigSvc<T: VeriSimPlanner>(pub Arc<T>);
-                    impl<
-                        T: VeriSimPlanner,
-                    > tonic::server::UnaryService<super::PlannerConfigRequest>
-                    for SetConfigSvc<T> {
+                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::PlannerConfigRequest>
+                        for SetConfigSvc<T>
+                    {
                         type Response = super::PlannerConfigResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::PlannerConfigRequest>,
@@ -712,17 +636,10 @@ pub mod veri_sim_planner_server {
                 "/verisim.VeriSimPlanner/GetStats" => {
                     #[allow(non_camel_case_types)]
                     struct GetStatsSvc<T: VeriSimPlanner>(pub Arc<T>);
-                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::Empty>
-                    for GetStatsSvc<T> {
+                    impl<T: VeriSimPlanner> tonic::server::UnaryService<super::Empty> for GetStatsSvc<T> {
                         type Response = super::StatsResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::Empty>,
-                        ) -> Self::Future {
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(&mut self, request: tonic::Request<super::Empty>) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as VeriSimPlanner>::get_stats(&inner, request).await
@@ -752,25 +669,19 @@ pub mod veri_sim_planner_server {
                     };
                     Box::pin(fut)
                 }
-                _ => {
-                    Box::pin(async move {
-                        let mut response = http::Response::new(
-                            tonic::body::Body::default(),
-                        );
-                        let headers = response.headers_mut();
-                        headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
-                        headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
-                        Ok(response)
-                    })
-                }
+                _ => Box::pin(async move {
+                    let mut response = http::Response::new(tonic::body::Body::default());
+                    let headers = response.headers_mut();
+                    headers.insert(
+                        tonic::Status::GRPC_STATUS,
+                        (tonic::Code::Unimplemented as i32).into(),
+                    );
+                    headers.insert(
+                        http::header::CONTENT_TYPE,
+                        tonic::metadata::GRPC_CONTENT_TYPE,
+                    );
+                    Ok(response)
+                }),
             }
         }
     }
@@ -799,10 +710,10 @@ pub mod veri_sim_octad_client {
         dead_code,
         missing_docs,
         clippy::wildcard_imports,
-        clippy::let_unit_value,
+        clippy::let_unit_value
     )]
-    use tonic::codegen::*;
     use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
     #[derive(Debug, Clone)]
     pub struct VeriSimOctadClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -846,9 +757,8 @@ pub mod veri_sim_octad_client {
                     <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            <T as tonic::codegen::Service<http::Request<tonic::body::Body>>>::Error:
+                Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             VeriSimOctadClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -888,18 +798,11 @@ pub mod veri_sim_octad_client {
             &mut self,
             request: impl tonic::IntoRequest<super::OctadCreateRequest>,
         ) -> std::result::Result<tonic::Response<super::OctadResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimOctad/Create",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimOctad/Create");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimOctad", "Create"));
@@ -910,18 +813,14 @@ pub mod veri_sim_octad_client {
             &mut self,
             request: impl tonic::IntoRequest<super::OctadIdRequest>,
         ) -> std::result::Result<tonic::Response<super::OctadResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimOctad/Get");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("verisim.VeriSimOctad", "Get"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("verisim.VeriSimOctad", "Get"));
             self.inner.unary(req, path, codec).await
         }
         /// Update an existing octad.
@@ -929,18 +828,11 @@ pub mod veri_sim_octad_client {
             &mut self,
             request: impl tonic::IntoRequest<super::OctadUpdateRequest>,
         ) -> std::result::Result<tonic::Response<super::OctadResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimOctad/Update",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimOctad/Update");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimOctad", "Update"));
@@ -951,18 +843,11 @@ pub mod veri_sim_octad_client {
             &mut self,
             request: impl tonic::IntoRequest<super::OctadIdRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimOctad/Delete",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimOctad/Delete");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimOctad", "Delete"));
@@ -973,18 +858,11 @@ pub mod veri_sim_octad_client {
             &mut self,
             request: impl tonic::IntoRequest<super::TextSearchRequest>,
         ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimOctad/SearchText",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimOctad/SearchText");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimOctad", "SearchText"));
@@ -995,18 +873,11 @@ pub mod veri_sim_octad_client {
             &mut self,
             request: impl tonic::IntoRequest<super::VectorSearchRequest>,
         ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::unknown(format!("Service was not ready: {}", e.into()))
+            })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/verisim.VeriSimOctad/SearchVector",
-            );
+            let path = http::uri::PathAndQuery::from_static("/verisim.VeriSimOctad/SearchVector");
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("verisim.VeriSimOctad", "SearchVector"));
@@ -1021,7 +892,7 @@ pub mod veri_sim_octad_server {
         dead_code,
         missing_docs,
         clippy::wildcard_imports,
-        clippy::let_unit_value,
+        clippy::let_unit_value
     )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with VeriSimOctadServer.
@@ -1079,10 +950,7 @@ pub mod veri_sim_octad_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -1137,23 +1005,16 @@ pub mod veri_sim_octad_server {
                 "/verisim.VeriSimOctad/Create" => {
                     #[allow(non_camel_case_types)]
                     struct CreateSvc<T: VeriSimOctad>(pub Arc<T>);
-                    impl<
-                        T: VeriSimOctad,
-                    > tonic::server::UnaryService<super::OctadCreateRequest>
-                    for CreateSvc<T> {
+                    impl<T: VeriSimOctad> tonic::server::UnaryService<super::OctadCreateRequest> for CreateSvc<T> {
                         type Response = super::OctadResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::OctadCreateRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as VeriSimOctad>::create(&inner, request).await
-                            };
+                            let fut =
+                                async move { <T as VeriSimOctad>::create(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1182,22 +1043,16 @@ pub mod veri_sim_octad_server {
                 "/verisim.VeriSimOctad/Get" => {
                     #[allow(non_camel_case_types)]
                     struct GetSvc<T: VeriSimOctad>(pub Arc<T>);
-                    impl<
-                        T: VeriSimOctad,
-                    > tonic::server::UnaryService<super::OctadIdRequest> for GetSvc<T> {
+                    impl<T: VeriSimOctad> tonic::server::UnaryService<super::OctadIdRequest> for GetSvc<T> {
                         type Response = super::OctadResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::OctadIdRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as VeriSimOctad>::get(&inner, request).await
-                            };
+                            let fut =
+                                async move { <T as VeriSimOctad>::get(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1226,23 +1081,16 @@ pub mod veri_sim_octad_server {
                 "/verisim.VeriSimOctad/Update" => {
                     #[allow(non_camel_case_types)]
                     struct UpdateSvc<T: VeriSimOctad>(pub Arc<T>);
-                    impl<
-                        T: VeriSimOctad,
-                    > tonic::server::UnaryService<super::OctadUpdateRequest>
-                    for UpdateSvc<T> {
+                    impl<T: VeriSimOctad> tonic::server::UnaryService<super::OctadUpdateRequest> for UpdateSvc<T> {
                         type Response = super::OctadResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::OctadUpdateRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as VeriSimOctad>::update(&inner, request).await
-                            };
+                            let fut =
+                                async move { <T as VeriSimOctad>::update(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1271,23 +1119,16 @@ pub mod veri_sim_octad_server {
                 "/verisim.VeriSimOctad/Delete" => {
                     #[allow(non_camel_case_types)]
                     struct DeleteSvc<T: VeriSimOctad>(pub Arc<T>);
-                    impl<
-                        T: VeriSimOctad,
-                    > tonic::server::UnaryService<super::OctadIdRequest>
-                    for DeleteSvc<T> {
+                    impl<T: VeriSimOctad> tonic::server::UnaryService<super::OctadIdRequest> for DeleteSvc<T> {
                         type Response = super::Empty;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::OctadIdRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as VeriSimOctad>::delete(&inner, request).await
-                            };
+                            let fut =
+                                async move { <T as VeriSimOctad>::delete(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -1316,15 +1157,9 @@ pub mod veri_sim_octad_server {
                 "/verisim.VeriSimOctad/SearchText" => {
                     #[allow(non_camel_case_types)]
                     struct SearchTextSvc<T: VeriSimOctad>(pub Arc<T>);
-                    impl<
-                        T: VeriSimOctad,
-                    > tonic::server::UnaryService<super::TextSearchRequest>
-                    for SearchTextSvc<T> {
+                    impl<T: VeriSimOctad> tonic::server::UnaryService<super::TextSearchRequest> for SearchTextSvc<T> {
                         type Response = super::SearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::TextSearchRequest>,
@@ -1361,15 +1196,11 @@ pub mod veri_sim_octad_server {
                 "/verisim.VeriSimOctad/SearchVector" => {
                     #[allow(non_camel_case_types)]
                     struct SearchVectorSvc<T: VeriSimOctad>(pub Arc<T>);
-                    impl<
-                        T: VeriSimOctad,
-                    > tonic::server::UnaryService<super::VectorSearchRequest>
-                    for SearchVectorSvc<T> {
+                    impl<T: VeriSimOctad> tonic::server::UnaryService<super::VectorSearchRequest>
+                        for SearchVectorSvc<T>
+                    {
                         type Response = super::SearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::VectorSearchRequest>,
@@ -1403,25 +1234,19 @@ pub mod veri_sim_octad_server {
                     };
                     Box::pin(fut)
                 }
-                _ => {
-                    Box::pin(async move {
-                        let mut response = http::Response::new(
-                            tonic::body::Body::default(),
-                        );
-                        let headers = response.headers_mut();
-                        headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
-                        headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
-                        Ok(response)
-                    })
-                }
+                _ => Box::pin(async move {
+                    let mut response = http::Response::new(tonic::body::Body::default());
+                    let headers = response.headers_mut();
+                    headers.insert(
+                        tonic::Status::GRPC_STATUS,
+                        (tonic::Code::Unimplemented as i32).into(),
+                    );
+                    headers.insert(
+                        http::header::CONTENT_TYPE,
+                        tonic::metadata::GRPC_CONTENT_TYPE,
+                    );
+                    Ok(response)
+                }),
             }
         }
     }

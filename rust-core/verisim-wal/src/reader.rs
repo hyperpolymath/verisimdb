@@ -37,9 +37,7 @@ impl WalReader {
     pub fn open(wal_dir: impl AsRef<Path>) -> WalResult<Self> {
         let wal_dir = wal_dir.as_ref().to_path_buf();
         if !wal_dir.is_dir() {
-            return Err(WalError::DirectoryNotFound(
-                wal_dir.display().to_string(),
-            ));
+            return Err(WalError::DirectoryNotFound(wal_dir.display().to_string()));
         }
         Ok(Self { wal_dir })
     }
@@ -74,8 +72,7 @@ impl WalReader {
 
         debug!(
             count = all_entries.len(),
-            from_sequence,
-            "Replaying WAL entries"
+            from_sequence, "Replaying WAL entries"
         );
 
         Ok(WalEntryIterator {
@@ -189,14 +186,13 @@ fn read_segment_entries(path: &Path) -> WalResult<Vec<WalEntry>> {
 
     while offset + 4 <= data.len() {
         // Read entry_length (u32 LE).
-        let entry_length = u32::from_le_bytes(
-            data[offset..offset + 4]
-                .try_into()
-                .map_err(|_| WalError::TruncatedEntry {
+        let entry_length =
+            u32::from_le_bytes(data[offset..offset + 4].try_into().map_err(|_| {
+                WalError::TruncatedEntry {
                     segment: segment_name.clone(),
                     offset: offset as u64,
-                })?,
-        );
+                }
+            })?);
 
         // Validate entry_length.
         if entry_length == 0 {
@@ -427,8 +423,7 @@ mod tests {
 
         // Find the second entry. The first entry starts at offset 0.
         // Read the first entry's length to find the second entry's offset.
-        let first_len =
-            u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
+        let first_len = u32::from_le_bytes(data[0..4].try_into().unwrap()) as usize;
         let second_entry_offset = 4 + first_len;
 
         // The CRC is at bytes [offset+4..offset+8] (after entry_length).
@@ -530,9 +525,7 @@ mod tests {
         {
             let mut writer = WalWriter::open(dir.path(), SyncMode::Fsync).unwrap();
             for _ in 0..7 {
-                writer
-                    .append(test_entry("e", WalModality::Graph))
-                    .unwrap();
+                writer.append(test_entry("e", WalModality::Graph)).unwrap();
             }
         }
 
@@ -550,10 +543,7 @@ mod tests {
                 WalWriter::open_with_max_size(dir.path(), SyncMode::Fsync, 100).unwrap();
             for i in 0..20 {
                 writer
-                    .append(test_entry(
-                        &format!("entity-{i}"),
-                        WalModality::Graph,
-                    ))
+                    .append(test_entry(&format!("entity-{i}"), WalModality::Graph))
                     .unwrap();
             }
         }
@@ -581,9 +571,7 @@ mod tests {
         {
             let mut writer = WalWriter::open(dir.path(), SyncMode::Fsync).unwrap();
             for _ in 0..5 {
-                writer
-                    .append(test_entry("e", WalModality::Graph))
-                    .unwrap();
+                writer.append(test_entry("e", WalModality::Graph)).unwrap();
             }
         }
 

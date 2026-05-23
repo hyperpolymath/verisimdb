@@ -38,8 +38,7 @@ impl OxiGraphStore {
     /// Convert GraphEdge to Oxigraph Quad
     fn edge_to_quad(&self, edge: &GraphEdge) -> Result<Quad, GraphError> {
         let subject = Subject::NamedNode(
-            NamedNode::new(&edge.subject.iri)
-                .map_err(|e| GraphError::InvalidIri(e.to_string()))?,
+            NamedNode::new(&edge.subject.iri).map_err(|e| GraphError::InvalidIri(e.to_string()))?,
         );
         let predicate = NamedNode::new(&edge.predicate.iri)
             .map_err(|e| GraphError::InvalidIri(e.to_string()))?;
@@ -51,7 +50,12 @@ impl OxiGraphStore {
                 Term::Literal(oxigraph::model::Literal::new_simple_literal(value))
             }
         };
-        Ok(Quad::new(subject, predicate, object, GraphName::DefaultGraph))
+        Ok(Quad::new(
+            subject,
+            predicate,
+            object,
+            GraphName::DefaultGraph,
+        ))
     }
 }
 
@@ -59,15 +63,21 @@ impl OxiGraphStore {
 impl GraphStore for OxiGraphStore {
     async fn insert(&self, edge: &GraphEdge) -> Result<(), GraphError> {
         let quad = self.edge_to_quad(edge)?;
-        self.store.insert(&quad).map_err(|e| GraphError::StoreError(e.to_string()))?;
+        self.store
+            .insert(&quad)
+            .map_err(|e| GraphError::StoreError(e.to_string()))?;
         Ok(())
     }
 
     async fn outgoing(&self, node: &GraphNode) -> Result<Vec<GraphEdge>, GraphError> {
-        let subject = NamedNode::new(&node.iri).map_err(|e| GraphError::InvalidIri(e.to_string()))?;
+        let subject =
+            NamedNode::new(&node.iri).map_err(|e| GraphError::InvalidIri(e.to_string()))?;
         let mut edges = Vec::new();
 
-        for quad in self.store.quads_for_pattern(Some(subject.as_ref().into()), None, None, None) {
+        for quad in self
+            .store
+            .quads_for_pattern(Some(subject.as_ref().into()), None, None, None)
+        {
             let quad = quad.map_err(|e| GraphError::StoreError(e.to_string()))?;
             let predicate = GraphNode::new(quad.predicate.as_str());
             let object = match quad.object {
@@ -88,10 +98,14 @@ impl GraphStore for OxiGraphStore {
     }
 
     async fn incoming(&self, node: &GraphNode) -> Result<Vec<GraphEdge>, GraphError> {
-        let object = NamedNode::new(&node.iri).map_err(|e| GraphError::InvalidIri(e.to_string()))?;
+        let object =
+            NamedNode::new(&node.iri).map_err(|e| GraphError::InvalidIri(e.to_string()))?;
         let mut edges = Vec::new();
 
-        for quad in self.store.quads_for_pattern(None, None, Some(object.as_ref().into()), None) {
+        for quad in self
+            .store
+            .quads_for_pattern(None, None, Some(object.as_ref().into()), None)
+        {
             let quad = quad.map_err(|e| GraphError::StoreError(e.to_string()))?;
             let subject = match quad.subject {
                 Subject::NamedNode(n) => GraphNode::new(n.as_str()),
@@ -109,16 +123,24 @@ impl GraphStore for OxiGraphStore {
 
     async fn exists(&self, edge: &GraphEdge) -> Result<bool, GraphError> {
         let quad = self.edge_to_quad(edge)?;
-        self.store.contains(&quad).map_err(|e| GraphError::StoreError(e.to_string()))
+        self.store
+            .contains(&quad)
+            .map_err(|e| GraphError::StoreError(e.to_string()))
     }
 
     async fn delete(&self, edge: &GraphEdge) -> Result<(), GraphError> {
         let quad = self.edge_to_quad(edge)?;
-        self.store.remove(&quad).map_err(|e| GraphError::StoreError(e.to_string()))?;
+        self.store
+            .remove(&quad)
+            .map_err(|e| GraphError::StoreError(e.to_string()))?;
         Ok(())
     }
 
-    async fn neighborhood(&self, node: &GraphNode, hops: usize) -> Result<Vec<GraphNode>, GraphError> {
+    async fn neighborhood(
+        &self,
+        node: &GraphNode,
+        hops: usize,
+    ) -> Result<Vec<GraphNode>, GraphError> {
         use std::collections::HashSet;
 
         let mut visited = HashSet::new();

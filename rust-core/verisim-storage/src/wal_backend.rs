@@ -66,9 +66,9 @@ impl<B: StorageBackend> WalBackend<B> {
         };
 
         let mut writer = self.wal.lock().await;
-        writer.append(entry).map_err(|e| {
-            StorageError::BackendUnavailable(format!("WAL append failed: {e}"))
-        })?;
+        writer
+            .append(entry)
+            .map_err(|e| StorageError::BackendUnavailable(format!("WAL append failed: {e}")))?;
 
         Ok(())
     }
@@ -124,9 +124,9 @@ impl<B: StorageBackend> StorageBackend for WalBackend<B> {
     async fn flush(&self) -> Result<(), StorageError> {
         // Sync the WAL first, then the inner store.
         let mut writer = self.wal.lock().await;
-        writer.sync().map_err(|e| {
-            StorageError::BackendUnavailable(format!("WAL sync failed: {e}"))
-        })?;
+        writer
+            .sync()
+            .map_err(|e| StorageError::BackendUnavailable(format!("WAL sync failed: {e}")))?;
         drop(writer);
 
         self.inner.flush().await
