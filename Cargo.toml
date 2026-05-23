@@ -108,7 +108,7 @@ redb = "3.1"
 crc32fast = "1.4"
 
 # Cryptography (ZKP proofs in semantic store)
-sha2 = "0.10"
+sha2 = "0.11"
 
 # GraphQL
 async-graphql = "7.2"
