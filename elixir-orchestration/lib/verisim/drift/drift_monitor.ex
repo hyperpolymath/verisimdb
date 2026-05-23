@@ -135,10 +135,7 @@ defmodule VeriSim.DriftMonitor do
     new_drift_scores =
       Map.update(state.drift_scores, drift_type, [score], &[score | Enum.take(&1, 99)])
 
-    new_state = %{state |
-      entity_drift: new_entity_drift,
-      drift_scores: new_drift_scores
-    }
+    new_state = %{state | entity_drift: new_entity_drift, drift_scores: new_drift_scores}
 
     # Check if normalization is needed
     new_state = maybe_trigger_normalization(new_state, entity_id, score, drift_type)
@@ -168,6 +165,7 @@ defmodule VeriSim.DriftMonitor do
       pending_normalizations: MapSet.size(state.pending_normalizations),
       last_sweep: state.last_sweep
     }
+
     {:reply, status, state}
   end
 
@@ -197,10 +195,7 @@ defmodule VeriSim.DriftMonitor do
         state.entity_drift
       end
 
-    {:noreply, %{state |
-      pending_normalizations: new_pending,
-      entity_drift: new_entity_drift
-    }}
+    {:noreply, %{state | pending_normalizations: new_pending, entity_drift: new_entity_drift}}
   end
 
   # Private Functions
@@ -213,7 +208,8 @@ defmodule VeriSim.DriftMonitor do
     Logger.debug("Performing drift sweep across #{map_size(state.entity_drift)} entities")
 
     # Check each entity that has reported drift
-    new_state = state.entity_drift
+    new_state =
+      state.entity_drift
       |> Enum.reduce(state, fn {entity_id, drift_scores}, acc ->
         # Check each drift type for this entity
         Enum.reduce(drift_scores, acc, fn {drift_type, score}, inner_acc ->
@@ -230,12 +226,24 @@ defmodule VeriSim.DriftMonitor do
             Enum.reduce(rust_metrics, new_state.drift_scores, fn metric, acc ->
               drift_type =
                 case metric["drift_type"] do
-                  "SemanticVectorDrift" -> :semantic_vector
-                  "GraphDocumentDrift" -> :graph_document
-                  "TemporalConsistencyDrift" -> :temporal_consistency
-                  "TensorDrift" -> :tensor
-                  "SchemaDrift" -> :schema
-                  "QualityDrift" -> :quality
+                  "SemanticVectorDrift" ->
+                    :semantic_vector
+
+                  "GraphDocumentDrift" ->
+                    :graph_document
+
+                  "TemporalConsistencyDrift" ->
+                    :temporal_consistency
+
+                  "TensorDrift" ->
+                    :tensor
+
+                  "SchemaDrift" ->
+                    :schema
+
+                  "QualityDrift" ->
+                    :quality
+
                   other ->
                     Logger.debug("Unknown drift type from Rust core: #{inspect(other)}")
                     nil
@@ -257,7 +265,10 @@ defmodule VeriSim.DriftMonitor do
           new_state
 
         {:error, reason} ->
-          Logger.warning("DriftMonitor: failed to fetch Rust core drift status: #{inspect(reason)}")
+          Logger.warning(
+            "DriftMonitor: failed to fetch Rust core drift status: #{inspect(reason)}"
+          )
+
           new_state
       end
 
@@ -285,10 +296,12 @@ defmodule VeriSim.DriftMonitor do
     if MapSet.size(state.pending_normalizations) < state.config.max_concurrent_normalizations do
       # Start async normalization
       Task.start(fn ->
-        result = case EntityServer.normalize(entity_id) do
-          :ok -> :success
-          _ -> :failure
-        end
+        result =
+          case EntityServer.normalize(entity_id) do
+            :ok -> :success
+            _ -> :failure
+          end
+
         send(__MODULE__, {:normalization_complete, entity_id, result})
       end)
 

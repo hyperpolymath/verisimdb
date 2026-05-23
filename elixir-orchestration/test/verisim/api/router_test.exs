@@ -176,8 +176,22 @@ defmodule VeriSim.Api.RouterTest do
       endpoints = [
         {"/telemetry/modality-heatmap", ["counts", "percentages", "total_modality_queries"]},
         {"/telemetry/query-patterns", ["total_queries", "error_count", "error_rate", "by_type"]},
-        {"/telemetry/drift", ["drift_detected_count", "normalise_attempts", "normalise_success_count", "normalise_success_rate", "modality_breakdown"]},
-        {"/telemetry/performance", ["query_count", "avg_duration_ms", "min_duration_ms", "max_duration_ms", "total_duration_ms"]},
+        {"/telemetry/drift",
+         [
+           "drift_detected_count",
+           "normalise_attempts",
+           "normalise_success_count",
+           "normalise_success_rate",
+           "modality_breakdown"
+         ]},
+        {"/telemetry/performance",
+         [
+           "query_count",
+           "avg_duration_ms",
+           "min_duration_ms",
+           "max_duration_ms",
+           "total_duration_ms"
+         ]},
         {"/telemetry/federation", ["total_federation_queries", "peer_errors"]},
         {"/telemetry/proof-types", ["total_proofs", "by_type", "vql_dt_active"]},
         {"/telemetry/entities", ["created", "deleted"]}
@@ -193,7 +207,7 @@ defmodule VeriSim.Api.RouterTest do
 
         for key <- expected_keys do
           assert Map.has_key?(body, key),
-            "#{path} missing expected key '#{key}'. Got: #{inspect(Map.keys(body))}"
+                 "#{path} missing expected key '#{key}'. Got: #{inspect(Map.keys(body))}"
         end
       end
     end
@@ -209,12 +223,20 @@ defmodule VeriSim.Api.RouterTest do
       # Either full report or disabled message — both are valid
       if Map.has_key?(body, "meta") do
         # Full report structure matches what PanLL Model.res expects
-        expected_sections = ["meta", "modality_heatmap", "query_patterns",
-                            "performance", "drift", "federation", "proof_types", "entities"]
+        expected_sections = [
+          "meta",
+          "modality_heatmap",
+          "query_patterns",
+          "performance",
+          "drift",
+          "federation",
+          "proof_types",
+          "entities"
+        ]
 
         for section <- expected_sections do
           assert Map.has_key?(body, section),
-            "Full telemetry report missing '#{section}' section"
+                 "Full telemetry report missing '#{section}' section"
         end
 
         # Meta section has privacy notice
@@ -249,16 +271,24 @@ defmodule VeriSim.Api.RouterTest do
 
       for modality <- octad_modalities do
         assert Map.has_key?(body["counts"], modality),
-          "Modality heatmap missing '#{modality}' in counts"
+               "Modality heatmap missing '#{modality}' in counts"
+
         assert Map.has_key?(body["percentages"], modality),
-          "Modality heatmap missing '#{modality}' in percentages"
+               "Modality heatmap missing '#{modality}' in percentages"
       end
     end
 
     test "all telemetry endpoints return CORS headers" do
-      endpoints = ["/telemetry", "/telemetry/modality-heatmap", "/telemetry/query-patterns",
-                   "/telemetry/drift", "/telemetry/performance", "/telemetry/federation",
-                   "/telemetry/proof-types", "/telemetry/entities"]
+      endpoints = [
+        "/telemetry",
+        "/telemetry/modality-heatmap",
+        "/telemetry/query-patterns",
+        "/telemetry/drift",
+        "/telemetry/performance",
+        "/telemetry/federation",
+        "/telemetry/proof-types",
+        "/telemetry/entities"
+      ]
 
       for path <- endpoints do
         conn =
@@ -266,7 +296,7 @@ defmodule VeriSim.Api.RouterTest do
           |> call()
 
         assert {"access-control-allow-origin", "*"} in conn.resp_headers,
-          "#{path} missing CORS header"
+               "#{path} missing CORS header"
       end
     end
   end

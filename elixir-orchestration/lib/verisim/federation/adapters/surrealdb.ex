@@ -87,9 +87,7 @@ defmodule VeriSim.Federation.Adapters.SurrealDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "SurrealDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("SurrealDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end
@@ -169,7 +167,9 @@ defmodule VeriSim.Federation.Adapters.SurrealDB do
         # Build OR conditions across searchable fields
         conditions =
           search_fields
-          |> Enum.map(fn field -> "string::contains(string::lowercase(#{field}), string::lowercase('#{text}'))" end)
+          |> Enum.map(fn field ->
+            "string::contains(string::lowercase(#{field}), string::lowercase('#{text}'))"
+          end)
           |> Enum.join(" OR ")
 
         """

@@ -12,10 +12,12 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
   setup do
     # Track started nodes for cleanup
     nodes = []
+
     on_exit(fn ->
       # Nodes are cleaned up by ExUnit since we use start_supervised for each
       :ok
     end)
+
     {:ok, nodes: nodes}
   end
 
@@ -204,6 +206,7 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
 
       # Find which one is leader
       leader_diag = KRaftNode.diagnostics(leader_id)
+
       {actual_leader, actual_follower, actual_follower_pid} =
         if leader_diag.role == :leader do
           {leader_id, follower_id, follower_pid}

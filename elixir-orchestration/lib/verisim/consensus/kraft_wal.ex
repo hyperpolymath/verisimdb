@@ -54,6 +54,7 @@ defmodule VeriSim.Consensus.KRaftWAL do
       {:error, reason} -> {:error, {:wal_init_failed, reason}}
     end
   end
+
   def init(nil), do: :ok
 
   @doc """
@@ -74,11 +75,13 @@ defmodule VeriSim.Consensus.KRaftWAL do
     case File.write(tmp_path, Jason.encode!(state)) do
       :ok ->
         File.rename(tmp_path, path)
+
       {:error, reason} ->
         Logger.error("KRaft WAL: failed to persist state: #{inspect(reason)}")
         {:error, reason}
     end
   end
+
   def persist_state(nil, _term, _voted_for), do: :ok
 
   @doc """
@@ -89,12 +92,15 @@ defmodule VeriSim.Consensus.KRaftWAL do
     json_line = Jason.encode!(serialize_entry(entry)) <> "\n"
 
     case File.write(path, json_line, [:append, :sync]) do
-      :ok -> :ok
+      :ok ->
+        :ok
+
       {:error, reason} ->
         Logger.error("KRaft WAL: failed to append entry: #{inspect(reason)}")
         {:error, reason}
     end
   end
+
   def append_entry(nil, _entry), do: :ok
 
   @doc """
@@ -105,18 +111,23 @@ defmodule VeriSim.Consensus.KRaftWAL do
       :ok
     else
       path = Path.join(wal_path, @wal_file)
-      lines = Enum.map_join(entries, fn entry ->
-        Jason.encode!(serialize_entry(entry)) <> "\n"
-      end)
+
+      lines =
+        Enum.map_join(entries, fn entry ->
+          Jason.encode!(serialize_entry(entry)) <> "\n"
+        end)
 
       case File.write(path, lines, [:append, :sync]) do
-        :ok -> :ok
+        :ok ->
+          :ok
+
         {:error, reason} ->
           Logger.error("KRaft WAL: failed to append entries: #{inspect(reason)}")
           {:error, reason}
       end
     end
   end
+
   def append_entries(nil, _entries), do: :ok
 
   @doc """
@@ -124,7 +135,8 @@ defmodule VeriSim.Consensus.KRaftWAL do
 
   After saving, truncates the WAL to remove entries at or before the snapshot index.
   """
-  def save_snapshot(wal_path, registry, last_included_index, last_included_term) when is_binary(wal_path) do
+  def save_snapshot(wal_path, registry, last_included_index, last_included_term)
+      when is_binary(wal_path) do
     snapshot = %{
       "registry" => serialize_registry(registry),
       "last_included_index" => last_included_index,
@@ -140,11 +152,13 @@ defmodule VeriSim.Consensus.KRaftWAL do
         File.rename(tmp_path, path)
         # Truncate WAL to only contain entries after the snapshot
         truncate_wal(wal_path, last_included_index)
+
       {:error, reason} ->
         Logger.error("KRaft WAL: failed to save snapshot: #{inspect(reason)}")
         {:error, reason}
     end
   end
+
   def save_snapshot(nil, _registry, _index, _term), do: :ok
 
   @doc """
@@ -166,18 +180,20 @@ defmodule VeriSim.Consensus.KRaftWAL do
       {registry, snap_index, snap_term} = recover_snapshot(wal_path)
       log = recover_log(wal_path, snap_index)
 
-      {:ok, %{
-        current_term: state[:current_term] || 0,
-        voted_for: state[:voted_for],
-        log: log,
-        registry: registry,
-        snapshot_index: snap_index,
-        snapshot_term: snap_term
-      }}
+      {:ok,
+       %{
+         current_term: state[:current_term] || 0,
+         voted_for: state[:voted_for],
+         log: log,
+         registry: registry,
+         snapshot_index: snap_index,
+         snapshot_term: snap_term
+       }}
     else
       {:ok, nil}
     end
   end
+
   def recover(nil), do: {:ok, nil}
 
   # ---------------------------------------------------------------------------
@@ -192,9 +208,11 @@ defmodule VeriSim.Consensus.KRaftWAL do
         case Jason.decode(data) do
           {:ok, %{"current_term" => term, "voted_for" => voted_for}} ->
             %{current_term: term, voted_for: voted_for}
+
           _ ->
             %{}
         end
+
       {:error, _} ->
         %{}
     end
@@ -208,9 +226,11 @@ defmodule VeriSim.Consensus.KRaftWAL do
         case Jason.decode(data) do
           {:ok, %{"registry" => reg, "last_included_index" => idx, "last_included_term" => term}} ->
             {deserialize_registry(reg), idx, term}
+
           _ ->
             {nil, 0, 0}
         end
+
       {:error, _} ->
         {nil, 0, 0}
     end
@@ -228,11 +248,13 @@ defmodule VeriSim.Consensus.KRaftWAL do
             {:ok, entry_map} ->
               entry = deserialize_entry(entry_map)
               if entry.index > after_index, do: [entry], else: []
+
             _ ->
               Logger.warning("KRaft WAL: skipping corrupt line: #{String.slice(line, 0, 100)}")
               []
           end
         end)
+
       {:error, _} ->
         []
     end
@@ -250,7 +272,8 @@ defmodule VeriSim.Consensus.KRaftWAL do
 
     case File.read(path) do
       {:ok, data} ->
-        remaining = data
+        remaining =
+          data
           |> String.split("\n", trim: true)
           |> Enum.filter(fn line ->
             case Jason.decode(line) do
@@ -263,9 +286,11 @@ defmodule VeriSim.Consensus.KRaftWAL do
         remaining = if remaining != "", do: remaining <> "\n", else: ""
         File.write(path, remaining, [:sync])
 
-      {:error, _} -> :ok
+      {:error, _} ->
+        :ok
     end
   end
+
   def truncate_after(nil, _index), do: :ok
 
   # ---------------------------------------------------------------------------
@@ -277,7 +302,8 @@ defmodule VeriSim.Consensus.KRaftWAL do
 
     case File.read(path) do
       {:ok, data} ->
-        remaining = data
+        remaining =
+          data
           |> String.split("\n", trim: true)
           |> Enum.filter(fn line ->
             case Jason.decode(line) do
@@ -290,7 +316,8 @@ defmodule VeriSim.Consensus.KRaftWAL do
         remaining = if remaining != "", do: remaining <> "\n", else: ""
         File.write(path, remaining)
 
-      {:error, _} -> :ok
+      {:error, _} ->
+        :ok
     end
   end
 
@@ -308,24 +335,32 @@ defmodule VeriSim.Consensus.KRaftWAL do
   end
 
   defp serialize_command(:noop), do: %{"type" => "noop"}
+
   defp serialize_command({:register_store, store_id, endpoint, modalities}) do
-    %{"type" => "register_store", "store_id" => store_id,
-      "endpoint" => endpoint, "modalities" => modalities}
+    %{
+      "type" => "register_store",
+      "store_id" => store_id,
+      "endpoint" => endpoint,
+      "modalities" => modalities
+    }
   end
+
   defp serialize_command({:unregister_store, store_id}) do
     %{"type" => "unregister_store", "store_id" => store_id}
   end
+
   defp serialize_command({:map_octad, octad_id, locations}) do
-    %{"type" => "map_octad", "octad_id" => octad_id,
-      "locations" => locations}
+    %{"type" => "map_octad", "octad_id" => octad_id, "locations" => locations}
   end
+
   defp serialize_command({:unmap_octad, octad_id}) do
     %{"type" => "unmap_octad", "octad_id" => octad_id}
   end
+
   defp serialize_command({:update_trust, store_id, new_trust}) do
-    %{"type" => "update_trust", "store_id" => store_id,
-      "new_trust" => new_trust}
+    %{"type" => "update_trust", "store_id" => store_id, "new_trust" => new_trust}
   end
+
   defp serialize_command(other) do
     %{"type" => "unknown", "data" => inspect(other)}
   end
@@ -340,65 +375,80 @@ defmodule VeriSim.Consensus.KRaftWAL do
   end
 
   defp deserialize_command(%{"type" => "noop"}), do: :noop
+
   defp deserialize_command(%{"type" => "register_store"} = cmd) do
     {:register_store, cmd["store_id"], cmd["endpoint"], cmd["modalities"]}
   end
+
   defp deserialize_command(%{"type" => "unregister_store"} = cmd) do
     {:unregister_store, cmd["store_id"]}
   end
+
   defp deserialize_command(%{"type" => "map_octad"} = cmd) do
     {:map_octad, cmd["octad_id"], cmd["locations"]}
   end
+
   defp deserialize_command(%{"type" => "unmap_octad"} = cmd) do
     {:unmap_octad, cmd["octad_id"]}
   end
+
   defp deserialize_command(%{"type" => "update_trust"} = cmd) do
     {:update_trust, cmd["store_id"], cmd["new_trust"]}
   end
+
   defp deserialize_command(_), do: :noop
 
   defp serialize_registry(registry) do
     %{
-      "stores" => Map.new(registry[:stores] || %{}, fn {k, v} ->
-        {k, %{
-          "store_id" => v[:store_id] || k,
-          "endpoint" => v[:endpoint],
-          "modalities" => v[:modalities],
-          "trust_level" => v[:trust_level]
-        }}
-      end),
-      "mappings" => Map.new(registry[:mappings] || %{}, fn {k, v} ->
-        {k, %{
-          "octad_id" => v[:octad_id] || k,
-          "locations" => v[:locations],
-          "primary_store" => v[:primary_store]
-        }}
-      end)
+      "stores" =>
+        Map.new(registry[:stores] || %{}, fn {k, v} ->
+          {k,
+           %{
+             "store_id" => v[:store_id] || k,
+             "endpoint" => v[:endpoint],
+             "modalities" => v[:modalities],
+             "trust_level" => v[:trust_level]
+           }}
+        end),
+      "mappings" =>
+        Map.new(registry[:mappings] || %{}, fn {k, v} ->
+          {k,
+           %{
+             "octad_id" => v[:octad_id] || k,
+             "locations" => v[:locations],
+             "primary_store" => v[:primary_store]
+           }}
+        end)
     }
   end
 
   defp deserialize_registry(nil), do: nil
+
   defp deserialize_registry(map) do
     %{
-      stores: Map.new(map["stores"] || %{}, fn {k, v} ->
-        {k, %{
-          store_id: v["store_id"] || k,
-          endpoint: v["endpoint"],
-          modalities: v["modalities"] || [],
-          trust_level: v["trust_level"] || 1.0,
-          last_seen: nil,
-          response_time_ms: nil
-        }}
-      end),
-      mappings: Map.new(map["mappings"] || %{}, fn {k, v} ->
-        {k, %{
-          octad_id: v["octad_id"] || k,
-          locations: v["locations"],
-          primary_store: v["primary_store"],
-          created: nil,
-          modified: nil
-        }}
-      end),
+      stores:
+        Map.new(map["stores"] || %{}, fn {k, v} ->
+          {k,
+           %{
+             store_id: v["store_id"] || k,
+             endpoint: v["endpoint"],
+             modalities: v["modalities"] || [],
+             trust_level: v["trust_level"] || 1.0,
+             last_seen: nil,
+             response_time_ms: nil
+           }}
+        end),
+      mappings:
+        Map.new(map["mappings"] || %{}, fn {k, v} ->
+          {k,
+           %{
+             octad_id: v["octad_id"] || k,
+             locations: v["locations"],
+             primary_store: v["primary_store"],
+             created: nil,
+             modified: nil
+           }}
+        end),
       config: %{
         min_trust_level: 0.5,
         max_store_downtime_ms: 300_000,

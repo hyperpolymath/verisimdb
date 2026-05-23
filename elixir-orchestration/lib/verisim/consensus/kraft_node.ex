@@ -301,9 +301,7 @@ defmodule VeriSim.Consensus.KRaftNode do
   defp start_election(state) do
     new_term = state.current_term + 1
 
-    Logger.info(
-      "KRaft: node #{state.node_id} starting election for term #{new_term}"
-    )
+    Logger.info("KRaft: node #{state.node_id} starting election for term #{new_term}")
 
     state = %{
       state
@@ -404,9 +402,7 @@ defmodule VeriSim.Consensus.KRaftNode do
   end
 
   defp become_leader(state) do
-    Logger.info(
-      "KRaft: node #{state.node_id} became leader for term #{state.current_term}"
-    )
+    Logger.info("KRaft: node #{state.node_id} became leader for term #{state.current_term}")
 
     last_log_index = length(state.log) + 1
 
@@ -624,7 +620,12 @@ defmodule VeriSim.Consensus.KRaftNode do
           "(#{state.last_applied + 1}..#{state.commit_index})"
       )
 
-      state = %{state | last_applied: state.commit_index, registry: new_registry, peers: new_peers}
+      state = %{
+        state
+        | last_applied: state.commit_index,
+          registry: new_registry,
+          peers: new_peers
+      }
 
       # Update leader tracking structures when peers change
       state =
@@ -641,7 +642,8 @@ defmodule VeriSim.Consensus.KRaftNode do
             end)
 
           # Remove entries for removed peers
-          removed = MapSet.difference(MapSet.new(Map.keys(state.next_index)), MapSet.new(new_peers))
+          removed =
+            MapSet.difference(MapSet.new(Map.keys(state.next_index)), MapSet.new(new_peers))
 
           new_next_index = Map.drop(new_next_index, MapSet.to_list(removed))
           new_match_index = Map.drop(new_match_index, MapSet.to_list(removed))
@@ -692,9 +694,7 @@ defmodule VeriSim.Consensus.KRaftNode do
           last_entry.term
         )
 
-        Logger.info(
-          "KRaft: node #{state.node_id} saved snapshot at index #{state.last_applied}"
-        )
+        Logger.info("KRaft: node #{state.node_id} saved snapshot at index #{state.last_applied}")
       end
     end
 

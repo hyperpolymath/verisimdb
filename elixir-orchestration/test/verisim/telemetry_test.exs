@@ -21,6 +21,7 @@ defmodule VeriSim.TelemetryTest do
       nil ->
         {:ok, _pid} = Collector.start_link()
         :ok
+
       _pid ->
         Collector.reset()
         :ok
@@ -258,7 +259,7 @@ defmodule VeriSim.TelemetryTest do
       # All keys should be atoms or {atom, atom/string} tuples — never raw strings.
       Enum.each(snapshot, fn {key, _value} ->
         assert is_atom(key) or is_tuple(key),
-          "Expected atom or tuple key, got: #{inspect(key)}"
+               "Expected atom or tuple key, got: #{inspect(key)}"
       end)
     end
   end

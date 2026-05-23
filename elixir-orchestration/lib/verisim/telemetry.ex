@@ -211,13 +211,17 @@ defmodule VeriSim.Telemetry do
   def measure_drift_status do
     # Get drift status from monitor
     case GenServer.whereis(VeriSim.DriftMonitor) do
-      nil -> :ok
+      nil ->
+        :ok
+
       _pid ->
         case VeriSim.DriftMonitor.status() do
           %{overall_health: health} ->
             score = health_to_score(health)
             :telemetry.execute([:verisim, :drift], %{score: score}, %{})
-          _ -> :ok
+
+          _ ->
+            :ok
         end
     end
   end

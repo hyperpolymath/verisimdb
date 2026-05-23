@@ -116,7 +116,9 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
 
   describe "multi-proof composition" do
     test "two proofs combined with AND parse correctly" do
-      query = "SELECT * FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
+
       ast = H.parse!(query)
 
       H.assert_has_proof(ast)
@@ -127,7 +129,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
     end
 
     test "multi-proof execution routes each proof independently" do
-      query = "SELECT * FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
 
       result = H.execute_safely(query)
       assert_proof_result_or_error(result)
@@ -145,8 +148,10 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
       result = H.execute_safely(query)
 
       case result do
-        {:error, _} -> assert true  # Expected: unknown proof type fails
-        {:unavailable, _} -> assert true  # Connection error
+        # Expected: unknown proof type fails
+        {:error, _} -> assert true
+        # Connection error
+        {:unavailable, _} -> assert true
         {:ok, _} -> flunk("Unknown proof type should not produce a valid result")
       end
     end
@@ -157,7 +162,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
         modalities: [:graph],
         source: {:octad, "entity-001"},
         where: nil,
-        proof: [%{proofType: "INTEGRITY"}],  # No contractName
+        # No contractName
+        proof: [%{proofType: "INTEGRITY"}],
         limit: nil,
         offset: nil,
         orderBy: nil,
@@ -171,7 +177,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
 
       case result do
         {:error, {:proof_verification_failed, {:missing_contract, _}}} -> assert true
-        {:error, _} -> assert true  # Any error is acceptable
+        # Any error is acceptable
+        {:error, _} -> assert true
         {:unavailable, _} -> assert true
         {:ok, _} -> flunk("Integrity proof without contract should fail")
       end
@@ -195,7 +202,7 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
           # Must have a proof_certificate — NOT bare data
           assert Map.has_key?(proved_result, :proof_certificate) or
                    Map.has_key?(proved_result, "proof_certificate"),
-            "VQL-DT result must include proof_certificate, got: #{inspect(Map.keys(proved_result))}"
+                 "VQL-DT result must include proof_certificate, got: #{inspect(Map.keys(proved_result))}"
 
         {:error, _} ->
           # Proof verification error is acceptable (Rust core unavailable)
@@ -221,9 +228,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
     end
 
     test "parse_slipstream rejects queries with PROOF clause" do
-      result = VQLBridge.parse_slipstream(
-        "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)"
-      )
+      result =
+        VQLBridge.parse_slipstream("SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)")
 
       case result do
         {:error, msg} ->
@@ -262,21 +268,26 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
         {:ok, proved_result} when is_map(proved_result) ->
           # Verify the ProvedResult structure
           assert Map.has_key?(proved_result, :data) or Map.has_key?(proved_result, "data"),
-            "ProvedResult must have :data field"
+                 "ProvedResult must have :data field"
+
           assert Map.has_key?(proved_result, :proof_certificate) or
                    Map.has_key?(proved_result, "proof_certificate"),
-            "ProvedResult must have :proof_certificate field"
+                 "ProvedResult must have :proof_certificate field"
 
           cert = proved_result[:proof_certificate] || proved_result["proof_certificate"]
+
           if cert do
             assert Map.has_key?(cert, :proofs) or Map.has_key?(cert, "proofs"),
-              "Certificate must have :proofs field"
+                   "Certificate must have :proofs field"
+
             assert Map.has_key?(cert, :composition) or Map.has_key?(cert, "composition"),
-              "Certificate must have :composition field"
+                   "Certificate must have :composition field"
+
             assert Map.has_key?(cert, :verified_at) or Map.has_key?(cert, "verified_at"),
-              "Certificate must have :verified_at field"
+                   "Certificate must have :verified_at field"
+
             assert Map.has_key?(cert, :query_hash) or Map.has_key?(cert, "query_hash"),
-              "Certificate must have :query_hash field"
+                   "Certificate must have :query_hash field"
           end
 
         {:error, _} ->
@@ -308,7 +319,7 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
       case result do
         {:ok, %{proof_certificate: cert}} ->
           assert Map.has_key?(cert, :obligations),
-            "Certificate should include :obligations list"
+                 "Certificate should include :obligations list"
 
         _ ->
           # Rust unavailable — skip structure check
@@ -398,9 +409,9 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
     case result do
       {:ok, proved_result} when is_map(proved_result) ->
         # Valid ProvedResult — should have proof_certificate
+        # Or it might be a plain data result if the proof silently passed (bug!)
         assert Map.has_key?(proved_result, :proof_certificate) or
                  Map.has_key?(proved_result, "proof_certificate") or
-                 # Or it might be a plain data result if the proof silently passed (bug!)
                  Map.has_key?(proved_result, :data) or
                  Map.has_key?(proved_result, "data")
 

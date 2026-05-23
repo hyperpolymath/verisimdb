@@ -77,9 +77,7 @@ defmodule VeriSim.Federation.Adapters.VeriSimDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "VeriSimDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("VeriSimDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end

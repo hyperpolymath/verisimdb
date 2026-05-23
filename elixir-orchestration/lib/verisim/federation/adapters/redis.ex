@@ -97,9 +97,7 @@ defmodule VeriSim.Federation.Adapters.Redis do
     end
   rescue
     e ->
-      Logger.warning(
-        "Redis adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("Redis adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end
@@ -246,7 +244,14 @@ defmodule VeriSim.Federation.Adapters.Redis do
         end_ts = range[:end] || range["end"] || "+"
 
         %{
-          "command" => ["TS.RANGE", ts_key, to_string(start_ts), to_string(end_ts), "COUNT", to_string(limit)]
+          "command" => [
+            "TS.RANGE",
+            ts_key,
+            to_string(start_ts),
+            to_string(end_ts),
+            "COUNT",
+            to_string(limit)
+          ]
         }
 
       :provenance in modalities ->

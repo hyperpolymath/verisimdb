@@ -116,9 +116,7 @@ defmodule VeriSim.Consensus.KRaftTransport do
           send(reply_to, {:append_entries_response, peer_id, response})
 
         {:error, reason} ->
-          Logger.debug(
-            "KRaft transport: append_entries to #{peer_id} failed: #{inspect(reason)}"
-          )
+          Logger.debug("KRaft transport: append_entries to #{peer_id} failed: #{inspect(reason)}")
       end
     end)
   end

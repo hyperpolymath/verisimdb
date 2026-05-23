@@ -292,9 +292,7 @@ defmodule VeriSim.Federation.Adapters.Elasticsearch do
         error_type = get_in(body, ["error", "type"]) || "unknown"
         error_reason = get_in(body, ["error", "reason"]) || "HTTP #{status}"
 
-        Logger.warning(
-          "Elasticsearch adapter: search failed: #{error_type} — #{error_reason}"
-        )
+        Logger.warning("Elasticsearch adapter: search failed: #{error_type} — #{error_reason}")
 
         {:error, {:es_error, status, error_type, error_reason}}
 

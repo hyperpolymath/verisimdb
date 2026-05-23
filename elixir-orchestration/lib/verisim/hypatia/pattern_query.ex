@@ -47,7 +47,8 @@ defmodule VeriSim.Hypatia.PatternQuery do
     %{
       total_scans: length(scans),
       total_weak_points: length(all_weak_points),
-      repos_scanned: scans |> Enum.map(&get_in(&1, [:metadata, :repo_name])) |> Enum.uniq() |> length(),
+      repos_scanned:
+        scans |> Enum.map(&get_in(&1, [:metadata, :repo_name])) |> Enum.uniq() |> length(),
       severity_distribution: severity_distribution(all_weak_points),
       top_categories: top_categories(all_weak_points, 10),
       average_weak_points_per_repo: safe_avg(length(all_weak_points), length(scans)),
@@ -189,7 +190,8 @@ defmodule VeriSim.Hypatia.PatternQuery do
     |> extract_all_weak_points()
     |> Enum.group_by(& &1["location"])
     |> Map.new(fn {location, items} ->
-      {location || "unknown", %{count: length(items), categories: Enum.map(items, & &1["category"]) |> Enum.uniq()}}
+      {location || "unknown",
+       %{count: length(items), categories: Enum.map(items, & &1["category"]) |> Enum.uniq()}}
     end)
     |> Enum.sort_by(fn {_loc, data} -> data.count end, :desc)
     |> Enum.take(50)

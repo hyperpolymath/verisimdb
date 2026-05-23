@@ -235,9 +235,10 @@ defmodule VeriSim.IntegrationTest do
       assert state.version == 0
 
       # Update entity
-      {:ok, new_state} = EntityServer.update(entity_id, [
-        {:modality, :document, true}
-      ])
+      {:ok, new_state} =
+        EntityServer.update(entity_id, [
+          {:modality, :document, true}
+        ])
 
       assert new_state.modalities.document == true
     end

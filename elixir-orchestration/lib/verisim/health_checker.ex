@@ -53,12 +53,13 @@ defmodule VeriSim.HealthChecker do
     registry_status = check_entity_registry()
     ets_status = check_ets_cache()
 
-    new_state = %{state |
-      rust_core: rust_status,
-      entity_registry: registry_status,
-      ets_cache: ets_status,
-      last_checked: DateTime.utc_now(),
-      check_count: state.check_count + 1
+    new_state = %{
+      state
+      | rust_core: rust_status,
+        entity_registry: registry_status,
+        ets_cache: ets_status,
+        last_checked: DateTime.utc_now(),
+        check_count: state.check_count + 1
     }
 
     # Emit telemetry events

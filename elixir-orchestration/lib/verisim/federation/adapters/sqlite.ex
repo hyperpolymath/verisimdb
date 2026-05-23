@@ -91,9 +91,7 @@ defmodule VeriSim.Federation.Adapters.SQLite do
     end
   rescue
     e ->
-      Logger.warning(
-        "SQLite adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("SQLite adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end
@@ -229,11 +227,12 @@ defmodule VeriSim.Federation.Adapters.SQLite do
         LIMIT $3
         """
 
-        {sql, %{
-          "$1" => range[:start] || range["start"] || "",
-          "$2" => range[:end] || range["end"] || "",
-          "$3" => limit
-        }}
+        {sql,
+         %{
+           "$1" => range[:start] || range["start"] || "",
+           "$2" => range[:end] || range["end"] || "",
+           "$3" => limit
+         }}
 
       :semantic in modalities && Map.has_key?(query_params, :filters) ->
         # JSON1 extraction for structured metadata queries

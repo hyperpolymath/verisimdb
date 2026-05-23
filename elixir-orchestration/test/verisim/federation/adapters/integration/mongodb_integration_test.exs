@@ -332,7 +332,8 @@ defmodule VeriSim.Federation.Adapters.MongoDBIntegrationTest do
 
       bad_peer = %{
         @peer_info
-        | adapter_config: Map.put(@peer_info.adapter_config, :collection, "nonexistent_collection_xyz")
+        | adapter_config:
+            Map.put(@peer_info.adapter_config, :collection, "nonexistent_collection_xyz")
       }
 
       query_params = %{modalities: [], limit: 10}
@@ -396,6 +397,8 @@ defmodule VeriSim.Federation.Adapters.MongoDBIntegrationTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp skip_if_unavailable(%{skip: true}), do: flunk("MongoDB not available — start test-infra stack")
+  defp skip_if_unavailable(%{skip: true}),
+    do: flunk("MongoDB not available — start test-infra stack")
+
   defp skip_if_unavailable(_context), do: :ok
 end

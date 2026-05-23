@@ -63,8 +63,17 @@ defmodule VeriSim.Query.VQLE2ETest do
       """
 
       ast = H.parse!(query)
-      H.assert_modalities(ast, [:graph, :vector, :tensor, :semantic,
-                                 :document, :temporal, :provenance, :spatial])
+
+      H.assert_modalities(ast, [
+        :graph,
+        :vector,
+        :tensor,
+        :semantic,
+        :document,
+        :temporal,
+        :provenance,
+        :spatial
+      ])
     end
   end
 
@@ -102,7 +111,9 @@ defmodule VeriSim.Query.VQLE2ETest do
     end
 
     test "WITHIN RADIUS spatial condition is parsed" do
-      query = "SELECT SPATIAL.* FROM HEXAD 'entity-001' WHERE WITHIN RADIUS(51.5074, -0.1278, 5000)"
+      query =
+        "SELECT SPATIAL.* FROM HEXAD 'entity-001' WHERE WITHIN RADIUS(51.5074, -0.1278, 5000)"
+
       ast = H.parse!(query)
 
       H.assert_has_where(ast)
@@ -117,7 +128,9 @@ defmodule VeriSim.Query.VQLE2ETest do
     end
 
     test "CONSISTENT cross-modal condition with COSINE metric" do
-      query = "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE > 0.8"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE > 0.8"
+
       ast = H.parse!(query)
 
       H.assert_has_where(ast)
@@ -145,11 +158,12 @@ defmodule VeriSim.Query.VQLE2ETest do
 
       test "#{@pt_upper} proof: typecheck → certificate → verify" do
         # Build a VQL-DT query with this proof type
-        contract = if @pt in [:integrity, :citation, :custom, :sanctify] do
-          "(my_contract)"
-        else
-          "(entity-001)"
-        end
+        contract =
+          if @pt in [:integrity, :citation, :custom, :sanctify] do
+            "(my_contract)"
+          else
+            "(entity-001)"
+          end
 
         query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF #{@pt_upper}#{contract}"
         ast = H.parse!(query)
@@ -172,7 +186,8 @@ defmodule VeriSim.Query.VQLE2ETest do
             # Certificate structure
             assert cert.type == @pt
             assert is_binary(cert.hash)
-            assert byte_size(cert.hash) == 32  # SHA-256
+            # SHA-256
+            assert byte_size(cert.hash) == 32
 
             # Verify round-trip
             assert :ok == VQLProofCertificate.verify_certificate(cert)
@@ -186,7 +201,9 @@ defmodule VeriSim.Query.VQLE2ETest do
     end
 
     test "multi-proof AND composition: typecheck produces multiple obligations" do
-      query = "SELECT * FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
+      query =
+        "SELECT * FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
+
       ast = H.parse!(query)
       H.assert_has_proof(ast)
 
@@ -196,9 +213,10 @@ defmodule VeriSim.Query.VQLE2ETest do
       assert length(obligations) >= 2
 
       # Generate batch certificates
-      witnesses = Enum.map(obligations, fn obl ->
-        {obl, build_mock_witness(obl[:type])}
-      end)
+      witnesses =
+        Enum.map(obligations, fn obl ->
+          {obl, build_mock_witness(obl[:type])}
+        end)
 
       {:ok, certs} = VQLProofCertificate.generate_batch(witnesses)
       assert length(certs) >= 2
@@ -262,6 +280,7 @@ defmodule VeriSim.Query.VQLE2ETest do
       SELECT * FROM HEXAD 'entity-001'
       WHERE DOCUMENT.severity > 5 AND PROVENANCE EXISTS
       """
+
       ast = H.parse!(query)
       H.assert_has_where(ast)
     end
@@ -282,6 +301,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
     test "unknown proof type is rejected by type checker" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF TELEPORT(entity-001)"
+
       case VQLBridge.parse(query) do
         {:ok, ast} ->
           result = VQLTypeChecker.typecheck(ast)
@@ -295,6 +315,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
     test "INTEGRITY proof without semantic modality is rejected" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF INTEGRITY(my_contract)"
+
       case VQLBridge.parse(query) do
         {:ok, ast} ->
           case VQLTypeChecker.typecheck(ast) do
@@ -308,12 +329,14 @@ defmodule VeriSim.Query.VQLE2ETest do
               :ok
           end
 
-        {:error, _} -> :ok
+        {:error, _} ->
+          :ok
       end
     end
 
     test "PROVENANCE proof without provenance modality is rejected" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF PROVENANCE(entity-001)"
+
       case VQLBridge.parse(query) do
         {:ok, ast} ->
           case VQLTypeChecker.typecheck(ast) do
@@ -321,10 +344,12 @@ defmodule VeriSim.Query.VQLE2ETest do
               reason_str = inspect(reason)
               assert reason_str =~ "provenance" or reason_str =~ "modality"
 
-            {:ok, _} -> :ok
+            {:ok, _} ->
+              :ok
           end
 
-        {:error, _} -> :ok
+        {:error, _} ->
+          :ok
       end
     end
 
@@ -335,7 +360,8 @@ defmodule VeriSim.Query.VQLE2ETest do
       case H.assert_ok_or_rust_unavailable(result) do
         :rust_unavailable -> :ok
         {:error_from_rust, _} -> :ok
-        :ok_result -> :ok  # May return empty results
+        # May return empty results
+        :ok_result -> :ok
       end
     end
   end
@@ -394,10 +420,11 @@ defmodule VeriSim.Query.VQLE2ETest do
       ast = %{
         modalities: [:graph, :vector, :document, :provenance],
         source: {:octad, "entity-001"},
-        where: H.and_condition(
-          H.modality_exists(:provenance),
-          H.modality_drift(:vector, :document, 0.5)
-        ),
+        where:
+          H.and_condition(
+            H.modality_exists(:provenance),
+            H.modality_drift(:vector, :document, 0.5)
+          ),
         limit: nil,
         offset: nil,
         order_by: nil,

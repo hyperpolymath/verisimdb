@@ -37,34 +37,76 @@ defmodule VeriSim.Hypatia.DispatchBridgeTest do
 
   defp sample_pending do
     [
-      %{"repo" => "echidna", "pattern" => "PA001", "strategy" => "auto_execute", "confidence" => 0.98,
-        "mutation" => "mutation { createPR(repo: \"echidna\") }"},
-      %{"repo" => "ambientops", "pattern" => "PA003", "strategy" => "review", "confidence" => 0.87,
-        "mutation" => "mutation { createPR(repo: \"ambientops\") }"},
-      %{"repo" => "verisimdb", "pattern" => "PA001", "strategy" => "auto_execute", "confidence" => 0.96,
-        "mutation" => "mutation { createPR(repo: \"verisimdb\") }"}
+      %{
+        "repo" => "echidna",
+        "pattern" => "PA001",
+        "strategy" => "auto_execute",
+        "confidence" => 0.98,
+        "mutation" => "mutation { createPR(repo: \"echidna\") }"
+      },
+      %{
+        "repo" => "ambientops",
+        "pattern" => "PA003",
+        "strategy" => "review",
+        "confidence" => 0.87,
+        "mutation" => "mutation { createPR(repo: \"ambientops\") }"
+      },
+      %{
+        "repo" => "verisimdb",
+        "pattern" => "PA001",
+        "strategy" => "auto_execute",
+        "confidence" => 0.96,
+        "mutation" => "mutation { createPR(repo: \"verisimdb\") }"
+      }
     ]
   end
 
   defp sample_dispatch_log do
     [
-      %{"repo" => "echidna", "pattern" => "PA001", "strategy" => "auto_execute",
-        "status" => "dispatched", "timestamp" => "2026-02-12T10:00:00Z"},
-      %{"repo" => "proven", "pattern" => "PA005", "strategy" => "report_only",
-        "status" => "dispatched", "timestamp" => "2026-02-12T10:01:00Z"},
-      %{"repo" => "ambientops", "pattern" => "PA003", "strategy" => "review",
-        "status" => "dispatched", "timestamp" => "2026-02-12T10:02:00Z"}
+      %{
+        "repo" => "echidna",
+        "pattern" => "PA001",
+        "strategy" => "auto_execute",
+        "status" => "dispatched",
+        "timestamp" => "2026-02-12T10:00:00Z"
+      },
+      %{
+        "repo" => "proven",
+        "pattern" => "PA005",
+        "strategy" => "report_only",
+        "status" => "dispatched",
+        "timestamp" => "2026-02-12T10:01:00Z"
+      },
+      %{
+        "repo" => "ambientops",
+        "pattern" => "PA003",
+        "strategy" => "review",
+        "status" => "dispatched",
+        "timestamp" => "2026-02-12T10:02:00Z"
+      }
     ]
   end
 
   defp sample_outcomes do
     [
-      %{"repo" => "echidna", "pattern" => "PA001", "status" => "success",
-        "timestamp" => "2026-02-12T11:00:00Z"},
-      %{"repo" => "proven", "pattern" => "PA005", "status" => "success",
-        "timestamp" => "2026-02-12T11:01:00Z"},
-      %{"repo" => "ambientops", "pattern" => "PA003", "status" => "failure",
-        "timestamp" => "2026-02-12T11:02:00Z"}
+      %{
+        "repo" => "echidna",
+        "pattern" => "PA001",
+        "status" => "success",
+        "timestamp" => "2026-02-12T11:00:00Z"
+      },
+      %{
+        "repo" => "proven",
+        "pattern" => "PA005",
+        "status" => "success",
+        "timestamp" => "2026-02-12T11:01:00Z"
+      },
+      %{
+        "repo" => "ambientops",
+        "pattern" => "PA003",
+        "status" => "failure",
+        "timestamp" => "2026-02-12T11:02:00Z"
+      }
     ]
   end
 
@@ -110,6 +152,7 @@ defmodule VeriSim.Hypatia.DispatchBridgeTest do
   describe "read_all_dispatch_logs/1" do
     test "reads all dispatch logs", %{data_path: dp, dispatch_dir: dd} do
       write_jsonl(Path.join(dd, "dispatch-2026-02-12.jsonl"), sample_dispatch_log())
+
       write_jsonl(Path.join(dd, "dispatch-2026-02-13.jsonl"), [
         %{"repo" => "verisimdb", "pattern" => "PA001", "strategy" => "auto_execute"}
       ])

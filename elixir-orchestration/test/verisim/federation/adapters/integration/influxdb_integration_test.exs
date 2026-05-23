@@ -369,6 +369,8 @@ defmodule VeriSim.Federation.Adapters.InfluxDBIntegrationTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp skip_if_unavailable(%{skip: true}), do: flunk("InfluxDB not available — start test-infra stack")
+  defp skip_if_unavailable(%{skip: true}),
+    do: flunk("InfluxDB not available — start test-infra stack")
+
   defp skip_if_unavailable(_context), do: :ok
 end

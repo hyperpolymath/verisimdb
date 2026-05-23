@@ -20,10 +20,7 @@ defmodule VeriSim.Application do
 
       # Dynamic supervisor for entity servers
       {DynamicSupervisor,
-        name: VeriSim.EntitySupervisor,
-        strategy: :one_for_one,
-        max_restarts: 100,
-        max_seconds: 60},
+       name: VeriSim.EntitySupervisor, strategy: :one_for_one, max_restarts: 100, max_seconds: 60},
 
       # Drift monitor
       VeriSim.DriftMonitor,
@@ -39,8 +36,8 @@ defmodule VeriSim.Application do
 
       # KRaft consensus node (single-node bootstrap by default)
       {VeriSim.Consensus.KRaftNode,
-        node_id: Application.get_env(:verisim, :kraft_node_id, "local"),
-        peers: Application.get_env(:verisim, :kraft_peers, [])},
+       node_id: Application.get_env(:verisim, :kraft_node_id, "local"),
+       peers: Application.get_env(:verisim, :kraft_peers, [])},
 
       # Federation resolver
       VeriSim.Federation.Resolver,

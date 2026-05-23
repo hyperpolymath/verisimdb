@@ -150,33 +150,32 @@ defmodule VeriSim.Hypatia.DispatchBridge do
   and outcome statistics.
   """
   def summarize(data_path) when is_binary(data_path) do
-    pending = case read_pending(data_path) do
-      {:ok, p} -> p
-      _ -> []
-    end
+    pending =
+      case read_pending(data_path) do
+        {:ok, p} -> p
+        _ -> []
+      end
 
-    dispatched = case read_all_dispatch_logs(data_path) do
-      {:ok, d} -> d
-      _ -> []
-    end
+    dispatched =
+      case read_all_dispatch_logs(data_path) do
+        {:ok, d} -> d
+        _ -> []
+      end
 
-    outcomes = case read_outcomes(data_path) do
-      {:ok, o} -> o
-      _ -> []
-    end
+    outcomes =
+      case read_outcomes(data_path) do
+        {:ok, o} -> o
+        _ -> []
+      end
 
     %{
       pending_count: length(pending),
       dispatched_count: length(dispatched),
       outcome_count: length(outcomes),
-
       by_strategy: group_by_field(dispatched, "strategy"),
       by_repo: group_by_field(dispatched, "repo") |> top_n(20),
-
       outcome_success_rate: outcome_success_rate(outcomes),
-
       pending_by_strategy: group_by_field(pending, "strategy"),
-
       repos_with_pending:
         pending
         |> Enum.map(& &1["repo"])
@@ -199,10 +198,11 @@ defmodule VeriSim.Hypatia.DispatchBridge do
   Returns a list of `{repo, drift_direction, delta}` tuples.
   """
   def feedback_to_drift(data_path) when is_binary(data_path) do
-    outcomes = case read_outcomes(data_path) do
-      {:ok, o} -> o
-      _ -> []
-    end
+    outcomes =
+      case read_outcomes(data_path) do
+        {:ok, o} -> o
+        _ -> []
+      end
 
     # Group outcomes by repo
     repo_outcomes =
@@ -215,11 +215,12 @@ defmodule VeriSim.Hypatia.DispatchBridge do
       successful = Enum.count(repo_ocs, &(&1["status"] == "success"))
       total = length(repo_ocs)
 
-      drift = cond do
-        successful == total -> :improving
-        successful >= total / 2 -> :stable
-        true -> :regressing
-      end
+      drift =
+        cond do
+          successful == total -> :improving
+          successful >= total / 2 -> :stable
+          true -> :regressing
+        end
 
       {repo, drift, %{successful: successful, total: total}}
     end)

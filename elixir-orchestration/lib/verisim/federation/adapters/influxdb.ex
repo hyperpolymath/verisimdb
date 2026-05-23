@@ -96,9 +96,7 @@ defmodule VeriSim.Federation.Adapters.InfluxDB do
     end
   rescue
     e ->
-      Logger.warning(
-        "InfluxDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}"
-      )
+      Logger.warning("InfluxDB adapter: exception querying #{peer_info.store_id}: #{inspect(e)}")
 
       {:error, {:exception, e}}
   end

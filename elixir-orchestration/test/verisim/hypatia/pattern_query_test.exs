@@ -39,24 +39,78 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
   defp test_data do
     [
-      {"repo-alpha", "rust", [
-        %{"category" => "PanicPath", "location" => "src/main.rs", "severity" => "Medium", "description" => "unwrap"},
-        %{"category" => "UnsafeCode", "location" => "src/ffi.rs", "severity" => "High", "description" => "unsafe block"},
-        %{"category" => "PanicPath", "location" => "src/lib.rs", "severity" => "Medium", "description" => "expect"}
-      ]},
-      {"repo-beta", "elixir", [
-        %{"category" => "PanicPath", "location" => "lib/worker.ex", "severity" => "Medium", "description" => "raise"},
-        %{"category" => "InputValidation", "location" => "lib/api.ex", "severity" => "High", "description" => "unsanitized"}
-      ]},
-      {"repo-gamma", "rust", [
-        %{"category" => "PanicPath", "location" => "src/core.rs", "severity" => "Medium", "description" => "unwrap"},
-        %{"category" => "PanicPath", "location" => "src/net.rs", "severity" => "High", "description" => "index panic"},
-        %{"category" => "UnsafeCode", "location" => "src/sys.rs", "severity" => "High", "description" => "transmute"}
-      ]},
-      {"repo-delta", "javascript", [
-        %{"category" => "InputValidation", "location" => "src/handler.js", "severity" => "High", "description" => "XSS"},
-        %{"category" => "PanicPath", "location" => "src/index.js", "severity" => "Low", "description" => "throw"}
-      ]}
+      {"repo-alpha", "rust",
+       [
+         %{
+           "category" => "PanicPath",
+           "location" => "src/main.rs",
+           "severity" => "Medium",
+           "description" => "unwrap"
+         },
+         %{
+           "category" => "UnsafeCode",
+           "location" => "src/ffi.rs",
+           "severity" => "High",
+           "description" => "unsafe block"
+         },
+         %{
+           "category" => "PanicPath",
+           "location" => "src/lib.rs",
+           "severity" => "Medium",
+           "description" => "expect"
+         }
+       ]},
+      {"repo-beta", "elixir",
+       [
+         %{
+           "category" => "PanicPath",
+           "location" => "lib/worker.ex",
+           "severity" => "Medium",
+           "description" => "raise"
+         },
+         %{
+           "category" => "InputValidation",
+           "location" => "lib/api.ex",
+           "severity" => "High",
+           "description" => "unsanitized"
+         }
+       ]},
+      {"repo-gamma", "rust",
+       [
+         %{
+           "category" => "PanicPath",
+           "location" => "src/core.rs",
+           "severity" => "Medium",
+           "description" => "unwrap"
+         },
+         %{
+           "category" => "PanicPath",
+           "location" => "src/net.rs",
+           "severity" => "High",
+           "description" => "index panic"
+         },
+         %{
+           "category" => "UnsafeCode",
+           "location" => "src/sys.rs",
+           "severity" => "High",
+           "description" => "transmute"
+         }
+       ]},
+      {"repo-delta", "javascript",
+       [
+         %{
+           "category" => "InputValidation",
+           "location" => "src/handler.js",
+           "severity" => "High",
+           "description" => "XSS"
+         },
+         %{
+           "category" => "PanicPath",
+           "location" => "src/index.js",
+           "severity" => "Low",
+           "description" => "throw"
+         }
+       ]}
     ]
   end
 
@@ -70,7 +124,8 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
       assert health.total_scans == 4
       assert health.repos_scanned == 4
-      assert health.total_weak_points == 0  # Weak points are in document body, not directly accessible
+      # Weak points are in document body, not directly accessible
+      assert health.total_weak_points == 0
     end
   end
 

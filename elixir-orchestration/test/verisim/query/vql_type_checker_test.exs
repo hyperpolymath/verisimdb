@@ -23,7 +23,10 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
 
   describe "parse_proof_specs/1" do
     test "splits AND-connected proofs" do
-      specs = VQLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(entity-001) AND PROVENANCE(entity-001)"})
+      specs =
+        VQLTypeChecker.parse_proof_specs(%{
+          raw: "EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
+        })
 
       assert length(specs) == 2
       assert Enum.at(specs, 0).proofType == "EXISTENCE"
@@ -57,9 +60,8 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
     end
 
     test "handles three proofs" do
-      specs = VQLTypeChecker.parse_proof_specs(
-        %{raw: "EXISTENCE(a) AND PROVENANCE(b) AND INTEGRITY(c)"}
-      )
+      specs =
+        VQLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(a) AND PROVENANCE(b) AND INTEGRITY(c)"})
 
       assert length(specs) == 3
       assert Enum.map(specs, & &1.proofType) == ["EXISTENCE", "PROVENANCE", "INTEGRITY"]
@@ -82,6 +84,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         %{proofType: "EXISTENCE", contractName: "a"},
         %{proofType: "INTEGRITY", contractName: "b"}
       ]
+
       specs = VQLTypeChecker.parse_proof_specs(input)
 
       assert length(specs) == 2
@@ -308,9 +311,10 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
       {:ok, info} = VQLTypeChecker.typecheck(ast)
 
       assert info.total_estimated_ms > 0
+
       assert info.total_estimated_ms ==
-        Enum.at(info.proof_obligations, 0).estimated_time_ms +
-        Enum.at(info.proof_obligations, 1).estimated_time_ms
+               Enum.at(info.proof_obligations, 0).estimated_time_ms +
+                 Enum.at(info.proof_obligations, 1).estimated_time_ms
     end
 
     test "provenance circuit is provenance-proof-v1" do
@@ -402,14 +406,17 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
 
       for {type, modalities, contract} <- test_cases do
         proof_type_str = type |> Atom.to_string() |> String.upcase()
+
         ast = %{
           modalities: modalities,
           proof: [%{proofType: proof_type_str, contractName: contract}]
         }
 
         result = VQLTypeChecker.typecheck(ast)
+
         assert {:ok, info} = result,
-          "#{proof_type_str} should be accepted, got: #{inspect(result)}"
+               "#{proof_type_str} should be accepted, got: #{inspect(result)}"
+
         assert Enum.at(info.proof_obligations, 0).type == type
       end
     end

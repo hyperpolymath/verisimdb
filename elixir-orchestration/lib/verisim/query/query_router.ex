@@ -66,6 +66,7 @@ defmodule VeriSim.QueryRouter do
       avg_latency_ms: 0.0,
       total_latency_ms: 0
     }
+
     {:ok, state}
   end
 
@@ -90,6 +91,7 @@ defmodule VeriSim.QueryRouter do
       queries_by_type: state.query_by_type,
       avg_latency_ms: state.avg_latency_ms
     }
+
     {:reply, stats, state}
   end
 
@@ -176,11 +178,12 @@ defmodule VeriSim.QueryRouter do
 
     new_by_type = Map.update(state.query_by_type, type, 1, &(&1 + 1))
 
-    %{state |
-      query_count: new_count,
-      query_by_type: new_by_type,
-      avg_latency_ms: new_avg,
-      total_latency_ms: new_total
+    %{
+      state
+      | query_count: new_count,
+        query_by_type: new_by_type,
+        avg_latency_ms: new_avg,
+        total_latency_ms: new_total
     }
   end
 end
