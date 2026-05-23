@@ -40,7 +40,7 @@ readme = "README.adoc"
 [workspace.dependencies]
 # Graph modality — SimpleGraphStore is default (pure Rust, no C++ linker needed).
 # Enable oxigraph-backend feature on verisim-graph for full RDF/SPARQL support.
-oxigraph = "0.4"
+oxigraph = "0.5"
 
 # Vector modality (HNSW)
 hnsw_rs = "0.3"
