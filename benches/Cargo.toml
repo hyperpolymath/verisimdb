@@ -13,7 +13,7 @@ path = "modality_benchmarks.rs"
 harness = false
 
 [dependencies]
-criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+criterion = { version = "0.8", features = ["async_tokio", "html_reports"] }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.11", features = ["v4"] }
 futures = "0.3"
