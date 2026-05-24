@@ -10,6 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+uuid = "1.23"
 
 [dependencies.verisim-octad]
 path = "../rust-core/verisim-octad"

@@ -7,6 +7,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+publish = false  # workspace-internal; path deps cannot be published to crates.io
 
 [dependencies]
 verisim-octad = { path = "../verisim-octad" }

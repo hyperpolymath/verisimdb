@@ -110,3 +110,7 @@ temp/
 
 # Crash recovery artifacts
 ai-cli-crash-capture/
+
+# Fuzz harness build artifacts
+fuzz/target/
+rust-core/fuzz/target/

@@ -61,6 +61,7 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@v6
+
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.17"
