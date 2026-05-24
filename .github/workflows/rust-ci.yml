@@ -71,6 +71,15 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
   bench-compile:
     name: benchmarks compile
     runs-on: ubuntu-latest
@@ -79,3 +88,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo bench --no-run
+
+  fuzz-compile:
+    name: fuzz targets compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        manifest:
+          - fuzz/Cargo.toml
+          - rust-core/fuzz/Cargo.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --manifest-path ${{ matrix.manifest }}

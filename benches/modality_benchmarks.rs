@@ -13,9 +13,9 @@ use verisim_octad::{
     InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadInput, OctadSemanticInput,
     OctadSnapshot, OctadStore, OctadVectorInput,
 };
-use verisim_provenance::InMemoryProvenanceStore;
+use verisim_provenance::{InMemoryProvenanceStore, ProvenanceEventType, ProvenanceStore};
 use verisim_semantic::{InMemorySemanticStore, ProofBlob, ProofType, SemanticStore, SemanticType};
-use verisim_spatial::InMemorySpatialStore;
+use verisim_spatial::{Coordinates, GeometryType, InMemorySpatialStore, SpatialData, SpatialStore};
 use verisim_temporal::{InMemoryVersionStore, TemporalStore};
 use verisim_tensor::{InMemoryTensorStore, ReduceOp, Tensor, TensorStore};
 use verisim_vector::{DistanceMetric, Embedding, HnswConfig, HnswVectorStore, VectorStore};
@@ -598,6 +598,148 @@ fn bench_temporal_operations(c: &mut Criterion) {
 }
 
 // ============================================================================
+// Spatial Store Benchmarks
+// ============================================================================
+
+fn bench_spatial_operations(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let mut group = c.benchmark_group("spatial");
+
+    // Index throughput.  Use a small deterministic walk that stays inside
+    // [-90, 90] / [-180, 180] no matter how many iterations criterion runs.
+    group.bench_function("index_point", |b| {
+        let store = InMemorySpatialStore::new();
+        let mut counter = 0u64;
+        b.to_async(&rt).iter(|| {
+            counter = counter.wrapping_add(1);
+            let entity_id = format!("spatial-{}", counter);
+            // Lattice walk: 360x180 cells centred on (0, 0); cycles forever.
+            let lat = ((counter % 180) as f64) - 90.0 + 0.5;
+            let lon = (((counter / 180) % 360) as f64) - 180.0 + 0.5;
+            let data = SpatialData {
+                coordinates: Coordinates::new(lat, lon, None).unwrap(),
+                geometry_type: GeometryType::Point,
+                srid: 4326,
+                properties: HashMap::new(),
+            };
+            let store_ref = &store;
+            async move {
+                store_ref.index(&entity_id, data).await.unwrap();
+                black_box(())
+            }
+        });
+    });
+
+    // Pre-populate 1000 points (clustered around London) for query bench
+    let query_store = InMemorySpatialStore::new();
+    rt.block_on(async {
+        for i in 0..1000 {
+            let lat = 51.5074 + ((i as f64) - 500.0) * 0.001;
+            let lon = -0.1278 + ((i as f64) - 500.0) * 0.001;
+            let data = SpatialData {
+                coordinates: Coordinates::new(lat, lon, None).unwrap(),
+                geometry_type: GeometryType::Point,
+                srid: 4326,
+                properties: HashMap::new(),
+            };
+            query_store.index(&format!("p-{}", i), data).await.unwrap();
+        }
+    });
+    let centre = Coordinates::new(51.5074, -0.1278, None).unwrap();
+
+    group.bench_function("search_radius_5km", |b| {
+        b.to_async(&rt).iter(|| async {
+            black_box(query_store.search_radius(&centre, 5.0, 100).await.unwrap())
+        });
+    });
+
+    group.bench_function("nearest_10", |b| {
+        b.to_async(&rt)
+            .iter(|| async { black_box(query_store.nearest(&centre, 10).await.unwrap()) });
+    });
+
+    group.finish();
+}
+
+// ============================================================================
+// Provenance Store Benchmarks
+// ============================================================================
+
+fn bench_provenance_operations(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let mut group = c.benchmark_group("provenance");
+
+    // Hash-chain append throughput on a long chain
+    group.bench_function("record_event_append", |b| {
+        let store = InMemoryProvenanceStore::new();
+        let entity = "chain-entity";
+        // Seed with a genesis record
+        rt.block_on(async {
+            store
+                .record_event(
+                    entity,
+                    ProvenanceEventType::Created,
+                    "bench",
+                    None,
+                    "genesis",
+                )
+                .await
+                .unwrap();
+        });
+        b.to_async(&rt).iter(|| {
+            let store_ref = &store;
+            async move {
+                store_ref
+                    .record_event(
+                        entity,
+                        ProvenanceEventType::Modified,
+                        "bench",
+                        None,
+                        "tick",
+                    )
+                    .await
+                    .unwrap();
+                black_box(())
+            }
+        });
+    });
+
+    // Build a 1000-event chain for verify + lookup benches
+    let chain_store = InMemoryProvenanceStore::new();
+    rt.block_on(async {
+        chain_store
+            .record_event("e-1", ProvenanceEventType::Created, "actor-0", None, "init")
+            .await
+            .unwrap();
+        for i in 1..1000 {
+            chain_store
+                .record_event(
+                    "e-1",
+                    ProvenanceEventType::Modified,
+                    &format!("actor-{}", i % 10),
+                    None,
+                    "edit",
+                )
+                .await
+                .unwrap();
+        }
+    });
+
+    group.bench_function("verify_chain_1000", |b| {
+        b.to_async(&rt)
+            .iter(|| async { black_box(chain_store.verify_chain("e-1").await.unwrap()) });
+    });
+
+    group.bench_function("search_by_actor", |b| {
+        b.to_async(&rt).iter(|| async {
+            black_box(chain_store.search_by_actor("actor-3").await.unwrap())
+        });
+    });
+
+    group.finish();
+}
+
+// ============================================================================
 // Benchmark Groups
 // ============================================================================
 
@@ -623,6 +765,10 @@ criterion_group!(semantic_benches, bench_semantic_operations);
 
 criterion_group!(temporal_benches, bench_temporal_operations);
 
+criterion_group!(spatial_benches, bench_spatial_operations);
+
+criterion_group!(provenance_benches, bench_provenance_operations);
+
 criterion_main!(
     document_benches,
     vector_benches,
@@ -632,5 +778,7 @@ criterion_main!(
     cross_modal_benches,
     tensor_benches,
     semantic_benches,
-    temporal_benches
+    temporal_benches,
+    spatial_benches,
+    provenance_benches
 );

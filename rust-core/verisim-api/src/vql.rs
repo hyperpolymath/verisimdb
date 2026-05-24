@@ -213,7 +213,9 @@ async fn validate_with_typell(query: &str) -> Option<(u8, String, Vec<String>)> 
     Some((level, path, obligations))
 }
 
-fn tokenize(input: &str) -> Vec<String> {
+/// Tokenize a VQL query into whitespace-separated tokens, respecting
+/// quoted strings.  Public so fuzz targets can exercise it.
+pub fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut in_single_quote = false;

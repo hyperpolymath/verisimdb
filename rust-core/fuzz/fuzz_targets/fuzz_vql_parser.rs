@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
         if input.len() <= 4096 {
             // The parser should never panic on any valid UTF-8 input.
             // We don't care about the result — only that it doesn't crash.
-            let _ = verisim_api::vql::parse(input);
+            let _ = verisim_api::vql::tokenize(input);
         }
     }
 });
