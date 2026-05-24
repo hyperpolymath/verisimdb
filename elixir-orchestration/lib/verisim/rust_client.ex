@@ -480,7 +480,7 @@ defmodule VeriSim.RustClient do
   # string. When a non-VeriSimDB server (e.g. nginx) sits on the configured
   # port, Req returns status 200 with an HTML string body. Without this check,
   # upstream code crashes trying to enumerate/map over a binary.
-  defp validate_json_response(%{status: status, body: body} = resp)
+  defp validate_json_response(%{status: _status, body: body} = resp)
        when is_map(body) or is_list(body) do
     {:ok, resp}
   end

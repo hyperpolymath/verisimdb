@@ -415,39 +415,10 @@ defmodule VeriSim.Query.VQLBridge do
     end
   end
 
-  defp parse_select(["SELECT" | rest]) do
-    {modalities, rest} = take_modalities(rest, [])
-    {:ok, modalities, rest}
-  end
-
-  defp parse_select(_), do: {:error, "Expected SELECT"}
-
-  defp take_modalities(["GRAPH" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:graph | acc])
-
-  defp take_modalities(["VECTOR" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:vector | acc])
-
-  defp take_modalities(["TENSOR" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:tensor | acc])
-
-  defp take_modalities(["SEMANTIC" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:semantic | acc])
-
-  defp take_modalities(["DOCUMENT" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:document | acc])
-
-  defp take_modalities(["TEMPORAL" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:temporal | acc])
-
-  defp take_modalities(["PROVENANCE" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:provenance | acc])
-
-  defp take_modalities(["SPATIAL" | rest], acc),
-    do: take_modalities(strip_comma(rest), [:spatial | acc])
-
-  defp take_modalities(["*" | rest], acc), do: take_modalities(strip_comma(rest), [:all | acc])
-  defp take_modalities(rest, acc), do: {Enum.reverse(acc), rest}
+  # parse_select/1 and take_modalities/2 were the original simple parser; the
+  # current grammar uses parse_select_extended/1 which handles projections and
+  # aggregates as well.  Kept strip_comma/1 since it's still used by the
+  # extended parser below.
 
   defp strip_comma(["," <> token | rest]) when token != "" do
     [token | rest]
