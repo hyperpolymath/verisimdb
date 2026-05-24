@@ -137,7 +137,7 @@ impl ProvenanceRecord {
         });
         let bytes = canonical.to_string().into_bytes();
         let digest = Sha256::digest(&bytes);
-        format!("{:x}", digest)
+        digest.iter().map(|b| format!("{:02x}", b)).collect()
     }
 
     /// Build a new record, computing its `content_hash` automatically.
@@ -222,7 +222,7 @@ impl ProvenanceChain {
     /// Get the hash of the genesis record (SHA-256 of "").
     fn genesis_hash() -> String {
         let digest = Sha256::digest(b"");
-        format!("{:x}", digest)
+        digest.iter().map(|b| format!("{:02x}", b)).collect()
     }
 
     /// Verify the entire hash chain.
