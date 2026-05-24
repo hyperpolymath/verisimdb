@@ -103,13 +103,7 @@ async fn search_by_actor_returns_matching_records_across_entities() {
         .await
         .unwrap();
     store
-        .record_event(
-            "e2",
-            ProvenanceEventType::Created,
-            "bob",
-            None,
-            "bob on e2",
-        )
+        .record_event("e2", ProvenanceEventType::Created, "bob", None, "bob on e2")
         .await
         .unwrap();
     store

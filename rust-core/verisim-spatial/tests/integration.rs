@@ -8,9 +8,7 @@
 //! `#[cfg(test)]` module of src/lib.rs.
 
 use std::collections::HashMap;
-use verisim_spatial::{
-    Coordinates, GeometryType, InMemorySpatialStore, SpatialData, SpatialStore,
-};
+use verisim_spatial::{Coordinates, GeometryType, InMemorySpatialStore, SpatialData, SpatialStore};
 
 fn point_at(lat: f64, lon: f64) -> SpatialData {
     SpatialData {
@@ -81,10 +79,7 @@ async fn search_radius_excludes_points_beyond_distance() {
 #[tokio::test]
 async fn search_radius_includes_self_with_zero_distance() {
     let store = InMemorySpatialStore::new();
-    store
-        .index("origin", point_at(0.0, 0.0))
-        .await
-        .unwrap();
+    store.index("origin", point_at(0.0, 0.0)).await.unwrap();
 
     let origin = Coordinates::new(0.0, 0.0, None).unwrap();
     let results = store.search_radius(&origin, 1.0, 10).await.unwrap();

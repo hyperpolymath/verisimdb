@@ -172,7 +172,7 @@ defmodule VeriSim.Federation.Adapters.DuckDB do
       :document in modalities && Map.has_key?(query_params, :text_query) ->
         # FTS extension: fts_main_{table}.match_bm25
         text = query_params.text_query
-        fts_index = "fts_main_#{table}"
+        _fts_index = "fts_main_#{table}"
 
         sql = """
         SELECT *,

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Performance benchmarks for VeriSimDB modality stores
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashMap;
+use std::hint::black_box;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -690,13 +691,7 @@ fn bench_provenance_operations(c: &mut Criterion) {
             let store_ref = &store;
             async move {
                 store_ref
-                    .record_event(
-                        entity,
-                        ProvenanceEventType::Modified,
-                        "bench",
-                        None,
-                        "tick",
-                    )
+                    .record_event(entity, ProvenanceEventType::Modified, "bench", None, "tick")
                     .await
                     .unwrap();
                 black_box(())
@@ -731,9 +726,8 @@ fn bench_provenance_operations(c: &mut Criterion) {
     });
 
     group.bench_function("search_by_actor", |b| {
-        b.to_async(&rt).iter(|| async {
-            black_box(chain_store.search_by_actor("actor-3").await.unwrap())
-        });
+        b.to_async(&rt)
+            .iter(|| async { black_box(chain_store.search_by_actor("actor-3").await.unwrap()) });
     });
 
     group.finish();

@@ -44,7 +44,6 @@ defmodule VeriSim.Consensus.KRaftNode do
   @election_timeout_min 150
   @election_timeout_max 300
   @heartbeat_interval 50
-  @tick_interval 10
   @snapshot_interval 1000
 
   # ---------------------------------------------------------------------------
