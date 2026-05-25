@@ -1,0 +1,16 @@
+{
+  "coverage_options": {
+    "treat_no_relevant_lines_as_covered": true,
+    "output_dir": "cover/",
+    "template_path": "./deps/excoveralls/lib/templates/html/htmlcov/",
+    "minimum_coverage": 60,
+    "print_summary": true,
+    "print_files": true
+  },
+  "skip_files": [
+    "test/",
+    "deps/",
+    "_build/",
+    "lib/mix/tasks/"
+  ]
+}

@@ -12,6 +12,14 @@ defmodule VeriSim.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       aliases: aliases(),
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ],
+      test_coverage: [tool: ExCoveralls],
       releases: [
         verisim: [
           include_executables_for: [:unix],
@@ -67,6 +75,12 @@ defmodule VeriSim.MixProject do
       {:ex_machina, "~> 2.7", only: :test},
       {:mox, "~> 1.0", only: :test},
       {:stream_data, "~> 1.1", only: [:test, :dev]},
+      {:excoveralls, "~> 0.18", only: :test},
+
+      # Benchmarking
+      {:benchee, "~> 1.3", only: [:dev, :test]},
+      {:benchee_html, "~> 1.0", only: [:dev, :test]},
+      {:benchee_json, "~> 1.0", only: [:dev, :test]},
 
       # Optional: native protocol adapters for federation
       # These are only needed when using :wire protocol instead of HTTP
@@ -88,7 +102,10 @@ defmodule VeriSim.MixProject do
     [
       setup: ["deps.get"],
       test: ["test"],
-      "test.watch": ["test.watch"]
+      "test.watch": ["test.watch"],
+      coverage: ["coveralls"],
+      "coverage.html": ["coveralls.html"],
+      bench: ["run -e 'VeriSim.Bench.run_all()'"]
     ]
   end
 end
