@@ -207,7 +207,7 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
       # Find which one is leader
       leader_diag = KRaftNode.diagnostics(leader_id)
 
-      {actual_leader, actual_follower, actual_follower_pid} =
+      {actual_leader, actual_follower, _actual_follower_pid} =
         if leader_diag.role == :leader do
           {leader_id, follower_id, follower_pid}
         else

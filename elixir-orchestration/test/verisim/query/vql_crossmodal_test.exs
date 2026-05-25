@@ -33,7 +33,6 @@ defmodule VeriSim.Query.VQLCrossModalTest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.VQLBridge
   alias VeriSim.Test.VQLTestHelpers, as: H
 
   setup_all do
