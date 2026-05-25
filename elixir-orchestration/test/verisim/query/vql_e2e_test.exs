@@ -28,7 +28,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.{VQLBridge, VQLExecutor, VQLTypeChecker, VQLProofCertificate}
+  alias VeriSim.Query.{VQLTypeChecker, VQLProofCertificate}
   alias VeriSim.Test.VQLTestHelpers, as: H
 
   setup_all do

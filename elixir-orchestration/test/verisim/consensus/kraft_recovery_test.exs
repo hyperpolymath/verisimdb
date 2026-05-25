@@ -26,7 +26,7 @@ defmodule VeriSim.Consensus.KRaftRecoveryTest do
     "#{prefix}-#{System.unique_integer([:positive])}"
   end
 
-  defp start_node(node_id, opts \\ []) do
+  defp start_node(node_id, opts) do
     {:ok, pid} = KRaftNode.start_link([node_id: node_id] ++ opts)
     pid
   end

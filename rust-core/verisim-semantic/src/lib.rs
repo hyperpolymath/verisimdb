@@ -356,12 +356,12 @@ impl SemanticStore for InMemorySemanticStore {
             if let Some(typ) = types.get(type_iri) {
                 for constraint in &typ.constraints {
                     match &constraint.kind {
-                        ConstraintKind::Required(prop) => {
-                            if !annotation.properties.contains_key(prop) {
-                                violations
-                                    .push(format!("{}: {}", constraint.name, constraint.message));
-                            }
+                        ConstraintKind::Required(prop)
+                            if !annotation.properties.contains_key(prop) =>
+                        {
+                            violations.push(format!("{}: {}", constraint.name, constraint.message));
                         }
+                        ConstraintKind::Required(_) => {}
                         ConstraintKind::Pattern { property, regex } => {
                             if let Some(SemanticValue::TypedLiteral { value, .. }) =
                                 annotation.properties.get(property)
