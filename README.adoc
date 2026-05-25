@@ -459,16 +459,51 @@ ZKP proofs and dependent types enable tamper-evident knowledge exchange. VQL-DT 
 
 == Documentation
 
-* link:docs/vql-grammar.ebnf[VQL Grammar] — Formal EBNF specification
-* link:docs/vql-formal-semantics.adoc[VQL Formal Semantics] — Operational semantics
-* link:docs/vql-type-system.adoc[VQL Type System] — Dependent types and bidirectional type checking
-* link:docs/drift-handling.adoc[Drift Handling] — Detection, repair, federation drift
-* link:docs/safety-and-fault-tolerance.adoc[Safety & Fault Tolerance] — Memory, kernel, platform, supply chain safety
-* link:docs/deployment-modes.adoc[Deployment Modes] — Standalone, federated, hybrid
-* link:docs/getting-started.adoc[Getting Started] — Step-by-step setup guide
-* link:docs/adoption-strategy.adoc[Adoption Strategy] — Target domains and rollout plan
-* link:docs/VQL-SPEC.adoc[VQL Specification] — 2785-line normative language spec
-* link:docs/papers/[White Papers] — Academic and industry papers
+See link:docs/INDEX.md[docs/INDEX.md] for the complete documentation tree.
+
+Quick links:
+
+* link:ROADMAP.md[Roadmap] — criticality-ordered work plan (Phase 1–8)
+* link:CHANGELOG.adoc[Changelog] — versioned history of all notable changes
+* link:TESTING.md[Testing & Benchmarking Standards] — CI gates, property tests, fuzz corpus
+* link:KNOWN-ISSUES.adoc[Known Issues] — honest-gaps audit (25/25 resolved)
+* link:SECURITY.md[Security Policy] — threat model and disclosure process
+* link:AUDIT.adoc[Audit Index] — RSR audit-trail index
+
+VQL language:
+
+* link:docs/getting-started.adoc[Getting Started] — step-by-step setup guide
+* link:docs/VQL-SPEC.adoc[VQL Specification] — normative language spec
+* link:docs/vql-grammar.ebnf[VQL Grammar] — formal EBNF
+* link:docs/vql-formal-semantics.adoc[VQL Formal Semantics] — operational semantics
+* link:docs/vql-type-system.adoc[VQL Type System] — dependent types + bidirectional checking
+* link:docs/vql-examples.adoc[VQL Examples] — worked examples
+
+Deployment & operations:
+
+* link:docs/deployment/deployment.adoc[Deployment Guide] — Podman, selur-compose, Containerfile
+* link:docs/deployment/void-setup.md[Void Linux Dev Setup]
+* link:docs/deployment-modes.adoc[Deployment Modes] — standalone, federated, hybrid
+* link:docs/safety-and-fault-tolerance.adoc[Safety & Fault Tolerance]
+* link:docs/drift-handling.adoc[Drift Handling] — detection, repair, federation drift
+
+Architecture & decisions:
+
+* link:docs/architecture/topology.md[Process Topology]
+* link:docs/architecture/abi-ffi.md[ABI/FFI Contract]
+* link:docs/decisions/rust-spark-stance.adoc[Why Rust] (decision record)
+* link:docs/decisions/kraft-comparison.adoc[Why KRaft] (decision record)
+* link:docs/decisions/proven-coherence.md[Proven Library Integration]
+
+Papers:
+
+* link:docs/papers/whitepaper.md[VeriSimDB Whitepaper] (Markdown source)
+* link:docs/papers/whitepaper.pdf[Whitepaper PDF]
+* link:docs/papers/arcvix-octad-data-model.tex[ARCVIX Octad Data-Model Paper]
+
+Releases:
+
+* link:docs/releases/v0.1.0-alpha.md[v0.1.0-alpha Release Notes]
 
 == License
 
@@ -476,4 +511,4 @@ MPL-2.0
 
 == Contributing
 
-See CONTRIBUTING.adoc for guidelines.
+See link:CONTRIBUTING.md[CONTRIBUTING.md] for guidelines.
