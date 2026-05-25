@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= VeriSimDB Audit Index
+:toc: left
+:toclevels: 2
+
+This file is the audit-trail index that the
+https://github.com/hyperpolymath/rsr-template-repo[rsr-template-repo]
+convention expects at the repository root. It points to the live
+audit artefacts; it doesn't duplicate their content.
+
+== Known issues & honest gaps
+
+See link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc].
+
+Tracks open and resolved technical gaps. Every item names the affected
+location, the original problem, the resolution (or current status), and
+the impact. As of 2026-05-25 all 25 catalogued issues are resolved; the
+file is preserved as the audit trail.
+
+== Testing & benchmarking standards
+
+See link:TESTING.md[TESTING.md].
+
+Documents the test pyramid, hard CI gates per language, property-test
+patterns, fuzz corpus location, supply-chain checks, and the next-tier
+standards (mutation testing, snapshot testing, differential testing,
+concurrency model-checking, bench-as-PR-gate, AFL++).
+
+== Security policy
+
+See link:SECURITY.md[SECURITY.md].
+
+Threat model, disclosure process, supported versions.
+
+== Changelog
+
+See link:CHANGELOG.adoc[CHANGELOG.adoc].
+
+Versioned history of all notable changes.  Release announcements (narrative,
+non-canonical) live under link:docs/releases/[docs/releases/].
+
+== Documentation index
+
+See link:docs/INDEX.md[docs/INDEX.md] for the full documentation tree.
+
+== Machine-readable state
+
+See link:.machine_readable/[.machine_readable/]:
+
+- `STATE.scm` — current project state and progress
+- `META.scm` — architecture decisions and development practices
+- `ECOSYSTEM.scm` — position in the ecosystem and related projects
