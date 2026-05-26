@@ -38,12 +38,12 @@ jobs:
           - elixir: "1.17"
             otp: "27"
     steps:
-      - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
             elixir-orchestration/deps
@@ -63,12 +63,12 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
         with:
           elixir-version: "1.17"
           otp-version: "27"
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
             elixir-orchestration/deps
@@ -76,7 +76,7 @@ jobs:
           key: ${{ runner.os }}-mix-coverage-${{ hashFiles('elixir-orchestration/mix.lock') }}
       - run: mix deps.get
       - run: mix coveralls.json
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           files: elixir-orchestration/cover/excoveralls.json
           flags: elixir
@@ -90,12 +90,12 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
         with:
           elixir-version: "1.17"
           otp-version: "27"
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: |
             elixir-orchestration/deps
@@ -116,9 +116,9 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
         with:
           elixir-version: "1.17"
           otp-version: "27"
