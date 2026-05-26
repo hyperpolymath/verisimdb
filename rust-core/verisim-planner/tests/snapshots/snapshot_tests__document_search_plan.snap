@@ -1,0 +1,21 @@
+---
+source: rust-core/verisim-planner/tests/snapshot_tests.rs
+description: Single-modality document search (LIMIT 10)
+expression: explain
+---
+steps:
+  - step: 1
+    operation: Document fulltext search (1 conditions)
+    modality: document
+    estimated_cost_ms: 24.24
+    estimated_selectivity: 0.0005
+    estimated_rows: 1
+    optimization_hint: "Tantivy fulltext: \"machine learning\""
+cost_breakdown:
+  - modality: document
+    time_ms: 24.24
+    percentage: 100
+performance_hints: []
+total_cost_ms: 24.24
+strategy: Sequential
+text_output: "=== VeriSimDB Query Plan ===\n\nStrategy: Sequential\nTotal Estimated Cost: 24.2ms\n\n--- Steps ---\n  Step 1: Document fulltext search (1 conditions) [document]\n    Cost: 24.2ms | Selectivity: 0.05% | Rows: ~1\n    Hint: Tantivy fulltext: \"machine learning\"\n\n--- Cost Breakdown ---\n  document: 24.2ms (100.0%)\n"

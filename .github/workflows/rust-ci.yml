@@ -113,6 +113,39 @@ jobs:
       - name: Enforce minimum coverage
         run: cargo llvm-cov --workspace --summary-only --fail-under-lines 60
 
+  mutants:
+    # Mutation testing — runs only on workflow_dispatch + scheduled because
+    # full-workspace mutants can take >20 min.  For PRs the recommended
+    # invocation is `cargo mutants --in-diff origin/main` which we can wire
+    # into a separate pr-mutants.yml once the suite stabilises.
+    name: cargo-mutants (on-demand)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: Run mutation tests on core invariant crates
+        run: |
+          cargo mutants \
+            -p verisim-drift \
+            -p verisim-normalizer \
+            -p verisim-spatial \
+            -p verisim-provenance \
+            -p verisim-semantic \
+            -p verisim-octad \
+            --no-shuffle \
+            --output mutants-out/
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutants-report
+          path: mutants-out/
+
   fuzz-compile:
     name: fuzz targets compile
     runs-on: ubuntu-latest

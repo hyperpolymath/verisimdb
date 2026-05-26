@@ -1,0 +1,33 @@
+---
+source: rust-core/verisim-planner/tests/snapshot_tests.rs
+description: Two-modality graph + vector; expect parallel strategy with vector first
+expression: explain
+---
+steps:
+  - step: 1
+    operation: Vector similarity search (1 conditions)
+    modality: vector
+    estimated_cost_ms: 40
+    estimated_selectivity: 0.001
+    estimated_rows: 1
+    optimization_hint: HNSW ANN search (k=10)
+  - step: 2
+    operation: Graph traversal (1 conditions)
+    modality: graph
+    estimated_cost_ms: 225
+    estimated_selectivity: 0.4
+    estimated_rows: 1
+    optimization_hint: "Graph traversal: relates_to (depth=2)"
+cost_breakdown:
+  - modality: graph
+    time_ms: 225
+    percentage: 84.90566037735849
+  - modality: vector
+    time_ms: 40
+    percentage: 15.09433962264151
+performance_hints:
+  - severity: info
+    message: "Step 2 (graph) costs 225ms — Graph traversal: relates_to (depth=2)"
+total_cost_ms: 225
+strategy: Parallel
+text_output: "=== VeriSimDB Query Plan ===\n\nStrategy: Parallel\nTotal Estimated Cost: 225.0ms\n\n--- Steps ---\n  Step 1: Vector similarity search (1 conditions) [vector]\n    Cost: 40.0ms | Selectivity: 0.10% | Rows: ~1\n    Hint: HNSW ANN search (k=10)\n  Step 2: Graph traversal (1 conditions) [graph]\n    Cost: 225.0ms | Selectivity: 40.00% | Rows: ~1\n    Hint: Graph traversal: relates_to (depth=2)\n\n--- Cost Breakdown ---\n  graph: 225.0ms (84.9%)\n  vector: 40.0ms (15.1%)\n\n--- Performance Hints ---\n  [info] Step 2 (graph) costs 225ms — Graph traversal: relates_to (depth=2)\n"

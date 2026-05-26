@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: MPL-2.0
+#
+# Configuration for cargo-mutants — mutation testing.
+#
+# Usage:
+#   cargo mutants                          # run on the whole workspace
+#   cargo mutants --in-diff <ref>          # only mutate code changed vs <ref>
+#   cargo mutants -p verisim-drift         # focus on a single crate
+#   cargo mutants --shard 0/4              # parallel sharding
+#
+# What mutation testing does: it inserts small bug-like changes into your
+# code (e.g. `>` → `>=`, `+` → `-`, `true` → `false`) and runs the test
+# suite. A mutant that survives means your tests don't distinguish the
+# buggy version from the original — you have a coverage gap that line/branch
+# metrics can't see.
+#
+# Target mutation score: 75-85% on core invariants (drift, normaliser,
+# octad). HTTP glue and trace setup are exempt because mutating them
+# produces uninteresting survivors.
+
+# ---------------------------------------------------------------------------
+# Scope
+# ---------------------------------------------------------------------------
+
+# Skip generated code, vendored protos, and crates whose value lies in
+# their I/O surface rather than their logic.
+exclude_globs = [
+    # Generated protobuf code — mutating it tests nothing real
+    "rust-core/verisim-api/src/proto/**",
+    # Repl/binary entry points — mutations here exercise rustyline/atty
+    # rather than VeriSimDB logic
+    "rust-core/verisim-repl/src/main.rs",
+    "rust-core/verisim-api/src/main.rs",
+    # Fuzz harnesses — mutations would just make them not fuzz
+    "fuzz/**",
+    "rust-core/fuzz/**",
+    # Benchmarks — mutations break bench harness, not project logic
+    "benches/**",
+    # Build scripts
+    "**/build.rs",
+]
+
+# Match cargo-mutants' default mutator set.  If a specific mutator produces
+# too much noise (e.g. constant-replacement on cost-model coefficients that
+# are themselves heuristic), pin operators here:
+# operators = ["binop", "logop", "bool_lit", "return"]
+
+# ---------------------------------------------------------------------------
+# Test execution
+# ---------------------------------------------------------------------------
+
+# Use cargo nextest if available — significantly faster than cargo test for
+# large mutation runs.  Falls back to cargo test automatically.
+# test_tool = "nextest"
+
+# Per-mutant timeout multiplier — generous to avoid false-positive timeouts
+# on the slower spatial/temporal tests.
+timeout_multiplier = 3.0
+
+# Run the *baseline* (no mutation) once before applying mutants; if it fails
+# the run aborts early with a clear "your tests are broken before any mutation"
+# message rather than blaming the mutator.
+# (cargo-mutants does this by default; documented here for clarity.)
+
+# ---------------------------------------------------------------------------
+# Per-crate strategy
+# ---------------------------------------------------------------------------
+#
+# Mutation testing is most valuable where invariants are encoded in pure
+# functions: drift calculation, hash-chain integrity, constraint
+# evaluation, k-nearest sorting.  Less valuable for HTTP routing, error
+# message strings, and IPC glue.
+#
+# Priority crates (mutation score target ≥80%):
+#   - verisim-drift       (drift score arithmetic, threshold policies)
+#   - verisim-normalizer  (regeneration strategies, conflict resolution)
+#   - verisim-spatial     (haversine distance, R-tree search)
+#   - verisim-provenance  (hash-chain verification)
+#   - verisim-semantic    (constraint validation, ZKP primitives)
+#   - verisim-octad       (transaction state machine, WAL replay)
+#
+# Best-effort crates (no enforced floor):
+#   - verisim-api         (HTTP handlers — mutations land in plumbing)
+#   - verisim-repl        (CLI surface — see exclusions above)
+#   - verisim-graph       (in-memory dispatcher, thin layer)
+#
+# For PR CI, run `cargo mutants --in-diff origin/main` to only mutate
+# changed lines.  This keeps per-PR runtime under ~5 minutes for typical
+# changesets.
