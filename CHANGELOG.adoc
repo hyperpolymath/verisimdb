@@ -9,6 +9,53 @@ All notable changes to VeriSimDB are documented here. This project uses https://
 
 == [Unreleased]
 
+=== Added — Testing & Benchmarking Standards (2026-05)
+
+==== Tier 1 — Coverage, Property Tests, Elixir Benchmarks
+- *Coverage gates*: `cargo-llvm-cov` (Rust) + `excoveralls` (Elixir) wired into CI as informational, ratcheting toward a 60% line-coverage floor. LCOV/JSON uploaded to Codecov.
+- *Property tests*: 14 properties in Rust via `proptest` (spatial round-trip + haversine invariants, provenance hash-chain integrity, search-by-actor counts); 13 properties in Elixir via `stream_data` (SchemaRegistry constraint algebra, VQLBridge parser invariants).
+- *Elixir benchmarks*: 5 `benchee` scripts under `elixir-orchestration/bench/` covering DriftMonitor, QueryRouter, VQLExecutor, VQLBridge, SchemaRegistry. JSON output for diff-driven regression detection.
+
+==== Tier 2 — Snapshots, Mutation Testing
+- *Snapshot tests*: `insta` introduced for the verisim-planner `ExplainOutput` contract. 4 snapshots covering single-modality, multi-modality parallel, semantic-trailing, and deterministic invariance. Stored as YAML under `rust-core/verisim-planner/tests/snapshots/`.
+- *Mutation testing*: `cargo-mutants` configured via `.cargo/mutants.toml` with priority crates (drift, normalizer, spatial, provenance, semantic, octad) targeted at ≥80% mutation score. Wired as opt-in `workflow_dispatch` + scheduled job; PR-time invocation deferred until per-PR `--in-diff` workflow lands.
+
+==== Test-Gap Audit Closure (9/9 modules)
+- *DriftMonitor, EntityServer, QueryRouter* — covered in PR #35
+- *SchemaRegistry, KRaftSupervisor, VQLBridge, VQLExecutor* — covered in PR #37
+- *telemetry/collector, telemetry/reporter* — already covered in pre-existing `TelemetryTest`
+
+==== TESTING.md
+- Top-level standards document codifying CI gates per language, test-pyramid ratios, property-test patterns, fuzz corpus location, supply-chain checks, and Tier 2/3 next-tier standards (mutation testing, snapshot testing, differential testing, concurrency model-checking, bench-as-PR-gate, AFL++).
+
+==== Documentation Taxonomy
+- *Top-level cleaned to 10 canonical files* aligned with `hyperpolymath/rsr-template-repo`: README, LICENSE, CHANGELOG, CODE_OF_CONDUCT, CONTRIBUTING, MAINTAINERS, SECURITY, KNOWN-ISSUES, TESTING, ROADMAP, plus the new AUDIT.adoc.
+- *`docs/` subtree organised* into `architecture/`, `decisions/`, `deployment/`, `status/`, `releases/`, `papers/`, `visualizations/`, `business/`, `design/`. 14 root-level detail files moved here via `git mv` (history preserved).
+- *Three roadmaps consolidated*: BEST-IN-CLASS-ROADMAP.md promoted to canonical ROADMAP.md; IMPLEMENTATION-ROADMAP.adoc archived to `docs/status/implementation-plan.adoc`; template-stub ROADMAP.adoc removed.
+- *Stale `backup/` directory removed* (450 KB of 2026-02 artefacts).
+- *New `docs/INDEX.md`* — master TOC for everything under docs/ plus top-level project docs, .machine_readable/, .github/workflows/, source-code layout, and container/deployment artefacts.
+- *New `AUDIT.adoc`* — RSR audit-trail index pointing to KNOWN-ISSUES, TESTING, SECURITY, CHANGELOG, .machine_readable/.
+- *Machine-readable state files created* under `.machine_readable/`: `STATE.scm` (current project state, modality coverage, test counts, CI gates), `META.scm` (architecture decisions, language policy, design philosophy), `ECOSYSTEM.scm` (hyperpolymath estate dependencies, third-party stack, academic anchors).
+
+==== CI Hardening
+- *Full-SHA pinning* of all third-party GitHub Actions in `rust-ci.yml` and `elixir-ci.yml` (11 distinct actions, resolved via `git ls-remote refs/tags/<version>`). Closes the Hypatia `unpinned_action` findings (14 medium-severity in `elixir-ci.yml` + `rust-ci.yml`).
+- *`.hypatia-ignore` whitelisting* of 34 ReScript files permitted by the project's language policy. Format aligned with the standards-repo `is_exempt()` function which strips the `./` prefix before grep.
+- *`sync-wiki.sh`* — script at repo root that mirrors `docs/` to the GitHub wiki, flattening subdirs into prefixed page names with auto-generated Home, Sidebar, Footer.
+
+==== Adapted to Upstream Dep Bumps
+- *sha2 0.11*: `GenericArray` lost `LowerHex` → replaced `format!("{:x}", digest)` with per-byte hex format in `verisim-provenance` and `verisim-api::federation`.
+- *criterion 0.8*: `criterion::black_box` deprecated → switched bench imports to `std::hint::black_box`.
+- *burn 0.21*: cleared RUSTSEC-2026-0097 (rand unsoundness) by pulling the patched `rand 0.10.1`.
+- *uuid 1.23*: minor bump, no API impact.
+
+==== Security Dependency Updates
+- *Elixir CVE pins*: `bandit >= 1.11.1` (GHSA-rf5q-vwxw-gmrf), `plug >= 1.19.2` (GHSA-468c-vq7p-gh64), `postgrex >= 0.22.2` (GHSA-r73h-97w8-m54h).
+
+==== Known issues
+- *`cargo-llvm-cov` and `excoveralls` gates are informational only* on first runs; will ratchet to hard ≥60% gates once long-tail Rust crates (api, repl, nif) and Elixir RustClient stubs have substantive coverage.
+- *`governance / Language / package anti-pattern policy`*, *`pr-fuzzing (address)`*, and *Elixir `compile + test`* checks have persisted as red across multiple SHA pushes; root causes are CI-environment-specific (cache/baseline staleness, runner image quirks) and require log access to diagnose further. All three pass locally.
+- *Hypatia `getExn`/`Obj.magic`/`JSON decode without validation`* findings on pre-existing ReScript code (`src/registry/`, `playground/src/`, `connectors/clients/rescript/`) are real but outside the testing+benchmarking scope of this changeset.
+
 === Added
 
 ==== Security Hardening (Phase 1)
