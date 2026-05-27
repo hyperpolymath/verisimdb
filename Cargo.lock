@@ -8718,7 +8718,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "burn",
- "ndarray 0.16.1",
+ "ndarray 0.17.2",
  "proptest",
  "serde",
  "serde_json",
@@ -8735,7 +8735,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "criterion",
- "ndarray 0.16.1",
+ "ndarray 0.17.2",
  "proptest",
  "serde",
  "serde_json",

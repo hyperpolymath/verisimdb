@@ -44,7 +44,7 @@ oxigraph = "0.5"
 
 # Vector modality (HNSW)
 hnsw_rs = "0.3"
-ndarray = "0.16"
+ndarray = "0.17"
 
 # Tensor modality
 burn = "0.21"
