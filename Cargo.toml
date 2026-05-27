@@ -29,7 +29,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
-license = "MPL-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://gitlab.com/hyperpolymath/verisimdb"
 homepage = "https://github.com/hyperpolymath/verisimdb"
 documentation = "https://github.com/hyperpolymath/verisimdb/tree/main/docs"
@@ -44,7 +44,7 @@ oxigraph = "0.5"
 
 # Vector modality (HNSW)
 hnsw_rs = "0.3"
-ndarray = "0.16"
+ndarray = "0.17"
 
 # Tensor modality
 burn = "0.21"
@@ -85,7 +85,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 
 # Testing
-proptest = "1.4"
+proptest = "1.11"
 criterion = "0.8"
 insta = { version = "1.40", features = ["yaml", "json"] }
 
