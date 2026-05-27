@@ -170,15 +170,64 @@ the upstream chain.
 
 `mix hex.audit` and `mix deps.unlock --check-unused` on every Elixir PR.
 
+## Adopted Tier 2 standards
+
+### Snapshot testing — `insta` (Rust)
+
+Where to use it:
+- Public structured outputs whose shape is part of a contract — explain
+  plans, AST dumps, drift report JSON, normaliser plans.
+
+Patterns adopted:
+- `rust-core/verisim-planner/tests/snapshot_tests.rs` snapshots the
+  full `ExplainOutput` for three representative `LogicalPlan` fixtures
+  (single-modality document, two-modality graph+vector, semantic-proof
+  trailing). YAML format chosen so diffs read naturally.
+- Workflow when a snapshot fails:
+  1. `cargo insta review` — inspect the diff interactively
+  2. Accept legitimate changes or fix the regression
+  3. Commit the updated `tests/snapshots/*.snap` file
+- In CI snapshots are read-only (no `INSTA_UPDATE`): any drift fails
+  the build.
+
+Snapshots live under `<crate>/tests/snapshots/*.snap` and are
+human-readable YAML. Review them with `git log -p` like any other
+source file.
+
+### Mutation testing — `cargo-mutants` (Rust, opt-in)
+
+Configuration in `.cargo/mutants.toml`:
+- `exclude_globs` skips generated protobuf, bench harnesses, fuzz
+  harnesses, `main.rs` binaries, and build scripts (mutating them
+  produces uninteresting survivors).
+- `timeout_multiplier = 3.0` gives slower spatial/temporal tests room.
+
+Recommended invocations:
+- Local development: `cargo mutants -p verisim-drift` to focus on one
+  crate.
+- PR triage: `cargo mutants --in-diff origin/main` only mutates lines
+  changed against main — keeps runtime under ~5 min for typical
+  changesets.
+- Nightly/weekly: `cargo mutants -p <core invariant crates>` full run
+  for a mutation-score baseline.
+
+CI integration: `rust-ci.yml` has a `mutants` job gated on
+`workflow_dispatch` and `schedule` events (full runs take >20 min;
+not suitable for every PR). Report uploaded as
+`mutants-report` artifact.
+
+Mutation score targets:
+- Priority crates (drift, normalizer, spatial, provenance, semantic,
+  octad): **≥80%** on core invariants
+- Best-effort crates (api, repl, graph): no enforced floor
+
 ## Next-tier standards (not yet adopted)
 
 These are documented for future work; no current CI gate enforces them.
 
-- **Mutation testing**: `cargo-mutants --in-diff` for changed files in
-  `verisim-drift`, `verisim-normalizer`, `verisim-octad`. Target 75-85%
-  mutation score on core invariants.
-- **Snapshot testing**: `insta` (Rust) for VQL parser AST, explain plans,
-  drift reports; `mneme` (Elixir) for built-in parser output.
+- **Snapshot testing (Elixir)**: `mneme` for built-in VQL parser output.
+  Skipped initially because `mneme`'s interactive accept/reject doesn't
+  fit batch CI; we'd need to wire `MNEME_REPLY=accept` workflow.
 - **Differential testing**: SQLancer-style queries through redb vs
   Oxigraph backends and naive linear vs HNSW vector search; assert
   result-set equivalence to catch optimiser bugs.

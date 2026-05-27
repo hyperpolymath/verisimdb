@@ -87,6 +87,7 @@ axum-server = { version = "0.8", default-features = false, features = ["tls-rust
 # Testing
 proptest = "1.11"
 criterion = "0.8"
+insta = { version = "1.40", features = ["yaml", "json"] }
 
 # Async
 futures = "0.3"

@@ -1,0 +1,35 @@
+---
+source: rust-core/verisim-planner/tests/snapshot_tests.rs
+description: Document + semantic proof; semantic always last
+expression: explain
+---
+steps:
+  - step: 1
+    operation: Document fulltext search (1 conditions)
+    modality: document
+    estimated_cost_ms: 48
+    estimated_selectivity: 0.05
+    estimated_rows: 1
+    optimization_hint: "Tantivy fulltext: \"audit\""
+  - step: 2
+    operation: Semantic verification (1 conditions)
+    modality: semantic
+    estimated_cost_ms: 510
+    estimated_selectivity: 1
+    estimated_rows: 1
+    optimization_hint: "ZKP verify: integrity-v1"
+cost_breakdown:
+  - modality: semantic
+    time_ms: 510
+    percentage: 91.39784946236558
+  - modality: document
+    time_ms: 48
+    percentage: 8.60215053763441
+performance_hints:
+  - severity: warning
+    message: Total estimated cost is 510ms — consider adding LIMIT clause
+  - severity: info
+    message: "Step 2 (semantic) costs 510ms — ZKP verify: integrity-v1"
+total_cost_ms: 510
+strategy: Parallel
+text_output: "=== VeriSimDB Query Plan ===\n\nStrategy: Parallel\nTotal Estimated Cost: 510.0ms\n\n--- Steps ---\n  Step 1: Document fulltext search (1 conditions) [document]\n    Cost: 48.0ms | Selectivity: 5.00% | Rows: ~1\n    Hint: Tantivy fulltext: \"audit\"\n  Step 2: Semantic verification (1 conditions) [semantic]\n    Cost: 510.0ms | Selectivity: 100.00% | Rows: ~1\n    Hint: ZKP verify: integrity-v1\n\n--- Cost Breakdown ---\n  semantic: 510.0ms (91.4%)\n  document: 48.0ms (8.6%)\n\n--- Performance Hints ---\n  [warning] Total estimated cost is 510ms — consider adding LIMIT clause\n  [info] Step 2 (semantic) costs 510ms — ZKP verify: integrity-v1\n"
