@@ -76,7 +76,7 @@ jobs:
           key: ${{ runner.os }}-mix-coverage-${{ hashFiles('elixir-orchestration/mix.lock') }}
       - run: mix deps.get
       - run: mix coveralls.json
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           files: elixir-orchestration/cover/excoveralls.json
           flags: elixir
