@@ -85,7 +85,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 
 # Testing
-proptest = "1.4"
+proptest = "1.11"
 criterion = "0.8"
 
 # Async
