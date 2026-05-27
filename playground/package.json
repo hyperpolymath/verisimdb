@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "VQL Playground — Interactive query editor for VeriSimDB",
   "type": "module",
-  "license": "MPL-2.0",
+  "license": "AGPL-3.0-or-later",
   "author": "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
   "scripts": {
     "res:build": "rescript",

@@ -5666,9 +5666,9 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37566cb3fdacef14c0737f9546df7cfeadbfbc9fef10991038bf5015d0c80532"
+checksum = "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744"
 dependencies = [
  "bit-set 0.8.0",
  "bit-vec 0.8.0",
@@ -6668,9 +6668,9 @@ dependencies = [
 
 [[package]]
 name = "rustyline-derive"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d66de233f908aebf9cc30ac75ef9103185b4b715c6f2fb7a626aa5e5ede53ab"
+checksum = "64e5587417a3c4e16a4415e8d7d07f80998ed835ade621d19dfbe9fbe3205b0f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8718,7 +8718,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "burn",
- "ndarray 0.16.1",
+ "ndarray 0.17.2",
  "proptest",
  "serde",
  "serde_json",
@@ -8735,7 +8735,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "criterion",
- "ndarray 0.16.1",
+ "ndarray 0.17.2",
  "proptest",
  "serde",
  "serde_json",
