@@ -103,7 +103,7 @@ uuid = { version = "1.23", features = ["v4"] }
 regex = "1.11"
 
 # Persistent storage (pure Rust, B-tree, ACID)
-redb = "3.1"
+redb = "4.1"
 
 # CRC (WAL integrity)
 crc32fast = "1.4"
