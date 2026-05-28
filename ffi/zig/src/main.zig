@@ -1,274 +1,122 @@
-// {{PROJECT}} FFI Implementation
+// VeriSimDB Unified API Gateway (Zig)
 //
-// This module implements the C-compatible FFI declared in src/abi/Foreign.idr
-// All types and layouts must match the Idris2 ABI definitions.
+// Replaces the legacy V-lang gateway. Unified REST + GraphQL gateway proxying to:
+//   - Rust core         (port 8080)  for data operations
+//   - Elixir orchestration (port 4080)  for telemetry/status
+//
+// Architecture:
+//   Client → Zig gateway (:9090) → Rust core (:8080)
+//                                → Elixir orchestration (:4080)
 //
 // SPDX-License-Identifier: MPL-2.0
 
 const std = @import("std");
+const config = @import("config.zig");
+const router = @import("router.zig");
 
-// Version information (keep in sync with project)
-const VERSION = "0.1.0";
-const BUILD_INFO = "{{PROJECT}} built with Zig " ++ @import("builtin").zig_version_string;
+const banner =
+    \\VeriSimDB Zig API Gateway
+    \\  REST + GraphQL on port {d}
+    \\  Rust core backend:     {s}
+    \\  Elixir orchestration:  {s}
+    \\
+    \\Endpoints:
+    \\  REST:    http://localhost:{d}/api/v1/
+    \\  GraphQL: http://localhost:{d}/graphql
+    \\
+    \\
+;
 
-/// Thread-local error storage
-threadlocal var last_error: ?[]const u8 = null;
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-/// Set the last error message
-fn setError(msg: []const u8) void {
-    last_error = msg;
+    const cfg = try config.load(allocator);
+    defer config.free(allocator, cfg);
+
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout = std.io.fixedBufferStream(&stdout_buf);
+    try stdout.writer().print(banner, .{
+        cfg.gateway_port,
+        cfg.rust_url,
+        cfg.orch_url,
+        cfg.gateway_port,
+        cfg.gateway_port,
+    });
+    try std.io.getStdOut().writeAll(stdout.getWritten());
+
+    const address = try std.net.Address.parseIp("0.0.0.0", cfg.gateway_port);
+    var net_server = try address.listen(.{ .reuse_address = true });
+    defer net_server.deinit();
+
+    while (true) {
+        const connection = net_server.accept() catch |err| {
+            std.log.warn("accept failed: {s}", .{@errorName(err)});
+            continue;
+        };
+        handleConnection(allocator, cfg, connection) catch |err| {
+            std.log.warn("connection failed: {s}", .{@errorName(err)});
+        };
+    }
 }
 
-/// Clear the last error
-fn clearError() void {
-    last_error = null;
-}
-
-//==============================================================================
-// Core Types (must match src/abi/Types.idr)
-//==============================================================================
-
-/// Result codes (must match Idris2 Result type)
-pub const Result = enum(c_int) {
-    ok = 0,
-    @"error" = 1,
-    invalid_param = 2,
-    out_of_memory = 3,
-    null_pointer = 4,
-};
-
-/// Library handle (opaque to prevent direct access)
-pub const Handle = opaque {
-    // Internal state hidden from C
+fn handleConnection(
     allocator: std.mem.Allocator,
-    initialized: bool,
-    // Add your fields here
-};
+    cfg: config.Config,
+    connection: std.net.Server.Connection,
+) !void {
+    defer connection.stream.close();
 
-//==============================================================================
-// Library Lifecycle
-//==============================================================================
+    var recv_buffer: [16 * 1024]u8 = undefined;
+    var server = std.http.Server.init(connection, &recv_buffer);
 
-/// Initialize the library
-/// Returns a handle, or null on failure
-export fn {{project}}_init() ?*Handle {
-    const allocator = std.heap.c_allocator;
-
-    const handle = allocator.create(Handle) catch {
-        setError("Failed to allocate handle");
-        return null;
+    var request = server.receiveHead() catch |err| {
+        std.log.warn("receiveHead failed: {s}", .{@errorName(err)});
+        return;
     };
 
-    // Initialize handle
-    handle.* = .{
-        .allocator = allocator,
-        .initialized = true,
+    const target = request.head.target;
+    const method = request.head.method;
+
+    // Read body if present (for POST/PUT). reader() returns a Reader for the request body.
+    const body = if (method == .POST or method == .PUT) blk: {
+        var body_buf = std.ArrayList(u8).init(allocator);
+        defer body_buf.deinit();
+        const reader = try request.reader();
+        reader.readAllArrayList(&body_buf, 16 * 1024 * 1024) catch |err| {
+            std.log.warn("body read failed: {s}", .{@errorName(err)});
+            try request.respond("{\"error\":\"bad_request\"}", .{ .status = .bad_request });
+            return;
+        };
+        break :blk try body_buf.toOwnedSlice();
+    } else &[_]u8{};
+    defer if (body.len > 0) allocator.free(body);
+
+    const outcome = router.route(allocator, cfg, method, target, body) catch |err| {
+        std.log.warn("route failed: {s}", .{@errorName(err)});
+        try request.respond("{\"error\":\"internal_error\"}", .{ .status = .internal_server_error });
+        return;
     };
+    defer allocator.free(outcome.body);
 
-    clearError();
-    return handle;
+    const status: std.http.Status = @enumFromInt(outcome.status);
+    try request.respond(outcome.body, .{
+        .status = status,
+        .extra_headers = &.{
+            .{ .name = "Content-Type", .value = "application/json" },
+            .{ .name = "Access-Control-Allow-Origin", .value = "*" },
+            .{ .name = "Access-Control-Allow-Methods", .value = "GET, POST, PUT, DELETE, OPTIONS" },
+            .{ .name = "Access-Control-Allow-Headers", .value = "Content-Type, Authorization, X-API-Key" },
+        },
+    });
 }
 
-/// Free the library handle
-export fn {{project}}_free(handle: ?*Handle) void {
-    const h = handle orelse return;
-    const allocator = h.allocator;
-
-    // Clean up resources
-    h.initialized = false;
-
-    allocator.destroy(h);
-    clearError();
-}
-
-//==============================================================================
-// Core Operations
-//==============================================================================
-
-/// Process data (example operation)
-export fn {{project}}_process(handle: ?*Handle, input: u32) Result {
-    const h = handle orelse {
-        setError("Null handle");
-        return .null_pointer;
-    };
-
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return .@"error";
-    }
-
-    // Example processing logic
-    _ = input;
-
-    clearError();
-    return .ok;
-}
-
-//==============================================================================
-// String Operations
-//==============================================================================
-
-/// Get a string result (example)
-/// Caller must free the returned string
-export fn {{project}}_get_string(handle: ?*Handle) ?[*:0]const u8 {
-    const h = handle orelse {
-        setError("Null handle");
-        return null;
-    };
-
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return null;
-    }
-
-    // Example: allocate and return a string
-    const result = h.allocator.dupeZ(u8, "Example result") catch {
-        setError("Failed to allocate string");
-        return null;
-    };
-
-    clearError();
-    return result.ptr;
-}
-
-/// Free a string allocated by the library
-export fn {{project}}_free_string(str: ?[*:0]const u8) void {
-    const s = str orelse return;
-    const allocator = std.heap.c_allocator;
-
-    const slice = std.mem.span(s);
-    allocator.free(slice);
-}
-
-//==============================================================================
-// Array/Buffer Operations
-//==============================================================================
-
-/// Process an array of data
-export fn {{project}}_process_array(
-    handle: ?*Handle,
-    buffer: ?[*]const u8,
-    len: u32,
-) Result {
-    const h = handle orelse {
-        setError("Null handle");
-        return .null_pointer;
-    };
-
-    const buf = buffer orelse {
-        setError("Null buffer");
-        return .null_pointer;
-    };
-
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return .@"error";
-    }
-
-    // Access the buffer
-    const data = buf[0..len];
-    _ = data;
-
-    // Process data here
-
-    clearError();
-    return .ok;
-}
-
-//==============================================================================
-// Error Handling
-//==============================================================================
-
-/// Get the last error message
-/// Returns null if no error
-export fn {{project}}_last_error() ?[*:0]const u8 {
-    const err = last_error orelse return null;
-
-    // Return C string (static storage, no need to free)
-    const allocator = std.heap.c_allocator;
-    const c_str = allocator.dupeZ(u8, err) catch return null;
-    return c_str.ptr;
-}
-
-//==============================================================================
-// Version Information
-//==============================================================================
-
-/// Get the library version
-export fn {{project}}_version() [*:0]const u8 {
-    return VERSION.ptr;
-}
-
-/// Get build information
-export fn {{project}}_build_info() [*:0]const u8 {
-    return BUILD_INFO.ptr;
-}
-
-//==============================================================================
-// Callback Support
-//==============================================================================
-
-/// Callback function type (C ABI)
-pub const Callback = *const fn (u64, u32) callconv(.C) u32;
-
-/// Register a callback
-export fn {{project}}_register_callback(
-    handle: ?*Handle,
-    callback: ?Callback,
-) Result {
-    const h = handle orelse {
-        setError("Null handle");
-        return .null_pointer;
-    };
-
-    const cb = callback orelse {
-        setError("Null callback");
-        return .null_pointer;
-    };
-
-    if (!h.initialized) {
-        setError("Handle not initialized");
-        return .@"error";
-    }
-
-    // Store callback for later use
-    _ = cb;
-
-    clearError();
-    return .ok;
-}
-
-//==============================================================================
-// Utility Functions
-//==============================================================================
-
-/// Check if handle is initialized
-export fn {{project}}_is_initialized(handle: ?*Handle) u32 {
-    const h = handle orelse return 0;
-    return if (h.initialized) 1 else 0;
-}
-
-//==============================================================================
-// Tests
-//==============================================================================
-
-test "lifecycle" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    try std.testing.expect({{project}}_is_initialized(handle) == 1);
-}
-
-test "error handling" {
-    const result = {{project}}_process(null, 0);
-    try std.testing.expectEqual(Result.null_pointer, result);
-
-    const err = {{project}}_last_error();
-    try std.testing.expect(err != null);
-}
-
-test "version" {
-    const ver = {{project}}_version();
-    const ver_str = std.mem.span(ver);
-    try std.testing.expectEqualStrings(VERSION, ver_str);
+test {
+    // Pull in module tests
+    std.testing.refAllDecls(@This());
+    _ = @import("config.zig");
+    _ = @import("proxy.zig");
+    _ = @import("router.zig");
+    _ = @import("graphql.zig");
 }

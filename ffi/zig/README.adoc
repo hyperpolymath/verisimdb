@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+
+= VeriSimDB Zig — Unified API Gateway + FFI
+:author: Jonathan D.A. Jewell
+:email: j.d.a.jewell@open.ac.uk
+:toc:
+
+== Overview
+
+Unified Zig tree replacing the legacy V-lang `v-api-gateway`. Provides two artifacts:
+
+[cols="1,3"]
+|===
+| Artifact | Purpose
+
+| `verisimdb-gateway` (exe)
+| HTTP/REST + GraphQL gateway. Proxies to the Rust core (data ops) and the
+  Elixir orchestration layer (telemetry/status). Replaces the deleted
+  `v-api-gateway/src/main.v`.
+
+| `libverisimdb_ffi` (shared+static)
+| C-ABI surface matching the Idris2 ABI declared in `src/abi/Foreign.idr`.
+  Idris2 remains the source-of-truth for ABI types and layouts per the
+  estate-wide language policy (Zig for APIs/FFIs, Idris2 for ABIs).
+|===
+
+== Architecture
+
+----
+        Clients (PanLL, CLI, web, external)
+                    │
+           ┌────────┴────────┐
+           │ verisimdb-gateway│
+           │   port 9090     │
+           │                 │
+           │  ├─ REST   /api/v1/*
+           │  └─ GraphQL /graphql
+           └────────┬────────┘
+                    │
+         ┌──────────┼──────────┐
+         ▼          ▼          ▼
+    Rust Core   Elixir Orch  (future)
+    :8080       :4080
+
+  gRPC: served directly by the Rust core on :50051 (not proxied).
+----
+
+== Build
+
+[source,bash]
+----
+cd ffi/zig
+zig build                     # builds gateway exe + ffi shared lib + static lib
+zig build test                # unit tests for gateway + ffi
+zig build test-integration    # integration tests against the FFI lib
+zig build run-gateway         # build + run the gateway
+----
+
+Targets recent Zig (0.14+).
+
+== Endpoints (REST)
+
+[cols="1,3,4"]
+|===
+| Method | Path | Backend
+
+| GET    | `/api/v1/health`          | Combined (gateway + Rust + Elixir)
+| GET    | `/api/v1/octads*`         | Rust core
+| POST   | `/api/v1/octads`          | Rust core
+| POST   | `/api/v1/vql/execute`     | Rust core
+| GET    | `/api/v1/drift/*`         | Rust core
+| GET/POST | `/api/v1/search/*`      | Rust core
+| GET    | `/api/v1/provenance/*`    | Rust core
+| POST   | `/api/v1/spatial/*`       | Rust core
+| GET    | `/api/v1/telemetry*`      | Elixir orchestration
+| GET    | `/api/v1/status`          | Elixir orchestration
+|===
+
+== Endpoints (GraphQL)
+
+[source,graphql]
+----
+type Query {
+  octad(id: ID!): Octad
+  octads(limit: Int, offset: Int): [Octad!]!
+  driftScore(entityId: ID!): DriftScore
+  telemetry: TelemetryReport
+  health: HealthStatus
+}
+
+type Mutation {
+  executeVql(query: String!): VqlResult
+}
+----
+
+Variables expected:
+
+* `driftScore`  — `variables.entityId` (string)
+* `executeVql` — `variables.query` (string)
+
+== Configuration (env vars)
+
+[cols="1,3,2"]
+|===
+| Var | Description | Default
+
+| `VERISIM_GATEWAY_PORT` | REST/GraphQL port           | `9090`
+| `VERISIM_RUST_URL`     | Rust-core API base URL      | `http://localhost:8080/api/v1`
+| `VERISIM_ORCH_URL`     | Elixir orchestration base   | `http://localhost:4080`
+|===
+
+== Why Zig?
+
+Per estate-wide policy (2026-05-28 directive):
+
+* **Zig** is the default for all APIs / FFIs / gateways / client SDKs.
+* **Idris2** is the canonical source-of-truth for ABIs.
+
+The legacy V-lang gateway (`v-api-gateway/`) was removed in the same change
+that introduced this tree. The Zig client SDK at `connectors/clients/zig/`
+replaces `connectors/clients/vlang/`.
+
+== Files
+
+[source,text]
+----
+ffi/zig/
+├── build.zig
+├── README.adoc            ← this file
+├── src/
+│   ├── main.zig           gateway entrypoint
+│   ├── config.zig         env-var config loader
+│   ├── proxy.zig          std.http.Client wrappers
+│   ├── router.zig         REST dispatch
+│   ├── graphql.zig        GraphQL field-routing
+│   └── ffi.zig            C-ABI exports (mirrors src/abi/Foreign.idr)
+└── test/
+    └── integration_test.zig
+----
