@@ -2,8 +2,8 @@
 ; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 ;
 ; ENSAID_CONFIG.a2ml — PanLL configuration for VeriSimDB.
-; VeriSimDB is a formally verified database with Idris2 ABI, Zig FFI,
-; V-lang API gateway, VQL query language, and a registry subsystem.
+; VeriSimDB is a formally verified database with Idris2 ABI, Zig FFI +
+; unified API gateway, VQL query language, and a registry subsystem.
 ; This is a key dogfooding project for the full ABI→FFI→Adapter stack.
 
 ; ─────────────────────────────────────────────────────────────────────
@@ -23,15 +23,15 @@ humidity = "dry"
 ; ─────────────────────────────────────────────────────────────────────
 [workspace]
 root = "."
-watch_extensions = [".idr", ".zig", ".v", ".vql", ".gleam", ".toml"]
-; .idr = ABI definitions, .zig = FFI bridge, .v = API gateway,
+watch_extensions = [".idr", ".zig", ".vql", ".gleam", ".toml"]
+; .idr = ABI definitions, .zig = FFI bridge + API gateway,
 ; .vql = VeriSimDB Query Language, .gleam = REPL/tooling
 ignore_patterns = ["build/", ".git/", "zig-cache/", "zig-out/", "_build/"]
 editor = "vscodium"
 build_command = "just build"
 test_command = "just test"
 language_id = "idris2"
-; Primary specification language. Implementation spans Zig + V + Gleam.
+; Primary specification language. Implementation spans Zig + Gleam.
 
 ; ─────────────────────────────────────────────────────────────────────
 ; [preferences] — developer preferences and UI settings
@@ -52,7 +52,7 @@ panel_layout = "three-column"
 enabled = [
   "valence-shell",       ; Terminal + command execution
   "editor-bridge",       ; Editor integration
-  "build-dashboard",     ; Multi-language build status (Idris2 + Zig + V)
+  "build-dashboard",     ; Multi-language build status (Idris2 + Zig + Gleam)
   "boj",                 ; BoJ dashboard — VeriSimDB is a BoJ consumer
   "database",            ; Database inspection — dogfooding VeriSimDB itself
   "vm-inspector",        ; Query engine / VQL inspection
@@ -64,7 +64,7 @@ enabled = [
 ]
 
 disabled = [
-  "network",             ; Network handled by V-lang adapter
+  "network",             ; Network handled by Zig gateway
   "container",           ; Container builds handled externally
   "fleet",               ; Single-repo work
 ]
@@ -81,12 +81,12 @@ action = "run_command"
 command = "cd ffi/zig && zig build test"
 description = "Rebuild and test Zig FFI when Idris2 ABI definitions change"
 
-[workflows.adapter-on-ffi-change]
+[workflows.gateway-on-ffi-change]
 trigger = "file_save"
 match = "ffi/zig/src/*.zig"
 action = "run_command"
-command = "cd v-api-gateway && v build ."
-description = "Rebuild V-lang API gateway when Zig FFI changes"
+command = "cd ffi/zig && zig build"
+description = "Rebuild unified Zig gateway + FFI when sources change"
 
 [workflows.vql-test-on-save]
 trigger = "file_save"

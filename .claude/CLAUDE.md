@@ -390,7 +390,7 @@ verisimdb/
 │   ├── config/
 │   └── mix.exs
 ├── connectors/                # Federation adapters + client SDKs + test infra
-│   ├── clients/               # 6 SDKs: Rust, V, Elixir, ReScript, Julia, Gleam
+│   ├── clients/               # 6 SDKs: Rust, Zig, Elixir, ReScript, Julia, Gleam
 │   ├── shared/                # JSON Schema, OpenAPI, protobuf
 │   └── test-infra/            # selur-compose: 7 databases for integration testing
 ├── container/                 # Containerfiles

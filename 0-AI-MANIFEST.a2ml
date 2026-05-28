@@ -70,7 +70,7 @@
       (description "Federation adapters (10) and client SDKs (6)")
       (location "connectors/")
       (adapters "MongoDB" "Redis" "DuckDB" "ClickHouse" "SurrealDB" "SQLite" "Neo4j" "VectorDB" "InfluxDB" "ObjectStorage")
-      (sdks "Rust" "V" "Elixir" "ReScript" "Julia" "Gleam")))
+      (sdks "Rust" "Zig" "Elixir" "ReScript" "Julia" "Gleam")))
 
   (critical-invariants
     (rule "SCM files ONLY in .machine_readable/ — never root")

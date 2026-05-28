@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+
+= VeriSimDB Zig Client SDK
+:author: Jonathan D.A. Jewell
+:email: j.d.a.jewell@open.ac.uk
+:toc:
+
+== Overview
+
+Zig client SDK for VeriSimDB. Replaces the legacy V-lang SDK at
+`connectors/clients/vlang/`. Joins the existing Rust, Elixir, ReScript, Julia,
+and Gleam SDKs in the `connectors/clients/` matrix.
+
+== Module layout
+
+[cols="1,3"]
+|===
+| File | Purpose
+
+| `src/root.zig`        | Public module entrypoint — `@import("verisimdb_client")`.
+| `src/client.zig`      | `Client` struct, `Auth` union, HTTP transport.
+| `src/types.zig`       | Wire types: `Octad`, `OctadInput`, `DriftScore`, etc.
+| `src/error.zig`       | `VeriSimError`, `VeriSimErrorCode`, server-envelope parser.
+| `src/octad.zig`       | Octad CRUD: `create / get / update / delete / list`.
+| `src/drift.zig`       | Drift: `score / status / normalize`.
+| `src/provenance.zig`  | Provenance: `chain / record / verify`.
+| `src/search.zig`      | Multi-modal search: text / vector / spatial / nearest / related.
+| `src/vql.zig`         | VQL: `execute / explain`.
+| `src/federation.zig`  | Federation: `registerPeer / listPeers / query`.
+|===
+
+== Quick start
+
+[source,zig]
+----
+const std = @import("std");
+const verisim = @import("verisimdb_client");
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var client = try verisim.Client.init(allocator, "http://localhost:8080");
+    defer client.deinit();
+
+    const healthy = try client.health();
+    std.debug.print("healthy = {}\n", .{healthy});
+
+    const parsed = try verisim.octad.list(&client, 1, 10);
+    defer parsed.deinit();
+    for (parsed.value.items) |o| std.debug.print("octad {s}\n", .{o.id});
+}
+----
+
+== Authentication
+
+[source,zig]
+----
+// API key
+var c = try verisim.Client.initWithApiKey(allocator, base, "sk-...");
+
+// Bearer
+var c = try verisim.Client.initWithAuth(allocator, base, .{ .bearer = "eyJ..." });
+
+// Basic
+var c = try verisim.Client.initWithAuth(allocator, base, .{
+    .basic = .{ .username = "alice", .password = "secret" },
+});
+----
+
+== Build
+
+[source,bash]
+----
+zig build           # builds verisimdb_client module
+zig build test      # runs unit tests
+----
+
+Targets Zig 0.14+.
+
+== Why Zig?
+
+Per estate-wide policy (2026-05-28 directive): Zig is the default language for
+all client SDKs, APIs, FFIs, and gateways. Idris2 owns the ABI surface.

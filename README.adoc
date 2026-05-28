@@ -389,7 +389,7 @@ curl -X POST http://localhost:8080/api/v1/normalizer/trigger/entity-001
 
 === gRPC (port 50051)
 
-VeriSimDB's gRPC server runs directly on the Rust core (via tonic) on port 50051. The V API gateway does not proxy gRPC traffic — connect directly to the Rust core.
+VeriSimDB's gRPC server runs directly on the Rust core (via tonic) on port 50051. The unified Zig API gateway does not proxy gRPC traffic — connect directly to the Rust core.
 
 [source,bash]
 ----
