@@ -78,6 +78,12 @@ jobs:
           set -euo pipefail
           coqc -q Normalizer.v | tee Normalizer.out
 
+      - name: Compile VCL.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q VCL.v | tee VCL.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -179,3 +185,17 @@ jobs:
             exit 1
           fi
           echo "OK(Normalizer): N2 idempotent + fills-drifted-when-winner"
+
+      - name: Verify VCL assumptions (must be empty)
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' VCL.out \
+            | sort -u || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(VCL): expected 0 axioms, found:"
+            echo "$UNEXPECTED"
+            cat VCL.out
+            exit 1
+          fi
+          echo "OK(VCL): V2 preservation + progress (0 axioms)"

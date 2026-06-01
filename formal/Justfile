@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner wal normalizer
+all: provenance drift transaction planner wal normalizer vcl
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -34,11 +34,14 @@ wal:
 normalizer:
     {{COQC}} -q Normalizer.v | tee Normalizer.out
 
+vcl:
+    {{COQC}} -q VCL.v | tee VCL.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -97,6 +100,15 @@ check-normalizer: normalizer
             echo "ERROR(Normalizer): unexpected axiom: $line"; cat; exit 1; \
           else \
             echo "OK(Normalizer): N2 idempotent + fills-drifted-when-winner"; \
+          fi; }
+
+check-vcl: vcl
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' VCL.out \
+      | sort -u \
+      | { if read -r line; then \
+            echo "ERROR(VCL): expected 0 axioms, found: $line"; cat; exit 1; \
+          else \
+            echo "OK(VCL): V2 preservation + progress (0 axioms)"; \
           fi; }
 
 # Remove all build artefacts.

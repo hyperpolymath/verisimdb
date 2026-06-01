@@ -74,10 +74,10 @@ Concretely:
 | `EchoSearchExample.agda` (existing) — "find the witness" pattern + `EchoTruncation.agda`
 | The `winner` function is a SEARCH for the authoritative modality — exactly `EchoSearchExample`'s pattern. The `winner_stable_off_drifted` axiom is the "search result depends only on non-drifted modalities" — direct lift of `EchoTruncation`'s decoupling lemma. N2 idempotence is then "search is idempotent on its own result" — a *truncated echo* fixed point.
 
-| V2 `vql_preservation` (still blocked, see #92)
-| _todo_
-| `EchoGradedComonadInterface.agda` (graded comonad for "well-typed at level n")
-| Type-preservation under reduction is the comonad ε ∘ δ = id property in the graded comonad of "well-typed terms at type τ". Once the VCL small-step semantics is specified (#92 blocker 1), V2 is a direct application of `EchoGradedComonadInstance2.agda` with τ as the grading.
+| V2 `vql_preservation` + `vql_progress`
+| `formal/VCL.v`
+| `EchoGradedComonadInterface.agda` (existing) — graded comonad for "well-typed at type τ"
+| Type-preservation under reduction is the comonad ε ∘ δ = id property in the graded comonad of "well-typed terms at type τ". Reduction is the comonad action. The V2 mechanisation here is the MINIMUM-VIABLE core (booleans + opaque proof terms + conditional), closing #92 blockers 1 (big-step → small-step) and 2 (proof terms as values, no β-reduction). Full VCL extends mechanically per added expression form. Progress bundled as the type-soundness companion.
 
 | Future: D7 `temporal_drift_zero_iff_monotone_unique`
 | _todo_
@@ -106,10 +106,20 @@ Concretely:
 
 == Status (2026-06-01)
 
-5 of 8 foundation theorems landed on verisimdb side (P2, P3, D1, C2, D2, Q1-lite, C7 in PRs #87/#90/#93/#94). Cross-doc to echo-types established by this file. N2 lands in PR #95. V2 blocked on #92 small-step spec.
+**Foundation pack COMPLETE — 8 of 8 closed.**
+
+* P2, P3 → `formal/Provenance.v` (PR #87)
+* D1, C2 → `formal/Drift.v`, `formal/Transaction.v` (PR #90)
+* D2, Q1-lite → `formal/Drift.v`, `formal/Planner.v` (PR #93)
+* C7 → `formal/WAL.v` (PR #94, closed #89)
+* N2 → `formal/Normalizer.v` (PR #95, closed #91)
+* **V2 → `formal/VCL.v` (PR #96, closed #92)**
+
+Cross-doc to echo-types established by this file.
 
 Future work:
 
-* Port WAL.v + Normalizer.v to Agda within echo-types (refactor on top of EchoResidue + EchoSearchExample).
-* Establish a verisimdb → echo-types citation graph in the V2 PR (use EchoGradedComonadInterface).
+* Port `WAL.v` + `Normalizer.v` + `VCL.v` to Agda within echo-types (refactor on top of `EchoResidue`, `EchoSearchExample`, `EchoGradedComonadInterface`).
+* Extend `VCL.v` from the 4-rule core to full VCL: filter expressions, projections, modality quantifiers, multi-proof composition. Each form adds one congruence step rule + one preservation case.
 * Add a CI check: every new `formal/*.v` module must reference an echo-types module name in its docstring (or `no-echo-types-analogue` with reason).
+* Tackle the post-foundation theorems (D3-D8, C1-C11, F1-F6, Q2-Q9, V1-V8, P1, P4, P5) per the #77 inventory.
