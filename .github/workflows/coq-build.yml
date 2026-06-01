@@ -60,6 +60,12 @@ jobs:
           set -euo pipefail
           coqc -q Transaction.v | tee Transaction.out
 
+      - name: Compile Planner.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Planner.v | tee Planner.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -81,10 +87,12 @@ jobs:
         working-directory: formal
         run: |
           set -euo pipefail
-          # Whitelist: 5 ordering Parameters + 3 ordering axioms + 9 f_*_drift Parameters
+          # D1 whitelist: 5 ordering Parameters + 3 ordering axioms + 9 f_*_drift
+          # D2 whitelist additions: f_detect_drift, strictly_greater, le_or_gt,
+          # le_gt_exclusive, detector_iff_threshold
           UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Drift.out \
             | sort -u \
-            | grep -vE '^(score|zero|one|le|clamp|le_refl|clamp_lower|clamp_upper|f_semantic_vector_drift|f_graph_document_drift|f_temporal_consistency_drift|f_tensor_drift|f_provenance_drift|f_spatial_drift|f_schema_drift|f_quality_drift|f_quality_drift_octad)$' || true)
+            | grep -vE '^(score|zero|one|le|clamp|le_refl|clamp_lower|clamp_upper|f_semantic_vector_drift|f_graph_document_drift|f_temporal_consistency_drift|f_tensor_drift|f_provenance_drift|f_spatial_drift|f_schema_drift|f_quality_drift|f_quality_drift_octad|f_detect_drift|strictly_greater|le_or_gt|le_gt_exclusive|detector_iff_threshold)$' || true)
           if [ -n "$UNEXPECTED" ]; then
             echo "ERROR(Drift): unexpected axiom(s) in Print Assumptions:"
             echo "$UNEXPECTED"
@@ -92,7 +100,7 @@ jobs:
             cat Drift.out
             exit 1
           fi
-          echo "OK(Drift): whitelisted Parameters + 9 drift fns"
+          echo "OK(Drift): D1 (9 fns) + D2 (detector iff threshold) whitelisted"
 
       - name: Verify Transaction assumptions (must be empty)
         working-directory: formal
@@ -110,3 +118,20 @@ jobs:
             exit 1
           fi
           echo "OK(Transaction): 3 theorems closed under global context (0 axioms)"
+
+      - name: Verify Planner assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Whitelist: modality, condition, optimize, optimize_is_permutation
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Planner.out \
+            | sort -u \
+            | grep -vE '^(modality|condition|optimize|optimize_is_permutation)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Planner): unexpected axiom(s) in Print Assumptions:"
+            echo "$UNEXPECTED"
+            echo "---"
+            cat Planner.out
+            exit 1
+          fi
+          echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"
