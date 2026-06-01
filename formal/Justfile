@@ -12,32 +12,52 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance
+all: provenance drift transaction
 
-# Compile the provenance module (P2 + P3).
+# --- Per-module compile recipes -------------------------------------------
+
 provenance:
     {{COQC}} -q Provenance.v | tee Provenance.out
 
-# Verify that every Print Assumptions block in compiled output mentions
-# only the whitelist of declared parameters/axioms. Fails if any new
-# axiom name leaks into a theorem's transitive closure.
-#
-# Whitelist:
-#   - content       : Type                 (Parameter, domain)
-#   - hash          : Type                 (Parameter, domain)
-#   - genesis_hash  : hash                 (Parameter, SHA-256 of "")
-#   - sha256        : content -> hash -> hash  (Parameter)
-#   - sha256_collision_resistant            (Axiom, declared but unused)
-check-assumptions: provenance
+drift:
+    {{COQC}} -q Drift.v | tee Drift.out
+
+transaction:
+    {{COQC}} -q Transaction.v | tee Transaction.out
+
+# --- Whitelist guards -----------------------------------------------------
+# Each module declares its own set of Parameters/Axioms; the guard greps
+# Print Assumptions output for any name outside that module's whitelist.
+
+check-assumptions: check-provenance check-drift check-transaction
+
+check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
       | sort -u \
       | grep -vE '^(content|hash|sha256|genesis_hash|sha256_collision_resistant)$' \
       | { if read -r line; then \
-            echo "ERROR: unexpected axiom/parameter in Print Assumptions: $line"; \
-            cat; \
-            exit 1; \
+            echo "ERROR(Provenance): unexpected axiom: $line"; cat; exit 1; \
           else \
-            echo "OK: Print Assumptions matches whitelist (3 theorems × 4 Parameters)"; \
+            echo "OK(Provenance): 3 theorems x 4 Parameters whitelisted"; \
+          fi; }
+
+check-drift: drift
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Drift.out \
+      | sort -u \
+      | grep -vE '^(score|zero|one|le|clamp|le_refl|clamp_lower|clamp_upper|f_semantic_vector_drift|f_graph_document_drift|f_temporal_consistency_drift|f_tensor_drift|f_provenance_drift|f_spatial_drift|f_schema_drift|f_quality_drift|f_quality_drift_octad)$' \
+      | { if read -r line; then \
+            echo "ERROR(Drift): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(Drift): whitelisted Parameters + 9 drift fns"; \
+          fi; }
+
+check-transaction: transaction
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Transaction.out \
+      | sort -u \
+      | { if read -r line; then \
+            echo "ERROR(Transaction): expected 0 axioms, found: $line"; cat; exit 1; \
+          else \
+            echo "OK(Transaction): 3 theorems closed under global context (0 axioms)"; \
           fi; }
 
 # Remove all build artefacts.
