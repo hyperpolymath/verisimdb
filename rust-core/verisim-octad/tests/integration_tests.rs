@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 //! Integration tests for VeriSimDB
 //!
 //! Tests cross-modal consistency and end-to-end workflows.
@@ -11,7 +12,7 @@ use verisim_octad::{InMemoryOctadStore, OctadBuilder, OctadConfig, OctadStore};
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
 use verisim_tensor::InMemoryTensorStore;
-use verisim_vector::{BruteForceVectorStore, DistanceMetric, VectorStore as _};
+use verisim_vector::{BruteForceVectorStore, DistanceMetric};
 
 type TestOctadStore = InMemoryOctadStore<
     SimpleGraphStore,
@@ -228,94 +229,13 @@ async fn test_crud_operations() {
     assert!(deleted.is_none());
 }
 
-/// Test vector store persistence
-/// Ignored: BruteForceVectorStore does not yet have save_to_file/load_from_file.
-/// See SONNET-TASKS.md for the persistence implementation task.
-#[tokio::test]
-#[ignore = "persistence not yet implemented on BruteForceVectorStore"]
-async fn test_vector_persistence() {
-    let store = BruteForceVectorStore::new(64, DistanceMetric::Cosine);
-
-    // Insert vectors
-    for i in 0..20 {
-        let mut vec = vec![0.0f32; 64];
-        vec[i % 64] = 1.0;
-        let embedding = verisim_vector::Embedding::new(format!("vec_{}", i), vec);
-        store.upsert(&embedding).await.unwrap();
-    }
-
-    // TODO: Implement save_to_file/load_from_file on BruteForceVectorStore
-    // store.save_to_file(temp_path).unwrap();
-    // let loaded = BruteForceVectorStore::load_from_file(temp_path).unwrap();
-    // assert_eq!(loaded.stats().total_vectors, 20);
-}
-
-/// Test tensor store persistence
-/// Ignored: InMemoryTensorStore does not yet have save_to_file/load_from_file.
-#[tokio::test]
-#[ignore = "persistence not yet implemented on InMemoryTensorStore"]
-async fn test_tensor_persistence() {
-    use verisim_tensor::{Tensor, TensorStore as _};
-
-    let store = InMemoryTensorStore::new();
-
-    let t1 = Tensor::new("tensor_1", vec![2, 3], vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
-    let t2 = Tensor::new("tensor_2", vec![3, 3], vec![1.0; 9]).unwrap();
-
-    store.put(&t1).await.unwrap();
-    store.put(&t2).await.unwrap();
-
-    // TODO: Implement save_to_file/load_from_file on InMemoryTensorStore
-    // store.save_to_file(temp_path).unwrap();
-    // let loaded = InMemoryTensorStore::load_from_file(temp_path).unwrap();
-}
-
-/// Test semantic store persistence
-/// Ignored: InMemorySemanticStore does not yet have save_to_file/load_from_file.
-#[tokio::test]
-#[ignore = "persistence not yet implemented on InMemorySemanticStore"]
-async fn test_semantic_persistence() {
-    use verisim_semantic::{Constraint, ConstraintKind, SemanticStore as _, SemanticType};
-
-    let store = InMemorySemanticStore::new();
-
-    let person_type = SemanticType::new("https://example.org/Person", "Person")
-        .with_supertype("https://example.org/Entity")
-        .with_constraint(Constraint {
-            name: "name_required".to_string(),
-            kind: ConstraintKind::Required("name".to_string()),
-            message: "Person must have a name".to_string(),
-        });
-
-    store.register_type(&person_type).await.unwrap();
-
-    // TODO: Implement save_to_file/load_from_file on InMemorySemanticStore
-    // store.save_to_file(temp_path).unwrap();
-    // let loaded = InMemorySemanticStore::load_from_file(temp_path).unwrap();
-}
-
-/// Test temporal store persistence
-/// Ignored: InMemoryVersionStore does not yet have save_to_file/load_from_file.
-#[tokio::test]
-#[ignore = "persistence not yet implemented on InMemoryVersionStore"]
-async fn test_temporal_persistence() {
-    use verisim_temporal::TemporalStore as _;
-
-    let store: InMemoryVersionStore<String> = InMemoryVersionStore::new();
-
-    store
-        .append("entity1", "v1 data".to_string(), "alice", Some("first"))
-        .await
-        .unwrap();
-    store
-        .append("entity1", "v2 data".to_string(), "bob", Some("second"))
-        .await
-        .unwrap();
-
-    // TODO: Implement save_to_file/load_from_file on InMemoryVersionStore
-    // store.save_to_file(temp_path).unwrap();
-    // let loaded: InMemoryVersionStore<String> = InMemoryVersionStore::load_from_file(temp_path).unwrap();
-}
+// Persistence tests for in-memory stores intentionally removed: the
+// BruteForceVectorStore / InMemoryTensorStore / InMemorySemanticStore /
+// InMemoryVersionStore types are in-memory by design. Disk persistence lives
+// in the sibling Persistent* variants (`verisim-{vector,tensor,semantic,
+// temporal}/src/persistent.rs`) and is covered by unit tests there. To deepen
+// the persistence test pyramid, expand those unit tests rather than adding
+// a save_to_file/load_from_file API to the in-memory shapes.
 
 /// Test that modality operations are isolated
 #[tokio::test]
