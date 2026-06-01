@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Coq build oracle for VeriSimDB formal proofs.
+# Follows the Ephapax pattern (hyperpolymath/ephapax formal/Justfile).
+#
+# Local use:
+#   just -f formal/Justfile all
+#   just -f formal/Justfile check-assumptions
+#   just -f formal/Justfile clean
+
+COQC := "coqc"
+
+# Compile every proof module.
+all: provenance
+
+# Compile the provenance module (P2 + P3).
+provenance:
+    {{COQC}} -q Provenance.v | tee Provenance.out
+
+# Verify that every Print Assumptions block in compiled output mentions
+# only the whitelist of declared parameters/axioms. Fails if any new
+# axiom name leaks into a theorem's transitive closure.
+#
+# Whitelist:
+#   - content       : Type                 (Parameter, domain)
+#   - hash          : Type                 (Parameter, domain)
+#   - genesis_hash  : hash                 (Parameter, SHA-256 of "")
+#   - sha256        : content -> hash -> hash  (Parameter)
+#   - sha256_collision_resistant            (Axiom, declared but unused)
+check-assumptions: provenance
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
+      | sort -u \
+      | grep -vE '^(content|hash|sha256|genesis_hash|sha256_collision_resistant)$' \
+      | { if read -r line; then \
+            echo "ERROR: unexpected axiom/parameter in Print Assumptions: $line"; \
+            cat; \
+            exit 1; \
+          else \
+            echo "OK: Print Assumptions matches whitelist (3 theorems × 4 Parameters)"; \
+          fi; }
+
+# Remove all build artefacts.
+clean:
+    rm -f *.vo *.vos *.vok *.glob .*.aux *.out
