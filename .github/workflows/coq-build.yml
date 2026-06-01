@@ -72,6 +72,12 @@ jobs:
           set -euo pipefail
           coqc -q WAL.v | tee WAL.out
 
+      - name: Compile Normalizer.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Normalizer.v | tee Normalizer.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -158,3 +164,18 @@ jobs:
             exit 1
           fi
           echo "OK(WAL): C7 replay-idempotent + deterministic-off-touched"
+
+      - name: Verify Normalizer assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Normalizer.out \
+            | sort -u \
+            | grep -vE '^(modality|modality_data|drifted|winner|winner_excludes_drifted|winner_stable_off_drifted|functional_extensionality_dep)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Normalizer): unexpected axiom(s):"
+            echo "$UNEXPECTED"
+            cat Normalizer.out
+            exit 1
+          fi
+          echo "OK(Normalizer): N2 idempotent + fills-drifted-when-winner"

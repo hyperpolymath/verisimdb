@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner wal
+all: provenance drift transaction planner wal normalizer
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -31,11 +31,14 @@ planner:
 wal:
     {{COQC}} -q WAL.v | tee WAL.out
 
+normalizer:
+    {{COQC}} -q Normalizer.v | tee Normalizer.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner check-wal
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -84,6 +87,16 @@ check-wal: wal
             echo "ERROR(WAL): unexpected axiom: $line"; cat; exit 1; \
           else \
             echo "OK(WAL): C7 replay-idempotent + deterministic-off-touched"; \
+          fi; }
+
+check-normalizer: normalizer
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Normalizer.out \
+      | sort -u \
+      | grep -vE '^(modality|modality_data|drifted|winner|winner_excludes_drifted|winner_stable_off_drifted|functional_extensionality_dep)$' \
+      | { if read -r line; then \
+            echo "ERROR(Normalizer): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(Normalizer): N2 idempotent + fills-drifted-when-winner"; \
           fi; }
 
 # Remove all build artefacts.
