@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Query.VQLTypeChecker do
   @moduledoc """
   Elixir-native VQL-DT type checker.
@@ -186,7 +186,15 @@ defmodule VeriSim.Query.VQLTypeChecker do
 
   def parse_proof_specs(%{proofType: _} = spec), do: [spec]
   def parse_proof_specs(%{TAG: _} = spec), do: [spec]
-  def parse_proof_specs(_), do: []
+
+  def parse_proof_specs(other) do
+    Logger.warning(
+      "VCL type checker: parse_proof_specs/1 hit unsupported spec shape; " <>
+        "returning empty list. shape=#{inspect(other, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   # ---------------------------------------------------------------------------
   # Private: Validation

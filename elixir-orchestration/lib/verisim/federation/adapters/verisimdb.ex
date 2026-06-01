@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Federation.Adapters.VeriSimDB do
   @moduledoc """
   Federation adapter for VeriSimDB-to-VeriSimDB communication.
@@ -218,7 +218,15 @@ defmodule VeriSim.Federation.Adapters.VeriSimDB do
   defp extract_results(%{"results" => results}) when is_list(results), do: results
   defp extract_results(%{"octads" => octads}) when is_list(octads), do: octads
   defp extract_results(body) when is_map(body), do: [body]
-  defp extract_results(_), do: []
+
+  defp extract_results(body) do
+    Logger.warning(
+      "VeriSimDB adapter: unrecognised response shape from peer; returning empty list. " <>
+        "shape_summary=#{inspect(body, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   defp auth_headers(peer_info) do
     case get_in(peer_info, [:adapter_config, :psk]) do

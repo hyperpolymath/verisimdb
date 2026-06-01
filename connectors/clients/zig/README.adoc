@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
-
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Zig Client SDK
 :author: Jonathan D.A. Jewell
 :email: j.d.a.jewell@open.ac.uk
@@ -9,8 +8,10 @@
 == Overview
 
 Zig client SDK for VeriSimDB. Replaces the legacy V-lang SDK at
-`connectors/clients/vlang/`. Joins the existing Rust, Elixir, ReScript, Julia,
-and Gleam SDKs in the `connectors/clients/` matrix.
+`connectors/clients/vlang/`. Joins the existing Rust, Elixir, ReScript, and
+Julia SDKs in the `connectors/clients/` matrix. Other BEAM languages (Gleam,
+Erlang) access VeriSimDB through the SNIFs WASM bridge (`hyperpolymath/snifs`)
+rather than via a maintained per-language SDK.
 
 == Module layout
 

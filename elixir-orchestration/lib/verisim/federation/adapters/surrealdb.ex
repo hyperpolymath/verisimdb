@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Federation.Adapters.SurrealDB do
   @moduledoc """
   Federation adapter for SurrealDB.
@@ -277,7 +277,14 @@ defmodule VeriSim.Federation.Adapters.SurrealDB do
     body["result"] || [body]
   end
 
-  defp extract_surreal_results(_body), do: []
+  defp extract_surreal_results(body) do
+    Logger.warning(
+      "SurrealDB adapter: unrecognised response shape from peer; returning empty list. " <>
+        "shape_summary=#{inspect(body, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   defp extract_surreal_error(body) when is_list(body) do
     body

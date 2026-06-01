@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Query.VQLExecutor do
   @moduledoc """
   VQL Executor - Executes VQL queries and mutations parsed by the ReScript VQL parser.
@@ -525,15 +525,35 @@ defmodule VeriSim.Query.VQLExecutor do
     # Extract a numeric vector from modality data for comparison.
     # Vector modality stores embeddings directly; others use hash fingerprints.
     cond do
-      is_list(data["embedding"]) -> data["embedding"]
-      is_list(data["vector"]) -> data["vector"]
-      is_binary(data["content"]) -> content_fingerprint(data["content"])
-      true -> []
+      is_list(data["embedding"]) ->
+        data["embedding"]
+
+      is_list(data["vector"]) ->
+        data["vector"]
+
+      is_binary(data["content"]) ->
+        content_fingerprint(data["content"])
+
+      true ->
+        Logger.warning(
+          "VCL executor: modality map carries no embedding/vector/content; " <>
+            "drift will fall back to empty vector. keys=#{inspect(Map.keys(data))}"
+        )
+
+        []
     end
   end
 
   defp extract_embedding_from_modality(data) when is_list(data), do: data
-  defp extract_embedding_from_modality(_), do: []
+
+  defp extract_embedding_from_modality(other) do
+    Logger.warning(
+      "VCL executor: extract_embedding_from_modality/1 hit unsupported shape; " <>
+        "returning empty vector. shape=#{inspect(other, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   defp content_fingerprint(text) when is_binary(text) do
     # Simple hash-based fingerprint for non-vector modalities.
@@ -1797,7 +1817,14 @@ defmodule VeriSim.Query.VQLExecutor do
     wrap_provenance_results(results)
   end
 
-  defp wrap_provenance_results(_), do: []
+  defp wrap_provenance_results(body) do
+    Logger.warning(
+      "VCL executor: provenance result has unsupported shape; returning empty list. " <>
+        "shape=#{inspect(body, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   # ---------------------------------------------------------------------------
   # Spatial query extraction and execution
@@ -1949,7 +1976,14 @@ defmodule VeriSim.Query.VQLExecutor do
     wrap_spatial_results(results)
   end
 
-  defp wrap_spatial_results(_), do: []
+  defp wrap_spatial_results(body) do
+    Logger.warning(
+      "VCL executor: spatial result has unsupported shape; returning empty list. " <>
+        "shape=#{inspect(body, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   defp parse_float_safe(str) when is_binary(str) do
     case Float.parse(str) do

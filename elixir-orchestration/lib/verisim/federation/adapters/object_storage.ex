@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Federation.Adapters.ObjectStorage do
   @moduledoc """
   Unified federation adapter for S3-compatible object storage: MinIO and
@@ -322,7 +322,14 @@ defmodule VeriSim.Federation.Adapters.ObjectStorage do
     end)
   end
 
-  defp parse_list_objects_response(_body), do: []
+  defp parse_list_objects_response(body) do
+    Logger.warning(
+      "ObjectStorage adapter: unrecognised ListObjects response shape; returning empty list. " <>
+        "shape_summary=#{inspect(body, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   defp parse_list_versions_response(body, range) when is_binary(body) do
     # Parse XML ListObjectVersions response and filter by time range
@@ -355,7 +362,14 @@ defmodule VeriSim.Federation.Adapters.ObjectStorage do
     body["Versions"] || body["versions"] || []
   end
 
-  defp parse_list_versions_response(_body, _range), do: []
+  defp parse_list_versions_response(body, range) do
+    Logger.warning(
+      "ObjectStorage adapter: unrecognised ListObjectVersions response shape; returning empty list. " <>
+        "range=#{inspect(range)} shape_summary=#{inspect(body, limit: 5, printable_limit: 200)}"
+    )
+
+    []
+  end
 
   defp extract_xml_field(xml, key, field) do
     # Simple XML field extraction near a specific key

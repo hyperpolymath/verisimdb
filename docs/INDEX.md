@@ -1,3 +1,7 @@
+<!--
+SPDX-License-Identifier: MPL-2.0
+Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+-->
 # VeriSimDB Documentation Index
 
 > Last updated: 2026-05-25. This file is the table of contents for everything under `docs/` and the top-level project documents.
@@ -155,7 +159,7 @@ Under [`.github/workflows/`](../.github/workflows/):
 | `elixir-orchestration/` | Elixir | OTP orchestration layer (DriftMonitor, EntityServer, VQLExecutor, VQLBridge, SchemaRegistry, federation adapters) |
 | `src/` | ReScript | VQL parser, type checker, federation registry |
 | `playground/` | ReScript + HTML | VQL Playground web UI |
-| `connectors/` | Multi | Federation adapters, client SDKs (Rust, V, Elixir, ReScript, Julia, Gleam), test infrastructure |
+| `connectors/` | Multi | Federation adapters, client SDKs (Rust, Elixir, ReScript, Julia, Zig), test infrastructure. Other BEAM languages (Gleam, Erlang) access via the SNIFs WASM bridge — see `hyperpolymath/snifs`. |
 | `debugger/` | Idris2 + Rust | ABI/FFI debugger |
 | `ffi/zig/` | Zig | Zig FFI |
 | `v-api-gateway/` | V | V-language API gateway |

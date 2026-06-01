@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Connectors -- Federation Adapters & Client SDKs
 :toc: macro
 :toc-title: Contents
@@ -54,9 +54,10 @@ octad entities, VQL queries, and drift reports.
    │  │ Rust SDK      │  │     Federation Protocol      │  │ PostgreSQL Adapter   │  │
    │  │ Elixir SDK    │  │     (gRPC / REST)            │  │ Neo4j Adapter        │  │
    │  │ ReScript SDK  │  │   ◄─────────────────────►    │  │ Elasticsearch Adapter│  │
-   │  │ Gleam SDK     │  │                              │  │ Qdrant Adapter       │  │
-   │  │ Julia SDK     │  │                              │  │ MongoDB Adapter      │  │
-   │  │ Zig SDK       │  │                              │  │ Redis Adapter        │  │
+   │  │ Julia SDK     │  │                              │  │ Qdrant Adapter       │  │
+   │  │ Zig SDK       │  │                              │  │ MongoDB Adapter      │  │
+   │  │ (SNIFs: any   │  │                              │  │ Redis Adapter        │  │
+   │  │  BEAM lang)   │  │                              │  │                      │  │
    │  └───────────────┘  │                              │  │ DuckDB Adapter       │  │
    │                     │                              │  │ ClickHouse Adapter   │  │
    └─────────────────────┘                              │  │ Weaviate Adapter     │  │
@@ -185,10 +186,6 @@ serialisation, and type-safe octad construction.
 
 | `verisim-rescript`
 | ReScript (via `Fetch` API, Deno runtime)
-| Planned
-
-| `verisim-gleam`
-| Gleam (via `gleam_http`, BEAM or JS target)
 | Planned
 
 | `verisim-jl`
