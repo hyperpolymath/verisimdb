@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# dogfood-gate.yml — Hyperpolymath Dogfooding Quality Gate
+# Validates that the repo uses hyperpolymath's own formats and tools.
+# Companion to static-analysis-gate.yml (security) — this is for format compliance.
+name: Dogfood Gate
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: A2ML manifest validation
+  # ---------------------------------------------------------------------------
+  a2ml-validate:
+    name: Validate A2ML manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Check for A2ML files
+        id: detect
+        run: |
+          COUNT=$(find . -name '*.a2ml' -not -path './.git/*' | wc -l)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::warning::No .a2ml manifest files found. Every RSR repo should have 0-AI-MANIFEST.a2ml"
+          fi
+
+      - name: Validate A2ML manifests
+        if: steps.detect.outputs.count > 0
+        uses: hyperpolymath/a2ml-validate-action@59145c7d1039fa3059b3ecacdb50ee23d7505898
+        with:
+          path: '.'
+          strict: 'false'
+
+      - name: Write summary
+        run: |
+          A2ML_COUNT="${{ steps.detect.outputs.count }}"
+          if [ "$A2ML_COUNT" -eq 0 ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## A2ML Validation
+
+          :warning: **No .a2ml files found.** Every RSR-compliant repo should have at least `0-AI-MANIFEST.a2ml`.
+
+          Create one with: `a2mliser init` or copy from [rsr-template-repo](https://github.com/hyperpolymath/rsr-template-repo).
+          EOF
+          else
+            echo "## A2ML Validation" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Scanned **${A2ML_COUNT}** .a2ml file(s). See step output for details." >> "$GITHUB_STEP_SUMMARY"
+          fi
