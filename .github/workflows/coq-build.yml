@@ -2,9 +2,12 @@
 # Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
 # Coq Build Oracle — compiles formal/ and asserts no axiom slippage.
-# Follows the Ephapax pattern (hyperpolymath/ephapax coq-build.yml):
-# coq_makefile + make rather than `just`, so we don't need to provision
-# `just` inside the coqorg/coq container (no sudo, dash shell).
+#
+# Uses Ubuntu + apt-installed Coq rather than the coqorg/coq container
+# image. Rationale: coqorg/coq runs as user `coq` with opam-loaded PATH;
+# running it as root (the standard EACCES workaround for actions/checkout)
+# breaks coqc lookup because root has no opam env. Apt-installed Coq is
+# simpler and the proofs here don't require a specific 8.x patch level.
 
 name: Coq Build Oracle
 
@@ -26,16 +29,15 @@ jobs:
   build:
     name: Compile Coq proofs + assumptions guard
     runs-on: ubuntu-latest
-    container:
-      image: coqorg/coq:8.18
-      # actions/checkout writes to /__w/_temp/_runner_file_commands. The
-      # coqorg/coq image defaults to non-root user `coq`, which lacks
-      # write access there. Running as root in-container keeps shared
-      # paths writable. Same fix Ephapax landed in #236.
-      options: --user root
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Coq
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends coq
 
       - name: Coq toolchain provenance
         run: coqc --version
@@ -43,13 +45,13 @@ jobs:
       - name: Compile Provenance.v
         working-directory: formal
         run: |
-          set -eu
+          set -euo pipefail
           coqc -q Provenance.v | tee Provenance.out
 
       - name: Verify Print Assumptions whitelist
         working-directory: formal
         run: |
-          set -eu
+          set -euo pipefail
           # Whitelist:
           #   content, hash, sha256, genesis_hash  (Parameters)
           #   sha256_collision_resistant            (declared Axiom)
