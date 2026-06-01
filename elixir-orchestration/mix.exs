@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 defmodule VeriSim.MixProject do
   use Mix.Project
@@ -62,6 +63,12 @@ defmodule VeriSim.MixProject do
 
       # JSON encoding/decoding
       {:jason, "~> 1.4"},
+
+      # Bundled CA certificates — pulled in to satisfy `Redix.Connector`
+      # (and `mint`/`excoveralls`) which treat castore as an optional dep.
+      # `mix compile --warnings-as-errors` flagged the unresolved
+      # `CAStore.file_path/0` call site at `lib/redix/connector.ex:261`.
+      {:castore, "~> 1.0"},
 
       # Telemetry and metrics
       {:telemetry, "~> 1.2"},
