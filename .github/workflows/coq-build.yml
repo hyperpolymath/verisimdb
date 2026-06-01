@@ -84,6 +84,12 @@ jobs:
           set -euo pipefail
           coqc -q VCL.v | tee VCL.out
 
+      - name: Compile PlannerSemantic.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q PlannerSemantic.v | tee PlannerSemantic.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -199,3 +205,18 @@ jobs:
             exit 1
           fi
           echo "OK(VCL): V2 preservation + progress (0 axioms)"
+
+      - name: Verify PlannerSemantic assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' PlannerSemantic.out \
+            | sort -u \
+            | grep -vE '^(modality|condition|octad|exec_node|exec_node_comm|optimize|optimize_is_permutation)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(PlannerSemantic): unexpected axiom(s):"
+            echo "$UNEXPECTED"
+            cat PlannerSemantic.out
+            exit 1
+          fi
+          echo "OK(PlannerSemantic): Q1-full semantic equivalence + membership"
