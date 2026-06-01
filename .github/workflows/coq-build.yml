@@ -48,22 +48,65 @@ jobs:
           set -euo pipefail
           coqc -q Provenance.v | tee Provenance.out
 
-      - name: Verify Print Assumptions whitelist
+      - name: Compile Drift.v
         working-directory: formal
         run: |
           set -euo pipefail
-          # Whitelist:
-          #   content, hash, sha256, genesis_hash  (Parameters)
-          #   sha256_collision_resistant            (declared Axiom)
-          # Any other axiom name in Print Assumptions output fails.
+          coqc -q Drift.v | tee Drift.out
+
+      - name: Compile Transaction.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Transaction.v | tee Transaction.out
+
+      - name: Verify Provenance assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Whitelist: 4 Parameters + 1 declared Axiom
           UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
             | sort -u \
             | grep -vE '^(content|hash|sha256|genesis_hash|sha256_collision_resistant)$' || true)
           if [ -n "$UNEXPECTED" ]; then
-            echo "ERROR: unexpected axiom(s)/parameter(s) in Print Assumptions:"
+            echo "ERROR(Provenance): unexpected axiom(s) in Print Assumptions:"
             echo "$UNEXPECTED"
             echo "---"
             cat Provenance.out
             exit 1
           fi
-          echo "OK: Print Assumptions matches whitelist (3 theorems x 4 Parameters)"
+          echo "OK(Provenance): 3 theorems x 4 Parameters whitelisted"
+
+      - name: Verify Drift assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Whitelist: 5 ordering Parameters + 3 ordering axioms + 9 f_*_drift Parameters
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Drift.out \
+            | sort -u \
+            | grep -vE '^(score|zero|one|le|clamp|le_refl|clamp_lower|clamp_upper|f_semantic_vector_drift|f_graph_document_drift|f_temporal_consistency_drift|f_tensor_drift|f_provenance_drift|f_spatial_drift|f_schema_drift|f_quality_drift|f_quality_drift_octad)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Drift): unexpected axiom(s) in Print Assumptions:"
+            echo "$UNEXPECTED"
+            echo "---"
+            cat Drift.out
+            exit 1
+          fi
+          echo "OK(Drift): whitelisted Parameters + 9 drift fns"
+
+      - name: Verify Transaction assumptions (must be empty)
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Transaction.v has zero Parameters/Axioms — every theorem must
+          # close under the global context.
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Transaction.out \
+            | sort -u || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Transaction): expected 0 axioms, found:"
+            echo "$UNEXPECTED"
+            echo "---"
+            cat Transaction.out
+            exit 1
+          fi
+          echo "OK(Transaction): 3 theorems closed under global context (0 axioms)"
