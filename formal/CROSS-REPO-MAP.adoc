@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= VeriSimDB formal/ ↔ Echo-Types cross-repo mapping
+:toc:
+
+== Why this document exists
+
+VeriSimDB's foundation-pack proofs (issue #77) and Echo-Types (hyperpolymath/echo-types) are conceptually the same project at different abstraction levels:
+
+* **VeriSimDB formal/** mechanises CONCRETE invariants of the 8-modality octad database in Coq, against specific Rust modules.
+* **Echo-Types proofs/agda/** mechanises ABSTRACT structural-loss theorems in Agda, parameterised over arbitrary `f : A → B` and the `Echo f y := Σ (x : A), (f x ≡ y)` fibre.
+
+Every VeriSimDB theorem is an instance of a more general Echo-Types theorem.
+This document pins those correspondences so neither side's work duplicates the other,
+and so a future Coq↔Agda bridge (or Agda re-mechanisation) can compose cleanly.
+
+== Standing direction
+
+Owner directive (2026-06-01): "in the proofs you do, you need to check the echo-types repo
+and make sure this is part of the proofing for the repo — if relevant use what we have,
+if not, establish the extension to what is there and work down that path proving as you go,
+then cross document."
+
+Concretely:
+
+* When adding a new VeriSimDB foundation theorem, check the table below.
+* If the abstract Echo-Types theorem ALREADY exists, the new VeriSimDB Coq lemma is justified as an instantiation. Cite the Echo-Types module in the Coq file's module docstring.
+* If the abstract Echo-Types theorem DOES NOT exist, **EITHER** add it to echo-types Agda FIRST (preferred when the generalisation is independently valuable), **OR** note in the docstring why instantiation-first was the right call.
+* Update this document whenever a new entry lands.
+
+== Mapping table
+
+[cols="1,2,2,3"]
+|===
+| Foundation theorem | VeriSimDB module | Echo-Types module | Mapping notes
+
+| P2 `record_verify_iff_unchanged`
+| `formal/Provenance.v`
+| `EchoProvenance.agda` (existing)
+| The hash-chain `verify` is the certification relation `Cert : C → B → Set` of `EchoResidue.EchoR`. A record verifies iff its content_hash is the SHA-256 of its (content, parent_hash) — i.e., iff it inhabits `Echo SHA-256 content_hash`. Owner-facing wording in `docs/echo-types/echo-types/EchoProvenance.adoc`: "For ANY payload type Payload, ANY tag type Tag with two distinguishable elements tag₁ ≢ tag₂, the projection proj₁ : Payload × Tag → Payload is non-injective on tag-differing records, and `Echo project p` carries the lost tag." Our P2 specialises Payload := content, Tag := hash, with sha256 the forgetful projection.
+
+| P3 `chain_linked_step` + `chain_linked`
+| `formal/Provenance.v`
+| `EchoProvenance.agda` (existing) + sequential composition
+| A linked chain `c1, c2, …, cn` is a tower of Echos `Echo sha256 hi` where `hi = sha256 cᵢ hᵢ₋₁`. The chain-link invariant says each `(cᵢ, hᵢ₋₁) ↦ hᵢ` is in the fibre. Composition of Echos under sequential append is the chain-walking property. No new echo-types abstraction needed.
+
+| D1 `drift_score_in_unit_interval` (9 corollaries)
+| `formal/Drift.v`
+| `EchoResidue.agda` (existing) + a clamp wrapper
+| Each drift function is a residue `EchoR ℝ Cert y` where `Cert r y := 0 ≤ r ≤ 1 ∧ y = clamp r`. The 9 named corollaries follow from a single `clamped_in_unit_interval` general lemma — same shape as `echo-to-residue` in `EchoResidue.agda`.
+
+| D2 `detect_drift_sound` + `detect_drift_complete`
+| `formal/Drift.v`
+| `EchoCharacteristic.agda` (existing) — collapse / echo-true / echo-false
+| The detector partitions scores into `Echo true` (above threshold) and `Echo false` (below). The iff axiom is exactly `echo-true≢echo-false` (`Cert` is the "exceeds threshold" predicate). The trichotomy axiom `le_or_gt` is the totality of the ordering — same role as `Bool` decidability in echo-types.
+
+| C2 `txn_state_machine_well_formed` (3 sub-theorems)
+| `formal/Transaction.v`
+| **Direct inductive — no echo-types lift needed** (terminal-state property is structural, not a structural-loss theorem)
+| Pure inductive predicate, zero axioms. Echo-types' general "trajectory through states" framing (via graded comonad in `EchoGradedComonadInterface.agda`) is OVERPOWERED for the 3-state finite automaton here. Recorded as deliberate non-port.
+
+| Q1-lite `planner_preserves_*` (3 corollaries)
+| `formal/Planner.v`
+| `EchoNoSectionGeneric.agda` (existing) + `EchoOFSUnivF5.agda` for cost lift
+| The optimizer is a permutation; in echo-types language, it's a SECTION of the "execute" function (i.e., for any physical plan there exists a logical plan producing it). The permutation property is the section-ness witness. `EchoNoSectionGeneric` proves that without further structure NO non-trivial section exists generically — Q1's optimizer breaks this by being a permutation, which IS the trivial section. Full Q1 semantic equivalence would lift cost via `EchoCost.agda` and tropical-resource-typing.
+
+| C7 `wal_replay_idempotent` (Option A from #89)
+| `formal/WAL.v`
+| `EchoResidue.agda` (existing) + `EchoCharacteristic.agda`
+| The WAL is a residue `EchoR (List wal_op) Cert obs_state` where `Cert ops s` holds iff `replay s ops = s`. Idempotence is `Cert (replay s ops) ops`, which is the *fixed-point* property of the residue under second application. Same shape as echo-types' "residue is invariant under re-projection" lemma. Future port: rephrase WAL.v in terms of `EchoR` once the Agda interop story is in place.
+
+| N2 `normalize_idempotent`
+| `formal/Normalizer.v`
+| `EchoSearchExample.agda` (existing) — "find the witness" pattern + `EchoTruncation.agda`
+| The `winner` function is a SEARCH for the authoritative modality — exactly `EchoSearchExample`'s pattern. The `winner_stable_off_drifted` axiom is the "search result depends only on non-drifted modalities" — direct lift of `EchoTruncation`'s decoupling lemma. N2 idempotence is then "search is idempotent on its own result" — a *truncated echo* fixed point.
+
+| V2 `vql_preservation` (still blocked, see #92)
+| _todo_
+| `EchoGradedComonadInterface.agda` (graded comonad for "well-typed at level n")
+| Type-preservation under reduction is the comonad ε ∘ δ = id property in the graded comonad of "well-typed terms at type τ". Once the VCL small-step semantics is specified (#92 blocker 1), V2 is a direct application of `EchoGradedComonadInstance2.agda` with τ as the grading.
+
+| Future: D7 `temporal_drift_zero_iff_monotone_unique`
+| _todo_
+| `EchoLossTaxonomy.agda` + `EchoEntropy.agda`
+| Temporal drift = lost information about version ordering. The "iff monotone-unique" direction needs the *strict* form of loss measurement (entropy of the version permutation).
+
+| Future: Full Q1 semantic equivalence
+| _todo_
+| `EchoCost.agda` + `EchoTropical.agda` + `AntiEchoTropicalGeneric.agda`
+| Plan semantic equivalence = result-set echo invariance under optimization, with cost lifted into tropical (max-plus) algebra for the cost model. Tropical-resource-typing repo is the natural home for the algebraic side.
+
+|===
+
+== Architecture for the Coq ↔ Agda boundary
+
+* **Coq side (verisimdb formal/):** specific Rust contracts. Mechanically check the 8 foundation theorems.
+* **Agda side (echo-types proofs/):** abstract structural-loss theorems. Each verisimdb theorem is an instance.
+* **Bridge (future):** echo-types' `0-AI-MANIFEST.a2ml` already declares the inter-repo coupling. A formal Coq→Agda port would use `Coq.io` extraction → Agda postulate / agda2hs, or vice versa. Currently NOT IMPLEMENTED; the mapping table above is informal but should be kept fresh.
+
+== Action items on every new foundation PR
+
+. Check this table. Update the relevant row.
+. If a new echo-types abstraction is warranted, file a companion issue in `hyperpolymath/echo-types` and link both ways.
+. The verisimdb Coq module's docstring **MUST** name the corresponding echo-types module (or "no direct echo-types analogue, deliberate" with rationale).
+. Update `MEMORY.md` `[[verisimdb-proof-programme-started]]` cross-ref.
+
+== Status (2026-06-01)
+
+5 of 8 foundation theorems landed on verisimdb side (P2, P3, D1, C2, D2, Q1-lite, C7 in PRs #87/#90/#93/#94). Cross-doc to echo-types established by this file. N2 lands in PR #95. V2 blocked on #92 small-step spec.
+
+Future work:
+
+* Port WAL.v + Normalizer.v to Agda within echo-types (refactor on top of EchoResidue + EchoSearchExample).
+* Establish a verisimdb → echo-types citation graph in the V2 PR (use EchoGradedComonadInterface).
+* Add a CI check: every new `formal/*.v` module must reference an echo-types module name in its docstring (or `no-echo-types-analogue` with reason).
