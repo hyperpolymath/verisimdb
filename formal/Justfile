@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner
+all: provenance drift transaction planner wal
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -28,11 +28,14 @@ transaction:
 planner:
     {{COQC}} -q Planner.v | tee Planner.out
 
+wal:
+    {{COQC}} -q WAL.v | tee WAL.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -71,6 +74,16 @@ check-planner: planner
             echo "ERROR(Planner): unexpected axiom: $line"; cat; exit 1; \
           else \
             echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"; \
+          fi; }
+
+check-wal: wal
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' WAL.out \
+      | sort -u \
+      | grep -vE '^(entity_id|data|eq_entity_dec|functional_extensionality_dep)$' \
+      | { if read -r line; then \
+            echo "ERROR(WAL): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(WAL): C7 replay-idempotent + deterministic-off-touched"; \
           fi; }
 
 # Remove all build artefacts.

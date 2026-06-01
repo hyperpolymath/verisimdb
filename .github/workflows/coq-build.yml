@@ -66,6 +66,12 @@ jobs:
           set -euo pipefail
           coqc -q Planner.v | tee Planner.out
 
+      - name: Compile WAL.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q WAL.v | tee WAL.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -135,3 +141,20 @@ jobs:
             exit 1
           fi
           echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"
+
+      - name: Verify WAL assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Whitelist: entity_id, data, eq_entity_dec, functional_extensionality_dep
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' WAL.out \
+            | sort -u \
+            | grep -vE '^(entity_id|data|eq_entity_dec|functional_extensionality_dep)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(WAL): unexpected axiom(s) in Print Assumptions:"
+            echo "$UNEXPECTED"
+            echo "---"
+            cat WAL.out
+            exit 1
+          fi
+          echo "OK(WAL): C7 replay-idempotent + deterministic-off-touched"
