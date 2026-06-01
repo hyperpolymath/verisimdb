@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: MPL-2.0
+name: Build Validation
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-rust:
+    name: Rust build validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace
+
+  validate-elixir:
+    name: Elixir build validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: elixir-orchestration
+    steps:
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17"
+          otp-version: "27"
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
