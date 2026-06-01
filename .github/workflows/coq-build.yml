@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Coq Build Oracle — compiles formal/ and asserts no axiom slippage.
+# Follows the Ephapax pattern (hyperpolymath/ephapax coq-build.yml).
+
+name: Coq Build Oracle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'formal/**'
+      - '.github/workflows/coq-build.yml'
+  pull_request:
+    paths:
+      - 'formal/**'
+      - '.github/workflows/coq-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile Coq proofs + assumptions guard
+    runs-on: ubuntu-latest
+    container:
+      image: coqorg/coq:8.18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install just
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends just
+      - name: Build proofs
+        run: just -f formal/Justfile all
+      - name: Verify Print Assumptions
+        run: just -f formal/Justfile check-assumptions
