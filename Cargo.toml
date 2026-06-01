@@ -126,23 +126,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 
-# Patch Bridge mitigations — forced upgrades for transitive CVEs in tantivy 0.25.0
-# These override the versions pinned by tantivy without forking.
-#
-# RUSTSEC-2026-0041: lz4_flex 0.11.5 — memory leak on decompression (CVSS 8.2 HIGH)
-#   Chain: tantivy 0.25.0 → lz4_flex 0.11.5
-#   Fix: 0.11.6 adds proper offset validation. Semver-compatible, safe to patch.
-#
-# RUSTSEC-2026-0002: lru 0.12.5 — IterMut Stacked Borrows violation (unsound)
-#   Chain: tantivy 0.25.0 → lru 0.12.5
-#   Fix: 0.12.6+ not available in 0.12.x line. Patching to 0.12.5 is NOT possible.
-#   The fix is in 0.16.3 which is semver-incompatible with tantivy's lru ^0.12 pin.
-#   Status: UNMITIGABLE without tantivy upgrade. tantivy 0.25.0 is latest.
-#   Risk: Low in practice — VeriSimDB uses #![forbid(unsafe_code)] in verisim-document,
-#   and the IterMut violation requires specific Miri-detectable UB, not exploitable
-#   in normal execution. Accepted risk until tantivy 0.26.
-#
-# NOTE: quinn-proto 0.11.14 (Dependabot alert — build-time only, NOT runtime)
+# NOTE: quinn-proto (Dependabot alert — build-time only, NOT runtime)
 # Chain: burn 0.20 → cubecl-cpu → tracel-llvm-bundler (build dep) → reqwest 0.12 → quinn → quinn-proto
 # This is a build-time dependency for LLVM artifact download, not in any production code path.
 # Waiting for burn 0.21 stable release. reqwest bumped to 0.13 for direct deps.

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 //! VeriSim Document Modality
 //!
 //! Full-text search via Tantivy.
@@ -275,7 +276,8 @@ impl DocumentStore for TantivyDocumentStore {
             QueryParser::for_index(&self.index, vec![self.schema.title, self.schema.body]);
 
         let parsed_query = query_parser.parse_query(query)?;
-        let top_docs = searcher.search(&parsed_query, &TopDocs::with_limit(limit))?;
+        let top_docs =
+            searcher.search(&parsed_query, &TopDocs::with_limit(limit).order_by_score())?;
 
         // Create snippet generator for body field
         let snippet_generator =
