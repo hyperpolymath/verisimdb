@@ -26,6 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: coqorg/coq:8.18
+      # coqorg/coq runs as user `coq` by default; actions/checkout needs to
+      # write into /__w/_temp which is owned by root. Run the container as
+      # root to sidestep EACCES (same fix as hyperpolymath/ephapax#236).
+      options: --user root
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
