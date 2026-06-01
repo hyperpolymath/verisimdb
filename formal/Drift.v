@@ -130,12 +130,74 @@ Theorem quality_drift_octad_in_unit_interval :
   forall input, in_unit_interval (quality_drift_octad input).
 Proof. intros. apply clamped_in_unit_interval. Qed.
 
+(** ** D2: detect_drift_sound + detect_drift_complete
+
+    The drift detector signals iff the score exceeds the threshold.
+    Mirrors [DriftDetector::record] in
+    [rust-core/verisim-drift/src/lib.rs], which returns [Some event]
+    when [score > threshold] and [None] otherwise.
+
+    This is the BOUNDARY direction — soundness ("if event then over
+    threshold") plus completeness ("if no event then within
+    threshold") at the threshold comparison. The deeper question of
+    whether threshold-exceedance corresponds to a real consistency
+    violation is the [score ↔ violation] gap (issue #80 territory).
+    See verisimdb#77 D2 row + audit transcript in PR description. *)
+
+(** The detector function: takes a score and a threshold and returns
+    whether to emit a drift event. *)
+Parameter f_detect_drift : score -> score -> bool.
+
+(** Strict ordering. *)
+Parameter strictly_greater : score -> score -> Prop.
+
+(** Total ordering on [score]: for every pair [s, t], either [s <= t]
+    or [s > t]. Faithful to the [f64] total order in the Rust source
+    (modulo NaN, which the drift code rules out via clamp). *)
+Axiom le_or_gt :
+  forall s t, le s t \/ strictly_greater s t.
+
+(** Strict-greater and weak-less-or-equal are mutually exclusive. *)
+Axiom le_gt_exclusive :
+  forall s t, ~ (le s t /\ strictly_greater s t).
+
+(** The detector contract: [f_detect_drift score threshold = true]
+    iff [score > threshold]. The Rust source implements this with
+    an [if score > threshold] guard at lib.rs line 419. *)
+Axiom detector_iff_threshold :
+  forall s t, f_detect_drift s t = true <-> strictly_greater s t.
+
+(** D2 soundness: a positive detector signal implies threshold is
+    strictly exceeded (no false positives at the comparison boundary). *)
+Theorem detect_drift_sound :
+  forall s t, f_detect_drift s t = true -> strictly_greater s t.
+Proof.
+  intros s t Hdet. apply detector_iff_threshold. exact Hdet.
+Qed.
+
+(** D2 completeness: a negative detector signal implies the score is
+    within threshold (no false negatives at the comparison boundary). *)
+Theorem detect_drift_complete :
+  forall s t, f_detect_drift s t = false -> le s t.
+Proof.
+  intros s t Hdet.
+  destruct (le_or_gt s t) as [Hle | Hgt].
+  - exact Hle.
+  - exfalso.
+    apply detector_iff_threshold in Hgt.
+    rewrite Hgt in Hdet. discriminate.
+Qed.
+
 (** ** Print Assumptions guard
 
     Each theorem must close under the global context. The whitelist
     in the CI workflow allows: score, zero, one, le, clamp, le_refl,
-    clamp_lower, clamp_upper, and the 9 [f_*_drift] parameters. *)
+    clamp_lower, clamp_upper, the 9 [f_*_drift] parameters, plus
+    [f_detect_drift], [strictly_greater], [strictly_greater_iff_not_le],
+    [detector_iff_threshold], [classic_le] (D2 additions). *)
 
 Print Assumptions clamped_in_unit_interval.
 Print Assumptions semantic_vector_drift_in_unit_interval.
 Print Assumptions quality_drift_octad_in_unit_interval.
+Print Assumptions detect_drift_sound.
+Print Assumptions detect_drift_complete.

@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction
+all: provenance drift transaction planner
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -25,11 +25,14 @@ drift:
 transaction:
     {{COQC}} -q Transaction.v | tee Transaction.out
 
+planner:
+    {{COQC}} -q Planner.v | tee Planner.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction
+check-assumptions: check-provenance check-drift check-transaction check-planner
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -44,11 +47,11 @@ check-provenance: provenance
 check-drift: drift
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Drift.out \
       | sort -u \
-      | grep -vE '^(score|zero|one|le|clamp|le_refl|clamp_lower|clamp_upper|f_semantic_vector_drift|f_graph_document_drift|f_temporal_consistency_drift|f_tensor_drift|f_provenance_drift|f_spatial_drift|f_schema_drift|f_quality_drift|f_quality_drift_octad)$' \
+      | grep -vE '^(score|zero|one|le|clamp|le_refl|clamp_lower|clamp_upper|f_semantic_vector_drift|f_graph_document_drift|f_temporal_consistency_drift|f_tensor_drift|f_provenance_drift|f_spatial_drift|f_schema_drift|f_quality_drift|f_quality_drift_octad|f_detect_drift|strictly_greater|le_or_gt|le_gt_exclusive|detector_iff_threshold)$' \
       | { if read -r line; then \
             echo "ERROR(Drift): unexpected axiom: $line"; cat; exit 1; \
           else \
-            echo "OK(Drift): whitelisted Parameters + 9 drift fns"; \
+            echo "OK(Drift): D1 (9 fns) + D2 (detector iff threshold) whitelisted"; \
           fi; }
 
 check-transaction: transaction
@@ -58,6 +61,16 @@ check-transaction: transaction
             echo "ERROR(Transaction): expected 0 axioms, found: $line"; cat; exit 1; \
           else \
             echo "OK(Transaction): 3 theorems closed under global context (0 axioms)"; \
+          fi; }
+
+check-planner: planner
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Planner.out \
+      | sort -u \
+      | grep -vE '^(modality|condition|optimize|optimize_is_permutation)$' \
+      | { if read -r line; then \
+            echo "ERROR(Planner): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"; \
           fi; }
 
 # Remove all build artefacts.
