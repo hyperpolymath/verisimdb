@@ -1,5 +1,5 @@
 ;; SPDX-License-Identifier: MPL-2.0
-;; STATE.scm - Project state for rsr-template-repo
+;; STATE.scm - Project state for VeriSimDB
 ;; Media-Type: application/vnd.state+scm
 
 (state
@@ -7,12 +7,12 @@
     (version "0.0.1")
     (schema-version "1.0")
     (created "2026-01-03")
-    (updated "2026-01-03")
-    (project "rsr-template-repo")
-    (repo "github.com/hyperpolymath/rsr-template-repo"))
+    (updated "2026-06-02")
+    (project "VeriSimDB")
+    (repo "github.com/hyperpolymath/VeriSimDB"))
 
   (project-context
-    (name "rsr-template-repo")
+    (name "VeriSimDB")
     (tagline "")
     (tech-stack ()))
 
