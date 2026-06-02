@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MPL-2.0
+#
+# Toolchain pin for the verisimdb fuzz workspace.
+#
+# Rationale: `burn@0.21.0` and `cubecl-zspace@0.10.0` (transitive
+# dependencies of `verisim-octad` → `verisim-tensor`) require
+# rustc >= 1.92, but the default ClusterFuzzLite builder image
+# was shipping rustc 1.91 nightly, causing
+# `cflite_pr.yml → pr-fuzzing (address)` to fail with:
+#
+#   error: package `burn@0.21.0` cannot be built because it
+#   requires rustc 1.92 or newer, while the currently active
+#   rustc version is 1.91.0-nightly.
+#
+# Pin a nightly that ships rustc >= 1.92 so the fuzz build
+# matches what the rest of the rust-ci workspace sees on the
+# (rolling) `dtolnay/rust-toolchain@stable` action.
+#
+# No top-level workspace `rust-toolchain.toml` exists yet —
+# scope this pin to `fuzz/` until a workspace-wide pin is
+# added (tracked separately).
+
+[toolchain]
+channel = "nightly-2026-05-15"
+components = ["rustfmt", "clippy"]
