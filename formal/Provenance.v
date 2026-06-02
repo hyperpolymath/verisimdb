@@ -3,25 +3,31 @@
 
 (** * VeriSimDB Provenance Hash-Chain Verification
 
-    Mechanises the foundation-pack theorems P2 ([record_verify_iff_unchanged])
-    and P3 ([chain_linked_step], [chain_linked]) for the provenance modality
-    defined in [rust-core/verisim-provenance/src/lib.rs].
+    Mechanises the foundation-pack theorems P2 ([record_verify_iff_unchanged]),
+    P3 ([chain_linked_step], [chain_linked]) and P4 ([append_preserves_verified],
+    [build_chain_all_verified]) for the provenance modality defined in
+    [rust-core/verisim-provenance/src/lib.rs].
 
     The Rust source maintains an append-only hash chain where each record's
     [parent_hash] equals the SHA-256 [content_hash] of its predecessor. The
-    three theorems below capture, in increasing strength:
+    theorems below capture, in increasing strength:
 
-    - [record_verify_iff_unchanged] — a single record verifies iff its
-      [content_hash] is the SHA-256 of its content payload and parent_hash.
-    - [chain_linked_step] — honest append preserves the chain-link
+    - [record_verify_iff_unchanged] (P2) — a single record verifies iff
+      its [content_hash] is the SHA-256 of its content payload and
+      parent_hash.
+    - [chain_linked_step] (P3) — honest append preserves the chain-link
       invariant.
-    - [chain_linked] — every chain built from genesis by repeated honest
-      append is well-linked.
+    - [chain_linked] (P3) — every chain built from genesis by repeated
+      honest append is well-linked.
+    - [append_preserves_verified] (P4) — honest append takes an
+      all-verified chain to an all-verified chain.
+    - [build_chain_all_verified] (P4) — every chain built from empty by
+      repeated honest append has all records verifying.
 
     The only declared axiom is [sha256_collision_resistant]. It is NOT
-    consumed by the three theorems below; the [Print Assumptions] guard
-    at file end confirms each closes under the global context. The
-    axiom is reserved for later uniqueness theorems (P4, V8).
+    consumed by the theorems below; the [Print Assumptions] guard at
+    file end confirms each closes under the global context. The axiom
+    is reserved for later uniqueness theorems (V8).
 
     Build oracle: [just -f formal/Justfile all]. CI: [.github/workflows/coq-build.yml].
 
@@ -180,6 +186,51 @@ Proof.
   - apply chain_linked_step. exact IH.
 Qed.
 
+(** ** P4: [append_preserves_verified]
+
+    The Rust [append()] constructs the new record via [Self::new()]
+    (mirrored here as [mk_honest]), which always computes the
+    [content_hash] honestly. Hence appending to an all-verified chain
+    yields an all-verified chain. The proof reduces to two facts:
+
+    - [Forall_app] — [Forall P (xs ++ ys)] iff [Forall P xs /\ Forall P ys].
+    - [mk_honest_verifies] — every [mk_honest] record satisfies
+      [record_verify] by construction. *)
+
+Lemma mk_honest_verifies :
+  forall cnt h, record_verify (mk_honest cnt h).
+Proof.
+  intros. unfold record_verify, mk_honest. simpl. reflexivity.
+Qed.
+
+Theorem append_preserves_verified :
+  forall c cnt,
+    Forall record_verify c ->
+    Forall record_verify (append_record c cnt).
+Proof.
+  intros c cnt H.
+  unfold append_record.
+  apply Forall_app. split.
+  - exact H.
+  - apply Forall_cons.
+    + apply mk_honest_verifies.
+    + apply Forall_nil.
+Qed.
+
+(** ** P4 corollary: [build_chain_all_verified]
+
+    Combining [append_preserves_verified] with [build_chain] yields the
+    closed-form result: every chain built from empty by repeated honest
+    append has all records verifying. The base case is [Forall_nil];
+    the step case is [append_preserves_verified]. *)
+Theorem build_chain_all_verified :
+  forall cnts, Forall record_verify (build_chain cnts).
+Proof.
+  induction cnts as [|cnt rest IH]; simpl.
+  - apply Forall_nil.
+  - apply append_preserves_verified. exact IH.
+Qed.
+
 (** ** Print Assumptions guard
 
     Each theorem must close under the global context. The
@@ -190,3 +241,5 @@ Qed.
 Print Assumptions record_verify_iff_unchanged.
 Print Assumptions chain_linked_step.
 Print Assumptions chain_linked.
+Print Assumptions append_preserves_verified.
+Print Assumptions build_chain_all_verified.
