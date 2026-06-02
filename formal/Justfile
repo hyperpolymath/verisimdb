@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner wal normalizer vcl
+all: provenance drift transaction planner wal normalizer vcl planner-semantic
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -37,11 +37,14 @@ normalizer:
 vcl:
     {{COQC}} -q VCL.v | tee VCL.out
 
+planner-semantic:
+    {{COQC}} -q PlannerSemantic.v | tee PlannerSemantic.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -109,6 +112,16 @@ check-vcl: vcl
             echo "ERROR(VCL): expected 0 axioms, found: $line"; cat; exit 1; \
           else \
             echo "OK(VCL): V2 preservation + progress (0 axioms)"; \
+          fi; }
+
+check-planner-semantic: planner-semantic
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' PlannerSemantic.out \
+      | sort -u \
+      | grep -vE '^(modality|condition|octad|exec_node|exec_node_comm|optimize|optimize_is_permutation)$' \
+      | { if read -r line; then \
+            echo "ERROR(PlannerSemantic): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(PlannerSemantic): Q1-full semantic equivalence + membership"; \
           fi; }
 
 # Remove all build artefacts.
