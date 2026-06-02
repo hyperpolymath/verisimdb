@@ -13,14 +13,31 @@
 
   (project-context
     (name "VeriSimDB")
-    (tagline "")
-    (tech-stack ()))
+    (tagline "Drift-aware, dependently-typed federated database with proof-bearing queries")
+    (tech-stack ("rust" "elixir" "rescript" "coq")))
 
   (current-position
-    (phase "initial")
+    (phase "foundation-pack-complete")
     (overall-completion 0)
-    (components ())
-    (working-features ()))
+    (components
+      (license
+        (status "normalized")
+        (value "MPL-2.0")
+        (scope "workspace + LICENSE file body uniform")
+        (closes (issue 82) (pr 101))
+        (date "2026-06-02"))
+      (coverage-elixir
+        (current-percent 42.6)
+        (floor 40)
+        (ramp-doc "elixir-orchestration/coveralls-coverage-targets.md")
+        (ramp-targets ((phase 1 (floor 50) (target-date "2026-07-15"))
+                       (phase 2 (floor 60) (target-date "2026-09-01"))))
+        (date "2026-06-02"))
+      (cicd-main-reds
+        (status "5-of-7-cleared")
+        (closes (pr 99))
+        (remaining "license deferred to #82 (closed via #101)")
+        (date "2026-06-02"))))
 
   (route-to-mvp
     (milestones ()))
@@ -36,4 +53,9 @@
     (this-week)
     (this-month))
 
-  (session-history ()))
+  (session-history
+    (entry
+      (date "2026-06-02")
+      (prs (99 100 101))
+      (closes (issue 82) (issue 83) (issue 100))
+      (summary "Workspace MPL-2.0 normalize + 5 root-cause main fixes + coverage floor realignment with ramp doc"))))
