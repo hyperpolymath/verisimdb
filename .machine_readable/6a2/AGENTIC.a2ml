@@ -1,16 +1,46 @@
 ;; SPDX-License-Identifier: MPL-2.0
-;; AGENTIC.scm - AI agent interaction patterns for rsr-template-repo
+;; AGENTIC.a2ml - AI agent interaction patterns for VeriSimDB
 
 (define agentic-config
   `((version . "1.0.0")
+    (project . "VeriSimDB")
+
     (claude-code
-      ((model . "claude-opus-4-5-20251101")
-       (tools . ("read" "edit" "bash" "grep" "glob"))
-       (permissions . "read-all")))
+      ((model . "claude-opus-4-7")
+       (tools . ("read" "edit" "bash" "grep" "glob" "agent"))
+       (permissions . "read-all + edit-with-confirmation")))
+
     (patterns
-      ((code-review . "thorough")
-       (refactoring . "conservative")
-       (testing . "comprehensive")))
+      ((code-review . "thorough — verify against EXPLAINME.adoc claims-with-evidence")
+       (refactoring . "conservative — preserve formal-proof invariants in formal/*.v")
+       (testing . "comprehensive — Rust cargo test + Elixir mix test + Coq build-oracle")
+       (licence-edits . "MANUAL ONLY — see feedback_no_automated_licence_edits")
+       (proofs . "MUST check via Print Assumptions; cross-document with echo-types if L3 obligation")))
+
     (constraints
-      ((languages . ())
-       (banned . ("typescript" "go" "python" "makefile"))))))
+      ((languages-allowed . ("Rust" "Elixir" "ReScript" "Coq" "Idris2"))
+       (languages-banned . ("TypeScript" "Go" "Python" "Node.js" "Makefile"))
+       (container-runtime . "Podman > Docker")
+       (source-hosting-preference . "GitLab > GitHub")
+       (licence . "MPL-2.0 — sole-owner repo per estate license-policy umbrella")))
+
+    (load-bearing-memories
+      ((feedback_estate_license_policy_umbrella . "five-way license rule")
+       (feedback_no_automated_licence_edits . "manual licence edits only")
+       (feedback_proofs_must_check_and_cross_doc_echo_types . "proof obligations cross-doc")
+       (project_verisimdb_subject_of_everything . "VCL rename incomplete; ecosystem dependencies")
+       (project_verisimdb_proof_programme_started . "foundation-pack proof status")))
+
+    (canonical-numbers-source
+      ((modality-list . "rust-core/verisim-{graph,vector,tensor,semantic,document,temporal,provenance,spatial}/")
+       (crate-count . "find rust-core -name Cargo.toml -not -path */fuzz/*")
+       (test-counts . "cargo test 2>&1 | grep test result")
+       (proof-count . "ls formal/*.v")
+       (foundation-pack-status . "ROADMAP.md")
+       (drift-type-catalogue . ".claude/CLAUDE.md section Drift Detection")))
+
+    (do-not
+      ((modify-licence-headers-in-bulk . "manual per-file owner-only")
+       (touch-third-party-vendored . "leave fork contents alone")
+       (sweep-cross-repo . "high blast-radius without explicit owner approval")
+       (assume-pre-authorization . "Work-without-stopping is not authorization for forbidden actions")))))

@@ -1,20 +1,58 @@
 ;; SPDX-License-Identifier: MPL-2.0
-;; ECOSYSTEM.scm - Ecosystem position for rsr-template-repo
-;; Media-Type: application/vnd.ecosystem+scm
+;; ECOSYSTEM.a2ml - Ecosystem position for VeriSimDB
+;; Media-Type: application/vnd.ecosystem+a2ml
 
 (ecosystem
   (version "1.0")
-  (name "rsr-template-repo")
-  (type "")
-  (purpose "")
+  (name "VeriSimDB")
+  (type "database + federation coordinator")
+  (purpose "Cross-modal entity consistency engine — detects drift before it causes data quality damage; operates standalone or as heterogeneous federation coordinator over existing databases.")
 
   (position-in-ecosystem
-    (category "")
-    (subcategory "")
-    (unique-value ()))
+    (category "multimodal database")
+    (subcategory "drift-aware federation")
+    (unique-value
+      ("Octad: one entity, eight synchronised representations"
+       "Continuous cross-modal drift detection with severity scoring"
+       "Self-normalisation via authoritative-modality selection"
+       "Formally verified consistency obligations (8 Coq modules)"
+       "VCL — formally verified query language with PROOF clauses"
+       "Operates as standalone DB OR federation coordinator over 7 external backends")))
 
-  (related-projects ())
+  (related-projects
+    ;; Direct dependencies (hyperpolymath estate)
+    (("hyperpolymath/echo-types"        "echo / drift / cost-typing foundations (cross-doc target)"))
+    (("hyperpolymath/vcl-ut"             "VCL unification toolchain (formal foundation)"))
+    (("hyperpolymath/tropical-resource-typing" "tropical cost-typing (drift cost composition)"))
+    (("hyperpolymath/kategoria"          "category-theory foundations"))
+    (("hyperpolymath/typed-wasm"         "WASM target for VCL compilation"))
+    (("hyperpolymath/affinescript"       "ReScript-successor language; consumes verisimdb client SDK"))
+    (("hyperpolymath/panll"              "PanLL database protocol; embeds verisimdb-debugger"))
+    ;; Hypatia pipeline (estate observability)
+    (("hyperpolymath/hypatia"            "estate-wide CI/CD scanning; ingests verisim octads"))
+    (("hyperpolymath/panic-attack"       "scan source; emits weak_points to verisimdb-data"))
+    (("hyperpolymath/verisimdb-data"     "git-backed flat-file store for CI scans + dispatch manifests"))
+    (("hyperpolymath/gitbot-fleet"       "dispatch infrastructure; consumes verisimdb octads"))
+    ;; Container ecosystem (estate)
+    (("hyperpolymath/stapeln"            ".ctp container bundle ecosystem; ct-build.sh signing"))
+    (("hyperpolymath/svalinn"            "edge gateway (.gatekeeper.yaml policy)"))
+    (("hyperpolymath/cerro-torre"        "container manifest (manifest.toml provenance)"))
+    (("hyperpolymath/selur"              "selur-compose stack runner"))
+    ;; Formal-proof ecosystem (estate)
+    (("hyperpolymath/ephapax"            "preservation theorem track; cross-doc echo-types target")))
 
-  (what-this-is ())
+  (what-this-is
+    ("A cross-modal consistency engine that detects + repairs drift across eight entity representations"
+     "A multimodal database where one entity ID maps to eight synchronised stores"
+     "A formally verified query layer (VCL) over heterogeneous data"
+     "A federation coordinator over 7 backends: MongoDB / Redis / Neo4j / ClickHouse / SurrealDB / InfluxDB / MinIO"
+     "A reference implementation for PanLL's database design/development/evaluation module"
+     "An octad-emitting source for the hypatia estate CI/CD pipeline"))
 
-  (what-this-is-not ()))
+  (what-this-is-not
+    ("NOT a SQL database — VCL is the query interface; SQL is not supported"
+     "NOT a replacement for any single-modality database — pairs WITH them via federation"
+     "NOT a graph-only DB — graph is one of eight modalities"
+     "NOT a vector-only DB — vector is one of eight modalities"
+     "NOT eventual-consistency — drift detection operates on the semantic layer"
+     "NOT Python / Go / Node.js — banned per language policy in .claude/CLAUDE.md")))
