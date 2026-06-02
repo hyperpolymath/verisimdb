@@ -371,7 +371,7 @@ defmodule VeriSim.Federation.Adapters.ObjectStorage do
     []
   end
 
-  defp extract_xml_field(xml, key, field) do
+  defp extract_xml_field(xml, _key, field) do
     # Simple XML field extraction near a specific key
     # This is a best-effort parser for S3 ListObjects XML
     pattern = ~r/<#{field}>([^<]+)<\/#{field}>/
