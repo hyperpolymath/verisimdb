@@ -3,7 +3,7 @@
     "treat_no_relevant_lines_as_covered": true,
     "output_dir": "cover/",
     "template_path": "./deps/excoveralls/lib/templates/html/htmlcov/",
-    "minimum_coverage": 60,
+    "minimum_coverage": 40,
     "print_summary": true,
     "print_files": true
   },

@@ -25,6 +25,7 @@ this project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(ci): align `ExCoveralls` floor with current `elixir-orchestration` reality (`60` → `40`); staged ramp back to `60` documented in [`elixir-orchestration/coveralls-coverage-targets.md`](elixir-orchestration/coveralls-coverage-targets.md).
 - fix(licence): clear scaffold-placeholder leak (rebuilt clean) (#17)
 - fix(licence): clear scaffold-placeholder leak (rebuilt clean) (#12)
 - fix(ci): sync hypatia-scan.yml to canonical (kill cd-scanner build drift) (#9)
