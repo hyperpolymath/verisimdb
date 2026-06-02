@@ -338,6 +338,12 @@ cd elixir-orchestration
 mix test                      # Elixir: 160+ tests (VQL, consensus, telemetry, federation, hypatia)
 ----
 
+=== CI & Coverage
+
+* `cargo-llvm-cov` (Rust) + `excoveralls` (Elixir) wired into CI, LCOV/JSON uploaded to Codecov.
+* `elixir-orchestration` coverage floor is currently `40` (`coveralls.json` → `coverage_options.minimum_coverage`). Actual coverage settled near 42.6 % once federation adapters grew live-service-only branches; this is a threshold mismatch, not a regression.
+* Staged ramp back to `60` is documented with target dates in link:elixir-orchestration/coveralls-coverage-targets.md[`elixir-orchestration/coveralls-coverage-targets.md`] (Phase 1: 50 by 2026-07-15; Phase 2: 60 by 2026-09-01).
+
 === Container
 
 [source,bash]

@@ -135,3 +135,15 @@
 ;; 3. Planner → Executor: proof verification dispatched before/after query
 ;; 4. Executor → ZKP Backend: circuit evaluated, proof generated/verified
 ;; 5. Client → API: proof result included in response (pass/fail + proof bytes)
+
+;; ============================================================================
+;; Cross-cutting trust invariants
+;; ============================================================================
+;;
+;; TRUST: all Cargo.toml + mix.exs `license` fields match the LICENSE file body.
+;;   - Canonical value: "MPL-2.0" (set workspace-wide by PR #101, 2026-06-02,
+;;     closing #82).
+;;   - Any future divergence must be a deliberate sole-owner carve-out and
+;;     surfaced in CHANGELOG + .machine_readable/6a2/STATE.a2ml.
+;;   - Estate standing directive: no automated license-field edits without
+;;     explicit owner orchestration.

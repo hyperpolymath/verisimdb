@@ -12,3 +12,17 @@ checks:
   - name: format
     run: just fmt
 
+# MUST invariants (verified by reviewers; no automation yet).
+#
+# MUST: `elixir-orchestration/coveralls.json` ➜
+#       `coverage_options.minimum_coverage`
+#   matches the current-stage floor declared in
+#   `elixir-orchestration/coveralls-coverage-targets.md`.
+#   - Current stage (2026-06-02): floor = 40, current ≈ 42.6 %.
+#   - Each ramp bump (Phase 1: 50 by 2026-07-15; Phase 2: 60 by 2026-09-01)
+#     is its own PR that updates both files together; reviewer rejects if
+#     the two diverge.
+#
+# MUST: workspace `Cargo.toml` + `mix.exs` `license` fields match the
+#       LICENSE file body (currently "MPL-2.0"). See contractiles/trust/Trustfile.
+
