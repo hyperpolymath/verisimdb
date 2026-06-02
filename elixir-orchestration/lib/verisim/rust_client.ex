@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 defmodule VeriSim.RustClient do
   @moduledoc """
@@ -195,6 +196,17 @@ defmodule VeriSim.RustClient do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  @doc """
+  Paginated listing of octad entities.
+  """
+  def list_octads(limit \\ 50, offset \\ 0) do
+    case get("/octads", limit: limit, offset: offset) do
+      {:ok, %{status: 200, body: body}} -> {:ok, body}
+      {:ok, %{status: status, body: body}} -> {:error, {status, body}}
+      {:error, reason} -> {:error, reason}
     end
   end
 

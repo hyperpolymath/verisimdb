@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
+# Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 defmodule VeriSim.Transport do
   @moduledoc """
@@ -191,7 +192,7 @@ defmodule VeriSim.Transport do
         {:error, reason} -> {:error, reason}
       end
     else
-      RustClient.trigger_normalization(entity_id)
+      RustClient.normalize(entity_id)
     end
   end
 end
