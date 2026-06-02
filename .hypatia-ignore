@@ -44,3 +44,6 @@ cicd_rules/banned_language_file:src/vql/VQLProofObligation.res
 cicd_rules/banned_language_file:src/vql/VQLSubtyping.res
 cicd_rules/banned_language_file:src/vql/VQLTypeChecker.res
 cicd_rules/banned_language_file:src/vql/VQLTypes.res
+
+# verisimdb-registry uses ReScript v11; rescript.json is its build config.
+cicd_rules/banned_config_file:rescript.json

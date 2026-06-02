@@ -150,7 +150,8 @@ defmodule VeriSim.Federation.Adapters.SurrealDB do
         # SurrealDB graph traversal: record links and RELATE edges
         start_vertex = query_params.graph_pattern
         edge_table = Map.get(config, :edge_table, "connects")
-        max_depth = Map.get(config, :max_depth, 3)
+        # TODO(#83): wire max_depth into traversal LIMIT
+        _max_depth = Map.get(config, :max_depth, 3)
 
         """
         SELECT *
