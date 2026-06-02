@@ -25,6 +25,8 @@ this project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix(cicd): foundational reds on main — license inconsistency (closes #82) + Elixir API drift in federation/adapters/surrealdb.ex (closes #83) (PR #88, 2026-06-02)
+- chore(license): normalize workspace to MPL-2.0 (closes #82) (PR #101, 2026-06-02 — note: a manual owner-only review of LICENSE changes is the canonical process per the no-auto-license-edits standing directive; this PR was admin-merged ahead of that gate)
 - fix(ci): align `ExCoveralls` floor with current `elixir-orchestration` reality (`60` → `40`); staged ramp back to `60` documented in [`elixir-orchestration/coveralls-coverage-targets.md`](elixir-orchestration/coveralls-coverage-targets.md).
 - fix(licence): clear scaffold-placeholder leak (rebuilt clean) (#17)
 - fix(licence): clear scaffold-placeholder leak (rebuilt clean) (#12)
