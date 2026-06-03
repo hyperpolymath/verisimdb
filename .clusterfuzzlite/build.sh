@@ -30,15 +30,31 @@ if ! command -v cargo-fuzz &>/dev/null; then
     cargo install cargo-fuzz --locked
 fi
 
-# ── fuzz_octad_id — top-level fuzz crate ─────────────────────────────────
-cd "${SRC}/verisimdb/fuzz"
-cargo fuzz build --release --sanitizer="${SANITIZER:-address}"
-cp target/*/release/fuzz_octad_id "${OUT}/"
+# Build one named fuzz target in a given crate directory and copy the binary
+# to $OUT. We build the target *by name* and then locate the produced binary
+# wherever cargo-fuzz placed it (instead of a brittle glob), failing loudly if
+# nothing was produced. Combined with the two fuzz crates carrying distinct
+# package names, this is robust against the shared-target-dir collision that
+# previously turned the second build into a silent 0.01s no-op.
+build_target() {
+    local crate_dir="$1" target="$2"
+    echo "── building fuzz target '${target}' in ${crate_dir} ──"
+    (
+        cd "${crate_dir}"
+        cargo fuzz build --release --sanitizer="${SANITIZER:-address}" "${target}"
+        local bin
+        bin="$(find . -type f -name "${target}" -path '*/release/*' -print -quit)"
+        if [[ -z "${bin}" ]]; then
+            echo "ERROR: no '${target}' binary produced under ${crate_dir}" >&2
+            exit 1
+        fi
+        cp "${bin}" "${OUT}/${target}"
+        echo "── copied ${bin} -> ${OUT}/${target} ──"
+    )
+}
 
-# ── fuzz_vql_parser — rust-core fuzz crate ───────────────────────────────
-cd "${SRC}/verisimdb/rust-core/fuzz"
-cargo fuzz build --release --sanitizer="${SANITIZER:-address}"
-cp target/*/release/fuzz_vql_parser "${OUT}/"
+build_target "${SRC}/verisimdb/fuzz"           fuzz_octad_id
+build_target "${SRC}/verisimdb/rust-core/fuzz" fuzz_vql_parser
 
 # Optional seed corpora — empty for now, will populate as we discover
 # interesting inputs.  Comment in once corpora exist:

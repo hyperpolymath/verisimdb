@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0
 
+# NOTE: package name MUST differ from the top-level fuzz crate (verisimdb-fuzz).
+# ClusterFuzzLite builds both fuzz crates in one OSS-Fuzz project; two root
+# packages sharing a name collide in the shared cargo target directory, which
+# silently no-ops the second build (it "Finished in 0.01s" and produces no
+# binary). Distinct names keep their build fingerprints separate.
 [package]
-name = "verisimdb-fuzz"
+name = "verisimdb-rustcore-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
