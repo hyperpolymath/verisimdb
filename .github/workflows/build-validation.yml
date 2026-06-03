@@ -15,9 +15,9 @@ jobs:
     name: Rust build validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
       - run: cargo check --workspace
 
   validate-elixir:
@@ -27,8 +27,8 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6.0.3
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+      - uses: erlef/setup-beam@8251c48667b97e88a0a24ec512f5b72a039fcea7 # v1
         with:
           elixir-version: "1.17"
           otp-version: "27"
