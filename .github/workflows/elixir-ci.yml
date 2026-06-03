@@ -38,7 +38,7 @@ jobs:
           - elixir: "1.17"
             otp: "27"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.elixir }}
@@ -63,7 +63,7 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.17"
@@ -90,7 +90,7 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.17"
@@ -116,7 +116,7 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
 
       - uses: erlef/setup-beam@v1
         with:

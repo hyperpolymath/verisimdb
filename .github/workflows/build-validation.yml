@@ -15,7 +15,7 @@ jobs:
     name: Rust build validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: elixir-orchestration
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.17"
