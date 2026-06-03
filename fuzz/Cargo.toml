@@ -8,13 +8,19 @@ edition = "2021"
 [package.metadata]
 cargo-fuzz = true
 
+# This is the project's single cargo-fuzz crate. cargo-fuzz resolves ONE fuzz
+# directory per project (it walks up from the cwd to the nearest `fuzz/`, which
+# is always this one), so EVERY target ClusterFuzzLite builds must live here —
+# a target in rust-core/fuzz is unreachable via `cargo fuzz` and silently
+# resolves back to this manifest. fuzz_vql_parser therefore lives here too.
+# rust-core/fuzz is retained only for the native `cargo check` matrix leg in
+# rust-ci.yml; the canonical fuzz harnesses are these.
 [dependencies]
 libfuzzer-sys = "0.4"
 uuid = "1.23"
-# NOTE: this harness fuzzes UUID parsing only (see fuzz_targets/fuzz_octad_id.rs);
-# it deliberately does NOT depend on verisim-octad. Pulling verisim-octad would
-# drag in verisim-tensor -> burn (rust-version 1.92), which the OSS-Fuzz image's
-# older nightly cannot build. Keep this crate's dependency surface minimal.
+
+[dependencies.verisim-api]
+path = "../rust-core/verisim-api"
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -23,6 +29,12 @@ members = ["."]
 [[bin]]
 name = "fuzz_octad_id"
 path = "fuzz_targets/fuzz_octad_id.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_vql_parser"
+path = "fuzz_targets/fuzz_vql_parser.rs"
 test = false
 doc = false
 

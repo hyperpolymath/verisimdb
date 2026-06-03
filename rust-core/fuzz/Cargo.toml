@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
 
-# NOTE: package name MUST differ from the top-level fuzz crate (verisimdb-fuzz).
-# ClusterFuzzLite builds both fuzz crates in one OSS-Fuzz project; two root
-# packages sharing a name collide in the shared cargo target directory, which
-# silently no-ops the second build (it "Finished in 0.01s" and produces no
-# binary). Distinct names keep their build fingerprints separate.
+# Retained for the native `cargo check` matrix leg in rust-ci.yml. The
+# ClusterFuzzLite build uses the top-level fuzz/ crate (cargo-fuzz resolves a
+# single fuzz dir per project), where fuzz_vql_parser is canonically hosted.
 [package]
-name = "verisimdb-rustcore-fuzz"
+name = "verisimdb-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"

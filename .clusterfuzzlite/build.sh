@@ -15,7 +15,7 @@ set -euo pipefail
 # ── Toolchain floor ──────────────────────────────────────────────────────
 # The OSS-Fuzz base-builder-rust image pins an older nightly (rustc 1.91 at
 # time of writing), but part of the dependency graph — burn / cubecl-zspace,
-# pulled transitively via verisim-tensor (rust-core/fuzz -> verisim-api) —
+# pulled transitively via verisim-tensor (fuzz -> verisim-api) —
 # declares rust-version = 1.92. cargo-fuzz rebuilds the standard library with
 # -Zbuild-std, so all we need is a new-enough nightly with rust-src present.
 # Install one and force it for the whole script via RUSTUP_TOOLCHAIN. This is
@@ -30,12 +30,11 @@ if ! command -v cargo-fuzz &>/dev/null; then
     cargo install cargo-fuzz --locked
 fi
 
-# Build one named fuzz target in a given crate directory and copy the binary
-# to $OUT. We build the target *by name* and then locate the produced binary
-# wherever cargo-fuzz placed it (instead of a brittle glob), failing loudly if
-# nothing was produced. Combined with the two fuzz crates carrying distinct
-# package names, this is robust against the shared-target-dir collision that
-# previously turned the second build into a silent 0.01s no-op.
+# Build one named fuzz target from the project's single cargo-fuzz crate
+# (fuzz/) and copy the binary to $OUT. cargo-fuzz resolves ONE fuzz directory
+# per project, so both targets are hosted in fuzz/; building each by name is
+# reliable. We then locate the produced binary wherever cargo-fuzz placed it
+# (not a brittle glob), failing loudly if nothing was produced.
 build_target() {
     local crate_dir="$1" target="$2"
     echo "── building fuzz target '${target}' in ${crate_dir} ──"
@@ -53,8 +52,8 @@ build_target() {
     )
 }
 
-build_target "${SRC}/verisimdb/fuzz"           fuzz_octad_id
-build_target "${SRC}/verisimdb/rust-core/fuzz" fuzz_vql_parser
+build_target "${SRC}/verisimdb/fuzz" fuzz_octad_id
+build_target "${SRC}/verisimdb/fuzz" fuzz_vql_parser
 
 # Optional seed corpora — empty for now, will populate as we discover
 # interesting inputs.  Comment in once corpora exist:
