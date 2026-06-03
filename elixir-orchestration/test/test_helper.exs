@@ -11,4 +11,3 @@ ExUnit.start()
 # Run them with the stack up via:  mix test --include integration
 # (see CLAUDE.md "Federation Adapter Integration Tests").
 ExUnit.configure(exclude: [:integration])
-
