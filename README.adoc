@@ -4,9 +4,98 @@
 :toc:
 :toc-placement!:
 
-**Cross-system data consistency that catches drift before it causes damage.**
+[.lead]
+**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-total validates whether proposed identity transitions are admissible.**
+
+_Cross-modal consonance that catches identity drift before it causes damage._
 
 toc::[]
+
+== Conceptual Model: Continuous Identity, Not Passive Storage
+
+VeriSimDB is not primarily a database of records. It is a federated consonance engine for continuously maintained identity claims.
+
+A VeriSimDB "entity" is best understood as a **consonance subject**: an identity under active maintenance across multiple modal witnesses. Those witnesses may include graph structure, vector embeddings, tensor data, semantic annotations, documents, temporal history, provenance chains, and spatial references. Together they form the octad view of an identity.
+
+The central problem VeriSimDB solves is not merely storing these views. The central problem is deciding whether they still refer to the same identity, whether they have drifted, whether a repair or normalisation is justified, whether a federated claim should be accepted, and whether an identity claim should be strengthened, weakened, merged, split, retracted, tombstoned, or expunged under policy.
+
+This means VeriSimDB should be read as a lifecycle system for identity claims:
+
+----
+Candidate
+  -> Declared
+  -> Asserted
+  -> Consonant
+  -> Drifting
+  -> Normalised
+  -> Merged / Split
+  -> Retracted
+  -> Tombstoned
+  -> Expunged only under explicit policy
+----
+
+A modality failure is not automatically an identity failure. For example:
+
+----
+document changed, vector stale        -> modal drift
+hash chain broken                     -> provenance/integrity failure
+remote node asserts incompatible type -> federation conflict
+all live witnesses retracted          -> inactive or tombstoned identity
+----
+
+These states have different proof obligations and different repair paths.
+
+=== Core Terms
+
+[cols="1,2"]
+|===
+|Term |Meaning
+
+|Consonance Subject
+|The lifecycle-managed identity under consideration.
+
+|Identity Claim
+|A claim that some subject exists, has a property, has a relation, or survives a transition.
+
+|Modality Witness
+|One modal presentation of a subject: graph, vector, tensor, semantic, document, temporal, provenance, or spatial.
+
+|Drift Report
+|Evidence that one or more modal witnesses no longer cohere.
+
+|Transition
+|A proposed identity event: declare, assert, retract, normalise, merge, split, federate, tombstone.
+
+|Proof Obligation
+|What must be shown before a transition is admissible.
+
+|Federation Attestation
+|A remote or local authority claim about identity, provenance, validity, or trust.
+
+|Tombstone
+|A durable marker that an identity claim is no longer live, without pretending it never existed.
+|===
+
+=== VCL and VCL-total
+
+VCL is the production consonance language used to propose and inspect identity transitions. VCL statements are not simply queries against a passive store. They are propositions or epistemic requests directed at a consonance engine.
+
+VCL-total / VCL-UT is the proof-bearing safety substrate behind VCL. It validates whether a proposed transition is admissible under the relevant schema, modality, provenance, authority, freshness, resource, effect, federation, and proof constraints.
+
+In short:
+
+----
+VeriSimDB stores and maintains identity consonance.
+VCL expresses identity propositions and epistemic requests.
+VCL-total checks whether those transitions are safe and admissible.
+----
+
+The proof goal is not "prove the whole database correct". The proof goal is narrower and more useful:
+
+----
+prove that this identity transition is admissible,
+traceable, authorised, and consonant enough to affect live state.
+----
 
 == The Problem: Silent Data Drift
 
