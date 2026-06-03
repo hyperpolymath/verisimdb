@@ -11,9 +11,10 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 uuid = "1.23"
-
-[dependencies.verisim-octad]
-path = "../rust-core/verisim-octad"
+# NOTE: this harness fuzzes UUID parsing only (see fuzz_targets/fuzz_octad_id.rs);
+# it deliberately does NOT depend on verisim-octad. Pulling verisim-octad would
+# drag in verisim-tensor -> burn (rust-version 1.92), which the OSS-Fuzz image's
+# older nightly cannot build. Keep this crate's dependency surface minimal.
 
 # Prevent this from interfering with workspaces
 [workspace]

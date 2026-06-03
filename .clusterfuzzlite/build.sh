@@ -12,6 +12,19 @@
 
 set -euo pipefail
 
+# ── Toolchain floor ──────────────────────────────────────────────────────
+# The OSS-Fuzz base-builder-rust image pins an older nightly (rustc 1.91 at
+# time of writing), but part of the dependency graph — burn / cubecl-zspace,
+# pulled transitively via verisim-tensor (rust-core/fuzz -> verisim-api) —
+# declares rust-version = 1.92. cargo-fuzz rebuilds the standard library with
+# -Zbuild-std, so all we need is a new-enough nightly with rust-src present.
+# Install one and force it for the whole script via RUSTUP_TOOLCHAIN. This is
+# contained to the fuzz job: it never touches the main workspace toolchain or
+# any other CI job.
+rustup toolchain install nightly --profile minimal \
+    --component rust-src --component llvm-tools-preview
+export RUSTUP_TOOLCHAIN=nightly
+
 # cargo-fuzz drives libfuzzer; install it if missing.
 if ! command -v cargo-fuzz &>/dev/null; then
     cargo install cargo-fuzz --locked
