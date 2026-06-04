@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: MPL-2.0
+= EXPLAINME — VeriSimDB Orientation
+:toc:
+:toc-placement!:
+
+[.lead]
+**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-total validates whether proposed identity transitions are admissible.**
+
+This is the human-readable orientation. For the feature/benefit framing see
+link:README.adoc[README.adoc]; for the normative VCL grammar see
+link:docs/VQL-SPEC.adoc[the VCL specification] (file still historically named
+`VQL-SPEC.adoc`).
+
+toc::[]
+
+== The one idea to hold onto
+
+If you take away a single thing: a VeriSimDB "entity" is **not a row**. It is a
+**consonance subject** — an identity under continuous maintenance across up to
+eight *modal witnesses* (the octad: graph, vector, tensor, semantic, document,
+temporal, provenance, spatial). The system's job is not storage; it is deciding,
+continuously, whether those witnesses still cohere as one identity — and what to
+do when they do not.
+
+So the verbs are not CRUD. They are **lifecycle transitions** on identity claims:
+declare, assert, inspect, verify, transform, retract, merge, split, normalise,
+tombstone.
+
+== Why "consonance", not "consistency"
+
+Classic databases enforce *consistency* up front (transactions, locks) and treat
+divergence as an error to prevent. VeriSimDB instead expects modal witnesses to
+drift — a document is edited before its embedding is recomputed; a spatial
+coordinate is refined independently of the text — and treats that drift as a
+**first-class, typed condition** to be measured, classified, and repaired. The
+maintained property is *consonance*: the witnesses still refer to the same
+identity, within policy.
+
+A modality failure is therefore **not** automatically an identity failure. These
+are distinct states with distinct proof obligations and repair paths:
+
+[cols="1,1"]
+|===
+|Observation |State
+
+|document changed, vector stale |modal drift (repairable by normalisation)
+|hash chain broken |provenance / integrity failure
+|remote node asserts an incompatible type |federation conflict (needs arbitration)
+|all live witnesses retracted |inactive / tombstoned identity
+|===
+
+== The identity lifecycle
+
+----
+Candidate
+  -> Declared
+  -> Asserted
+  -> Consonant
+  -> Drifting
+  -> Normalised
+  -> Merged / Split
+  -> Retracted
+  -> Tombstoned
+  -> Expunged  (only under explicit policy)
+----
+
+**Retraction is not deletion.** A retracted claim usually stays visible to
+provenance, audit, federation, and proof systems — it is no longer *live*.
+Tombstoning durably retires an identity or claim without pretending it never
+existed. Expungement is a separate, policy-governed operation.
+
+== Core terms
+
+[cols="1,2"]
+|===
+|Term |Meaning
+
+|Consonance Subject |The lifecycle-managed identity under consideration.
+|Identity Claim |A claim that some subject exists, has a property, has a relation, or survives a transition.
+|Modality Witness |One modal presentation of a subject: graph, vector, tensor, semantic, document, temporal, provenance, or spatial.
+|Drift Report |Evidence that one or more modal witnesses no longer cohere.
+|Transition |A proposed identity event: declare, assert, retract, normalise, merge, split, federate, tombstone.
+|Proof Obligation |What must be shown before a transition is admissible.
+|Federation Attestation |A remote or local authority claim about identity, provenance, validity, or trust.
+|Tombstone |A durable marker that an identity claim is no longer live, without pretending it never existed.
+|===
+
+== VCL, VCL-total, and VeriSimDB
+
+[cols="1,3"]
+|===
+|Layer |Role
+
+|**VeriSimDB** |The federated consonance engine. Stores and maintains identity consonance across the octad of modal witnesses; detects drift; repairs under policy.
+|**VCL** |The production consonance language. Statements are *propositions* (`DECLARE`, `ASSERT`, `RETRACT`) or *epistemic requests* (`INSPECT`, `VERIFY`), plus `MERGE` / `SPLIT` / `NORMALISE` — directed at the engine, not queries against a passive store.
+|**VCL-total** |The proof-bearing safety substrate behind VCL (repo: https://github.com/hyperpolymath/vcl-ut[vcl-ut]). It decides whether a proposed identity transition is *admissible* under schema, modality, provenance, authority, freshness, resource, effect, federation, and proof constraints.
+|===
+
+The proof goal is deliberately narrow and useful — **not** "prove the whole
+database correct", but:
+
+----
+prove that THIS identity transition is admissible,
+traceable, authorised, and consonant enough to affect live state.
+----
+
+== What is implemented vs design intent (honest)
+
+* **Implemented today:** the octad stores (graph, vector, tensor, semantic,
+  document, temporal, provenance hash-chain, spatial R-tree); cross-modal drift
+  detection + self-normalisation; the federation coordinator; and a VCL surface
+  whose *current* in-repo grammar (`spec/grammar.ebnf` v3.0) is a read-style,
+  SQL-shaped convenience (`SELECT … FROM HEXAD …`, with `HEXAD` the legacy
+  keyword for the octad source) plus `PROOF`-carrying statements.
+* **The model / direction:** the lifecycle/consonance verbs (`DECLARE` …
+  `NORMALISE`) and full proof-bearing admissibility are the semantic target,
+  carried by **VCL-total** (vcl-ut). Read the SQL-ish read-path as *epistemic
+  inspection of consonance state*, not row retrieval.
+* **Formal core:** invariants are mechanised in Coq under `formal/` (octad
+  modality algebra, provenance hash-chain, drift bounds, planner equivalence,
+  WAL/normaliser idempotence, VCL preservation) — see
+  link:formal/CROSS-REPO-MAP.adoc[the cross-repo map] and
+  link:docs/proof-debt.md[the trusted-base ledger].
+
+== Where to go next
+
+* link:README.adoc[README.adoc] — capabilities, comparisons, quick start.
+* link:docs/VQL-SPEC.adoc[VCL specification] — normative grammar (historically `VQL-SPEC.adoc`).
+* https://github.com/hyperpolymath/vcl-ut[vcl-ut] — VCL-total, the proof-bearing substrate.
+* link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc] — honest-gaps audit.

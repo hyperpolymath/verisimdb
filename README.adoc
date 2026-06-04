@@ -105,7 +105,7 @@ Traditional tools detect drift _after_ it causes downstream failures. VeriSimDB 
 
 == What VeriSimDB Does
 
-VeriSimDB is a **cross-modal consistency engine**. Each entity exists simultaneously across up to 8 representations (the **octad**) with automatic drift detection and self-normalisation:
+VeriSimDB is a **federated consonance engine**. Each consonance subject is maintained across up to 8 modal witnesses (the **octad**), with continuous drift detection and self-normalisation:
 
 ----
 ┌─────────────────────────────────────────────────────────────┐
@@ -192,15 +192,15 @@ Sample output:
 |Partial
 |**Hash-chain verified**
 
-|Query language
+|Consonance language
 |No (Python API)
 |No (UI)
-|**VQL (with dependent types)**
+|**VCL (propositions + epistemic requests)**
 
-|Formal verification
+|Proof-bearing transitions
 |No
 |No
-|**VQL-DT (proof certificates)**
+|**VCL-total (admissibility proofs)**
 |===
 
 == The Octad: Eight Modalities
@@ -330,34 +330,56 @@ VeriSimDB can also operate as a **federation coordinator** over existing databas
 └────────────────────────────────────────────────────────────────┘
 ----
 
-== VQL: VeriSim Query Language
+== VCL: VeriSim Consonance Language
 
-VQL provides unified querying across all eight modalities with two execution paths:
+VCL statements are **propositions and epistemic requests to a consonance engine**, not queries against a passive store. They propose, inspect, verify, transform, retract, merge, split, and normalise identity claims across the eight modal witnesses (see the Conceptual Model section above). The proof-bearing safety substrate behind VCL is **VCL-total** (https://github.com/hyperpolymath/vcl-ut[vcl-ut]), which decides whether a proposed identity transition is _admissible_.
 
-=== Slipstream (Fast, No Proofs)
+The consonance operations:
+
+[cols="1,3"]
+|===
+|Operation |Meaning
+
+|`DECLARE`   |introduce a candidate identity claim
+|`ASSERT`    |strengthen or add evidence to an identity claim
+|`RETRACT`   |revoke, weaken, or retire a live claim (not erasure — see below)
+|`INSPECT`   |observe consonance, drift, provenance, or federation state
+|`VERIFY`    |request proof-bearing validation of a claim or transition
+|`MERGE`     |join identities when consonance evidence supports it
+|`SPLIT`     |separate an over-coalesced identity
+|`NORMALISE` |repair drift when a justified repair path exists
+|===
+
+NOTE: The lifecycle/consonance verbs above are the **semantic model**, carried fully by VCL-total. The current in-repo surface grammar (`spec/grammar.ebnf` v3.0) still exposes a read-style, SQL-shaped convenience (`SELECT … FROM …`, plus legacy `INSERT`/`UPDATE`/`DELETE` mutation forms) and uses `HEXAD` as the legacy keyword for the octad source (8 modal witnesses, retained for backward compatibility). Read the read-path below as **epistemic inspection of consonance state**, not row retrieval from a passive store.
+
+=== Inspection surface — Slipstream (fast, no proofs)
+
+A read-only convenience for inspecting consonance state. `HEXAD <uuid>` names the octad source; `DRIFT(...)` inspects cross-modal divergence:
 
 [source,sql]
 ----
--- Query across modalities
+-- Inspect across modal witnesses
 SELECT GRAPH.*, DOCUMENT.*, VECTOR.* FROM HEXAD 'entity-001'
 
--- Cross-modal drift detection in WHERE clause
+-- Cross-modal drift inspection
 SELECT * FROM HEXAD 'entity-001'
   WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
 
--- Modality existence checks
+-- Modality-witness presence checks
 SELECT * FROM HEXAD 'entity-001'
   WHERE PROVENANCE EXISTS AND TENSOR NOT EXISTS
 
--- Federation queries
+-- Federated inspection
 SELECT * FROM FEDERATION /* WITH DRIFT STRICT
 ----
 
-=== VQL-DT (Dependent Types with Proof Certificates)
+=== Proof-bearing statements — VCL-total (dependent types + proof certificates)
+
+A `PROOF` clause makes a statement proof-bearing: VCL-total must discharge the attached obligation before the result is admissible.
 
 [source,sql]
 ----
--- Query with existence proof
+-- Statement carrying an existence proof obligation
 SELECT GRAPH.* FROM HEXAD 'entity-001'
   PROOF EXISTENCE(entity-001)
 
@@ -365,12 +387,12 @@ SELECT GRAPH.* FROM HEXAD 'entity-001'
 SELECT * FROM HEXAD 'entity-001'
   PROOF EXISTENCE(entity-001) AND PROVENANCE(entity-001)
 
--- Integrity verification with contract
+-- Integrity verification against a contract
 SELECT GRAPH.* FROM HEXAD 'entity-001'
   PROOF INTEGRITY(my_contract)
 ----
 
-VQL-DT queries return a `ProvedResult` with data AND a proof certificate:
+VCL-total proof-bearing statements return a `ProvedResult` with data AND a proof certificate:
 
 [source,elixir]
 ----
@@ -424,7 +446,7 @@ iex -S mix
 ----
 cargo test                    # Rust: 510+ tests
 cd elixir-orchestration
-mix test                      # Elixir: 160+ tests (VQL, consensus, telemetry, federation, hypatia)
+mix test                      # Elixir: 160+ tests (VCL, consensus, telemetry, federation, hypatia)
 ----
 
 === CI & Coverage
@@ -494,7 +516,7 @@ grpcurl -plaintext localhost:50051 list
 # Health check
 grpcurl -plaintext localhost:50051 verisimdb.VeriSimService/Health
 
-# Execute a VQL query
+# Submit a VCL statement
 grpcurl -plaintext -d '{"query": "SELECT * FROM octads LIMIT 10"}' \
   localhost:50051 verisimdb.VeriSimService/Query
 
@@ -525,13 +547,13 @@ verisimdb/
 │   ├── lib/verisim/
 │   │   ├── drift/             # DriftMonitor GenServer
 │   │   ├── entity/            # EntityServer (per-entity GenServer)
-│   │   ├── query/             # VQL parser, executor, bridge
+│   │   ├── query/             # VCL parser, executor, bridge
 │   │   └── rust_client.ex     # HTTP client for Rust core
 │   └── test/
 ├── demos/
 │   └── drift-detection/       # Drift detection demo script
 ├── docs/                      # Specifications and design documents
-│   ├── vql-grammar.ebnf       # VQL formal grammar
+│   ├── vql-grammar.ebnf       # VCL formal grammar
 │   ├── vql-formal-semantics.adoc
 │   └── vql-type-system.adoc
 ├── registry/                  # ReScript federation registry
@@ -550,7 +572,7 @@ Universities and research institutions federate their archives while maintaining
 Vector embeddings and symbolic graphs coexist in the same namespace. AI systems query both modalities without ETL, with formal proof certificates guaranteeing query correctness.
 
 === Verifiable Data Exchange
-ZKP proofs and dependent types enable tamper-evident knowledge exchange. VQL-DT queries return data with cryptographic proof certificates — you can verify the result without trusting the source.
+ZKP proofs and dependent types enable tamper-evident knowledge exchange. VCL-total proof-bearing statements return data with cryptographic proof certificates — you can verify the result without trusting the source.
 
 == Documentation
 
@@ -565,14 +587,14 @@ Quick links:
 * link:SECURITY.md[Security Policy] — threat model and disclosure process
 * link:AUDIT.adoc[Audit Index] — RSR audit-trail index
 
-VQL language:
+VCL language (file paths retain the historical `vql-` / `VQL-` names; the in-repo file rename is a separate, tracked cleanup):
 
 * link:docs/getting-started.adoc[Getting Started] — step-by-step setup guide
-* link:docs/VQL-SPEC.adoc[VQL Specification] — normative language spec
-* link:docs/vql-grammar.ebnf[VQL Grammar] — formal EBNF
-* link:docs/vql-formal-semantics.adoc[VQL Formal Semantics] — operational semantics
-* link:docs/vql-type-system.adoc[VQL Type System] — dependent types + bidirectional checking
-* link:docs/vql-examples.adoc[VQL Examples] — worked examples
+* link:docs/VQL-SPEC.adoc[VCL Specification] — normative language spec
+* link:docs/vql-grammar.ebnf[VCL Grammar] — formal EBNF
+* link:docs/vql-formal-semantics.adoc[VCL Formal Semantics] — operational semantics
+* link:docs/vql-type-system.adoc[VCL Type System] — dependent types + bidirectional checking
+* link:docs/vql-examples.adoc[VCL Examples] — worked examples
 
 Deployment & operations:
 
