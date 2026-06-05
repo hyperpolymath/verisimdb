@@ -1,0 +1,276 @@
+version = 1
+
+# ---------------------------------------------------------------------------
+# REUSE-3.3 annotation file for VeriSimDB
+# Policy: code/config = MPL-2.0 | docs = CC-BY-SA-4.0
+# Copyright holder: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# NOTE: In REUSE 3.x the *last* matching [[annotations]] block wins.
+# Broad "catch-all" globs come first; specific overrides come last.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# A. Documentation — CC-BY-SA-4.0
+# ---------------------------------------------------------------------------
+[[annotations]]
+path = [
+  "docs/**",
+  "**/*.md",
+  "**/*.adoc",
+  "**/*.tex",
+  "**/*.bib",
+  "**/*.ebnf",
+  "**/*.pdf",
+  "**/*.lgt",
+  "spec/**",
+  "verification/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# ---------------------------------------------------------------------------
+# B. All code and configuration — MPL-2.0
+# ---------------------------------------------------------------------------
+
+# Root-level config / dotfiles
+[[annotations]]
+path = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "rescript.json",
+  "selur-compose.yml",
+  "stapeln.toml",
+  "deny.toml",
+  "opsm.toml",
+  "justfile",
+  "sync-wiki.sh",
+  ".cfignore",
+  ".editorconfig",
+  ".gitignore",
+  ".gitattributes",
+  ".gitlab-ci.yml",
+  ".hypatia-ignore",
+  ".nojekyll",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Rust source and config
+[[annotations]]
+path = [
+  "**/*.rs",
+  "**/*.toml",
+  "**/Cargo.lock",
+  "**/*.proto",
+  "benches/**",
+  "tests/**",
+  "fuzz/**",
+  "rust-core/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Elixir / Mix source and config
+[[annotations]]
+path = [
+  "**/*.ex",
+  "**/*.exs",
+  "**/*.lock",
+  "elixir-orchestration/**",
+  "lib/**",
+  "demos/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# ReScript / JavaScript source
+[[annotations]]
+path = [
+  "**/*.res",
+  "**/*.js",
+  "**/*.mjs",
+  "**/*.json",
+  "**/*.resi",
+  "src/**",
+  "playground/**",
+  "vql-bridge/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Zig / FFI source
+[[annotations]]
+path = [
+  "**/*.zig",
+  "**/*.zon",
+  "ffi/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Idris / formal proofs
+[[annotations]]
+path = [
+  "**/*.idr",
+  "formal/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Shell scripts and examples
+[[annotations]]
+path = [
+  "**/*.sh",
+  "scripts/**",
+  "examples/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# YAML / CI / compose config
+[[annotations]]
+path = [
+  "**/*.yml",
+  "**/*.yaml",
+  ".github/**",
+  "container/**",
+  "connectors/test-infra/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Nickel config
+[[annotations]]
+path = [
+  "**/*.ncl",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# A2ML / AI-manifest files (general)
+[[annotations]]
+path = [
+  "**/*.a2ml",
+  ".machine_readable/**",
+  "0-AI-MANIFEST.a2ml",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Scheme files
+[[annotations]]
+path = [
+  "**/*.scm",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# RDF / VoID / semantic web
+[[annotations]]
+path = [
+  "**/*.rdf",
+  "**/*.ttl",
+  ".well-known/**",
+  "docs/.well-known/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# HTML / CSS (playground/visualisations)
+[[annotations]]
+path = [
+  "**/*.html",
+  "**/*.css",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# VQL query files
+[[annotations]]
+path = [
+  "**/*.vql",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# SQL / CQL / SurrealQL seed
+[[annotations]]
+path = [
+  "**/*.sql",
+  "**/*.cypher",
+  "**/*.surql",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Containerfiles / Dockerfiles
+[[annotations]]
+path = [
+  "**/Containerfile*",
+  "**/Dockerfile*",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Property test regression files / snapshots
+[[annotations]]
+path = [
+  "**/*.proptest-regressions",
+  "**/*.snap",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Misc config dirs
+[[annotations]]
+path = [
+  ".clusterfuzzlite/**",
+  ".cargo/**",
+  ".verisimdb/**",
+  ".claude/**",
+  "debugger/**",
+  "contractiles/**",
+  "connectors/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# ---------------------------------------------------------------------------
+# C. OVERRIDES — must come LAST (last matching annotation wins)
+#    These suppress erroneous/non-SPDX in-file tags.
+# ---------------------------------------------------------------------------
+
+# bot_directives: override PMPL-1.0-or-later (private licence, not in SPDX)
+# with MPL-2.0 so reuse does not need a PMPL licence text file.
+[[annotations]]
+path = ".machine_readable/bot_directives/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+# json-schema: the $comment field contains `MPL-2.0"` (trailing quote) which
+# REUSE parses as an invalid expression. Override so REUSE.toml is authoritative.
+[[annotations]]
+path = "connectors/shared/json-schema/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"

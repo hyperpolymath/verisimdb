@@ -62,9 +62,11 @@
     :- private(workflow_issue/2).
 
     % Missing SPDX header
+    % REUSE-IgnoreStart
     workflow_issue(Path, missing_spdx_header) :-
         read_first_line(Path, Line),
         \+ atom_concat('# SPDX-License-Identifier:', _, Line).
+    % REUSE-IgnoreEnd
 
     % Unpinned GitHub Actions
     workflow_issue(Path, unpinned_action(Action, Line)) :-
