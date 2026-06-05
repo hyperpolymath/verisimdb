@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: MPL-2.0
+# Trustfile — Integrity, provenance and safe-hacking contract for VeriSimDB
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Security + provenance verifications PLUS an authorised safe-hacking section
+# scoped strictly to this repo. Hard gate on any verification failure.
+# Pairs with: trust.ncl (same directory)
+# Run with:  contractile trust verify   (read-only verifications)
+#            contractile trust probe    (authorised safe-hacking probes)
+
+@abstract:
+Integrity and provenance invariants for VeriSimDB, plus a declared
+safe-hacking section. Verifications are read-only and offline by default;
+safe-hacking probes are scoped to this-repo-only (cargo fuzz / property
+tests) and never touch external systems. All hard-gating.
+@end
+
+## License & SPDX Integrity
+
+### no-agpl-headers
+- description: No AGPL-3.0 license headers anywhere in source
+- run: test -z "$(grep -rlE 'AGPL-3\.0' --include='*.rs' --include='*.ex' --include='*.exs' --include='*.idr' --include='*.zig' --include='*.yml' . 2>/dev/null)"
+- severity: critical
+
+### license-file-mpl2
+- description: LICENSE body declares MPL-2.0 (workspace normalised, closes #82 / PR #101)
+- run: grep -q 'Mozilla Public License' LICENSE
+- severity: critical
+
+### spdx-on-rust
+- description: Rust crate roots carry an SPDX-License-Identifier header
+- run: test -z "$(find rust-core -name 'lib.rs' -o -name 'main.rs' 2>/dev/null | head -1 | xargs -r grep -L 'SPDX-License-Identifier' 2>/dev/null)"
+- severity: high
+- notes: Spot-check on crate entry points; full sweep runs in CI.
+
+## Supply-Chain Provenance
+
+### cargo-lock-committed
+- description: Cargo.lock is committed (reproducible Rust dependency graph)
+- run: test -f Cargo.lock
+- severity: high
+
+### deny-toml-present
+- description: cargo-deny policy (deny.toml) present for dependency auditing
+- run: test -f deny.toml
+- severity: medium
+
+### stapeln-manifest-present
+- description: stapeln/cerro-torre supply-chain manifest present
+- run: test -f stapeln.toml || test -f container/manifest.toml
+- severity: medium
+- notes: .ctp bundle provenance + attestations for verified container deploy.
+
+### gatekeeper-policy-present
+- description: svalinn edge-gateway policy present (auth, rate limits, trust)
+- run: test -f container/.gatekeeper.yaml
+- severity: low
+
+## Secret Hygiene
+
+### no-env-files
+- description: No committed .env secret files
+- run: test ! -f .env && test ! -f elixir-orchestration/.env
+- severity: critical
+
+### no-beam-cookie
+- description: No Erlang/BEAM cookie committed
+- run: test -z "$(find . -name '.erlang.cookie' -not -path '*/.git/*' 2>/dev/null)"
+- severity: critical
+
+## Safe Hacking (this-repo-only)
+
+### cargo-fuzz-harness-present
+- description: cargo-fuzz harness directory exists for in-repo fuzzing
+- run: test -d fuzz || test -d rust-core/fuzz
+- severity: medium
+- class: fuzz
+- scope: this-repo-only
+- expected_outcome: probe_finds_no_issue
+- notes: Authorised offensive probe target; runs `cargo fuzz` against repo-local crates only.
+
+### vql-property-tests-present
+- description: VQL property-test suite exists (proptest/StreamData over the parser)
+- run: test -f elixir-orchestration/test/verisim/property/vql_bridge_props_test.exs
+- severity: low
+- class: property_test
+- scope: this-repo-only
+- expected_outcome: probe_finds_no_issue
