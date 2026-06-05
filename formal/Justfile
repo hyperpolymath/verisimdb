@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner wal normalizer vcl planner-semantic
+all: provenance drift transaction planner wal normalizer vcl planner-semantic octad
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -40,11 +40,14 @@ vcl:
 planner-semantic:
     {{COQC}} -q PlannerSemantic.v | tee PlannerSemantic.out
 
+octad:
+    {{COQC}} -q Octad.v | tee Octad.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic check-octad
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -122,6 +125,16 @@ check-planner-semantic: planner-semantic
             echo "ERROR(PlannerSemantic): unexpected axiom: $line"; cat; exit 1; \
           else \
             echo "OK(PlannerSemantic): Q1-full semantic equivalence + membership"; \
+          fi; }
+
+check-octad: octad
+    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Octad.out \
+      | sort -u \
+      | grep -vE '^(mval|ident|functional_extensionality_dep)$' \
+      | { if read -r line; then \
+            echo "ERROR(Octad): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(Octad): O-series (cardinality, present-totality, projection) + R1-R3 merge algebra"; \
           fi; }
 
 # Remove all build artefacts.

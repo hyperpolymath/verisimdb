@@ -90,6 +90,12 @@ jobs:
           set -euo pipefail
           coqc -q PlannerSemantic.v | tee PlannerSemantic.out
 
+      - name: Compile Octad.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Octad.v | tee Octad.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -220,3 +226,22 @@ jobs:
             exit 1
           fi
           echo "OK(PlannerSemantic): Q1-full semantic equivalence + membership"
+
+      - name: Verify Octad assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Whitelist: 2 Parameters (mval, ident) + functional_extensionality_dep
+          # (Coq stdlib). modality is inductive; resolve is an operation
+          # argument — neither is an axiom.
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Octad.out \
+            | sort -u \
+            | grep -vE '^(mval|ident|functional_extensionality_dep)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Octad): unexpected axiom(s) in Print Assumptions:"
+            echo "$UNEXPECTED"
+            echo "---"
+            cat Octad.out
+            exit 1
+          fi
+          echo "OK(Octad): O-series + R1-R3 modality algebra whitelisted"

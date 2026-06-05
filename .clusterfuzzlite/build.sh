@@ -12,20 +12,48 @@
 
 set -euo pipefail
 
+# ── Toolchain floor ──────────────────────────────────────────────────────
+# The OSS-Fuzz base-builder-rust image pins an older nightly (rustc 1.91 at
+# time of writing), but part of the dependency graph — burn / cubecl-zspace,
+# pulled transitively via verisim-tensor (fuzz -> verisim-api) —
+# declares rust-version = 1.92. cargo-fuzz rebuilds the standard library with
+# -Zbuild-std, so all we need is a new-enough nightly with rust-src present.
+# Install one and force it for the whole script via RUSTUP_TOOLCHAIN. This is
+# contained to the fuzz job: it never touches the main workspace toolchain or
+# any other CI job.
+rustup toolchain install nightly --profile minimal \
+    --component rust-src --component llvm-tools-preview
+export RUSTUP_TOOLCHAIN=nightly
+
 # cargo-fuzz drives libfuzzer; install it if missing.
 if ! command -v cargo-fuzz &>/dev/null; then
     cargo install cargo-fuzz --locked
 fi
 
-# ── fuzz_octad_id — top-level fuzz crate ─────────────────────────────────
-cd "${SRC}/verisimdb/fuzz"
-cargo fuzz build --release --sanitizer="${SANITIZER:-address}"
-cp target/*/release/fuzz_octad_id "${OUT}/"
+# Build one named fuzz target from the project's single cargo-fuzz crate
+# (fuzz/) and copy the binary to $OUT. cargo-fuzz resolves ONE fuzz directory
+# per project, so both targets are hosted in fuzz/; building each by name is
+# reliable. We then locate the produced binary wherever cargo-fuzz placed it
+# (not a brittle glob), failing loudly if nothing was produced.
+build_target() {
+    local crate_dir="$1" target="$2"
+    echo "── building fuzz target '${target}' in ${crate_dir} ──"
+    (
+        cd "${crate_dir}"
+        cargo fuzz build --release --sanitizer="${SANITIZER:-address}" "${target}"
+        local bin
+        bin="$(find . -type f -name "${target}" -path '*/release/*' -print -quit)"
+        if [[ -z "${bin}" ]]; then
+            echo "ERROR: no '${target}' binary produced under ${crate_dir}" >&2
+            exit 1
+        fi
+        cp "${bin}" "${OUT}/${target}"
+        echo "── copied ${bin} -> ${OUT}/${target} ──"
+    )
+}
 
-# ── fuzz_vql_parser — rust-core fuzz crate ───────────────────────────────
-cd "${SRC}/verisimdb/rust-core/fuzz"
-cargo fuzz build --release --sanitizer="${SANITIZER:-address}"
-cp target/*/release/fuzz_vql_parser "${OUT}/"
+build_target "${SRC}/verisimdb/fuzz" fuzz_octad_id
+build_target "${SRC}/verisimdb/fuzz" fuzz_vql_parser
 
 # Optional seed corpora — empty for now, will populate as we discover
 # interesting inputs.  Comment in once corpora exist:
