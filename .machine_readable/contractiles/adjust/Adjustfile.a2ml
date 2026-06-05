@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: MPL-2.0
+# Adjustfile — Drift-tolerance + accessibility contract for VeriSimDB
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Tolerance bands + corrective actions. Advisory (continue-with-warnings):
+# progress-tracked, not a hard gate. Deterministic fixes applied where defined.
+# Pairs with: adjust.ncl (same directory)
+# Run with: contractile adjust check   (run probes, list violations)
+#           contractile adjust fix     (apply deterministic fixes where defined)
+
+@abstract:
+Drift tolerances and corrective actions for VeriSimDB. Two registers:
+(1) accessibility of the human-facing surfaces — the VQL Playground and the
+PanLL telemetry dashboard (ReScript); (2) self-normalisation tolerance bands,
+the in-domain analogue of "adjust" for a drift-aware database. Advisory:
+tracked over sessions, never blocks merge.
+@end
+
+## Accessibility — VQL Playground / PanLL Dashboard
+
+### playground-present
+- description: VQL Playground surface exists (human-facing query UI)
+- status: declared
+- probe: test -d playground
+- compliance: WCAG 2.1 AA
+- notes: ReScript ApiClient.res wired to real backend with demo-mode fallback.
+
+### dashboard-keyboard-nav
+- description: PanLL telemetry dashboard panel is keyboard-navigable
+- status: declared
+- probe: test -d playground
+- compliance: WCAG 2.1 AA
+- notes: Modality heatmap + query-pattern panels need full keyboard-only traversal audit.
+- fix: Port the estate keyboard-navigation pattern to the dashboard panel.
+
+### high-contrast-theme
+- description: High-contrast theme available for the playground/dashboard
+- status: declared
+- compliance: WCAG 2.1 AA
+- notes: Not yet implemented; tracked as accessibility horizon.
+- fix: Add CSS contrast-ratio variables (>= 4.5:1).
+
+### reduced-motion
+- description: Heatmap/animation respects prefers-reduced-motion
+- status: declared
+- compliance: WCAG 2.1 AA
+- notes: Telemetry heatmap animates; needs a reduced-motion path.
+
+## Drift-Tolerance Bands (self-normalisation)
+
+### drift-thresholds-configurable
+- description: Drift detection thresholds are configurable (tolerance bands, not hard-coded)
+- status: declared
+- probe: test -d rust-core/verisim-drift
+- notes: semantic_vector / graph_document / temporal / tensor / schema / quality drift each carry a threshold.
+
+### normalizer-trigger-tolerance
+- description: Self-normalisation fires only when drift exceeds the band (avoids thrash)
+- status: declared
+- probe: test -d rust-core/verisim-normalizer
+- notes: Cumulative-drift catchment — trend across sessions, flag accelerating drift.
+
+### coverage-floor-band
+- description: Elixir test-coverage stays at or above the agreed floor (ramp band)
+- status: partial
+- compliance: project ramp target
+- notes: Floor 40, current ~42.6 per coveralls; ramp to 50 (2026-07-15) then 60 (2026-09-01). See elixir-orchestration coverage ramp doc.
+
+## Documentation Adjustments
+
+### accessibility-guide
+- description: User-facing accessibility guide for the playground
+- status: declared
+- target: docs/ accessibility guide
+- notes: Keyboard shortcuts, screen-reader setup, theme switching.

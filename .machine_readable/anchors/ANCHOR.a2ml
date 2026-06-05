@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: MPL-2.0
+# ⚓ ANCHOR: verisimdb
+# This is the canonical authority for the VeriSimDB repository.
+#
+# Modelled on the hyperpolymath standards ANCHOR shape (cf. ephapax). Declares
+# identity, clade, SSG posture, and ecosystem relationships. Authoritative:
+# code conforms to this, not the reverse. Last refreshed during the 2026-06-05
+# machine-readable currency pass.
+
+id: "org.hyperpolymath.verisimdb"
+version: "0.0.1"
+clade: "database"
+status: "active"
+
+# ─── Identity ─────────────────────────────────────────────────────────────────
+identity:
+  project: "VeriSimDB"
+  full-name: "Veridical Simulacrum Database"
+  kind: "database"
+  one-sentence: >
+    A cross-system entity consistency engine: one entity held simultaneously
+    across eight modalities (the octad — Graph, Vector, Tensor, Semantic,
+    Document, Temporal, Provenance, Spatial) with drift detection,
+    self-normalisation, and proof-bearing VQL queries.
+  domain: "cross-modal databases / data consistency / formal verification"
+
+# ─── SSG Configuration ──────────────────────────────────────────────────────
+# Unlike SSG-publishing repos (e.g. ephapax → casket/boj-server), VeriSimDB
+# does not currently publish a static site. Source hosting prefers GitLab
+# (user preference); no GitHub Pages / casket build is wired. boj_trigger is
+# false until/unless a docs site is stood up.
+ssg:
+  engine: "none"
+  output_dir: null
+  boj_trigger: false
+  cartridge: null
+  notes: "No SSG publish target configured. Docs live as .adoc under docs/ + repo root."
+
+# ─── Semantic Authority ─────────────────────────────────────────────────────
+semantic-authority:
+  policy: "canonical"
+  owns:
+    - "Octad entity model and cross-modal consistency semantics"
+    - "Drift-detection thresholds and self-normalisation behaviour"
+    - "VQL (VeriSim Query Language) syntax, type system, and proof obligations"
+    - "Contractile invariant definitions (.machine_readable/contractiles/)"
+  authoritative-files:
+    formal-proofs: "formal/ (Coq: Drift.v, Normalizer.v, Provenance.v, Transaction.v, WAL.v, Planner.v, VCL.v)"
+    abi: "src/abi/ (Idris2: Types.idr, Layout.idr, Foreign.idr; 0 believe_me)"
+    known-issues: "KNOWN-ISSUES.adoc"
+    state: ".machine_readable/6a2/STATE.a2ml"
+
+# ─── Implementation Policy ──────────────────────────────────────────────────
+implementation-policy:
+  allowed: ["Rust", "Elixir", "ReScript", "VQL", "Idris2", "Zig", "Coq", "Just", "AsciiDoc"]
+  forbidden: ["Python", "Go", "Node.js"]
+  notes: >
+    Rust core (modality stores), Elixir/OTP orchestration, ReScript VQL parser.
+    A single JS bridge file exists (vql-bridge/vql_parser_port.js) as parser
+    glue. Python is banned (Rust/Julia replace it).
+
+# ─── Golden Path ────────────────────────────────────────────────────────────
+golden-path:
+  smoke-test-command:
+    - "just build"
+    - "just test"
+    - "just test-elixir"
+  success-criteria:
+    - "Rust core builds (cargo build --release)"
+    - "Rust + Elixir test suites pass"
+    - "No AGPL-3.0 headers (just license-check)"
+    - "No unresolved critical security findings"
+
+# ─── Relationships ──────────────────────────────────────────────────────────
+parents:
+  - id: "org.hyperpolymath.standards"
+    relationship: "anchor-template-source"
+
+siblings:
+  - id: "org.hyperpolymath.verisimdb-data"
+    relationship: "git-backed-flatfile-store"
+    note: "Data repo holding panic-attack scans, drift snapshots, dispatch manifests; queried without a running server."
+  - id: "org.hyperpolymath.hypatia"
+    relationship: "integration-consumer"
+    note: "ScanIngester/PatternQuery/DispatchBridge feed the Hypatia neurosymbolic review pipeline."
+  - id: "org.hyperpolymath.panic-attacker"
+    relationship: "upstream-scanner"
+    note: "panic-attack assail produces the JSON ingested as octad entities."
+  - id: "org.hyperpolymath.gitbot-fleet"
+    relationship: "downstream-dispatch"
+    note: "DispatchBridge logs JSONL manifests destined for fleet auto-merge bots."
+
+# ─── Satellite Policy ───────────────────────────────────────────────────────
+satellite-policy:
+  must-pin-upstream: true
+  must-declare-authority: true
+  must-have-anchor: true
+  must-have-golden-path: true
+
+# ─── History ────────────────────────────────────────────────────────────────
+realignment-history:
+  - date: "2026-06-05"
+    event: "anchor-born"
+    session-type: "machine-readable-currency-pass"
+    summary: >
+      ANCHOR.a2ml first written during the estate-wide currency checkpoint.
+      Added alongside the .machine_readable/contractiles/ Verbfile.a2ml set
+      (must/trust/bust/adjust/dust/intend) and the 6a2 refresh. No source code
+      changes. Models the standards/ephapax ANCHOR shape, accurate to VeriSimDB
+      (clade=database, no SSG publish target).

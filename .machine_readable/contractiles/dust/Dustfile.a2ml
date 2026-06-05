@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: MPL-2.0
+# Dustfile — Exnovation / cleanup contract for VeriSimDB
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Removal candidates and hygiene items. Advisory (continue-with-warnings):
+# housekeeping, not blockers. Destructive sweeps gated behind --apply.
+# Pairs with: dust.ncl (same directory)
+# Run with: contractile dust find          (list removal candidates)
+#           contractile dust sweep         (dry-run)
+#           contractile dust sweep --apply  (execute, gated + per-item approval)
+
+@abstract:
+Exnovation targets and hygiene items for VeriSimDB. Covers stale template
+residue, dropped components, and tracked build artefacts. Advisory by default;
+nothing is deleted without --apply and per-item approval. Audit trail preserved.
+@end
+
+## Template Residue
+
+# (cleared) The 6a2 rsr-template residue previously tracked here was removed by
+# PR #114 (de-templatize machine_readable + honest STATE). ECOSYSTEM.a2ml and
+# META.a2ml now carry VeriSimDB-specific content with no template boilerplate;
+# verified clean on the 2026-06-05 rebuild. No open template-residue items.
+
+## Dropped / Superseded Components
+
+### gleam-sdk-residue
+- description: Gleam client SDK was dropped (PR #85) — no Gleam residue should remain
+- target: connectors/clients
+- reason: Gleam SDK removed in "chore(rot): flush silent failures + drop Gleam SDK"
+- probe: test -z "$(find connectors/clients -iname '*gleam*' -not -path '*/.git/*' 2>/dev/null)"
+- status: declared
+- severity: info
+
+### top-level-contractiles-extensionless
+- description: Top-level contractiles/{must,trust,dust}/<Verb>file (no extension) predate the .machine_readable trident
+- target: contractiles/
+- reason: Older extensionless convention; canonical trident now lives under .machine_readable/contractiles/
+- status: declared
+- severity: info
+- notes: Owner-review item — do NOT delete this pass; the .machine_readable set is the evolving canonical map.
+
+## Build Artefacts
+
+### no-tracked-rust-target
+- description: No Rust target/ build output tracked in git
+- target: target/
+- reason: Build artefacts must not be committed
+- probe: test -z "$(git ls-files 'target/' 'rust-core/target/' 2>/dev/null)"
+- status: declared
+- severity: warning
+
+### no-tracked-elixir-build
+- description: No Elixir _build/ or deps/ tracked in git
+- target: elixir-orchestration/_build
+- reason: Build artefacts must not be committed
+- probe: test -z "$(git ls-files 'elixir-orchestration/_build/' 'elixir-orchestration/deps/' 2>/dev/null)"
+- status: declared
+- severity: warning
+
+### no-tracked-rescript-mjs
+- description: No compiled ReScript .res.mjs output tracked in git
+- target: src/vql
+- reason: Compiled output regenerated from .res sources
+- probe: test -z "$(git ls-files '*.res.mjs' 2>/dev/null)"
+- status: declared
+- severity: info
+
+## Stale Snapshots
+
+### no-dated-status-files
+- description: No dated STATUS/COMPLETION markdown snapshots in root
+- target: ./*-STATUS-*.md
+- reason: Superseded by 6a2/STATE.a2ml and ROADMAP.md
+- probe: test -z "$(ls *-STATUS-*.md *-COMPLETION-*.md 2>/dev/null)"
+- status: declared
+- severity: info
