@@ -1,59 +1,109 @@
 ;; SPDX-License-Identifier: MPL-2.0
-;; STATE.scm - Project state for VeriSimDB
-;; Media-Type: application/vnd.state+scm
+;; STATE.a2ml - Project state for VeriSimDB
+;; Media-Type: application/vnd.state+a2ml
 
 (state
   (metadata
-    (version "0.0.1")
+    (version "0.1.0")
     (schema-version "1.0")
     (created "2026-01-03")
-    (updated "2026-06-02")
+    (updated "2026-06-05")
     (project "VeriSimDB")
-    (repo "github.com/hyperpolymath/VeriSimDB"))
+    (repo "github.com/hyperpolymath/verisimdb"))
 
   (project-context
     (name "VeriSimDB")
-    (tagline "Drift-aware, dependently-typed federated database with proof-bearing queries")
-    (tech-stack ("rust" "elixir" "rescript" "coq")))
+    (tagline "Cross-system data consistency that catches drift before it causes damage")
+    (tech-stack
+      ("Rust"          "core engine + modality stores")
+      ("Elixir/OTP"    "orchestration + supervision")
+      ("ReScript"      "VCL parser + federation registry")
+      ("Coq"           "formal proofs (9 modules in formal/, Coq 8.18)")
+      ("Idris2"        "VCL-DT type checker / proof bridge")
+      ("HTTP + gRPC"   "API surface")
+      ("Tantivy"       "document modality (full-text)")
+      ("Burn"          "tensor modality")
+      ("redb"          "graph storage (pure-Rust default)")
+      ("Oxigraph"      "graph storage (optional)")))
+
+  ;; -----------------------------------------------------------------------
+  ;; Proof status is calibrated to a machine-checked Coq `Print Assumptions`
+  ;; audit (2026-06-05, coqc 8.18). The earlier "8/8 closed / foundation-pack
+  ;; done" wording was an overclaim and has been removed. See issue #113.
+  ;; -----------------------------------------------------------------------
 
   (current-position
-    (phase "foundation-pack-complete")
-    (overall-completion 0)
+    (phase "core operational; foundation-pack proofs mechanised in Coq (mixed axiom status — see formal-proofs)")
+    (overall-completion 0.78)
     (components
-      (license
-        (status "normalized")
-        (value "MPL-2.0")
-        (scope "workspace + LICENSE file body uniform")
-        (closes (issue 82) (pr 101))
-        (date "2026-06-02"))
-      (coverage-elixir
-        (current-percent 42.6)
-        (floor 40)
-        (ramp-doc "elixir-orchestration/coveralls-coverage-targets.md")
-        (ramp-targets ((phase 1 (floor 50) (target-date "2026-07-15"))
-                       (phase 2 (floor 60) (target-date "2026-09-01"))))
-        (date "2026-06-02"))
-      (cicd-main-reds
-        (status "5-of-7-cleared")
-        (closes (pr 99))
-        (remaining "license deferred to #82 (closed via #101)")
-        (date "2026-06-02"))))
+      (("verisim-graph"        "implemented" "redb default + Oxigraph optional"))
+      (("verisim-vector"       "implemented" "HNSW similarity search"))
+      (("verisim-tensor"       "implemented" "ndarray + Burn"))
+      (("verisim-semantic"     "implemented" "CBOR proofs + ZKP bridge"))
+      (("verisim-document"     "implemented" "Tantivy 0.26 (PR #76)"))
+      (("verisim-temporal"     "implemented" "time-series + versions"))
+      (("verisim-provenance"   "implemented" "hash-chain integrity + actor search"))
+      (("verisim-spatial"      "implemented" "R-tree + radius/bounds/nearest"))
+      (("verisim-octad"        "implemented" "unified entity layer"))
+      (("verisim-drift"        "implemented" "cross-modal monitoring"))
+      (("verisim-normalizer"   "implemented" "automatic repair"))
+      (("verisim-planner"      "implemented" "cost-based; Coq semantics over an abstract model (Q1 `optimize_is_permutation` axiomatised, not proven)"))
+      (("verisim-wal"          "implemented" "crash recovery"))
+      (("verisim-storage"      "implemented" "pluggable backend abstraction"))
+      (("verisim-api"          "implemented" "HTTP API server"))
+      (("verisim-repl"         "implemented" "interactive VCL REPL"))
+      (("verisim-nif"          "stub"        "placeholder — returns nif_placeholder; real host-side impl tracked in issue #61"))
+      (("elixir-orchestration" "implemented" "entity_server / drift_monitor / query_router / schema_registry"))
+      (("hypatia-integration"  "live"        "3 modules / 37 tests / verisim-data flat-file store"))
+      (("formal-proofs"        "mechanised"  "Coq 8.18, hole-free, Print-Assumptions-gated. 0-axiom: C2 V2. Closed modulo standard primitives: Octad(O/R) P2 P3 C7. Structural over uninterpreted ops (NOT impl-linked): D1 D2 N2. Crux axiomatised: Q1 (optimize_is_permutation). OWED: discharge Q1 axiom + add a Coq<->Rust refinement link (see issue #113)")))
+    (working-features
+      ("Octad entity create/get/update across 8 modalities")
+      ("Cross-modal drift detection with severity scoring")
+      ("Self-normalisation with most-authoritative-modality selection")
+      ("VCL queries (parse, plan, execute, return); planner semantics mechanised in Coq over an abstract model")
+      ("VCL-DT proof clauses: EXISTENCE / INTEGRITY / CONSISTENCY / PROVENANCE / FRESHNESS / ACCESS / CITATION / CUSTOM / ZKP / PROVEN / SANCTIFY")
+      ("Multi-proof parsing (PROOF A(x) AND B(y))")
+      ("Provenance hash-chain integrity (P2/P3 Coq-verified, modulo an abstract hash)")
+      ("WAL replay (C7 idempotent on observable state, modulo decidable equality)")
+      ("Federation adapters: MongoDB Redis Neo4j ClickHouse SurrealDB InfluxDB MinIO (7x, 105 integration tests)")
+      ("Client SDKs: Rust Zig Elixir ReScript Julia (Gleam SDK retired 2026-06-01)")
+      ("Stapeln container ecosystem: compose.toml + .gatekeeper.yaml + manifest.toml + ct-build.sh")
+      ("Telemetry: opt-in collector + reporter + 19 telemetry tests")))
 
   (route-to-mvp
-    (milestones ()))
+    (milestones
+      ("Foundation-pack proofs"          "MECHANISED 2026-06-02" "Coq 9 modules; honest axiom status in formal-proofs; Q1 axiom + refinement owed (#113)")
+      ("License consistency on main"     "DONE 2026-06-02"       "PR #101 closes issue #82; cargo-deny GREEN")
+      ("Tantivy 0.26 keystone"           "DONE 2026-05-30"       "PR #76")
+      ("Hypatia integration live"        "DONE"                  "3 modules; ScanIngester + PatternQuery + DispatchBridge")
+      ("Stapeln container bundle"        "DONE"                  "compose.toml / .ctp manifest / ct-build.sh")
+      ("verisim-nif real implementation" "TRACKED"               "issue #61 — host-side NIF still a placeholder")
+      ("REUSE licence gate + provable consistency" "TRACKED"     "issue #113")
+      ("VCL rename complete"             "IN-FLIGHT"             "VQL->VCL incomplete in 90 files (#84)")
+      ("Cross-repo synthesis layer"      "TRACKED"               "issue #84")))
 
   (blockers-and-issues
-    (critical)
-    (high)
-    (medium)
-    (low))
+    (critical ())
+    (high
+      ("verisim-nif is a placeholder (issue #61) — the BEAM-native path is a no-op")
+      ("VCL rename incomplete across 90 files (issue #84)"))
+    (medium
+      ("Coq foundation-pack: Q1 soundness is an axiom; no Coq<->Rust refinement link yet (#113)")
+      ("Federation adapters silent-fail on unknown response shapes (issue #80)"))
+    (low
+      ("Elixir suite remediation: consensus failures + coverage gate (issue #110)")))
 
   (critical-next-actions
-    (immediate)
-    (this-week)
-    (this-month))
+    (immediate
+      ("Supersede #107 with honest STATE + k9->self-validating rename (this PR)")
+      ("Normalise licences + install REUSE/k9 provable gate (#113)"))
+    (this-week ())
+    (this-month ()))
 
   (session-history
+    (entry
+      (date "2026-06-05")
+      (summary "Supersede #107: de-templatize 6a2 + migrate bot_directives to .a2ml + k9->self-validating rename + Dustfile. STATE proof claims calibrated to a machine-checked Coq Print-Assumptions audit (the '8/8 closed' overclaim removed); verisim-nif corrected to stub per #61"))
     (entry
       (date "2026-06-02")
       (prs (99 100 101))

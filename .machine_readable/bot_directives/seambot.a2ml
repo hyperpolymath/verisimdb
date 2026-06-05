@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# Converted from .scm format
+
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+[bot-directive]
+allow = ["analysis", "contract checks", "docs updates", "integration runbooks"]
+bot = "seambot"
+deny = ["code changes without approval", "deleting database data or backups"]
+notes = "First status line must include: ACK: verisimdb cleanup cadence loaded. For integration maintenance, use daily stale-prune and weekly full clean cadence."
+scope = "integration health"
+
+
