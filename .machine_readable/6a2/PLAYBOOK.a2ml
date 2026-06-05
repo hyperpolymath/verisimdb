@@ -1,13 +1,63 @@
 ;; SPDX-License-Identifier: MPL-2.0
-;; PLAYBOOK.scm - Operational runbook for rsr-template-repo
+;; PLAYBOOK.a2ml - Operational runbook for VeriSimDB
 
 (define playbook
   `((version . "1.0.0")
+    (project . "VeriSimDB")
+
     (procedures
-      ((deploy . (("build" . "just build")
-                  ("test" . "just test")
-                  ("release" . "just release")))
-       (rollback . ())
-       (debug . ())))
-    (alerts . ())
-    (contacts . ())))
+      (build
+        ((rust-only . "cd rust-core && cargo build --release")
+         (full . "cargo build --release && cd elixir-orchestration && mix compile")
+         (container-in-memory . "podman build -t verisimdb:latest -f container/Containerfile .")
+         (container-persistent . "podman build -t verisimdb:persistent --build-arg FEATURES=persistent -f container/Containerfile .")
+         (signed-bundle . "cd container && ./ct-build.sh persistent --push")))
+
+      (test
+        ((rust-unit . "cargo test")
+         (rust-integration . "cargo test --test integration")
+         (elixir-unit . "cd elixir-orchestration && mix test")
+         (elixir-integration . "cd elixir-orchestration && mix test --include integration")
+         (federation-adapters . "cd connectors/test-infra && selur-compose up -d && cd ../../elixir-orchestration && mix test --include integration")
+         (coq-proofs . "cd formal && just check")
+         (fuzz . "cargo fuzz run <target> -- -max_total_time=60")))
+
+      (run
+        ((api-server . "cargo run -p verisim-api -- --bind 127.0.0.1:8080")
+         (elixir-orchestration . "cd elixir-orchestration && iex -S mix")
+         (repl . "cargo run -p verisim-repl")
+         (debugger . "cd debugger && cargo run -- --rust-url http://localhost:8080 --orch-url http://localhost:4080")
+         (full-stack . "selur-compose up --detach")
+         (container-quick . "podman run -p 8080:8080 verisimdb:latest")))
+
+      (deploy
+        ((local . "podman run -p 8080:8080 -v verisimdb-data:/data verisimdb:persistent")
+         (selur-stack . "cd container && selur-compose up --detach")
+         (github-ci-scan . "via verisimdb-data repository_dispatch from per-repo scan-and-report.yml")))
+
+      (rollback
+        ((via-stapeln . "verify .ctp bundle attestation before re-launch")
+         (via-git . "git revert <bad-commit> && cargo deny check && cargo test")
+         (via-wal-replay . "verisim-wal replay; idempotency proven by C7")))
+
+      (debug
+        ((interactive-tui . "cd debugger && cargo run -- --rust-url http://localhost:8080")
+         (panll-protocol . "JSON-over-stdio: {\"cmd\":\"inspect\",\"entity_id\":\"...\"}")
+         (drift-scan . "{\"cmd\":\"drift_scan\",\"threshold\":0.3}")
+         (vql-trace . "{\"cmd\":\"trace_vql\",\"query\":\"SELECT ...\"}")
+         (proof-verify . "{\"cmd\":\"verify_proof\",\"query\":\"... PROOF ...\"}")
+         (health . "{\"cmd\":\"health\"}")
+         (formal-proof-check . "cd formal && coqc -Q . VeriSimDB <Module>.v && Print Assumptions <Theorem>"))))
+
+    (alerts
+      ((cargo-deny-red . "check workspace license vs deny.toml allow-list; precedent issue #82, fix #101")
+       (governance-licence-consistency-red . "infrastructure baseline-red on main per #59 — non-blocking")
+       (scorecard-startup-failure . "PARKED per feedback_scorecard_startup_failure_2026_06_02_park; do not re-attempt the three surface fixes")
+       (proof-axiom-slippage . "Print Assumptions guard fails — investigate before merge")
+       (drift-threshold-exceeded . "drift_monitor coordinates self-normalisation; check verisim-drift logs")))
+
+    (contacts
+      ((maintainer . "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>")
+       (estate-policy . ".claude/CLAUDE.md + ~/.claude/projects/.../memory/")
+       (hypatia-pipeline . "hypatia/lib/verisim_connector.ex + hypatia#416")
+       (panic-attack-pipeline . "panic-attack/src/* + panic-attack#101")))))

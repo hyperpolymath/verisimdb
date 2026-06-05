@@ -1,17 +1,72 @@
 ;; SPDX-License-Identifier: MPL-2.0
-;; META.scm - Meta-level information for rsr-template-repo
-;; Media-Type: application/meta+scheme
+;; META.a2ml - Meta-level information for VeriSimDB
+;; Media-Type: application/vnd.meta+a2ml
 
 (meta
-  (architecture-decisions ())
+  (architecture-decisions
+    (("AD-001"
+       (decision "Marr's three levels of analysis as the design lens")
+       (rationale "Computational / algorithmic / implementational separation keeps the octad invariant clean")
+       (source ".claude/CLAUDE.md section 'Design Philosophy'")))
+    (("AD-002"
+       (decision "Rust core + Elixir orchestration split")
+       (rationale "Rust for performance-critical modality stores; Elixir/OTP for distributed coordination + fault tolerance")
+       (source "README.adoc + .claude/CLAUDE.md 'Architecture'")))
+    (("AD-003"
+       (decision "Pluggable storage backend (verisim-storage) with redb as pure-Rust default")
+       (rationale "Eliminate oxrocksdb-sys C++ dependency; Oxigraph feature-flagged")
+       (source "rust-core/verisim-storage + rust-core/verisim-graph")))
+    (("AD-004"
+       (decision "PLONK as ZKP scheme for VCL-DT PROOF clause")
+       (rationale "Universal trusted setup + small proofs + recursion + circuit flexibility (see Trustfile table)")
+       (source "contractiles/trust/Trustfile")))
+    (("AD-005"
+       (decision "Git-backed flat-file store for GitHub CI integration (verisimdb-data repo)")
+       (rationale "No persistent server needed for ~290-repo scanning workflow; verisim-api server runs locally as needed")
+       (source ".claude/CLAUDE.md 'GitHub CI Integration'")))
+    (("AD-006"
+       (decision "MPL-2.0 across the workspace (no AGPL)")
+       (rationale "Sole-owner repo per estate license-policy umbrella")
+       (source "LICENSE + Cargo.toml + PR #101 (closes issue #82)")))
+    (("AD-007"
+       (decision "Tantivy 0.26 with order_by_score() for TopDocs")
+       (rationale "Tantivy 0.26 collector API change; lz4_flex + lru CVE resolution via transitive bump")
+       (source "PR #76 + reference_tantivy_0_26_collector_api memory"))))
 
   (development-practices
-    (code-style ())
+    (code-style
+      ("rustfmt + clippy --all-targets --all-features"
+        "Elixir mix format"
+        "AsciiDoc for prose docs"
+        "a2ml for machine-readable artefacts"))
     (security
-      (principle "Defense in depth"))
-    (testing ())
+      (principle "Defense in depth")
+      (practices
+        ("cargo deny check (advisories + bans + licenses + sources)"
+         "cargo audit (RUSTSEC)"
+         "cargo-llvm-cov coverage gate (>= 60%)"
+         "fuzz targets (Rust + cargo-fuzz)"
+         "OpenSSF Scorecard enforcement"
+         "SHA-pinned actions"
+         "Stapeln container signing + .ctp bundle attestations")))
+    (testing
+      ("Rust: cargo test + integration tests under rust-core/*/tests/"
+       "Elixir: mix test (incl. --include integration for 105 federation-adapter tests via selur-compose stack)"
+       "Coq: formal proofs in formal/*.v with Print Assumptions guard"))
     (versioning "SemVer")
-    (documentation "AsciiDoc")
-    (branching "main for stable"))
+    (documentation "AsciiDoc (README.adoc, EXPLAINME.adoc, contractiles/README.adoc); a2ml for state/meta/ecosystem/agentic/neurosym/playbook")
+    (branching "main for stable; feature branches off main; squash-merge into main"))
 
-  (design-rationale ()))
+  (design-rationale
+    (("rationale-octad"
+       (claim "Eight modalities is not arbitrary")
+       (reasoning "Each modality captures a distinct entity-level semantic: structure (Graph), similarity (Vector), high-dimensional shape (Tensor), type-system intent (Semantic), text content (Document), time (Temporal), origin (Provenance), location (Spatial). Together they span the practical entity-representation space without redundancy.")))
+    (("rationale-drift-vs-eventual-consistency"
+       (claim "Drift detection > eventual consistency for cross-modal data")
+       (reasoning "Eventual consistency cures structural divergence; it does not cure semantic divergence (vector that no longer matches text; provenance hash whose chain is broken). Drift detection + self-normalisation operates at the semantic layer.")))
+    (("rationale-formal-proofs"
+       (claim "Coq proofs for the consistency obligations")
+       (reasoning "Foundation-pack (P2/P3/D1/C2/C7/N2/V2/Q1) covers the invariants that would be expensive to debug empirically: hash-chain integrity, normaliser fixed-points, WAL idempotency, planner semantic equivalence.")))
+    (("rationale-flat-file-ci"
+       (claim "Git-backed flat-file store instead of persistent server in GitHub CI")
+       (reasoning "Persistent server scoped to ~290 repos × per-PR scans would dominate CI cost. Flat-file store keeps the data path read-only-from-git and write-via-repository_dispatch; verisim-api server is opt-in for local dev or future Fly.io deployment.")))))
