@@ -1,0 +1,134 @@
+# SPDX-License-Identifier: MPL-2.0
+# Mustfile — Physical state contract for VeriSimDB
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# What MUST be true about this repository. Hard requirements.
+# Pairs with: must.ncl (same directory)
+# Run with: contractile must run
+# Fix with: contractile must fix (where deterministic fix exists)
+
+@abstract:
+Physical-state invariants for VeriSimDB — the cross-modal (octad) entity
+consistency engine. Rust core + Elixir/OTP orchestration + ReScript VQL.
+These are hard requirements: CI and pre-commit hooks fail if any check fails.
+@end
+
+## Workspace Structure
+
+### cargo-workspace-present
+- description: Root Cargo workspace manifest must exist
+- run: test -f Cargo.toml
+- severity: critical
+
+### rust-core-present
+- description: Rust core crate directory must exist
+- run: test -d rust-core
+- severity: critical
+
+### verisim-api-crate
+- description: verisim-api HTTP server crate must exist
+- run: test -d rust-core/verisim-api
+- severity: critical
+
+### verisim-octad-crate
+- description: verisim-octad unified-entity crate must exist
+- run: test -d rust-core/verisim-octad
+- severity: critical
+
+### elixir-mix-present
+- description: Elixir orchestration mix.exs must exist
+- run: test -f elixir-orchestration/mix.exs
+- severity: critical
+
+### elixir-lib-present
+- description: Elixir VeriSim library tree must exist
+- run: test -d elixir-orchestration/lib/verisim
+- severity: critical
+
+## File Presence
+
+### license-present
+- description: LICENSE file must exist
+- run: test -f LICENSE
+- severity: critical
+
+### readme-present
+- description: README.adoc must exist
+- run: test -f README.adoc
+- severity: critical
+
+### security-policy
+- description: SECURITY.md must exist
+- run: test -f SECURITY.md
+- severity: critical
+
+### ai-manifest
+- description: 0-AI-MANIFEST.a2ml must exist
+- run: test -f 0-AI-MANIFEST.a2ml
+- severity: high
+
+### known-issues-doc
+- description: KNOWN-ISSUES.adoc must exist (honest-gaps register)
+- run: test -f KNOWN-ISSUES.adoc
+- severity: warning
+
+### editorconfig
+- description: .editorconfig must exist
+- run: test -f .editorconfig
+- severity: warning
+
+## VQL (VeriSim Query Language)
+
+### vql-rescript-parser
+- description: ReScript VQL parser source must exist
+- run: test -d src/vql
+- severity: critical
+
+### vql-elixir-bridge
+- description: Elixir VQL bridge module must exist
+- run: test -f elixir-orchestration/lib/verisim/query/vql_bridge.ex
+- severity: high
+
+### vql-examples-present
+- description: At least one .vql example/fixture must exist
+- run: test -n "$(find . -name '*.vql' -not -path '*/.git/*' 2>/dev/null)"
+- severity: warning
+
+## Container Policy
+
+### containerfile-present
+- description: container/Containerfile must exist (Podman build front door)
+- run: test -f container/Containerfile
+- severity: high
+
+### no-dockerfile-outside-fuzz
+- description: No Dockerfile outside the .clusterfuzzlite OSS-Fuzz harness (use Containerfile + Podman)
+- run: test -z "$(find . -name 'Dockerfile' -not -path '*/.clusterfuzzlite/*' -not -path '*/.git/*' 2>/dev/null)"
+- severity: warning
+
+## Language Policy
+
+### no-python
+- description: No Python files (policy: use Rust/Elixir/ReScript; Julia for data processing)
+- run: test -z "$(find . -name '*.py' -not -path '*/.git/*' -not -path '*/deps/*' 2>/dev/null)"
+- severity: critical
+
+### no-go
+- description: No Go files (policy: use Rust)
+- run: test -z "$(find . -name '*.go' -not -path '*/.git/*' -not -path '*/deps/*' 2>/dev/null)"
+- severity: warning
+
+## License Compliance
+
+### no-agpl
+- description: No AGPL-3.0 headers in source (workspace normalised to MPL-2.0, closes #82)
+- run: test -z "$(grep -rlE 'AGPL-3\.0' --include='*.rs' --include='*.ex' --include='*.exs' --include='*.idr' --include='*.zig' . 2>/dev/null)"
+- severity: critical
+- notes: Mirrors the `just license-check` recipe.
+
+## Dangerous Patterns
+
+### no-believe-me
+- description: No believe_me in Idris2 ABI code (0-believe_me invariant)
+- run: test -z "$(find . -name '*.idr' -not -path '*/.git/*' -exec grep -l 'believe_me' {} \; 2>/dev/null)"
+- severity: critical
