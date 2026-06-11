@@ -25,6 +25,7 @@ verisim-planner = { path = "../verisim-planner" }
 
 axum.workspace = true
 tokio.workspace = true
+async-trait.workspace = true
 tower.workspace = true
 hyper.workspace = true
 serde.workspace = true
