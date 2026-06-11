@@ -76,6 +76,10 @@ serve:
 serve-otp:
     cd elixir-orchestration && MIX_ENV=dev mix run --no-halt
 
+# The consonance loop, live: dissonance -> measured drift -> repair -> re-measure
+demo-consonance:
+    scripts/demo-consonance.sh
+
 # ── Container ──────────────────────────────────────────────────
 
 # Build container image with Podman

@@ -8,7 +8,7 @@
 
 == Overview
 
-This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-02-13. Each entry describes the current state, why it matters, and what needs to happen to resolve it.
+This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-06-11. Each entry describes the current state, why it matters, and what needs to happen to resolve it. A full claims-vs-reality review with the active work plan lives at `docs/reviews/2026-06-11-deep-review-and-july-1-plan.adoc`.
 
 A major 7-phase hardening effort was completed on 2026-02-13, resolving most previously-open issues. The remaining open items are documented below.
 
@@ -18,9 +18,11 @@ VeriSimDB is a working system with real implementations in its core modality sto
 
 === 1. Normalizer Regeneration Strategies Are Stubs — ✅ RESOLVED
 
-**Location:** `rust-core/verisim-normalizer/`
+**Location:** `rust-core/verisim-normalizer/`, `rust-core/verisim-api/src/regenerator.rs`
 
-**Resolved:** 2026-02-12. Regeneration strategies now inspect octad data to select the authoritative modality and derive drifted modality content from it, rather than returning hardcoded placeholder strings. Each of the six modality strategies performs actual data transformation.
+**Resolved (write-back + endpoint):** 2026-06-11. The 2026-02-12 fix made the strategies *derive* repaired content but nothing wrote it back to the stores, and `POST /normalizer/trigger/{id}` was a 202 no-op. Now `StoreRegenerator` (verisim-api) implements `ModalityRegenerator` against the live octad store: repairs are written back through `OctadStore::update` (versioned, WAL-logged, recorded on the provenance chain as `normalized` events), the endpoint measures drift, runs the regeneration engine, re-measures from persisted state, and returns before/after scores. Demo: `just demo-consonance`. Honest scope: implemented repair paths are Graph→Document, Document→Vector (deterministic feature-hash embedding, not an ML model), Document/Vector→Tensor; other pairs return an explicit failure instead of fake success; merge regeneration is not implemented.
+
+**Resolved (derivation):** 2026-02-12. Regeneration strategies inspect octad data to select the authoritative modality and derive drifted modality content from it, rather than returning hardcoded placeholder strings.
 
 **Original issue:** Every regeneration strategy returned a hardcoded `[regenerated]` placeholder string instead of actually regenerating data.
 
@@ -252,3 +254,16 @@ Added `rescript.json` for build configuration.
 **Resolved:** 2026-02-28. Protobuf code is now pre-generated and committed at `src/proto/verisim.rs`. The `build.rs` is a no-op. The `prost-build`/`tonic-build` build-dependencies were removed. The Containerfile no longer installs protoc.
 
 **Original issue:** `prost-build` shelled out to the `protoc` binary to compile `verisim.proto`. To regenerate after changing the proto, install protoc and run: `protoc --prost_out=src/proto proto/verisim.proto`.
+
+=== 26. Drift Was Never Measured on Real Data — ✅ RESOLVED
+
+**Location:** `rust-core/verisim-api/src/drift_compute.rs`, `rust-core/verisim-drift/`
+
+**Resolved:** 2026-06-11. `DriftCalculator` contained real drift mathematics but had zero callers: `/drift/status` reported initialized-to-zero metrics forever, and `/drift/entity/{id}` returned the global (zero) worst score labelled as entity-specific. Now every create/update measures the entity's cross-modal drift from its live modality data (graph-document reflection, temporal consistency, tensor shape/data coherence, schema baseline, provenance chain integrity and staleness, spatial validity) and records it into the shared `DriftDetector`; `/drift/entity/{id}` measures THIS entity on demand with a per-component breakdown.
+
+**Honest scope (still open):**
+
+* `semantic_vector_drift` is reported as `computable: false` — measuring it needs a type-embedding registry that does not exist yet. Non-computable components are excluded from the aggregates.
+* `temporal_consistency_drift` works at 1-second timestamp resolution, so two writes within the same second register as a (mild) conflict signal.
+
+**Original issue:** The product's core claim — drift detection — ran on no real data anywhere in the system.
