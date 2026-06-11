@@ -201,7 +201,10 @@ impl ProofAttemptStore {
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut counts: HashMap<String, (u32, u32)> = HashMap::new();
-        for attempt in rows.iter().filter(|a| a.obligation_class == obligation_class) {
+        for attempt in rows
+            .iter()
+            .filter(|a| a.obligation_class == obligation_class)
+        {
             let entry = counts.entry(attempt.prover_used.clone()).or_insert((0, 0));
             entry.1 += 1;
             if attempt.outcome == "success" {
@@ -237,11 +240,7 @@ impl ProofAttemptStore {
 // ── HTTP handlers ────────────────────────────────────────────────────────
 
 fn error_json(status: StatusCode, message: impl Into<String>) -> Response {
-    (
-        status,
-        Json(serde_json::json!({ "error": message.into() })),
-    )
-        .into_response()
+    (status, Json(serde_json::json!({ "error": message.into() }))).into_response()
 }
 
 /// `POST /proof_attempts` — record one attempt, 201 + `{"attempt_id": …}`.
@@ -342,7 +341,9 @@ mod tests {
         let second = attempt("goal-1", "c", "z3", "success");
         store.record(first.clone()).unwrap();
         store.record(second.clone()).unwrap();
-        store.record(attempt("goal-2", "c", "z3", "success")).unwrap();
+        store
+            .record(attempt("goal-2", "c", "z3", "success"))
+            .unwrap();
 
         let rows = store.by_obligation("goal-1", 50);
         assert_eq!(rows.len(), 2);
@@ -355,7 +356,9 @@ mod tests {
     fn limit_caps_results() {
         let store = ProofAttemptStore::in_memory();
         for _ in 0..10 {
-            store.record(attempt("goal-cap", "c", "z3", "success")).unwrap();
+            store
+                .record(attempt("goal-cap", "c", "z3", "success"))
+                .unwrap();
         }
         assert_eq!(store.by_obligation("goal-cap", 3).len(), 3);
     }
@@ -363,11 +366,21 @@ mod tests {
     #[test]
     fn success_rate_aggregation() {
         let store = ProofAttemptStore::in_memory();
-        store.record(attempt("g1", "linearity", "z3", "success")).unwrap();
-        store.record(attempt("g2", "linearity", "z3", "success")).unwrap();
-        store.record(attempt("g3", "linearity", "z3", "failure")).unwrap();
-        store.record(attempt("g4", "linearity", "coq", "timeout")).unwrap();
-        store.record(attempt("g5", "termination", "coq", "success")).unwrap();
+        store
+            .record(attempt("g1", "linearity", "z3", "success"))
+            .unwrap();
+        store
+            .record(attempt("g2", "linearity", "z3", "success"))
+            .unwrap();
+        store
+            .record(attempt("g3", "linearity", "z3", "failure"))
+            .unwrap();
+        store
+            .record(attempt("g4", "linearity", "coq", "timeout"))
+            .unwrap();
+        store
+            .record(attempt("g5", "termination", "coq", "success"))
+            .unwrap();
 
         let rows = store.success_by_class("linearity");
         assert_eq!(rows.len(), 2);
@@ -378,9 +391,7 @@ mod tests {
         assert_eq!(rows[1].prover, "z3");
         assert_eq!(rows[1].total_attempts, 3);
         assert!((rows[1].success_rate - 2.0 / 3.0).abs() < f32::EPSILON);
-        assert!(rows
-            .iter()
-            .all(|r| (0.0..=1.0).contains(&r.success_rate)));
+        assert!(rows.iter().all(|r| (0.0..=1.0).contains(&r.success_rate)));
         assert!(store.success_by_class("no-such-class").is_empty());
     }
 
@@ -412,8 +423,12 @@ mod tests {
 
         {
             let store = ProofAttemptStore::with_persistence(&dir).unwrap();
-            store.record(attempt("g-persist", "c", "lean", "success")).unwrap();
-            store.record(attempt("g-persist", "c", "lean", "failure")).unwrap();
+            store
+                .record(attempt("g-persist", "c", "lean", "success"))
+                .unwrap();
+            store
+                .record(attempt("g-persist", "c", "lean", "failure"))
+                .unwrap();
         }
 
         // Reopen: rows must come back in insertion order.
@@ -421,7 +436,10 @@ mod tests {
         assert_eq!(reopened.len(), 2);
         let rows = reopened.by_obligation("g-persist", 50);
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].outcome, "failure", "most recent first survives reload");
+        assert_eq!(
+            rows[0].outcome, "failure",
+            "most recent first survives reload"
+        );
 
         std::fs::remove_dir_all(&dir).ok();
     }
