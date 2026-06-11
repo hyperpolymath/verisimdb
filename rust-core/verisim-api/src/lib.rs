@@ -10,6 +10,7 @@ pub mod drift_compute;
 pub mod federation;
 pub mod graphql;
 pub mod grpc;
+pub mod proof_attempts;
 pub mod rbac;
 pub mod regenerator;
 pub mod transaction;
@@ -513,6 +514,7 @@ pub struct AppState {
     pub circuit_registry: Arc<CircuitRegistry>,
     pub federation: federation::FederationState,
     pub auth: auth::AuthState,
+    pub proof_attempts: Arc<proof_attempts::ProofAttemptStore>,
     pub config: ApiConfig,
 }
 
@@ -709,6 +711,15 @@ impl AppState {
         let auth = auth::AuthState::default();
         let circuit_registry = Arc::new(CircuitRegistry::new());
 
+        // --- S4 proof-attempt row store (ECHIDNA learning loop) ---
+        #[cfg(feature = "persistent")]
+        let proof_attempts = Arc::new(
+            proof_attempts::ProofAttemptStore::with_persistence(&persist_dir)
+                .map_err(|e| ApiError::Internal(format!("proof_attempts store: {e}")))?,
+        );
+        #[cfg(not(feature = "persistent"))]
+        let proof_attempts = Arc::new(proof_attempts::ProofAttemptStore::in_memory());
+
         Ok(Self {
             start_time: std::time::Instant::now(),
             octad_store,
@@ -722,6 +733,7 @@ impl AppState {
             circuit_registry,
             federation,
             auth,
+            proof_attempts,
             config,
         })
     }
@@ -813,6 +825,15 @@ pub fn build_router(state: AppState) -> Router {
         .route("/spatial/search/nearest", post(spatial_nearest_handler))
         // VQL text query endpoint (used by verisim-repl)
         .route("/vql/execute", post(vql::vql_execute_handler))
+        // S4 learning loop — ECHIDNA proof attempts (see proof_attempts module docs)
+        .route(
+            "/proof_attempts",
+            get(proof_attempts::list_handler).post(proof_attempts::record_handler),
+        )
+        .route(
+            "/mv_prover_success_by_class",
+            get(proof_attempts::success_by_class_handler),
+        )
         // Authentication middleware layer
         .layer(axum_middleware::from_fn_with_state(
             auth_state,
@@ -823,6 +844,22 @@ pub fn build_router(state: AppState) -> Router {
         .merge(graphql::graphql_router(state))
         // Federation endpoints (separate state)
         .merge(federation_routes)
+}
+
+/// Mount the API router at both the root and under `version_prefix`.
+///
+/// Historically `serve()` mounted everything at the root and the configured
+/// `version_prefix` ("/api/v1") was never applied, so documented prefixed
+/// paths (and every `/api/v1/…` call from ECHIDNA's verisim_bridge) 404'd.
+/// Root mounting is kept for backwards compatibility with consumers that
+/// grew up against the unprefixed paths (verisim-repl, local tooling);
+/// the nested mount makes the documented contract real.
+pub fn mount_with_prefix(api: Router, prefix: &str) -> Router {
+    let prefix = prefix.trim_end_matches('/');
+    if prefix.is_empty() || !prefix.starts_with('/') {
+        return api;
+    }
+    Router::new().nest(prefix, api.clone()).merge(api)
 }
 
 /// Health check handler — verifies drift detector status and reports degraded when critical
@@ -2077,7 +2114,7 @@ pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
     let octad_store = state.octad_store.clone();
 
     // Build HTTP router with hardening middleware
-    let app = build_router(state.clone())
+    let app = mount_with_prefix(build_router(state.clone()), &config.version_prefix)
         .layer(axum::extract::DefaultBodyLimit::max(config.max_body_size));
 
     // Start HTTP server
@@ -2162,7 +2199,7 @@ pub async fn serve_tls(
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     let octad_store = state.octad_store.clone();
-    let app = build_router(state);
+    let app = mount_with_prefix(build_router(state), &config.version_prefix);
 
     let addr = format!("{}:{}", config.host, config.port);
     info!(addr = %addr, cert = %cert_path, "Starting VeriSimDB API server with TLS");
@@ -2536,6 +2573,125 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// One proof-attempt JSON body in exactly the shape ECHIDNA posts.
+    fn s4_attempt_json(obligation_id: &str, class: &str, outcome: &str) -> String {
+        serde_json::json!({
+            "attempt_id": format!("test-{}-{}", obligation_id, outcome),
+            "obligation_id": obligation_id,
+            "repo": "hyperpolymath/echidna",
+            "file": "tests/s4_loop_closure.rs",
+            "claim": "true",
+            "obligation_class": class,
+            "prover_used": "z3",
+            "outcome": outcome,
+            "duration_ms": 1,
+            "confidence": if outcome == "success" { 1.0 } else { 0.0 },
+            "parent_attempt_id": null,
+            "strategy_tag": "test",
+            "started_at": "2026-06-11T00:00:00Z",
+            "completed_at": "2026-06-11T00:00:01Z",
+            "prover_output": "",
+            "error_message": null
+        })
+        .to_string()
+    }
+
+    /// Full S4 loop over the wire, at both the prefixed (/api/v1, the
+    /// ECHIDNA contract) and unprefixed (back-compat) mounts:
+    /// record → list by obligation_id → mv_prover_success_by_class.
+    #[tokio::test]
+    async fn test_s4_proof_attempts_loop() {
+        let state = create_test_state().await;
+        let app = mount_with_prefix(build_router(state), "/api/v1");
+
+        for (prefix, obligation) in [("/api/v1", "goal-prefixed"), ("", "goal-root")] {
+            // Record two attempts (one success, one failure).
+            for outcome in ["success", "failure"] {
+                let response = app
+                    .clone()
+                    .oneshot(
+                        Request::builder()
+                            .method("POST")
+                            .uri(format!("{prefix}/proof_attempts"))
+                            .header("content-type", "application/json")
+                            .body(Body::from(s4_attempt_json(obligation, "s4-test", outcome)))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), StatusCode::CREATED, "POST at {prefix}");
+            }
+
+            // Read back by obligation_id — most recent first.
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(format!(
+                            "{prefix}/proof_attempts?obligation_id={obligation}&limit=50"
+                        ))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let rows: Vec<proof_attempts::ProofAttempt> =
+                serde_json::from_slice(&body).unwrap();
+            assert_eq!(rows.len(), 2, "both attempts visible at {prefix}");
+            assert_eq!(rows[0].outcome, "failure", "most recent first");
+        }
+
+        // Aggregate over everything recorded above: 4 attempts in class
+        // s4-test for z3, half successful.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/mv_prover_success_by_class?class=s4-test")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let rows: Vec<proof_attempts::ProverSuccessRow> =
+            serde_json::from_slice(&body).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].prover, "z3");
+        assert_eq!(rows[0].total_attempts, 4);
+        assert!((rows[0].success_rate - 0.5).abs() < f32::EPSILON);
+
+        // Unknown class and unknown obligation are empty 200s, not 404s.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/mv_prover_success_by_class?class=no-such-class")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Missing required query parameters are 400s.
+        for uri in ["/api/v1/proof_attempts", "/api/v1/mv_prover_success_by_class"] {
+            let response = app
+                .clone()
+                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{uri}");
+        }
     }
 
     #[tokio::test]
