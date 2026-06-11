@@ -18,7 +18,7 @@ defmodule VeriSimClient.Federation do
         "us-west-replica",
         "https://peer.example.com:8080",
         "verisimdb",
-        %{api_key: "peer-key-123"}
+        %{api_key: "example-peer-key-123"}
       )
 
       {:ok, peers} = VeriSimClient.Federation.list_peers(client)
