@@ -132,7 +132,41 @@ Consumer repositories should keep their own lightweight VeriSim runtime profiles
 
 Canonical bot policy files for this repository live in `/.machine_readable/bot_directives/`. Root-level `/.bot_directives/` is treated as legacy.
 
-=== Drift Detection Demo
+=== The Consonance Loop, Live (Rust core)
+
+One command, real server, real measurements — no seeded data, no mocks:
+
+[source,bash]
+----
+just demo-consonance        # or: scripts/demo-consonance.sh
+----
+
+The script creates an entity whose document and graph disagree, measures
+the dissonance from the entity's own modality data, asks the normalizer to
+repair it (the document is regenerated from the graph — the authoritative
+source — and the write-back is versioned, WAL-logged, and recorded on the
+provenance chain), then re-measures. Abridged transcript from a real run
+(2026-06-11):
+
+----
+== 2. Measure drift for this entity ==
+  "graph_document": { "score": 0.5,
+    "detail": "0/1 graph relationship targets mentioned in document" }
+
+== 4. Ask the normalizer to repair it ==
+  { "action": "repaired", "modality": "document",
+    "source_modality": "graph",
+    "before_score": 0.5, "after_score": 0.0 }
+
+== 5. Re-measure: the dissonance is gone ==
+  "graph_document": { "score": 0.0,
+    "detail": "1/1 graph relationship targets mentioned in document" }
+
+== 6. The repair is on the audit trail ==
+  { "version_count": 2, "provenance_chain_length": 2 }
+----
+
+=== Drift Detection Demo (Elixir orchestration)
 
 [source,bash]
 ----
