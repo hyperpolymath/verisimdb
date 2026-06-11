@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 pub mod auth;
+pub mod drift_compute;
 pub mod federation;
 pub mod graphql;
 pub mod grpc;
@@ -988,6 +989,11 @@ async fn create_octad_handler(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
+    // Measure cross-modal drift for the new entity (best-effort bookkeeping;
+    // never fails the write).
+    let report = drift_compute::compute_entity_drift(&state.octad_store, &octad, None).await;
+    drift_compute::record_entity_drift(&state.drift_detector, &report).await;
+
     Ok((StatusCode::CREATED, Json(OctadResponse::from(&octad))))
 }
 
@@ -1021,6 +1027,10 @@ async fn update_octad_handler(
     let octad_id = OctadId::new(&id);
     let input = request.to_octad_input();
 
+    // The pre-update modality set is the schema baseline: an update that
+    // silently drops a previously-populated modality is schema drift.
+    let previous = state.octad_store.get(&octad_id).await.ok().flatten();
+
     let octad = state
         .octad_store
         .update(&octad_id, input)
@@ -1031,6 +1041,11 @@ async fn update_octad_handler(
             }
             _ => ApiError::Internal(e.to_string()),
         })?;
+
+    let baseline = previous.as_ref().map(drift_compute::present_modalities);
+    let report =
+        drift_compute::compute_entity_drift(&state.octad_store, &octad, baseline.as_deref()).await;
+    drift_compute::record_entity_drift(&state.drift_detector, &report).await;
 
     Ok(Json(OctadResponse::from(&octad)))
 }
@@ -1182,9 +1197,13 @@ pub struct EntityDriftResponse {
     pub score: f64,
     pub drift_type: String,
     pub status: String,
+    /// Per-modality drift components measured for THIS entity.
+    pub components: Vec<drift_compute::DriftComponent>,
+    pub computed_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Entity drift handler — get drift info for a single entity
+/// Entity drift handler — measure drift for a single entity on demand
+/// from its own modality data.
 #[instrument(skip(state))]
 async fn entity_drift_handler(
     State(state): State<AppState>,
@@ -1193,32 +1212,20 @@ async fn entity_drift_handler(
     validate_octad_id(&id)?;
     let octad_id = OctadId::new(&id);
 
-    // Verify octad exists
-    let _octad = state
+    let octad = state
         .octad_store
         .get(&octad_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .ok_or_else(|| ApiError::NotFound(format!("Octad {} not found", id)))?;
 
-    // Get aggregate health from drift detector
-    let all_metrics = state
-        .drift_detector
-        .all_metrics()
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let (worst_type, worst_score) = all_metrics
-        .iter()
-        .max_by(|a, b| {
-            a.1.current_score
-                .partial_cmp(&b.1.current_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .map(|(dt, m)| (dt.to_string(), m.current_score))
-        .unwrap_or_else(|| ("none".to_string(), 0.0));
+    let report = drift_compute::compute_entity_drift(&state.octad_store, &octad, None).await;
+    // An on-demand read is still a real measurement: feed the aggregates.
+    drift_compute::record_entity_drift(&state.drift_detector, &report).await;
 
-    let status = if worst_score >= 0.7 {
+    let status = if report.overall_score >= 0.7 {
         "critical"
-    } else if worst_score >= 0.3 {
+    } else if report.overall_score >= 0.3 {
         "warning"
     } else {
         "healthy"
@@ -1226,9 +1233,11 @@ async fn entity_drift_handler(
 
     Ok(Json(EntityDriftResponse {
         entity_id: id,
-        score: worst_score,
-        drift_type: worst_type,
+        score: report.overall_score,
+        drift_type: report.primary_drift_type.clone(),
         status: status.to_string(),
+        components: report.components,
+        computed_at: report.computed_at,
     }))
 }
 
@@ -2521,5 +2530,220 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Request whose graph relationship target is not mentioned in the
+    /// document body — a real cross-modal inconsistency.
+    fn dissonant_octad_request() -> OctadRequest {
+        OctadRequest {
+            title: Some("Consonance Note".to_string()),
+            body: Some("A short note that does not mention its relation".to_string()),
+            embedding: Some(vec![0.1, 0.2, 0.3]),
+            types: None,
+            relationships: Some(vec![(
+                "relates_to".to_string(),
+                "orphan-target".to_string(),
+            )]),
+            tensor: None,
+            metadata: None,
+            provenance: Some(ProvenanceRequest {
+                event_type: "created".to_string(),
+                actor: "test-suite".to_string(),
+                source: None,
+                description: "created by drift wiring test".to_string(),
+            }),
+            spatial: None,
+        }
+    }
+
+    async fn post_octad(app: &axum::Router, request: &OctadRequest) -> OctadResponse {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(request).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    /// Creating an entity must record real drift measurements in the
+    /// aggregates — `/drift/status` may never report initialized zeros
+    /// after a write.
+    #[tokio::test]
+    async fn test_drift_recorded_on_create() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        post_octad(&app, &dissonant_octad_request()).await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/drift/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let statuses: Vec<DriftStatusResponse> = serde_json::from_slice(&body).unwrap();
+
+        let quality = statuses
+            .iter()
+            .find(|s| s.drift_type == "quality_drift")
+            .expect("quality_drift must be tracked");
+        assert!(
+            quality.measurement_count >= 1,
+            "create must record a quality-drift measurement"
+        );
+
+        let graph_doc = statuses
+            .iter()
+            .find(|s| s.drift_type == "graph_document_drift")
+            .expect("graph_document_drift must be tracked");
+        assert!(graph_doc.measurement_count >= 1);
+        assert!(
+            graph_doc.current_score > 0.0,
+            "unmentioned graph target must register graph-document drift"
+        );
+    }
+
+    /// `/drift/entity/{id}` must measure THIS entity's drift from its own
+    /// modality data, with a per-component breakdown.
+    #[tokio::test]
+    async fn test_entity_drift_measured_per_entity() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let created = post_octad(&app, &dissonant_octad_request()).await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/drift/entity/{}", created.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let report: EntityDriftResponse = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(report.entity_id, created.id);
+        assert!(
+            report.score > 0.0,
+            "dissonant entity must show non-zero overall drift"
+        );
+
+        let component = |name: &str| {
+            report
+                .components
+                .iter()
+                .find(|c| c.drift_type == name)
+                .unwrap_or_else(|| panic!("{name} component missing"))
+        };
+
+        let graph_doc = component("graph_document_drift");
+        assert!(graph_doc.computable);
+        assert!(graph_doc.score > 0.0);
+
+        let provenance = component("provenance_drift");
+        assert!(provenance.computable);
+        assert_eq!(
+            provenance.score, 0.0,
+            "fresh verified chain must show zero provenance drift"
+        );
+
+        let semantic_vector = component("semantic_vector_drift");
+        assert!(
+            !semantic_vector.computable,
+            "semantic-vector drift must be honestly marked unmeasurable"
+        );
+    }
+
+    /// Updating the document to mention the graph target must measurably
+    /// reduce graph-document drift: detection responds to repair.
+    #[tokio::test]
+    async fn test_drift_falls_after_consonant_update() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let created = post_octad(&app, &dissonant_octad_request()).await;
+
+        let entity_drift = |app: axum::Router, id: String| async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/drift/entity/{id}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let report: EntityDriftResponse = serde_json::from_slice(&body).unwrap();
+            report
+                .components
+                .iter()
+                .find(|c| c.drift_type == "graph_document_drift")
+                .expect("graph_document_drift component missing")
+                .score
+        };
+
+        let before = entity_drift(app.clone(), created.id.clone()).await;
+        assert!(before > 0.0);
+
+        // Repair the dissonance: the document now mentions the target.
+        let update = OctadRequest {
+            title: Some("Consonance Note".to_string()),
+            body: Some("This note now mentions orphan-target explicitly".to_string()),
+            embedding: None,
+            types: None,
+            relationships: None,
+            tensor: None,
+            metadata: None,
+            provenance: None,
+            spatial: None,
+        };
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/octads/{}", created.id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&update).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let after = entity_drift(app, created.id.clone()).await;
+        assert!(
+            after < before,
+            "graph-document drift must fall after the document mentions the target \
+             (before={before}, after={after})"
+        );
+        assert_eq!(after, 0.0);
     }
 }
