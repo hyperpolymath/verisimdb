@@ -2492,8 +2492,7 @@ mod tests {
             let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
                 .await
                 .unwrap();
-            let rows: Vec<proof_attempts::ProofAttempt> =
-                serde_json::from_slice(&body).unwrap();
+            let rows: Vec<proof_attempts::ProofAttempt> = serde_json::from_slice(&body).unwrap();
             assert_eq!(rows.len(), 2, "both attempts visible at {prefix}");
             assert_eq!(rows[0].outcome, "failure", "most recent first");
         }
@@ -2514,8 +2513,7 @@ mod tests {
         let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
             .await
             .unwrap();
-        let rows: Vec<proof_attempts::ProverSuccessRow> =
-            serde_json::from_slice(&body).unwrap();
+        let rows: Vec<proof_attempts::ProverSuccessRow> = serde_json::from_slice(&body).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].prover, "z3");
         assert_eq!(rows[0].total_attempts, 4);
@@ -2535,7 +2533,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         // Missing required query parameters are 400s.
-        for uri in ["/api/v1/proof_attempts", "/api/v1/mv_prover_success_by_class"] {
+        for uri in [
+            "/api/v1/proof_attempts",
+            "/api/v1/mv_prover_success_by_class",
+        ] {
             let response = app
                 .clone()
                 .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
