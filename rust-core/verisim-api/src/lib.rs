@@ -6,10 +6,13 @@
 
 #![forbid(unsafe_code)]
 pub mod auth;
+pub mod drift_compute;
 pub mod federation;
 pub mod graphql;
 pub mod grpc;
+pub mod proof_attempts;
 pub mod rbac;
+pub mod regenerator;
 pub mod transaction;
 pub mod vql;
 
@@ -35,6 +38,9 @@ use verisim_drift::{DriftDetector, DriftMetrics, DriftThresholds, DriftType};
 use verisim_graph::RedbGraphStore;
 #[cfg(not(feature = "persistent"))]
 use verisim_graph::SimpleGraphStore;
+use verisim_normalizer::regeneration::{
+    Modality as RegenModality, RegenerationConfig, RegenerationEngine, RegenerationResult,
+};
 use verisim_normalizer::{create_default_normalizer, Normalizer, NormalizerStatus};
 use verisim_octad::{
     BoundingBox, Coordinates, InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadGraphInput,
@@ -500,6 +506,7 @@ pub struct AppState {
     pub octad_store: Arc<ConcreteOctadStore>,
     pub drift_detector: Arc<DriftDetector>,
     pub normalizer: Arc<Normalizer>,
+    pub regeneration_engine: Arc<RegenerationEngine>,
     pub planner: Arc<Mutex<Planner>>,
     pub plan_cache: Arc<PlanCache>,
     pub slow_query_log: Arc<SlowQueryLog>,
@@ -507,6 +514,7 @@ pub struct AppState {
     pub circuit_registry: Arc<CircuitRegistry>,
     pub federation: federation::FederationState,
     pub auth: auth::AuthState,
+    pub proof_attempts: Arc<proof_attempts::ProofAttemptStore>,
     pub config: ApiConfig,
 }
 
@@ -665,6 +673,27 @@ impl AppState {
 
         let drift_detector = Arc::new(DriftDetector::new(DriftThresholds::default()));
         let normalizer = Arc::new(create_default_normalizer(drift_detector.clone()).await);
+        // Authority order restricted to content modalities: provenance and
+        // temporal are audit/history records, not content a modality can be
+        // regenerated FROM (under the default order, the ever-present
+        // provenance chain would win source selection for every repair).
+        let regeneration_engine = Arc::new(RegenerationEngine::with_regenerator(
+            RegenerationConfig {
+                authority_order: vec![
+                    RegenModality::Document,
+                    RegenModality::Semantic,
+                    RegenModality::Graph,
+                    RegenModality::Vector,
+                    RegenModality::Tensor,
+                    RegenModality::Spatial,
+                ],
+                ..Default::default()
+            },
+            Arc::new(regenerator::StoreRegenerator::new(
+                octad_store.clone(),
+                config.vector_dimension,
+            )),
+        ));
 
         let planner = Arc::new(Mutex::new(Planner::new(PlannerConfig::default())));
         let plan_cache = Arc::new(PlanCache::new(CacheConfig::default()));
@@ -682,11 +711,21 @@ impl AppState {
         let auth = auth::AuthState::default();
         let circuit_registry = Arc::new(CircuitRegistry::new());
 
+        // --- S4 proof-attempt row store (ECHIDNA learning loop) ---
+        #[cfg(feature = "persistent")]
+        let proof_attempts = Arc::new(
+            proof_attempts::ProofAttemptStore::with_persistence(&persist_dir)
+                .map_err(|e| ApiError::Internal(format!("proof_attempts store: {e}")))?,
+        );
+        #[cfg(not(feature = "persistent"))]
+        let proof_attempts = Arc::new(proof_attempts::ProofAttemptStore::in_memory());
+
         Ok(Self {
             start_time: std::time::Instant::now(),
             octad_store,
             drift_detector,
             normalizer,
+            regeneration_engine,
             planner,
             plan_cache,
             slow_query_log,
@@ -694,6 +733,7 @@ impl AppState {
             circuit_registry,
             federation,
             auth,
+            proof_attempts,
             config,
         })
     }
@@ -785,6 +825,15 @@ pub fn build_router(state: AppState) -> Router {
         .route("/spatial/search/nearest", post(spatial_nearest_handler))
         // VQL text query endpoint (used by verisim-repl)
         .route("/vql/execute", post(vql::vql_execute_handler))
+        // S4 learning loop — ECHIDNA proof attempts (see proof_attempts module docs)
+        .route(
+            "/proof_attempts",
+            get(proof_attempts::list_handler).post(proof_attempts::record_handler),
+        )
+        .route(
+            "/mv_prover_success_by_class",
+            get(proof_attempts::success_by_class_handler),
+        )
         // Authentication middleware layer
         .layer(axum_middleware::from_fn_with_state(
             auth_state,
@@ -795,6 +844,22 @@ pub fn build_router(state: AppState) -> Router {
         .merge(graphql::graphql_router(state))
         // Federation endpoints (separate state)
         .merge(federation_routes)
+}
+
+/// Mount the API router at both the root and under `version_prefix`.
+///
+/// Historically `serve()` mounted everything at the root and the configured
+/// `version_prefix` ("/api/v1") was never applied, so documented prefixed
+/// paths (and every `/api/v1/…` call from ECHIDNA's verisim_bridge) 404'd.
+/// Root mounting is kept for backwards compatibility with consumers that
+/// grew up against the unprefixed paths (verisim-repl, local tooling);
+/// the nested mount makes the documented contract real.
+pub fn mount_with_prefix(api: Router, prefix: &str) -> Router {
+    let prefix = prefix.trim_end_matches('/');
+    if prefix.is_empty() || !prefix.starts_with('/') {
+        return api;
+    }
+    Router::new().nest(prefix, api.clone()).merge(api)
 }
 
 /// Health check handler — verifies drift detector status and reports degraded when critical
@@ -988,6 +1053,11 @@ async fn create_octad_handler(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
+    // Measure cross-modal drift for the new entity (best-effort bookkeeping;
+    // never fails the write).
+    let report = drift_compute::compute_entity_drift(&state.octad_store, &octad, None).await;
+    drift_compute::record_entity_drift(&state.drift_detector, &report).await;
+
     Ok((StatusCode::CREATED, Json(OctadResponse::from(&octad))))
 }
 
@@ -1021,6 +1091,10 @@ async fn update_octad_handler(
     let octad_id = OctadId::new(&id);
     let input = request.to_octad_input();
 
+    // The pre-update modality set is the schema baseline: an update that
+    // silently drops a previously-populated modality is schema drift.
+    let previous = state.octad_store.get(&octad_id).await.ok().flatten();
+
     let octad = state
         .octad_store
         .update(&octad_id, input)
@@ -1031,6 +1105,11 @@ async fn update_octad_handler(
             }
             _ => ApiError::Internal(e.to_string()),
         })?;
+
+    let baseline = previous.as_ref().map(drift_compute::present_modalities);
+    let report =
+        drift_compute::compute_entity_drift(&state.octad_store, &octad, baseline.as_deref()).await;
+    drift_compute::record_entity_drift(&state.drift_detector, &report).await;
 
     Ok(Json(OctadResponse::from(&octad)))
 }
@@ -1182,9 +1261,13 @@ pub struct EntityDriftResponse {
     pub score: f64,
     pub drift_type: String,
     pub status: String,
+    /// Per-modality drift components measured for THIS entity.
+    pub components: Vec<drift_compute::DriftComponent>,
+    pub computed_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Entity drift handler — get drift info for a single entity
+/// Entity drift handler — measure drift for a single entity on demand
+/// from its own modality data.
 #[instrument(skip(state))]
 async fn entity_drift_handler(
     State(state): State<AppState>,
@@ -1193,32 +1276,20 @@ async fn entity_drift_handler(
     validate_octad_id(&id)?;
     let octad_id = OctadId::new(&id);
 
-    // Verify octad exists
-    let _octad = state
+    let octad = state
         .octad_store
         .get(&octad_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .ok_or_else(|| ApiError::NotFound(format!("Octad {} not found", id)))?;
 
-    // Get aggregate health from drift detector
-    let all_metrics = state
-        .drift_detector
-        .all_metrics()
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let (worst_type, worst_score) = all_metrics
-        .iter()
-        .max_by(|a, b| {
-            a.1.current_score
-                .partial_cmp(&b.1.current_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .map(|(dt, m)| (dt.to_string(), m.current_score))
-        .unwrap_or_else(|| ("none".to_string(), 0.0));
+    let report = drift_compute::compute_entity_drift(&state.octad_store, &octad, None).await;
+    // An on-demand read is still a real measurement: feed the aggregates.
+    drift_compute::record_entity_drift(&state.drift_detector, &report).await;
 
-    let status = if worst_score >= 0.7 {
+    let status = if report.overall_score >= 0.7 {
         "critical"
-    } else if worst_score >= 0.3 {
+    } else if report.overall_score >= 0.3 {
         "warning"
     } else {
         "healthy"
@@ -1226,9 +1297,11 @@ async fn entity_drift_handler(
 
     Ok(Json(EntityDriftResponse {
         entity_id: id,
-        score: worst_score,
-        drift_type: worst_type,
+        score: report.overall_score,
+        drift_type: report.primary_drift_type.clone(),
         status: status.to_string(),
+        components: report.components,
+        computed_at: report.computed_at,
     }))
 }
 
@@ -1241,28 +1314,141 @@ async fn normalizer_status_handler(
     Ok(Json(status))
 }
 
-/// Trigger normalization handler
+/// Outcome of a normalization request: measured drift before/after plus
+/// what the regeneration engine actually did.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NormalizeResponse {
+    pub entity_id: String,
+    /// "repaired" | "no_action_needed" | "pending_resolution" | "failed"
+    pub action: String,
+    /// The modality that was regenerated, when a repair was attempted.
+    pub modality: Option<String>,
+    /// Source modality used for the repair, when known.
+    pub source_modality: Option<String>,
+    pub reason: Option<String>,
+    pub before_score: f64,
+    pub after_score: Option<f64>,
+    /// Full per-component drift report measured after the action.
+    pub report_after: drift_compute::EntityDriftReport,
+}
+
+/// Modality targeted for repair, derived from the worst measured component.
+fn repair_target(report: &drift_compute::EntityDriftReport) -> Option<(RegenModality, f64)> {
+    report
+        .components
+        .iter()
+        .filter(|c| c.computable && c.score > 0.0)
+        .filter_map(|c| {
+            // Only components with an implemented regeneration path map to
+            // a repair target; the rest are detect-only for now.
+            let modality = match c.drift_type.as_str() {
+                "graph_document_drift" => Some(RegenModality::Document),
+                "tensor_drift" => Some(RegenModality::Tensor),
+                "semantic_vector_drift" => Some(RegenModality::Vector),
+                _ => None,
+            };
+            modality.map(|m| (m, c.score))
+        })
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+}
+
+/// Trigger normalization: measure the entity's drift, pick the worst
+/// repairable component, run the regeneration engine (which writes the
+/// repair back through the store), and report measured before/after scores.
 #[instrument(skip(state))]
 async fn trigger_normalization_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<StatusCode, ApiError> {
+) -> Result<(StatusCode, Json<NormalizeResponse>), ApiError> {
     validate_octad_id(&id)?;
     let octad_id = OctadId::new(&id);
 
-    // Check if octad exists
-    let _octad = state
+    let octad = state
         .octad_store
         .get(&octad_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .ok_or_else(|| ApiError::NotFound(format!("Octad {} not found", id)))?;
 
-    // In a full implementation, this would trigger actual normalization
-    // For now, we just verify the octad exists and return accepted
-    info!(id = %id, "Normalization triggered for octad");
+    let before = drift_compute::compute_entity_drift(&state.octad_store, &octad, None).await;
 
-    Ok(StatusCode::ACCEPTED)
+    let Some((target, score)) = repair_target(&before) else {
+        return Ok((
+            StatusCode::OK,
+            Json(NormalizeResponse {
+                entity_id: id,
+                action: "no_action_needed".to_string(),
+                modality: None,
+                source_modality: None,
+                reason: Some("no repairable drift component above zero".to_string()),
+                before_score: before.overall_score,
+                after_score: None,
+                report_after: before,
+            }),
+        ));
+    };
+
+    info!(id = %id, modality = %target, score, "Normalization triggered for octad");
+    let result = state
+        .regeneration_engine
+        .regenerate(&octad, target, score)
+        .await;
+
+    // Re-measure from the persisted state and feed the aggregates, so
+    // /drift/status reflects the post-repair reality.
+    let fresh = state
+        .octad_store
+        .get(&octad_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("Octad {} not found", id)))?;
+    let after = drift_compute::compute_entity_drift(&state.octad_store, &fresh, None).await;
+    drift_compute::record_entity_drift(&state.drift_detector, &after).await;
+
+    let response = match result {
+        RegenerationResult::Repaired { event } => NormalizeResponse {
+            entity_id: id,
+            action: "repaired".to_string(),
+            modality: Some(event.drifted_modality.to_string()),
+            source_modality: event.source_modality.map(|m| m.to_string()),
+            reason: None,
+            before_score: score,
+            after_score: event.post_drift_score,
+            report_after: after,
+        },
+        RegenerationResult::NoActionNeeded => NormalizeResponse {
+            entity_id: id,
+            action: "no_action_needed".to_string(),
+            modality: Some(target.to_string()),
+            source_modality: None,
+            reason: Some("drift score at or below the engine threshold".to_string()),
+            before_score: score,
+            after_score: None,
+            report_after: after,
+        },
+        RegenerationResult::PendingResolution { reason, .. } => NormalizeResponse {
+            entity_id: id,
+            action: "pending_resolution".to_string(),
+            modality: Some(target.to_string()),
+            source_modality: None,
+            reason: Some(reason),
+            before_score: score,
+            after_score: None,
+            report_after: after,
+        },
+        RegenerationResult::Failed { error } => NormalizeResponse {
+            entity_id: id,
+            action: "failed".to_string(),
+            modality: Some(target.to_string()),
+            source_modality: None,
+            reason: Some(error),
+            before_score: score,
+            after_score: None,
+            report_after: after,
+        },
+    };
+
+    Ok((StatusCode::OK, Json(response)))
 }
 
 // --- Query Planner Handlers ---
@@ -1928,7 +2114,7 @@ pub async fn serve(config: ApiConfig) -> Result<(), std::io::Error> {
     let octad_store = state.octad_store.clone();
 
     // Build HTTP router with hardening middleware
-    let app = build_router(state.clone())
+    let app = mount_with_prefix(build_router(state.clone()), &config.version_prefix)
         .layer(axum::extract::DefaultBodyLimit::max(config.max_body_size));
 
     // Start HTTP server
@@ -2013,7 +2199,7 @@ pub async fn serve_tls(
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     let octad_store = state.octad_store.clone();
-    let app = build_router(state);
+    let app = mount_with_prefix(build_router(state), &config.version_prefix);
 
     let addr = format!("{}:{}", config.host, config.port);
     info!(addr = %addr, cert = %cert_path, "Starting VeriSimDB API server with TLS");
@@ -2389,6 +2575,126 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
+    /// One proof-attempt JSON body in exactly the shape ECHIDNA posts.
+    fn s4_attempt_json(obligation_id: &str, class: &str, outcome: &str) -> String {
+        serde_json::json!({
+            "attempt_id": format!("test-{}-{}", obligation_id, outcome),
+            "obligation_id": obligation_id,
+            "repo": "hyperpolymath/echidna",
+            "file": "tests/s4_loop_closure.rs",
+            "claim": "true",
+            "obligation_class": class,
+            "prover_used": "z3",
+            "outcome": outcome,
+            "duration_ms": 1,
+            "confidence": if outcome == "success" { 1.0 } else { 0.0 },
+            "parent_attempt_id": null,
+            "strategy_tag": "test",
+            "started_at": "2026-06-11T00:00:00Z",
+            "completed_at": "2026-06-11T00:00:01Z",
+            "prover_output": "",
+            "error_message": null
+        })
+        .to_string()
+    }
+
+    /// Full S4 loop over the wire, at both the prefixed (/api/v1, the
+    /// ECHIDNA contract) and unprefixed (back-compat) mounts:
+    /// record → list by obligation_id → mv_prover_success_by_class.
+    #[tokio::test]
+    async fn test_s4_proof_attempts_loop() {
+        let state = create_test_state().await;
+        let app = mount_with_prefix(build_router(state), "/api/v1");
+
+        for (prefix, obligation) in [("/api/v1", "goal-prefixed"), ("", "goal-root")] {
+            // Record two attempts (one success, one failure).
+            for outcome in ["success", "failure"] {
+                let response = app
+                    .clone()
+                    .oneshot(
+                        Request::builder()
+                            .method("POST")
+                            .uri(format!("{prefix}/proof_attempts"))
+                            .header("content-type", "application/json")
+                            .body(Body::from(s4_attempt_json(obligation, "s4-test", outcome)))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), StatusCode::CREATED, "POST at {prefix}");
+            }
+
+            // Read back by obligation_id — most recent first.
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(format!(
+                            "{prefix}/proof_attempts?obligation_id={obligation}&limit=50"
+                        ))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let rows: Vec<proof_attempts::ProofAttempt> = serde_json::from_slice(&body).unwrap();
+            assert_eq!(rows.len(), 2, "both attempts visible at {prefix}");
+            assert_eq!(rows[0].outcome, "failure", "most recent first");
+        }
+
+        // Aggregate over everything recorded above: 4 attempts in class
+        // s4-test for z3, half successful.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/mv_prover_success_by_class?class=s4-test")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let rows: Vec<proof_attempts::ProverSuccessRow> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].prover, "z3");
+        assert_eq!(rows[0].total_attempts, 4);
+        assert!((rows[0].success_rate - 0.5).abs() < f32::EPSILON);
+
+        // Unknown class and unknown obligation are empty 200s, not 404s.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/mv_prover_success_by_class?class=no-such-class")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Missing required query parameters are 400s.
+        for uri in [
+            "/api/v1/proof_attempts",
+            "/api/v1/mv_prover_success_by_class",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{uri}");
+        }
+    }
+
     #[tokio::test]
     async fn test_ready_endpoint() {
         let state = create_test_state().await;
@@ -2521,5 +2827,309 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Request whose graph relationship target is not mentioned in the
+    /// document body — a real cross-modal inconsistency.
+    fn dissonant_octad_request() -> OctadRequest {
+        OctadRequest {
+            title: Some("Consonance Note".to_string()),
+            body: Some("A short note that does not mention its relation".to_string()),
+            embedding: Some(vec![0.1, 0.2, 0.3]),
+            types: None,
+            relationships: Some(vec![(
+                "relates_to".to_string(),
+                "orphan-target".to_string(),
+            )]),
+            tensor: None,
+            metadata: None,
+            provenance: Some(ProvenanceRequest {
+                event_type: "created".to_string(),
+                actor: "test-suite".to_string(),
+                source: None,
+                description: "created by drift wiring test".to_string(),
+            }),
+            spatial: None,
+        }
+    }
+
+    async fn post_octad(app: &axum::Router, request: &OctadRequest) -> OctadResponse {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(request).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    /// Creating an entity must record real drift measurements in the
+    /// aggregates — `/drift/status` may never report initialized zeros
+    /// after a write.
+    #[tokio::test]
+    async fn test_drift_recorded_on_create() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        post_octad(&app, &dissonant_octad_request()).await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/drift/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let statuses: Vec<DriftStatusResponse> = serde_json::from_slice(&body).unwrap();
+
+        let quality = statuses
+            .iter()
+            .find(|s| s.drift_type == "quality_drift")
+            .expect("quality_drift must be tracked");
+        assert!(
+            quality.measurement_count >= 1,
+            "create must record a quality-drift measurement"
+        );
+
+        let graph_doc = statuses
+            .iter()
+            .find(|s| s.drift_type == "graph_document_drift")
+            .expect("graph_document_drift must be tracked");
+        assert!(graph_doc.measurement_count >= 1);
+        assert!(
+            graph_doc.current_score > 0.0,
+            "unmentioned graph target must register graph-document drift"
+        );
+    }
+
+    /// `/drift/entity/{id}` must measure THIS entity's drift from its own
+    /// modality data, with a per-component breakdown.
+    #[tokio::test]
+    async fn test_entity_drift_measured_per_entity() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let created = post_octad(&app, &dissonant_octad_request()).await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/drift/entity/{}", created.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let report: EntityDriftResponse = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(report.entity_id, created.id);
+        assert!(
+            report.score > 0.0,
+            "dissonant entity must show non-zero overall drift"
+        );
+
+        let component = |name: &str| {
+            report
+                .components
+                .iter()
+                .find(|c| c.drift_type == name)
+                .unwrap_or_else(|| panic!("{name} component missing"))
+        };
+
+        let graph_doc = component("graph_document_drift");
+        assert!(graph_doc.computable);
+        assert!(graph_doc.score > 0.0);
+
+        let provenance = component("provenance_drift");
+        assert!(provenance.computable);
+        assert_eq!(
+            provenance.score, 0.0,
+            "fresh verified chain must show zero provenance drift"
+        );
+
+        let semantic_vector = component("semantic_vector_drift");
+        assert!(
+            !semantic_vector.computable,
+            "semantic-vector drift must be honestly marked unmeasurable"
+        );
+    }
+
+    /// Updating the document to mention the graph target must measurably
+    /// reduce graph-document drift: detection responds to repair.
+    #[tokio::test]
+    async fn test_drift_falls_after_consonant_update() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let created = post_octad(&app, &dissonant_octad_request()).await;
+
+        let entity_drift = |app: axum::Router, id: String| async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/drift/entity/{id}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let report: EntityDriftResponse = serde_json::from_slice(&body).unwrap();
+            report
+                .components
+                .iter()
+                .find(|c| c.drift_type == "graph_document_drift")
+                .expect("graph_document_drift component missing")
+                .score
+        };
+
+        let before = entity_drift(app.clone(), created.id.clone()).await;
+        assert!(before > 0.0);
+
+        // Repair the dissonance: the document now mentions the target.
+        let update = OctadRequest {
+            title: Some("Consonance Note".to_string()),
+            body: Some("This note now mentions orphan-target explicitly".to_string()),
+            embedding: None,
+            types: None,
+            relationships: None,
+            tensor: None,
+            metadata: None,
+            provenance: None,
+            spatial: None,
+        };
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/octads/{}", created.id))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&update).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let after = entity_drift(app, created.id.clone()).await;
+        assert!(
+            after < before,
+            "graph-document drift must fall after the document mentions the target \
+             (before={before}, after={after})"
+        );
+        assert_eq!(after, 0.0);
+    }
+
+    /// The full loop: measured drift -> normalize -> regeneration engine
+    /// repairs the document from the graph -> re-measured drift falls to
+    /// zero -> the repair is recorded in the provenance chain.
+    #[tokio::test]
+    async fn test_normalize_repairs_dissonant_entity() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let created = post_octad(&app, &dissonant_octad_request()).await;
+        assert_eq!(created.provenance_chain_length, 1);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/normalizer/trigger/{}", created.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let normalized: NormalizeResponse = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(
+            normalized.action, "repaired",
+            "reason: {:?}",
+            normalized.reason
+        );
+        assert_eq!(normalized.modality.as_deref(), Some("document"));
+        assert_eq!(normalized.source_modality.as_deref(), Some("graph"));
+        assert!(normalized.before_score > 0.0);
+        assert_eq!(
+            normalized.after_score,
+            Some(0.0),
+            "regenerated document must fully restore graph-document consonance"
+        );
+        let graph_doc_after = normalized
+            .report_after
+            .components
+            .iter()
+            .find(|c| c.drift_type == "graph_document_drift")
+            .expect("graph_document_drift component missing");
+        assert_eq!(graph_doc_after.score, 0.0);
+
+        // The repair itself must be on the provenance chain.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/octads/{}", created.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let fetched: OctadResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            fetched.provenance_chain_length, 2,
+            "the normalized event must extend the provenance chain"
+        );
+
+        // A consonant entity has nothing to repair.
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/normalizer/trigger/{}", created.id))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let second: NormalizeResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(second.action, "no_action_needed");
     }
 }

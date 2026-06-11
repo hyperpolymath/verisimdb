@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: MPL-2.0
+#
+# Publish the verisim-api container image to GHCR.
+#
+# Downstream contract: echidna's S4 loop-closure CI (see
+# echidna/docs/handover/S4-LOOP-CLOSURE-RUNBOOK.md) waits on
+# ghcr.io/hyperpolymath/verisimdb-api existing as a pullable service
+# image. Tags published: `latest` (main HEAD) + the 12-char commit SHA.
+name: ghcr-publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust-core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "container/**"
+      - ".github/workflows/ghcr-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/hyperpolymath/verisimdb-api
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+
+      - name: Build image (Podman)
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          podman build \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:$SHORT_SHA" \
+            -f container/Containerfile .
+
+      - name: Smoke-test image
+        run: |
+          podman run -d --name verisim-smoke -p 8080:8080 \
+            -e VERISIM_ENABLE_IPV4=true "$IMAGE:latest"
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/health >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8080/health
+          # The S4 endpoints must answer at the documented /api/v1 prefix.
+          curl -sf "http://127.0.0.1:8080/api/v1/mv_prover_success_by_class?class=smoke" >/dev/null
+          podman rm -f verisim-smoke
+
+      - name: Push to GHCR
+        if: github.event_name != 'pull_request'
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          podman push "$IMAGE:latest"
+          podman push "$IMAGE:$SHORT_SHA"

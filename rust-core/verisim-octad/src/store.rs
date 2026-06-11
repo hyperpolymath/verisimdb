@@ -381,6 +381,16 @@ where
         &self.spatial
     }
 
+    /// Access the graph store for direct queries.
+    pub fn graph_store(&self) -> &Arc<G> {
+        &self.graph
+    }
+
+    /// Access the temporal store for direct queries.
+    pub fn temporal_store(&self) -> &Arc<R> {
+        &self.temporal
+    }
+
     /// Process graph input for a octad
     async fn process_graph(
         &self,
