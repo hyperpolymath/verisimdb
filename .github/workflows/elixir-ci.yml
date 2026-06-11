@@ -57,7 +57,10 @@ jobs:
       - run: mix test
 
   coverage:
-    name: ExCoveralls (≥60%)
+    # Unit-test coverage only: the federation adapters are exercised by the
+    # :integration suite (live databases; excluded in CI) and are skipped in
+    # coveralls.json, so they don't dilute the unit-coverage denominator.
+    name: ExCoveralls (unit, gate in coveralls.json)
     runs-on: ubuntu-latest
     defaults:
       run:

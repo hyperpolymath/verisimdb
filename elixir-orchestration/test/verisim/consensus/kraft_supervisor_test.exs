@@ -39,8 +39,8 @@ defmodule VeriSim.Consensus.KRaftSupervisorTest do
       {:ok, {_flags, children}} = KRaftSupervisor.init(nodes: [])
 
       [registry_spec] = children
-      # Children come back as %{id: Registry, start: {Registry, :start_link, [...]}}
-      assert registry_spec.id == Registry
+      # Registry.child_spec/1 uses the :name option as the child id.
+      assert registry_spec.id == VeriSim.Consensus.Registry
     end
 
     test "one configured node yields Registry + one KRaftNode spec" do
