@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-VeriSimDB (Veridical Simulacrum Database) is a cross-system entity consistency engine with drift detection, self-normalisation, and formally verified queries. Each entity exists simultaneously across 8 modalities — the octad (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial) — with drift detection and automatic consistency maintenance. Operates as standalone database OR heterogeneous federation coordinator over existing databases.
+VeriSimDB (Veridical Simulacrum Database) is a cross-system **identity-consonance** engine with drift detection, self-normalisation, and proof-bearing validation of **identity transitions**. Each entity is a *consonance subject* — one identity maintained across 8 modal witnesses, the octad (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial) — with drift detection and automatic consonance maintenance. Operates as a standalone engine OR a heterogeneous federation coordinator over existing databases.
+
+> **Canonical framing — see `README.adoc` / `EXPLAINME.adoc` (authoritative).** VeriSimDB does *not* merely store or query records; it maintains identity consonance across modal witnesses. **VCL = VeriSim Consonance Language**: it expresses **propositions** (`DECLARE`/`ASSERT`/`RETRACT`) and **epistemic requests** (`INSPECT`/`VERIFY`), plus `MERGE`/`SPLIT`/`NORMALISE` — *not* SQL-style queries. "Query language" / "VQL" is a **deprecated misnomer**; any older query/CRUD wording below is legacy being retired (some code identifiers such as `QueryRouter` keep their names).
 
 ## Machine-Readable Artefacts
 
@@ -42,7 +44,7 @@ The following files in `.machine_readable/` contain structured project metadata:
 1. **Computational Level**: What problem are we solving?
    - Maintain cross-modal consistency across 8 representations of the same entity (octad)
    - Detect and repair drift before it causes data quality issues
-   - Provide unified querying across all modalities
+   - Provide unified inspection/verification of consonance state across all modalities (epistemic requests, not row queries)
 
 2. **Algorithmic Level**: How do we solve it?
    - Octad entities: one ID, eight synchronized stores
@@ -61,8 +63,8 @@ The following files in `.machine_readable/` contain structured project metadata:
 ### ALLOWED
 - **Rust** - Core database engine, modality stores
 - **Elixir** - OTP orchestration layer
-- **ReScript** - VQL parser, federation registry
-- **VQL** - VeriSim Query Language (native query interface, NOT SQL)
+- **ReScript** - VCL parser (convenience frontend) + federation registry
+- **VCL** - VeriSim Consonance Language: propositions + epistemic requests over identity-consonance state, **not** a query language (legacy name: VQL). See `README.adoc`/`EXPLAINME.adoc`.
 
 ### BANNED
 - Python - Use Rust instead
