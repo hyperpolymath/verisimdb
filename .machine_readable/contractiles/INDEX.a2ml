@@ -86,13 +86,13 @@ notes = "First trident instance in the estate (2026-04-18). Reports progress tow
 name = "k9"
 semantics = "trust-tier templates (EXCEPTION to one-verbfile rule)"
 file_pair = [
-  "../svc/self-validating/template-hunt.k9.ncl",
-  "../svc/self-validating/template-kennel.k9.ncl",
-  "../svc/self-validating/template-yard.k9.ncl",
+  "../svc/k9/template-hunt.k9.ncl",
+  "../svc/k9/template-kennel.k9.ncl",
+  "../svc/k9/template-yard.k9.ncl",
 ]
 status = "exception"
 gating = "not applicable"
-notes = "k9 is service-automation meta-infrastructure, not a verb contractile. Three trust-tier templates (Kennel/Yard/Hunt). Does not have a Verbfile.a2ml. Templates live under .machine_readable/svc/self-validating/ (the single k9 home, per PR #114's svc/k9 -> svc/self-validating rename); the verb tridents (intend/adjust .k9.ncl) import them via ../../svc/self-validating/. See CONTRACTILE-SPEC §k9-exception."
+notes = "k9 is service-automation meta-infrastructure, not a verb contractile. Three trust-tier templates (Kennel/Yard/Hunt). Does not have a Verbfile.a2ml. Templates live under .machine_readable/svc/k9/ (the single k9 home, restored per ADR-001 2026-04-18 — PR #114's svc/k9 -> svc/self-validating directory rename was reverted estate-wide as a partial divergence that contradicted the svc/README.adoc, this registry's name=\"k9\", and the immovable .k9.ncl/K9!/base_k9 file format; #114's ../../svc/ import depth was kept, as it is the correct one). The verb tridents (intend/adjust .k9.ncl) import them via ../../svc/k9/. See CONTRACTILE-SPEC §k9-exception."
 
 # [[verbs]] lust REMOVED 2026-04-18 — name had unwanted associations;
 # the horizon/aspiration semantics were always meant to live inside `intend`

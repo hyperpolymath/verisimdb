@@ -71,13 +71,13 @@ Choose the appropriate security level for your use case:
 [source,bash]
 ----
 # Kennel: Pure configuration
-cp contractiles/self-validating/examples/project-metadata.k9.ncl config/metadata.k9.ncl
+cp .machine_readable/svc/k9/examples/project-metadata.k9.ncl config/metadata.k9.ncl
 
 # Yard: Validated configuration
-cp contractiles/self-validating/examples/ci-config.k9.ncl .github/ci.k9.ncl
+cp .machine_readable/svc/k9/examples/ci-config.k9.ncl .github/ci.k9.ncl
 
 # Hunt: Full automation
-cp contractiles/self-validating/examples/setup-repo.k9.ncl scripts/setup.k9.ncl
+cp .machine_readable/svc/k9/examples/setup-repo.k9.ncl scripts/setup.k9.ncl
 ----
 
 === 2. Validate Components
