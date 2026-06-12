@@ -95,12 +95,15 @@
 
   (critical-next-actions
     (immediate
-      ("Supersede #107 with honest STATE + k9->self-validating rename (this PR)")
+      ("Revert #114's svc/self-validating directory rename back to svc/k9 per ADR-001 (this PR); the #107 supersession + honest STATE already landed in #114")
       ("Normalise licences + install REUSE/k9 provable gate (#113)"))
     (this-week ())
     (this-month ()))
 
   (session-history
+    (entry
+      (date "2026-06-12")
+      (summary "Estate naming resolution: reverted #114's svc/self-validating directory rename back to svc/k9 per ADR-001 (2026-04-18). The rename was a partial divergence — svc/README.adoc, the contractile INDEX name=\"k9\", and the immovable .k9.ncl/K9!/base_k9 format all still said k9. Kept #114's correct ../../svc/ import depth (its one right half). Updated INDEX template paths + notes, both verb .k9.ncl imports, and the svc/k9 README + setup example. Five sibling repos already used svc/k9; this aligns the estate."))
     (entry
       (date "2026-06-05")
       (summary "Supersede #107: de-templatize 6a2 + migrate bot_directives to .a2ml + k9->self-validating rename + Dustfile. STATE proof claims calibrated to a machine-checked Coq Print-Assumptions audit (the '8/8 closed' overclaim removed); verisim-nif corrected to stub per #61"))

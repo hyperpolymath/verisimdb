@@ -95,7 +95,7 @@ K9!
       commands = [
         "mkdir -p src/ docs/ tests/ scripts/",
         "mkdir -p .github/workflows/",
-        "mkdir -p contractiles/self-validating/",
+        "mkdir -p .machine_readable/svc/k9/",
         "echo '✓ Directory structure created'",
       ],
     },
