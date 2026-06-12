@@ -60,7 +60,7 @@
       ("Octad entity create/get/update across 8 modalities")
       ("Cross-modal drift detection with severity scoring")
       ("Self-normalisation with most-authoritative-modality selection")
-      ("VCL queries (parse, plan, execute, return); planner semantics mechanised in Coq over an abstract model")
+      ("VCL statements — propositions (DECLARE/ASSERT/RETRACT) + epistemic requests (INSPECT/VERIFY) — checked for transition admissibility; planner semantics mechanised in Coq over an abstract model")
       ("VCL-DT proof clauses: EXISTENCE / INTEGRITY / CONSISTENCY / PROVENANCE / FRESHNESS / ACCESS / CITATION / CUSTOM / ZKP / PROVEN / SANCTIFY")
       ("Multi-proof parsing (PROOF A(x) AND B(y))")
       ("Provenance hash-chain integrity (P2/P3 Coq-verified, modulo an abstract hash)")
