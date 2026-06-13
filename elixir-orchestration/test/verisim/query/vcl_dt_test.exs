@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLDTTest do
+defmodule VeriSim.Query.VCLDTTest do
   @moduledoc """
-  VQL-DT (dependent type) integration tests.
+  VCL-DT (dependent type) integration tests.
 
   Tests the proof verification pipeline: type checking → execution → proof
   verification → ProvedResult bundling.
@@ -21,10 +21,10 @@ defmodule VeriSim.Query.VQLDTTest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.{VQLBridge, VQLExecutor}
+  alias VeriSim.Query.{VCLBridge, VCLExecutor}
 
   setup_all do
-    case VQLBridge.start_link([]) do
+    case VCLBridge.start_link([]) do
       {:ok, pid} -> %{bridge_pid: pid}
       {:error, {:already_started, pid}} -> %{bridge_pid: pid}
     end
@@ -34,24 +34,24 @@ defmodule VeriSim.Query.VQLDTTest do
   # Type checker integration
   # ===========================================================================
 
-  describe "VQLBridge.typecheck/1" do
+  describe "VCLBridge.typecheck/1" do
     test "returns :type_checker_unavailable when no Deno subprocess" do
       # Without the Deno subprocess, typecheck must return an explicit error
-      {:ok, ast} = VQLBridge.parse("SELECT GRAPH.* FROM HEXAD 'abc-123'")
-      result = VQLBridge.typecheck(ast)
+      {:ok, ast} = VCLBridge.parse("SELECT GRAPH.* FROM HEXAD 'abc-123'")
+      result = VCLBridge.typecheck(ast)
       assert result == {:error, :type_checker_unavailable}
     end
   end
 
   # ===========================================================================
-  # VQL-DT query execution (PROOF clause)
+  # VCL-DT query execution (PROOF clause)
   # ===========================================================================
 
-  describe "VQL-DT execution path" do
+  describe "VCL-DT execution path" do
     test "parse_statement handles PROOF clause in AST" do
       # The built-in parser should handle PROOF clauses
       result =
-        VQLBridge.parse_statement("SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)")
+        VCLBridge.parse_statement("SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)")
 
       case result do
         {:ok, ast} ->
@@ -64,11 +64,11 @@ defmodule VeriSim.Query.VQLDTTest do
     end
 
     test "execute_string with PROOF returns error when Rust unavailable" do
-      # VQL-DT queries MUST fail if proofs cannot be verified —
+      # VCL-DT queries MUST fail if proofs cannot be verified —
       # they should NOT silently return unproven data.
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)",
             timeout: 1_000
           )
@@ -98,7 +98,7 @@ defmodule VeriSim.Query.VQLDTTest do
       # Without Rust core, existence check should fail (not silently pass)
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)",
             timeout: 1_000
           )
@@ -112,7 +112,7 @@ defmodule VeriSim.Query.VQLDTTest do
     test "provenance proof fails when Rust core unavailable" do
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT PROVENANCE.* FROM HEXAD 'abc-123' PROOF PROVENANCE(abc-123)",
             timeout: 1_000
           )
@@ -127,7 +127,7 @@ defmodule VeriSim.Query.VQLDTTest do
     test "integrity proof fails when Rust core unavailable" do
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF INTEGRITY(my_contract)",
             timeout: 1_000
           )
@@ -142,7 +142,7 @@ defmodule VeriSim.Query.VQLDTTest do
     test "access proof fails when Rust core unavailable and entity specified" do
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF ACCESS(abc-123)",
             timeout: 1_000
           )
@@ -156,7 +156,7 @@ defmodule VeriSim.Query.VQLDTTest do
     test "citation proof fails when Rust core unavailable" do
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF CITATION(my_citation)",
             timeout: 1_000
           )
@@ -170,7 +170,7 @@ defmodule VeriSim.Query.VQLDTTest do
     test "zkp proof fails when Rust core unavailable" do
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF ZKP(claim_123)",
             timeout: 1_000
           )
@@ -193,7 +193,7 @@ defmodule VeriSim.Query.VQLDTTest do
       # a provenance proof that cannot identify its target entity is meaningless.
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT PROVENANCE.* FROM HEXAD 'abc-123' PROOF PROVENANCE(abc-123)",
             timeout: 1_000
           )
@@ -213,7 +213,7 @@ defmodule VeriSim.Query.VQLDTTest do
       # A completely unknown proof type should produce an error.
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF BOGUS_TYPE(entity)",
             timeout: 1_000
           )
@@ -230,8 +230,8 @@ defmodule VeriSim.Query.VQLDTTest do
   # ===========================================================================
 
   describe "ProvedResult structure" do
-    test "VQL-DT queries should produce proved results with certificate" do
-      # This test documents the expected shape of VQL-DT results.
+    test "VCL-DT queries should produce proved results with certificate" do
+      # This test documents the expected shape of VCL-DT results.
       # In production (with Rust running), the result should be:
       # %{
       #   data: [...],
@@ -246,7 +246,7 @@ defmodule VeriSim.Query.VQLDTTest do
       # For now, we verify the executor code path doesn't crash.
       result =
         try do
-          VQLExecutor.execute_string(
+          VCLExecutor.execute_string(
             "SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)",
             timeout: 1_000
           )

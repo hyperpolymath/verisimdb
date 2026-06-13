@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-defmodule VeriSim.Query.VQLTypeChecker do
+defmodule VeriSim.Query.VCLTypeChecker do
   @moduledoc """
-  Elixir-native VQL-DT type checker.
+  Elixir-native VCL-DT type checker.
 
-  Provides lightweight type checking for VQL queries with PROOF clauses when the
-  ReScript subprocess (VQLBidir) is unavailable. This ensures that VQL-DT queries
+  Provides lightweight type checking for VCL queries with PROOF clauses when the
+  ReScript subprocess (VCLBidir) is unavailable. This ensures that VCL-DT queries
   are always type-checked before execution — never silently downgraded to slipstream.
 
   ## Design
 
-  The ReScript type checker (VQLBidir.res) is the canonical implementation with
+  The ReScript type checker (VCLBidir.res) is the canonical implementation with
   bidirectional type inference and full subtyping. This Elixir module implements a
   pragmatic subset of the same rules:
 
@@ -20,7 +20,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
   4. **Contract reference validation** — proof specs that need contracts have them
   5. **Proof obligation generation** — structured obligations with witness fields
 
-  Falls back to the ReScript type checker when it's available (via VQLBridge.typecheck/2).
+  Falls back to the ReScript type checker when it's available (via VCLBridge.typecheck/2).
 
   ## Proof Types and Required Modalities
 
@@ -107,7 +107,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Type-check a VQL-DT query AST.
+  Type-check a VCL-DT query AST.
 
   Validates proof types, modality compatibility, and composition rules.
   Returns structured proof obligations ready for the executor.
@@ -152,13 +152,13 @@ defmodule VeriSim.Query.VQLTypeChecker do
 
   ## Examples
 
-      iex> VQLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(entity-001) AND PROVENANCE(entity-001)"})
+      iex> VCLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(entity-001) AND PROVENANCE(entity-001)"})
       [
         %{proofType: "EXISTENCE", contractName: "entity-001", raw: "EXISTENCE(entity-001)"},
         %{proofType: "PROVENANCE", contractName: "entity-001", raw: "PROVENANCE(entity-001)"}
       ]
 
-      iex> VQLTypeChecker.parse_proof_specs(%{raw: "INTEGRITY(my_contract)"})
+      iex> VCLTypeChecker.parse_proof_specs(%{raw: "INTEGRITY(my_contract)"})
       [%{proofType: "INTEGRITY", contractName: "my_contract", raw: "INTEGRITY(my_contract)"}]
   """
   def parse_proof_specs(nil), do: []
@@ -204,7 +204,7 @@ defmodule VeriSim.Query.VQLTypeChecker do
   defp validate_modalities(_modalities), do: :ok
 
   defp validate_proof_specs([]) do
-    {:error, {:missing_proof, "VQL-DT query requires at least one PROOF specification"}}
+    {:error, {:missing_proof, "VCL-DT query requires at least one PROOF specification"}}
   end
 
   defp validate_proof_specs(specs) do

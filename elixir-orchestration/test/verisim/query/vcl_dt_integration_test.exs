@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLDTIntegrationTest do
+defmodule VeriSim.Query.VCLDTIntegrationTest do
   @moduledoc """
-  VQL-DT (dependent type) integration tests.
+  VCL-DT (dependent type) integration tests.
 
-  Exercises the full VQL-DT pipeline: parse → type-check → execute → verify
+  Exercises the full VCL-DT pipeline: parse → type-check → execute → verify
   proofs → bundle ProvedResult. Tests verify both the happy path (proofs pass
   when data exists) and the error paths (proofs fail correctly).
 
@@ -14,7 +14,7 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
      the correct Rust endpoint and returns a structured artifact or error
   2. **Multi-proof composition** — multiple proofs in a single query
   3. **Invalid proof rejection** — tampered or malformed data fails verification
-  4. **Proof downgrade rejection** — VQL-DT cannot silently become slipstream
+  4. **Proof downgrade rejection** — VCL-DT cannot silently become slipstream
   5. **ProvedResult structure** — data + proof_certificate with all required fields
   6. **Fallback type extraction** — when type checker unavailable, obligations
      are extracted from the AST directly with correct structure
@@ -25,8 +25,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.{VQLBridge, VQLExecutor}
-  alias VeriSim.Test.VQLTestHelpers, as: H
+  alias VeriSim.Query.{VCLBridge, VCLExecutor}
+  alias VeriSim.Test.VCLTestHelpers, as: H
 
   setup_all do
     pid = H.ensure_bridge_started()
@@ -190,8 +190,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
   # ===========================================================================
 
   describe "proof downgrade rejection" do
-    test "VQL-DT query with PROOF clause cannot silently become slipstream" do
-      # A query with PROOF must go through the VQL-DT path and either
+    test "VCL-DT query with PROOF clause cannot silently become slipstream" do
+      # A query with PROOF must go through the VCL-DT path and either
       # return a ProvedResult or fail with a proof-related error.
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001)"
 
@@ -202,7 +202,7 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
           # Must have a proof_certificate — NOT bare data
           assert Map.has_key?(proved_result, :proof_certificate) or
                    Map.has_key?(proved_result, "proof_certificate"),
-                 "VQL-DT result must include proof_certificate, got: #{inspect(Map.keys(proved_result))}"
+                 "VCL-DT result must include proof_certificate, got: #{inspect(Map.keys(proved_result))}"
 
         {:error, _} ->
           # Proof verification error is acceptable (Rust core unavailable)
@@ -214,7 +214,7 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
     end
 
     test "parse_dependent rejects queries without PROOF clause" do
-      result = VQLBridge.parse_dependent("SELECT GRAPH.* FROM HEXAD 'abc-123'")
+      result = VCLBridge.parse_dependent("SELECT GRAPH.* FROM HEXAD 'abc-123'")
 
       case result do
         {:error, msg} ->
@@ -229,7 +229,7 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
 
     test "parse_slipstream rejects queries with PROOF clause" do
       result =
-        VQLBridge.parse_slipstream("SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)")
+        VCLBridge.parse_slipstream("SELECT GRAPH.* FROM HEXAD 'abc-123' PROOF EXISTENCE(abc-123)")
 
       case result do
         {:error, msg} ->
@@ -246,8 +246,8 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
   # ===========================================================================
 
   describe "ProvedResult structure" do
-    test "VQL-DT result has expected shape with proof_certificate" do
-      # Build a well-formed AST that will go through the VQL-DT path
+    test "VCL-DT result has expected shape with proof_certificate" do
+      # Build a well-formed AST that will go through the VCL-DT path
       ast = %{
         modalities: [:graph],
         source: {:octad, "entity-001"},
@@ -383,16 +383,16 @@ defmodule VeriSim.Query.VQLDTIntegrationTest do
   end
 
   # ===========================================================================
-  # 7. Explain plan for VQL-DT queries
+  # 7. Explain plan for VCL-DT queries
   # ===========================================================================
 
-  describe "VQL-DT explain plan" do
-    test "explain: true on a VQL-DT query returns plan without executing proofs" do
+  describe "VCL-DT explain plan" do
+    test "explain: true on a VCL-DT query returns plan without executing proofs" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF EXISTENCE(entity-001)"
       ast = H.parse!(query)
 
       # explain: true should return the execution plan, NOT execute proofs
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
 
       assert is_map(plan)
       assert Map.has_key?(plan, :strategy)

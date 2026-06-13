@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLPropertyTest do
+defmodule VeriSim.Query.VCLPropertyTest do
   @moduledoc """
-  Property-based tests for the VQL type checker using StreamData.
+  Property-based tests for the VCL type checker using StreamData.
 
   Generates random valid proof specifications and verifies that the type
   checker handles them correctly — no crashes, proper error messages for
@@ -12,7 +12,7 @@ defmodule VeriSim.Query.VQLPropertyTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias VeriSim.Query.VQLTypeChecker
+  alias VeriSim.Query.VCLTypeChecker
 
   # ---------------------------------------------------------------------------
   # Generators
@@ -60,14 +60,14 @@ defmodule VeriSim.Query.VQLPropertyTest do
 
   property "type checker never crashes on valid proof specs" do
     check all(query_ast <- valid_query_ast()) do
-      result = VQLTypeChecker.typecheck(query_ast)
+      result = VCLTypeChecker.typecheck(query_ast)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
   end
 
   property "type checker output has required fields when successful" do
     check all(query_ast <- valid_query_ast()) do
-      case VQLTypeChecker.typecheck(query_ast) do
+      case VCLTypeChecker.typecheck(query_ast) do
         {:ok, info} ->
           assert is_list(info.proof_obligations)
           assert info.composition_strategy in [:independent, :conjunction, :sequential]
@@ -88,7 +88,7 @@ defmodule VeriSim.Query.VQLPropertyTest do
             contract <- valid_contract_name()
           ) do
       raw = "#{String.upcase(proof_type)}(#{contract})"
-      specs = VQLTypeChecker.parse_proof_specs(%{raw: raw})
+      specs = VCLTypeChecker.parse_proof_specs(%{raw: raw})
 
       assert length(specs) == 1
       [spec] = specs
@@ -105,7 +105,7 @@ defmodule VeriSim.Query.VQLPropertyTest do
       parts = Enum.zip(types, contracts) |> Enum.map(fn {t, c} -> "#{String.upcase(t)}(#{c})" end)
       raw = Enum.join(parts, " AND ")
 
-      specs = VQLTypeChecker.parse_proof_specs(%{raw: raw})
+      specs = VCLTypeChecker.parse_proof_specs(%{raw: raw})
       assert length(specs) == length(types)
     end
   end
@@ -121,7 +121,7 @@ defmodule VeriSim.Query.VQLPropertyTest do
         proof: [%{raw: "#{bad_type}(test)"}]
       }
 
-      assert {:error, {:unknown_proof_type, _}} = VQLTypeChecker.typecheck(query_ast)
+      assert {:error, {:unknown_proof_type, _}} = VCLTypeChecker.typecheck(query_ast)
     end
   end
 end

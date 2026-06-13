@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Test.VQLTestHelpers do
+defmodule VeriSim.Test.VCLTestHelpers do
   @moduledoc """
-  Shared test helpers for VQL integration tests.
+  Shared test helpers for VCL integration tests.
 
   Provides:
-  - VQLBridge startup and teardown
+  - VCLBridge startup and teardown
   - Octad fixtures for each modality combination
   - AST assertion helpers
   - Query execution wrappers with Rust-core-unavailable handling
@@ -13,55 +13,55 @@ defmodule VeriSim.Test.VQLTestHelpers do
 
   ## Usage
 
-      use VeriSim.Test.VQLTestHelpers
+      use VeriSim.Test.VCLTestHelpers
 
-  This imports all helper functions and sets up the VQLBridge GenServer in
+  This imports all helper functions and sets up the VCLBridge GenServer in
   `setup_all`. Tests can then call `parse!/1`, `execute_safely/2`, and
   fixture builders without boilerplate.
   """
 
-  alias VeriSim.Query.{VQLBridge, VQLExecutor}
+  alias VeriSim.Query.{VCLBridge, VCLExecutor}
 
   @doc """
-  Ensure VQLBridge GenServer is running. Returns the PID.
+  Ensure VCLBridge GenServer is running. Returns the PID.
 
   Safe to call multiple times — if already started, returns the existing PID.
   """
   def ensure_bridge_started do
-    case VQLBridge.start_link([]) do
+    case VCLBridge.start_link([]) do
       {:ok, pid} -> pid
       {:error, {:already_started, pid}} -> pid
     end
   end
 
   @doc """
-  Parse a VQL query string, raising on failure.
+  Parse a VCL query string, raising on failure.
 
   Returns the parsed AST map. Useful in tests where a parse failure
   means the test itself is broken, not the feature under test.
   """
   def parse!(query_string) do
-    case VQLBridge.parse(query_string) do
+    case VCLBridge.parse(query_string) do
       {:ok, ast} -> ast
-      {:error, reason} -> raise "VQL parse failed: #{inspect(reason)}\n  Query: #{query_string}"
+      {:error, reason} -> raise "VCL parse failed: #{inspect(reason)}\n  Query: #{query_string}"
     end
   end
 
   @doc """
-  Parse a VQL statement (query or mutation), raising on failure.
+  Parse a VCL statement (query or mutation), raising on failure.
   """
   def parse_statement!(query_string) do
-    case VQLBridge.parse_statement(query_string) do
+    case VCLBridge.parse_statement(query_string) do
       {:ok, ast} ->
         ast
 
       {:error, reason} ->
-        raise "VQL statement parse failed: #{inspect(reason)}\n  Query: #{query_string}"
+        raise "VCL statement parse failed: #{inspect(reason)}\n  Query: #{query_string}"
     end
   end
 
   @doc """
-  Execute a VQL query string, handling Rust-core-unavailable gracefully.
+  Execute a VCL query string, handling Rust-core-unavailable gracefully.
 
   Returns `{:ok, result}`, `{:error, reason}`, or `{:unavailable, reason}`
   when the Rust core is not running (rescues connection errors).
@@ -70,7 +70,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
     opts = Keyword.put_new(opts, :timeout, 2_000)
 
     try do
-      VQLExecutor.execute_string(query_string, opts)
+      VCLExecutor.execute_string(query_string, opts)
     rescue
       e ->
         {:unavailable, Exception.message(e)}
@@ -78,13 +78,13 @@ defmodule VeriSim.Test.VQLTestHelpers do
   end
 
   @doc """
-  Execute a parsed VQL AST, handling Rust-core-unavailable gracefully.
+  Execute a parsed VCL AST, handling Rust-core-unavailable gracefully.
   """
   def execute_ast_safely(ast, opts \\ []) do
     opts = Keyword.put_new(opts, :timeout, 2_000)
 
     try do
-      VQLExecutor.execute(ast, opts)
+      VCLExecutor.execute(ast, opts)
     rescue
       e ->
         {:unavailable, Exception.message(e)}
@@ -92,13 +92,13 @@ defmodule VeriSim.Test.VQLTestHelpers do
   end
 
   @doc """
-  Execute a VQL statement AST (query or mutation), handling errors gracefully.
+  Execute a VCL statement AST (query or mutation), handling errors gracefully.
   """
   def execute_statement_safely(ast, opts \\ []) do
     opts = Keyword.put_new(opts, :timeout, 2_000)
 
     try do
-      VQLExecutor.execute_statement(ast, opts)
+      VCLExecutor.execute_statement(ast, opts)
     rescue
       e ->
         {:unavailable, Exception.message(e)}
@@ -146,7 +146,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
   end
 
   # ===========================================================================
-  # Fixtures: pre-built VQL query strings for common test scenarios
+  # Fixtures: pre-built VCL query strings for common test scenarios
   # ===========================================================================
 
   @doc "All 8 modality names as atoms."
@@ -154,7 +154,7 @@ defmodule VeriSim.Test.VQLTestHelpers do
     [:graph, :vector, :tensor, :semantic, :document, :temporal, :provenance, :spatial]
   end
 
-  @doc "All 8 modality names as uppercase strings (for VQL SELECT)."
+  @doc "All 8 modality names as uppercase strings (for VCL SELECT)."
   def all_modality_names do
     ~w(GRAPH VECTOR TENSOR SEMANTIC DOCUMENT TEMPORAL PROVENANCE SPATIAL)
   end

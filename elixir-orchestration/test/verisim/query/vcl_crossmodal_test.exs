@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLCrossModalTest do
+defmodule VeriSim.Query.VCLCrossModalTest do
   @moduledoc """
-  Cross-modal condition tests for VQL queries.
+  Cross-modal condition tests for VCL queries.
 
   Exercises the condition classification and cross-modal evaluation logic in
-  `VQLExecutor`. Cross-modal conditions are NOT pushed down to individual
+  `VCLExecutor`. Cross-modal conditions are NOT pushed down to individual
   modality stores — they are evaluated post-fetch by comparing data across
   two or more modalities on the same octad.
 
@@ -33,7 +33,7 @@ defmodule VeriSim.Query.VQLCrossModalTest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Test.VQLTestHelpers, as: H
+  alias VeriSim.Test.VCLTestHelpers, as: H
 
   setup_all do
     pid = H.ensure_bridge_started()

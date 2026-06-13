@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLProofCertificateTest do
+defmodule VeriSim.Query.VCLProofCertificateTest do
   @moduledoc """
-  Tests for VQL-DT proof certificate generation and verification.
+  Tests for VCL-DT proof certificate generation and verification.
 
   Verifies that:
   1. Certificates are generated with correct structure and SHA-256 hash
@@ -14,7 +14,7 @@ defmodule VeriSim.Query.VQLProofCertificateTest do
 
   use ExUnit.Case, async: true
 
-  alias VeriSim.Query.VQLProofCertificate
+  alias VeriSim.Query.VCLProofCertificate
 
   # ---------------------------------------------------------------------------
   # Fixtures
@@ -70,7 +70,7 @@ defmodule VeriSim.Query.VQLProofCertificateTest do
   describe "generate_certificate/2" do
     test "produces a certificate with all required fields" do
       {:ok, cert} =
-        VQLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
+        VCLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
 
       assert cert.type == :existence
       assert cert.obligation == existence_obligation()
@@ -85,15 +85,15 @@ defmodule VeriSim.Query.VQLProofCertificateTest do
       bad_obligation = %{proofType: "EXISTENCE", contract: "x"}
 
       assert {:error, {:invalid_obligation, _}} =
-               VQLProofCertificate.generate_certificate(bad_obligation, %{})
+               VCLProofCertificate.generate_certificate(bad_obligation, %{})
     end
 
     test "rejects non-map arguments" do
       assert {:error, {:invalid_arguments, _}} =
-               VQLProofCertificate.generate_certificate("not a map", %{})
+               VCLProofCertificate.generate_certificate("not a map", %{})
 
       assert {:error, {:invalid_arguments, _}} =
-               VQLProofCertificate.generate_certificate(%{type: :existence}, "not a map")
+               VCLProofCertificate.generate_certificate(%{type: :existence}, "not a map")
     end
   end
 
@@ -104,33 +104,33 @@ defmodule VeriSim.Query.VQLProofCertificateTest do
   describe "verify_certificate/1" do
     test "valid certificate passes verification" do
       {:ok, cert} =
-        VQLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
+        VCLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
 
-      assert :ok = VQLProofCertificate.verify_certificate(cert)
+      assert :ok = VCLProofCertificate.verify_certificate(cert)
     end
 
     test "tampered obligation causes hash mismatch" do
       {:ok, cert} =
-        VQLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
+        VCLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
 
       tampered = %{cert | obligation: %{cert.obligation | type: :integrity}}
-      assert {:error, :invalid_hash} = VQLProofCertificate.verify_certificate(tampered)
+      assert {:error, :invalid_hash} = VCLProofCertificate.verify_certificate(tampered)
     end
 
     test "tampered witness causes hash mismatch" do
       {:ok, cert} =
-        VQLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
+        VCLProofCertificate.generate_certificate(existence_obligation(), existence_witness())
 
       tampered = %{cert | witness: %{"octad_id" => "evil-entity"}}
-      assert {:error, :invalid_hash} = VQLProofCertificate.verify_certificate(tampered)
+      assert {:error, :invalid_hash} = VCLProofCertificate.verify_certificate(tampered)
     end
 
     test "malformed certificate returns error" do
-      assert {:error, :malformed_certificate} = VQLProofCertificate.verify_certificate(%{})
-      assert {:error, :malformed_certificate} = VQLProofCertificate.verify_certificate(nil)
+      assert {:error, :malformed_certificate} = VCLProofCertificate.verify_certificate(%{})
+      assert {:error, :malformed_certificate} = VCLProofCertificate.verify_certificate(nil)
 
       assert {:error, :malformed_certificate} =
-               VQLProofCertificate.verify_certificate("not a cert")
+               VCLProofCertificate.verify_certificate("not a cert")
     end
   end
 
@@ -145,13 +145,13 @@ defmodule VeriSim.Query.VQLProofCertificateTest do
         {provenance_obligation(), provenance_witness()}
       ]
 
-      {:ok, certs} = VQLProofCertificate.generate_batch(pairs)
+      {:ok, certs} = VCLProofCertificate.generate_batch(pairs)
       assert length(certs) == 2
       assert Enum.at(certs, 0).type == :existence
       assert Enum.at(certs, 1).type == :provenance
 
       # All certificates should verify
-      assert :ok = VQLProofCertificate.verify_batch(certs)
+      assert :ok = VCLProofCertificate.verify_batch(certs)
     end
 
     test "batch verification fails with index on tampered certificate" do
@@ -160,14 +160,14 @@ defmodule VeriSim.Query.VQLProofCertificateTest do
         {provenance_obligation(), provenance_witness()}
       ]
 
-      {:ok, certs} = VQLProofCertificate.generate_batch(pairs)
+      {:ok, certs} = VCLProofCertificate.generate_batch(pairs)
 
       # Tamper with the second certificate
       tampered_second = %{Enum.at(certs, 1) | witness: %{"chain_hash" => "tampered"}}
       tampered_batch = List.replace_at(certs, 1, tampered_second)
 
       assert {:error, {:batch_failure, 1, :invalid_hash}} =
-               VQLProofCertificate.verify_batch(tampered_batch)
+               VCLProofCertificate.verify_batch(tampered_batch)
     end
   end
 end

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLProofCertificate do
+defmodule VeriSim.Query.VCLProofCertificate do
   @moduledoc """
-  VQL-DT proof certificate generation and verification.
+  VCL-DT proof certificate generation and verification.
 
-  After the VQL type checker validates a query's proof obligations and the
+  After the VCL type checker validates a query's proof obligations and the
   executor verifies the proofs at runtime, this module produces independently
   verifiable certificates. Each certificate bundles the proof obligation,
   witness data, and a SHA-256 integrity hash so that any party can later
@@ -34,14 +34,14 @@ defmodule VeriSim.Query.VQLProofCertificate do
       obligation = %{type: :existence, witness_fields: ["octad_id", "timestamp", "modality_count"], ...}
       witness = %{"octad_id" => "entity-001", "timestamp" => "2026-02-28T12:00:00Z", "modality_count" => 8}
 
-      {:ok, cert} = VQLProofCertificate.generate_certificate(obligation, witness)
-      :ok = VQLProofCertificate.verify_certificate(cert)
+      {:ok, cert} = VCLProofCertificate.generate_certificate(obligation, witness)
+      :ok = VCLProofCertificate.verify_certificate(cert)
 
   ## Batch certificates
 
       obligations_and_witnesses = [{obl1, wit1}, {obl2, wit2}]
-      {:ok, certs} = VQLProofCertificate.generate_batch(obligations_and_witnesses)
-      :ok = VQLProofCertificate.verify_batch(certs)
+      {:ok, certs} = VCLProofCertificate.generate_batch(obligations_and_witnesses)
+      :ok = VCLProofCertificate.verify_batch(certs)
   """
 
   @doc """
@@ -54,7 +54,7 @@ defmodule VeriSim.Query.VQLProofCertificate do
 
   ## Parameters
 
-  - `obligation` — proof obligation map from `VQLTypeChecker.typecheck/1`
+  - `obligation` — proof obligation map from `VCLTypeChecker.typecheck/1`
   - `witness` — witness data map gathered during proof execution
 
   ## Returns
@@ -125,7 +125,7 @@ defmodule VeriSim.Query.VQLProofCertificate do
   @doc """
   Generate certificates for a batch of obligation/witness pairs.
 
-  Useful when a VQL-DT query has multiple PROOF clauses (e.g.,
+  Useful when a VCL-DT query has multiple PROOF clauses (e.g.,
   `PROOF EXISTENCE(x) AND PROVENANCE(x)`).
 
   ## Parameters
