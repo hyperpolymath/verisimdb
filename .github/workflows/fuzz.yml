@@ -22,6 +22,7 @@ jobs:
   fuzz-core:
     name: Core Fuzz Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -37,6 +38,7 @@ jobs:
   fuzz-debugger:
     name: Debugger Fuzz Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:

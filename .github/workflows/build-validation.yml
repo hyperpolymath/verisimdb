@@ -14,6 +14,7 @@ jobs:
   validate-rust:
     name: Rust build validation
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -23,6 +24,7 @@ jobs:
   validate-elixir:
     name: Elixir build validation
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: elixir-orchestration

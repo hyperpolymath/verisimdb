@@ -10,6 +10,7 @@ permissions: read-all
 jobs:
   batch-fuzzing:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
