@@ -210,13 +210,15 @@ defmodule VeriSim.Federation.Resolver do
 
         new_peers = Map.put(state.peers, store_id, peer)
 
-        # Also register VeriSimDB-type peers with the Rust API for Rust-side federation
+        # Notify Rust core asynchronously so register doesn't block if core is down.
         if adapter_type == :verisimdb do
-          RustClient.post("/federation/register", %{
-            store_id: store_id,
-            endpoint: endpoint,
-            modalities: effective_modalities
-          })
+          Task.start(fn ->
+            RustClient.post("/federation/register", %{
+              store_id: store_id,
+              endpoint: endpoint,
+              modalities: effective_modalities
+            })
+          end)
         end
 
         {:reply, :ok, %{state | peers: new_peers}}
@@ -237,9 +239,10 @@ defmodule VeriSim.Federation.Resolver do
         new_peers = Map.delete(state.peers, store_id)
         Logger.info("Federation: deregistered peer #{store_id}")
 
-        # Deregister VeriSimDB peers from Rust API
+        # Notify Rust core asynchronously so the GenServer isn't blocked
+        # if the core is unreachable (nxdomain in tests, down in prod).
         if peer.adapter_type == :verisimdb do
-          RustClient.post("/federation/deregister/#{store_id}", %{})
+          Task.start(fn -> RustClient.post("/federation/deregister/#{store_id}", %{}) end)
         end
 
         {:reply, :ok, %{state | peers: new_peers}}
@@ -311,7 +314,11 @@ defmodule VeriSim.Federation.Resolver do
           []
 
         {task, nil} ->
-          Task.shutdown(task, :brutal_kill)
+          # Non-blocking cleanup: unlink + demonitor before kill so the GenServer
+          # isn't held up waiting for each blocked network task to die.
+          Process.unlink(task.pid)
+          Process.demonitor(task.ref, [:flush])
+          Process.exit(task.pid, :kill)
           Logger.warning("Federation: peer query timed out")
           []
       end)

@@ -166,7 +166,7 @@ Earlier versions of VeriSimDB used a octad (six modalities), but operational exp
 
 | Spatial
 | Geospatial coordinates, geometries
-| R-tree index
+| Haversine brute-force (R-tree planned)
 | Radius, bounding box, nearest-neighbour
 |===
 
@@ -547,7 +547,7 @@ Key crates include:
 - **verisim-drift**: The `DriftCalculator` struct implementing all drift scoring functions (cosine similarity, Jaccard coefficients, Frobenius norms).
 - **verisim-normalizer**: The self-normalisation engine with five strategies, authority ranking, conflict resolution, and audit logging.
 - **verisim-provenance**: Hash-chain-based lineage tracking with actor search and integrity verification.
-- **verisim-spatial**: R-tree index for geospatial queries (radius, bounding box, k-nearest).
+- **verisim-spatial**: Haversine brute-force geospatial queries (radius, bounding box, k-nearest); R-tree index planned.
 - **verisim-octad**: The octad entity abstraction, builder pattern, and cross-modal linking logic.
 - **verisim-api**: Actix-web HTTP server exposing RESTful endpoints for all operations plus federation peer management.
 - **verisim-wal**: Write-ahead log for crash recovery and atomic multi-modality commits.

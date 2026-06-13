@@ -2,7 +2,7 @@
 
 [package]
 name = "verisim-tensor"
-description = "Tensor modality - multi-dimensional array operations via Burn"
+description = "Tensor modality - multi-dimensional array operations via ndarray"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,7 +10,6 @@ license.workspace = true
 publish = false  # workspace-internal; path deps cannot be published to crates.io
 
 [dependencies]
-burn.workspace = true
 ndarray.workspace = true
 serde.workspace = true
 thiserror.workspace = true

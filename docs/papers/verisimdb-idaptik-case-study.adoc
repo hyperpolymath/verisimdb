@@ -719,7 +719,7 @@ unfair player experience, the answer is yes.
 | Document | Yes | Level names, briefings, notes | Full-text searchable
 | Temporal | Yes | Version history, design iterations | Bitemporal queries
 | Provenance | Yes | Designer decisions, playtest origins | Hash-chain integrity
-| Spatial | Yes | Zone coordinates, guard positions | R-tree indexed
+| Spatial | Yes | Zone coordinates, guard positions | Haversine search (R-tree planned)
 |===
 
 [appendix]

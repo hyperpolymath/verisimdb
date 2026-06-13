@@ -8,7 +8,7 @@
 
 == Overview
 
-This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-06-11. Each entry describes the current state, why it matters, and what needs to happen to resolve it. A full claims-vs-reality review with the active work plan lives at `docs/reviews/2026-06-11-deep-review-and-july-1-plan.adoc`.
+This document lists known issues, incomplete implementations, and honest gaps in VeriSimDB as of 2026-06-13. Each entry describes the current state, why it matters, and what needs to happen to resolve it. A full claims-vs-reality review with the active work plan lives at `docs/reviews/2026-06-11-deep-review-and-july-1-plan.adoc`.
 
 A major 7-phase hardening effort was completed on 2026-02-13, resolving most previously-open issues. The remaining open items are documented below.
 
@@ -275,6 +275,32 @@ Added `rescript.json` for build configuration.
 **Resolved:** 2026-06-13. The text, vector, and similar-query search endpoints all reported `score: 1.0 - (i as f32 * 0.1)` — a synthetic sequence derived from result position, discarding the real relevance scores the modality stores already compute (Tantivy BM25 for documents, cosine similarity for vectors). The octad store now exposes `search_text_scored` / `search_similar_scored` (returning `Vec<(Octad, f32)>`); the three handlers surface those real scores. Test `test_vector_search_returns_real_cosine_scores` pins the distinction (the second hit reports its true ~0.994 cosine, not synthetic 0.9).
 
 **Original issue:** API search responses carried fabricated scores, so any client ranking or thresholding on `score` was meaningless.
+
+=== 29. HTTP API Has No Authentication — OPEN
+
+**Location:** `rust-core/verisim-api/src/lib.rs` (all handlers)
+
+**Current state:** Every HTTP endpoint is unauthenticated. Any client that can reach the port can read, write, or delete any entity. There is no bearer-token check, no mTLS, and no authorisation layer. The svalinn gateway config in `container/.gatekeeper.yaml` sketches future policy but is not enforced by the embedded server.
+
+**Impact:** In production deployments the API must be placed behind a reverse proxy or gateway (svalinn, nginx, etc.) that enforces authentication. Do **not** expose this port directly on a network interface shared with untrusted clients.
+
+**Resolution path:** Add an optional tower middleware layer that validates a pre-shared bearer token (env `VERISIM_API_TOKEN`). When the token is absent in the env, all requests are accepted (development default); when present, `Authorization: Bearer <token>` is required on every request, returning `401` otherwise. See roadmap issue #auth1.
+
+=== 30. Cross-Request Transactions Are Not Implemented — OPEN
+
+**Location:** `rust-core/verisim-api/src/lib.rs` — `POST/GET /txn/*` handlers
+
+**Current state:** The four transaction endpoints (`POST /txn/begin`, `POST /txn/commit`, `POST /txn/rollback`, `GET /txn/{id}/status`) return **HTTP 501 Not Implemented**. The in-process `TransactionManager` tracks lifetime within a single request, but there is no mechanism to hold an open transaction across multiple HTTP round-trips. Attempting to use these endpoints will receive an honest 501 with a plain-text explanation.
+
+**Resolution path:** Introduce a session-token-keyed transaction store with TTL, and wire `update`/`delete` to check for an active token before applying.
+
+=== 31. `at_time` Returns Partial Data for Multi-Update Entities — OPEN
+
+**Location:** `rust-core/verisim-octad/src/store.rs`, `at_time` method
+
+**Current state:** The `at_time` method now honestly reconstructs modality data from the snapshot captured at the requested version (fixed in 0.2.0 from the prior "return current state with patched version" bug). However, each snapshot only contains the `OctadInput` from the *specific write call* that created that version. If an entity was created with `{document, vector}` and later updated with `{graph}`, the v1 snapshot contains the document+vector input but the v2 snapshot contains only the graph input. `at_time(v2_ts)` therefore returns `document=None, vector=None` even though they existed at that time.
+
+**Resolution path:** Store a full cross-modal copy (all live modality data, not just the delta) in each snapshot, or implement a fold-forward from the first snapshot. Until then, `at_time` is reliable only for entities mutated in a single write.
 
 === 28. NIF Transport Faked Success (Silent Data Loss) — ✅ RESOLVED
 
