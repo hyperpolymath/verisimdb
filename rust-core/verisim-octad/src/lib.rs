@@ -324,8 +324,24 @@ pub trait OctadStore: Send + Sync {
     /// Search by vector similarity
     async fn search_similar(&self, embedding: &[f32], k: usize) -> Result<Vec<Octad>, OctadError>;
 
+    /// Search by vector similarity, returning each match with its modality
+    /// score (cosine similarity for the default metric; higher is closer).
+    async fn search_similar_scored(
+        &self,
+        embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<(Octad, f32)>, OctadError>;
+
     /// Search by document text
     async fn search_text(&self, query: &str, limit: usize) -> Result<Vec<Octad>, OctadError>;
+
+    /// Search by document text, returning each match with its relevance
+    /// score (Tantivy BM25; higher is more relevant).
+    async fn search_text_scored(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(Octad, f32)>, OctadError>;
 
     /// Query by graph relationship
     async fn query_related(&self, id: &OctadId, predicate: &str) -> Result<Vec<Octad>, OctadError>;
