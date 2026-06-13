@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
-= VQL Architecture: Dual-Path Query Router
+= VCL Architecture: Dual-Path Query Router
 :toc: left
 :toclevels: 3
 :sectnums:
 
 == Overview
 
-This document describes the **corrected** VQL (VeriSim Query Language) architecture, aligned with link:../design-decisions.adoc[Architecture Design Decisions] and the link:../WHITEPAPER.md[VeriSimDB White Paper].
+This document describes the **corrected** VCL (VeriSim Consonance Language) architecture, aligned with link:../design-decisions.adoc[Architecture Design Decisions] and the link:../WHITEPAPER.md[VeriSimDB White Paper].
 
 **Key Corrections from Initial Design:**
 
@@ -19,12 +19,12 @@ This document describes the **corrected** VQL (VeriSim Query Language) architect
 
 == 1. Core Architecture: Dual-Path Router
 
-VQL provides two execution paths for queries:
+VCL provides two execution paths for queries:
 
 [source,text]
 ----
                  ┌─────────────────┐
-                 │  VQL Query      │
+                 │  VCL Query      │
                  │  (raw string)   │
                  └────────┬────────┘
                           │
@@ -82,7 +82,7 @@ src/vql/
 
 [source,rescript]
 // VQLRouter.res
-module VQL = {
+module VCL = {
   type queryMetadata = {
     queryId: string,
     timestamp: float,
@@ -361,7 +361,7 @@ end
 defmodule VeriSim.DriftMonitor do
   @moduledoc """
   Detects and repairs drift across federated nodes.
-  Integrates with VQL query path.
+  Integrates with VCL query path.
   """
 
   use GenServer
@@ -419,17 +419,17 @@ end
 module Endpoint = {
   @post("/api/v1/query")
   let queryEndpoint = (req: {body: string, headers: dict<string>}) => {
-    let useDependentTypes = Dict.get(req.headers, "X-VQL-Safe") == Some("true")
+    let useDependentTypes = Dict.get(req.headers, "X-VCL-Safe") == Some("true")
 
     // Parse and route query
-    let result = VQL.handleQuery(req.body, useDependentTypes)
+    let result = VCL.handleQuery(req.body, useDependentTypes)
 
     // Return with appropriate headers
     {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "X-VQL-Verified": result.verified ? "true" : "false",
+        "X-VCL-Verified": result.verified ? "true" : "false",
         "X-Query-ID": result.queryId,
       },
       body: JSON.stringify(result),
@@ -443,7 +443,7 @@ module Endpoint = {
 **ReScript Client:**
 
 [source,rescript]
-// Client SDK for VQL
+// Client SDK for VCL
 module VQLClient = {
   type queryOptions = {
     useDependentTypes: bool,
@@ -453,7 +453,7 @@ module VQLClient = {
 
   let query = async (vql: string, options: queryOptions) => {
     let headers = options.useDependentTypes
-      ? {"X-VQL-Safe": "true", "Content-Type": "text/vql"}
+      ? {"X-VCL-Safe": "true", "Content-Type": "text/vql"}
       : {"Content-Type": "text/vql"}
 
     let response = await fetch("/api/v1/query", {
@@ -595,7 +595,7 @@ let searchPapers = async () => {
 
 === Phase 1: Grammar & Slipstream Parser (Week 1-2)
 
-- [ ] Finalize VQL grammar (link:vql-grammar.ebnf[])
+- [ ] Finalize VCL grammar (link:vcl-grammar.ebnf[])
 - [ ] Implement slipstream parser in ReScript
 - [ ] Add basic AST types
 - [ ] Test with simple queries
@@ -616,15 +616,15 @@ let searchPapers = async () => {
 
 === Phase 4: WASM Endpoint (Week 7-8)
 
-- [ ] Compile VQL to WASM
+- [ ] Compile VCL to WASM
 - [ ] Deploy behind Cloudflare SDP
 - [ ] Add rate limiting
 - [ ] Complete audit logging
 
 == 7. References
 
-- link:vql-grammar.ebnf[VQL Grammar (EBNF)]
-- link:vql-examples.adoc[VQL Examples]
+- link:vcl-grammar.ebnf[VCL Grammar (EBNF)]
+- link:vcl-examples.adoc[VCL Examples]
 - link:../WHITEPAPER.md[VeriSimDB White Paper]
 - link:../design-decisions.adoc[Architecture Design Decisions]
 - link:technical-specification-kraft-metadata-log.adoc[KRaft Metadata Log]

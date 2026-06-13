@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-= VQL Type System Specification
+= VCL Type System Specification
 :toc: left
 :toclevels: 4
 :sectnums:
@@ -8,21 +8,21 @@
 
 == Overview
 
-This document specifies the **static type system** for VQL, including:
+This document specifies the **static type system** for VCL, including:
 
 1. Type syntax and semantics
-2. Typing rules for all VQL constructs
+2. Typing rules for all VCL constructs
 3. Type checking algorithm
 4. Subtyping and type equivalence
 5. Differences between dependent-type and slipstream paths
 
-This complements link:vql-formal-semantics.adoc[VQL Formal Semantics] which covers operational semantics.
+This complements link:vcl-formal-semantics.adoc[VCL Formal Semantics] which covers operational semantics.
 
 == Type Language
 
 === Type Syntax
 
-The VQL type language stem:[\tau] is defined by:
+The VCL type language stem:[\tau] is defined by:
 
 [stem]
 ++++
@@ -683,7 +683,7 @@ Two types are **semantically equal** if they denote the same set of values:
 
 === Bidirectional Type Checking
 
-VQL uses **bidirectional type checking** with two modes:
+VCL uses **bidirectional type checking** with two modes:
 
 1. **Synthesis (stem:[\Uparrow])**: Infer type of an expression
 2. **Checking (stem:[\Downarrow])**: Check expression against expected type
@@ -772,7 +772,7 @@ check_proved_query Γ (SELECT M ... PROOF P) =
 
 === Type Inference
 
-Some VQL constructs support **type inference**:
+Some VCL constructs support **type inference**:
 
 ==== Vector Dimension Inference
 
@@ -914,8 +914,8 @@ Ensure ZKP witnesses are used exactly once:
 
 == References
 
-- link:vql-formal-semantics.adoc[VQL Formal Semantics]
-- link:vql-grammar.ebnf[VQL Grammar]
+- link:vcl-formal-semantics.adoc[VCL Formal Semantics]
+- link:vcl-grammar.ebnf[VCL Grammar]
 - Pierce, B. C. (2002). *Types and Programming Languages*. MIT Press.
 - Pierce, B. C. (ed.) (2005). *Advanced Topics in Types and Programming Languages*. MIT Press.
 - Chlipala, A. (2013). *Certified Programming with Dependent Types*. MIT Press.

@@ -19,7 +19,7 @@
          (("formal/VCL.v"            . "N2 normalize_idempotent + V2 vql_preservation"))
          (("formal/WAL.v"            . "C7 wal_replay_idempotent on observable state")))
        (idris2-bridge
-         ((path . "VQL-DT type checker via Elixir-native + ReScript + Rust ZKP bridge")
+         ((path . "VCL-DT type checker via Elixir-native + ReScript + Rust ZKP bridge")
           (proof-types . ("EXISTENCE" "INTEGRITY" "CONSISTENCY" "PROVENANCE" "FRESHNESS"
                            "ACCESS" "CITATION" "CUSTOM" "ZKP" "PROVEN" "SANCTIFY"))))))
 

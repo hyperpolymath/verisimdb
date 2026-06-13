@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // VQL Types — Core type definitions for the bidirectional type checker
 //
-// Implements the type system from vql-type-system.adoc:
+// Implements the type system from vcl-type-system.adoc:
 // - Pi types (dependent function types)
 // - Sigma types (dependent pair types)
 // - Modality types

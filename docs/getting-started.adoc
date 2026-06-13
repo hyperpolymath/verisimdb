@@ -291,7 +291,7 @@ show all scores back near zero.
 
 == Querying with VQL
 
-VeriSimDB uses its own query language, *VQL* (VeriSim Query Language),
+VeriSimDB uses its own query language, *VQL* (VeriSim Consonance Language),
 designed for cross-modal queries. VQL is not SQL -- it natively
 understands modalities and drift.
 
@@ -333,9 +333,9 @@ SELECT * FROM FEDERATION /*
 WHERE DOCUMENT.severity > GRAPH.importance
 ----
 
-=== VQL-DT (Formally Verified Queries)
+=== VCL-DT (Formally Verified Queries)
 
-VQL-DT extends VQL with proof certificates. Every result includes a
+VCL-DT extends VQL with proof certificates. Every result includes a
 cryptographic proof that the data satisfies stated constraints:
 
 [source,sql]
@@ -345,7 +345,7 @@ FROM HEXAD 'entity-id'
 PROOF EXISTENCE(entity-id), PROVENANCE(entity-id)
 ----
 
-NOTE: VQL-DT proof generation is under active development. The syntax
+NOTE: VCL-DT proof generation is under active development. The syntax
 parses correctly and proof obligations are extracted, but end-to-end
 verifiable certificates require the Lean type checker integration
 (planned for Q2 2026).
@@ -576,8 +576,8 @@ queries. The fallback warning can be safely ignored.
 
 == Next Steps
 
-* Read the link:VQL-SPEC.adoc[VQL Specification] for the full query language
-* See link:vql-examples.adoc[VQL Examples] for more query patterns
+* Read the link:VCL-SPEC.adoc[VQL Specification] for the full query language
+* See link:vcl-examples.adoc[VQL Examples] for more query patterns
 * Review link:federation-readiness.adoc[Federation Readiness] for deployment planning
 * Explore link:drift-handling.adoc[Drift Handling] for advanced configuration
 * Check link:deployment-modes.adoc[Deployment Modes] for production setup

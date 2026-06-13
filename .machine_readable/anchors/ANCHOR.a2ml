@@ -42,7 +42,7 @@ semantic-authority:
   owns:
     - "Octad entity model and cross-modal consistency semantics"
     - "Drift-detection thresholds and self-normalisation behaviour"
-    - "VQL (VeriSim Query Language) syntax, type system, and proof obligations"
+    - "VQL (VeriSim Consonance Language) syntax, type system, and proof obligations"
     - "Contractile invariant definitions (.machine_readable/contractiles/)"
   authoritative-files:
     formal-proofs: "formal/ (Coq: Drift.v, Normalizer.v, Provenance.v, Transaction.v, WAL.v, Planner.v, VCL.v)"

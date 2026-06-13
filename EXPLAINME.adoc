@@ -8,8 +8,8 @@
 
 This is the human-readable orientation. For the feature/benefit framing see
 link:README.adoc[README.adoc]; for the normative VCL grammar see
-link:docs/VQL-SPEC.adoc[the VCL specification] (file still historically named
-`VQL-SPEC.adoc`).
+link:docs/VCL-SPEC.adoc[the VCL specification] (file still historically named
+`VCL-SPEC.adoc`).
 
 toc::[]
 
@@ -125,6 +125,6 @@ traceable, authorised, and consonant enough to affect live state.
 == Where to go next
 
 * link:README.adoc[README.adoc] — capabilities, comparisons, quick start.
-* link:docs/VQL-SPEC.adoc[VCL specification] — normative grammar (historically `VQL-SPEC.adoc`).
+* link:docs/VCL-SPEC.adoc[VCL specification] — normative grammar (historically `VCL-SPEC.adoc`).
 * https://github.com/hyperpolymath/vcl-ut[vcl-ut] — VCL-total, the proof-bearing substrate.
 * link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc] — honest-gaps audit.

@@ -124,7 +124,7 @@ has no drift detection, no temporal versioning, no provenance tracking, no forma
 query verification, and no federation.
 
 VeriSimDB supports 8 modalities with cross-modal drift detection and formal query
-proofs (VQL-DT). The fundamental difference is architectural: Weaviate treats
+proofs (VCL-DT). The fundamental difference is architectural: Weaviate treats
 vectors and objects as complementary storage; VeriSimDB treats all modalities as
 representations of a single entity that must remain consistent.
 
@@ -181,10 +181,10 @@ VQL is designed to be familiar to SQL users while supporting modality-specific
 operations (graph traversals, vector similarity, tensor operations, temporal
 time-travel, spatial containment, etc.) in a unified syntax.
 
-=== What are dependent-type proofs (VQL-DT)?
+=== What are dependent-type proofs (VCL-DT)?
 
-VQL-DT is an optional extension to VQL that adds dependent-type verification.
-When enabled, VQL-DT uses the Idris2 type system to prove properties of queries
+VCL-DT is an optional extension to VQL that adds dependent-type verification.
+When enabled, VCL-DT uses the Idris2 type system to prove properties of queries
 at compile time:
 
 * *Type correctness:* Ensure that query expressions are well-typed across
@@ -194,8 +194,8 @@ at compile time:
   meaningful
 * *Threshold validity:* Prove that coherence thresholds are within valid ranges
 
-VQL-DT is entirely optional. Teams can use plain VQL for standard operations and
-adopt VQL-DT incrementally when they want formal guarantees.
+VCL-DT is entirely optional. Teams can use plain VQL for standard operations and
+adopt VCL-DT incrementally when they want formal guarantees.
 
 === How does federation work?
 
@@ -257,7 +257,7 @@ j.d.a.jewell@open.ac.uk for a quote.
 1. Clone the repository: `git clone https://github.com/hyperpolymath/verisimdb`
 2. Follow the getting-started guide: `docs/getting-started.adoc`
 3. Run the test suite: `cargo test` (Rust) and `mix test` (Elixir)
-4. Explore the VQL examples: `docs/vql-examples.adoc`
+4. Explore the VQL examples: `docs/vcl-examples.adoc`
 
 === Is VeriSimDB production-ready?
 
@@ -289,7 +289,7 @@ The roadmap includes:
 
 * *Short-term (0-6 months):* Community building, documentation improvements,
   federation connector hardening, performance benchmarking
-* *Medium-term (6-18 months):* Container images, managed service pilot, VQL-DT
+* *Medium-term (6-18 months):* Container images, managed service pilot, VCL-DT
   tooling, additional federation connectors
 * *Long-term (18-36 months):* Enterprise features (RBAC, audit logging),
   OEM licensing framework, academic paper publications
@@ -312,6 +312,6 @@ See `CONTRIBUTING.md` in the repository for contribution guidelines.
 
 * *Repository:* https://github.com/hyperpolymath/verisimdb
 * *Documentation:* `docs/` directory in the repository
-* *VQL specification:* `docs/VQL-SPEC.adoc`
-* *Architecture:* `docs/vql-architecture.adoc`
+* *VQL specification:* `docs/VCL-SPEC.adoc`
+* *Architecture:* `docs/vcl-architecture.adoc`
 * *Contact:* j.d.a.jewell@open.ac.uk

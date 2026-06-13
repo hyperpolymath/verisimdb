@@ -589,9 +589,9 @@ verisimdb/
 ├── demos/
 │   └── drift-detection/       # Drift detection demo script
 ├── docs/                      # Specifications and design documents
-│   ├── vql-grammar.ebnf       # VCL formal grammar
-│   ├── vql-formal-semantics.adoc
-│   └── vql-type-system.adoc
+│   ├── vcl-grammar.ebnf       # VCL formal grammar
+│   ├── vcl-formal-semantics.adoc
+│   └── vcl-type-system.adoc
 ├── registry/                  # ReScript federation registry
 └── .machine_readable/         # STATE.scm, META.scm, ECOSYSTEM.scm
 ----
@@ -623,14 +623,14 @@ Quick links:
 * link:SECURITY.md[Security Policy] — threat model and disclosure process
 * link:AUDIT.adoc[Audit Index] — RSR audit-trail index
 
-VCL language (file paths retain the historical `vql-` / `VQL-` names; the in-repo file rename is a separate, tracked cleanup):
+VCL language (file paths retain the historical `vcl-` / `VCL-` names; the in-repo file rename is a separate, tracked cleanup):
 
 * link:docs/getting-started.adoc[Getting Started] — step-by-step setup guide
-* link:docs/VQL-SPEC.adoc[VCL Specification] — normative language spec
-* link:docs/vql-grammar.ebnf[VCL Grammar] — formal EBNF
-* link:docs/vql-formal-semantics.adoc[VCL Formal Semantics] — operational semantics
-* link:docs/vql-type-system.adoc[VCL Type System] — dependent types + bidirectional checking
-* link:docs/vql-examples.adoc[VCL Examples] — worked examples
+* link:docs/VCL-SPEC.adoc[VCL Specification] — normative language spec
+* link:docs/vcl-grammar.ebnf[VCL Grammar] — formal EBNF
+* link:docs/vcl-formal-semantics.adoc[VCL Formal Semantics] — operational semantics
+* link:docs/vcl-type-system.adoc[VCL Type System] — dependent types + bidirectional checking
+* link:docs/vcl-examples.adoc[VCL Examples] — worked examples
 
 Deployment & operations:
 

@@ -159,7 +159,7 @@ cargo fmt --check
 | **Rust** | Core database engine, modality stores, CLI tools |
 | **Elixir** | OTP orchestration, distributed coordination |
 | **ReScript** | VQL parser, playground PWA |
-| **VQL** | VeriSim Query Language (query interface) |
+| **VQL** | VeriSim Consonance Language (query interface) |
 
 ### Not Accepted
 
