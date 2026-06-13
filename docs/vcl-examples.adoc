@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
-= VeriSim Query Language (VQL) Examples
+= VeriSim Consonance Language (VCL) Examples
 :toc: left
 :toclevels: 3
 :sectnums:
 
 == Overview
 
-This document provides **63 comprehensive examples** of VQL queries and mutations for both **dependent-type** (formally verified) and **slipstream** (fast, unverified) paths, including backwards compatibility (VERSION), drift handling (DRIFT REPAIR), SQL-compatible extensions (ORDER BY, GROUP BY, HAVING, aggregates, column projections), multi-proof composition, cross-modal correlation conditions, and write path mutations (INSERT/UPDATE/DELETE).
+This document provides **63 comprehensive examples** of VCL queries and mutations for both **dependent-type** (formally verified) and **slipstream** (fast, unverified) paths, including backwards compatibility (VERSION), drift handling (DRIFT REPAIR), SQL-compatible extensions (ORDER BY, GROUP BY, HAVING, aggregates, column projections), multi-proof composition, cross-modal correlation conditions, and write path mutations (INSERT/UPDATE/DELETE).
 
 == Basic Queries
 
@@ -498,7 +498,7 @@ WHERE (h)-[:INVALID_SYNTAX
 ----
 {
   "error": "ParseError",
-  "message": "Failed to parse VQL query",
+  "message": "Failed to parse VCL query",
   "details": {
     "line": 3,
     "column": 27,
@@ -606,7 +606,7 @@ LIMIT 100
 
 == Summary
 
-VQL provides two execution paths:
+VCL provides two execution paths:
 
 1. **Dependent-Type Path** (`PROOF` clause present):
    - Formal verification via `proven-library`
@@ -636,7 +636,7 @@ Use slipstream path for:
 
 === Example 36: Version Pinning
 
-**Query with explicit VQL version:**
+**Query with explicit VCL version:**
 [source,vql]
 ----
 VERSION 1.0;
@@ -825,7 +825,7 @@ LIMIT 50
 
 === Example 47: Full SQL-Compatible Query
 
-**Combining all SQL-compatible features with VQL's model:**
+**Combining all SQL-compatible features with VCL's model:**
 [source,vql]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity, COUNT(*), SUM(DOCUMENT.severity), AVG(DOCUMENT.severity)
@@ -840,7 +840,7 @@ OFFSET 20
 
 === Example 48: SQL-Compatible with Dependent-Type Verification
 
-**Combining aggregates with formal verification (VQL-dt path):**
+**Combining aggregates with formal verification (VCL-dt path):**
 [source,vql]
 ----
 SELECT DOCUMENT.name, COUNT(*)
@@ -1069,7 +1069,7 @@ ensures the deletion is recorded in the audit chain.
 
 == References
 
-- link:vql-grammar.ebnf[VQL Grammar (EBNF)]
+- link:vcl-grammar.ebnf[VCL Grammar (EBNF)]
 - link:backwards-compatibility.adoc[Backwards Compatibility Strategy]
 - link:drift-handling.adoc[Drift Handling Documentation]
 - link:../WHITEPAPER.md[VeriSimDB White Paper]

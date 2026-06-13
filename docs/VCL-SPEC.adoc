@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-= VeriSim Query Language (VQL) Specification
+= VeriSim Consonance Language (VCL) Specification
 :author: Jonathan D.A. Jewell
 :email: j.d.a.jewell@open.ac.uk
 :revnumber: 2.0
@@ -21,25 +21,25 @@
 
 === Purpose and Scope
 
-The VeriSim Query Language (VQL) is the native query interface for VeriSimDB, a cross-system entity consistency engine with drift detection, self-normalisation, and formally verified queries. This document is the **normative language specification** for VQL version 2.0.
+The VeriSim Consonance Language (VCL) is the native query interface for VeriSimDB, a cross-system entity consistency engine with drift detection, self-normalisation, and formally verified queries. This document is the **normative language specification** for VCL version 2.0.
 
-VQL is not SQL. It is a domain-specific language for querying and mutating **octad entities** — data objects that exist simultaneously across up to eight modalities (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial). VQL provides:
+VCL is not SQL. It is a domain-specific language for querying and mutating **octad entities** — data objects that exist simultaneously across up to eight modalities (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial). VCL provides:
 
 * **Multi-modal querying** — SELECT across any combination of eight modalities in a single statement.
-* **Dual-path execution** — Slipstream (fast, unverified) and VQL-DT (formally verified with ZKP proofs).
+* **Dual-path execution** — Slipstream (fast, unverified) and VCL-DT (formally verified with ZKP proofs).
 * **Federation** — Query across distributed VeriSimDB instances with configurable drift policies.
 * **Cross-modal conditions** — Filter on relationships _between_ modalities (drift, consistency, existence).
 * **Write path** — INSERT, UPDATE, DELETE with optional proof verification.
 
 This specification unifies and supersedes the information in:
 
-* `vql-grammar.ebnf` — Normative EBNF grammar (included in full as <<appendix-a>>)
-* `vql-type-system.adoc` — Formal type system
-* `vql-formal-semantics.adoc` — Operational and denotational semantics
-* `vql-examples.adoc` — 63 comprehensive examples
-* `vql-architecture.adoc` — Dual-path routing architecture
-* `vql-vs-vql-dt.adoc` — Slipstream vs dependent-type comparison
-* `vql-vs-sql.adoc` — SQL differences
+* `vcl-grammar.ebnf` — Normative EBNF grammar (included in full as <<appendix-a>>)
+* `vcl-type-system.adoc` — Formal type system
+* `vcl-formal-semantics.adoc` — Operational and denotational semantics
+* `vcl-examples.adoc` — 63 comprehensive examples
+* `vcl-architecture.adoc` — Dual-path routing architecture
+* `vcl-vs-vcl-dt.adoc` — Slipstream vs dependent-type comparison
+* `vcl-vs-sql.adoc` — SQL differences
 
 Those documents remain valid for deep dives; this specification is the authoritative reference for language behaviour.
 
@@ -50,7 +50,7 @@ Those documents remain valid for deep dives; this specification is the authorita
 | Convention | Meaning
 
 | `KEYWORD`
-| VQL keyword (case-insensitive in source, uppercase in this document)
+| VCL keyword (case-insensitive in source, uppercase in this document)
 
 | `identifier`
 | User-defined name
@@ -74,15 +74,15 @@ Those documents remain valid for deep dives; this specification is the authorita
 | Feature is specified but not yet implemented
 |===
 
-Keywords are **case-insensitive** throughout VQL. `SELECT`, `select`, and `Select` are equivalent.
+Keywords are **case-insensitive** throughout VCL. `SELECT`, `select`, and `Select` are equivalent.
 
 === Dual-Path Architecture
 
-VQL operates in two execution modes, determined by the presence or absence of a `PROOF` clause:
+VCL operates in two execution modes, determined by the presence or absence of a `PROOF` clause:
 
 [cols="1,1,1"]
 |===
-| Property | Slipstream (no PROOF) | VQL-DT (with PROOF)
+| Property | Slipstream (no PROOF) | VCL-DT (with PROOF)
 
 | Parse
 | Same parser, same AST
@@ -114,7 +114,7 @@ Both modes use the same parser and produce the same AST. They diverge at the **q
 .Dual-path architecture
 ----
                      ┌──────────────────────────────────────────────────┐
-                     │              VQL Statement                       │
+                     │              VCL Statement                       │
                      └───────────────────┬──────────────────────────────┘
                                          │
                                    ┌─────▼──────┐
@@ -130,7 +130,7 @@ Both modes use the same parser and produce the same AST. They diverge at the **q
                          ┌────▼────┐          ┌─────▼─────┐
                          │   NO    │          │    YES    │
                     ┌────▼────┐         ┌─────▼─────┐
-                    │Slipstream│         │  VQL-DT    │
+                    │Slipstream│         │  VCL-DT    │
                     │  Path    │         │  Path      │
                     └────┬────┘         └─────┬─────┘
                          │                     │
@@ -157,10 +157,10 @@ Both modes use the same parser and produce the same AST. They diverge at the **q
 
 === Conformance Levels
 
-A VQL implementation MAY support one or both execution paths:
+A VCL implementation MAY support one or both execution paths:
 
 * **Level 1 — Slipstream**: Parse, validate, execute queries without proof obligations. All SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, and mutation statements MUST be supported.
-* **Level 2 — Full (Slipstream + VQL-DT)**: All Level 1 features plus PROOF clause parsing, dependent type checking, proof generation, and proof certificate bundling.
+* **Level 2 — Full (Slipstream + VCL-DT)**: All Level 1 features plus PROOF clause parsing, dependent type checking, proof generation, and proof certificate bundling.
 
 VeriSimDB's current implementation is Level 1 complete with Level 2 partially implemented (parser and type checker complete; runtime proof generation planned).
 
@@ -173,7 +173,7 @@ VeriSimDB's current implementation is Level 1 complete with Level 2 partially im
 
 === Character Set
 
-VQL source text is encoded in **UTF-8**. Identifiers are restricted to ASCII letters, digits, and underscores. String literals may contain any valid UTF-8 sequence.
+VCL source text is encoded in **UTF-8**. Identifiers are restricted to ASCII letters, digits, and underscores. String literals may contain any valid UTF-8 sequence.
 
 === Keywords
 
@@ -327,7 +327,7 @@ Forward-slash delimited regular expressions. Example: `/\b(AI|ML|DL)\b.*ethics/`
 
 === Comments
 
-VQL supports two comment styles:
+VCL supports two comment styles:
 
 ----
 -- This is a line comment (extends to end of line)
@@ -418,7 +418,7 @@ Not every octad populates every modality. An octad might have only Document and 
 
 === Primitive Types
 
-VQL's type system operates over these primitive types:
+VCL's type system operates over these primitive types:
 
 [cols="1,2,2"]
 |===
@@ -481,11 +481,11 @@ When drift exceeds configurable thresholds, the **self-normalizer** identifies t
 
 == Type System
 
-VQL has a rich type system that operates in two modes depending on the execution path. The slipstream path uses simple types for basic validation. The VQL-DT path adds dependent types, refinement types, and proof types for formal verification.
+VCL has a rich type system that operates in two modes depending on the execution path. The slipstream path uses simple types for basic validation. The VCL-DT path adds dependent types, refinement types, and proof types for formal verification.
 
 === Type Language
 
-The full VQL type language stem:[\tau] is defined by:
+The full VCL type language stem:[\tau] is defined by:
 
 [stem]
 ++++
@@ -533,7 +533,7 @@ type rec vqlType =
 
 `[.implemented]` All simple type checking in `VQLBidir.res`.
 
-=== Dependent Types (VQL-DT Path)
+=== Dependent Types (VCL-DT Path)
 
 When a `PROOF` clause is present, the type checker activates dependent type checking:
 
@@ -611,7 +611,7 @@ The subtyping relation stem:[\tau_1 <: \tau_2] governs when a value of type stem
 
 === Type Inference (Bidirectional)
 
-VQL uses **bidirectional type checking** with two modes:
+VCL uses **bidirectional type checking** with two modes:
 
 * **Synthesis** (stem:[\Gamma \vdash e \Rightarrow \tau]) — Infer the type of an expression from its structure.
 * **Checking** (stem:[\Gamma \vdash e \Leftarrow \tau]) — Verify that an expression has an expected type.
@@ -643,7 +643,7 @@ The `synthesizeQuery` function in `VQLBidir.res` walks the query AST through nin
 
 === Refinement Types
 
-Refinement types stem:[\{x : \tau \mid \phi(x)\}] constrain values beyond their base type. In VQL, refinement types appear implicitly in WHERE conditions:
+Refinement types stem:[\{x : \tau \mid \phi(x)\}] constrain values beyond their base type. In VCL, refinement types appear implicitly in WHERE conditions:
 
 ----
 WHERE FIELD severity > 3
@@ -655,7 +655,7 @@ This produces a refined query result type: stem:[\{h : \text{Octad} \mid h.\text
 
 === Type Safety Properties
 
-The VQL type system satisfies three key properties (proven in `vql-type-system.adoc`):
+The VCL type system satisfies three key properties (proven in `vcl-type-system.adoc`):
 
 * **Progress** — A well-typed query can always take a step (it is never stuck).
 * **Preservation** — If a query steps, the result is still well-typed.
@@ -1197,7 +1197,7 @@ LIMIT 50
 
 === PROOF Clause
 
-The PROOF clause activates the VQL-DT execution path and specifies proof obligations.
+The PROOF clause activates the VCL-DT execution path and specifies proof obligations.
 
 .Grammar
 ----
@@ -1317,7 +1317,7 @@ OFFSET 500
 
 == Mutation Statements
 
-VQL 2.0 adds a write path with INSERT, UPDATE, and DELETE operations. All mutations optionally accept a PROOF clause for verified writes.
+VCL 2.0 adds a write path with INSERT, UPDATE, and DELETE operations. All mutations optionally accept a PROOF clause for verified writes.
 
 .Grammar
 ----
@@ -1520,7 +1520,7 @@ STRICT < LATEST < REPAIR < TOLERATE
 
 == Proof System
 
-The proof system is the core differentiator between VQL and traditional query languages. It enables cryptographic verification of query results.
+The proof system is the core differentiator between VCL and traditional query languages. It enables cryptographic verification of query results.
 
 === Six Proof Types
 
@@ -1590,7 +1590,7 @@ CUSTOM     → user_circuit         (custom circuit from contract definition)
 
 === Proof Certificates
 
-When a VQL-DT query succeeds, the result includes a **proof certificate**:
+When a VCL-DT query succeeds, the result includes a **proof certificate**:
 
 [source,json]
 ----
@@ -1628,7 +1628,7 @@ The execution pipeline flows through three layers:
 
 .Execution pipeline
 ----
-VQL String
+VCL String
   → Parser (ReScript VQLParser.res / Elixir vql_bridge.ex fallback)
   → AST
   → Type Checker (VQLBidir.res)
@@ -1655,7 +1655,7 @@ The executor separates conditions into two categories:
 
 === Cross-Modal Joins
 
-VQL does not have explicit JOIN syntax. Instead, cross-modal querying is implicit — every octad is already the join of all its modalities. When you write:
+VCL does not have explicit JOIN syntax. Instead, cross-modal querying is implicit — every octad is already the join of all its modalities. When you write:
 
 [source,vql]
 ----
@@ -1689,7 +1689,7 @@ LIMIT 50
 
 .Example EXPLAIN output
 ----
-VQL Execution Plan
+VCL Execution Plan
 ==================
 Strategy: Parallel
 Steps:
@@ -1740,7 +1740,7 @@ Optimization hints:
 
 === Error Handling and Diagnostics
 
-VQL provides structured error responses with error codes, messages, and recovery hints.
+VCL provides structured error responses with error codes, messages, and recovery hints.
 
 ==== Error Categories
 
@@ -1859,11 +1859,11 @@ This section provides an honest assessment of what is implemented, partially imp
 |===
 | Feature | Version | Notes
 
-| VQL Parser (ReScript)
+| VCL Parser (ReScript)
 | 2.0
 | 1154 lines, monadic parser combinators. Handles all grammar productions.
 
-| VQL Parser (Elixir fallback)
+| VCL Parser (Elixir fallback)
 | 2.0
 | Built into `vql_bridge.ex` (672 lines). No external Deno/Node dependency needed.
 
@@ -1943,7 +1943,7 @@ This section provides an honest assessment of what is implemented, partially imp
 | Cross-modal write atomicity
 | INSERT/UPDATE/DELETE execute but atomic cross-modal writes (all modalities or none) are not guaranteed.
 
-| VQL Bridge (Elixir ↔ ReScript)
+| VCL Bridge (Elixir ↔ ReScript)
 | Port-based communication works. Falls back to built-in Elixir parser when Deno/Node unavailable.
 |===
 
@@ -1953,7 +1953,7 @@ This section provides an honest assessment of what is implemented, partially imp
 |===
 | Feature | Timeline
 
-| VQL-DT runtime (Lean type checker wired to execution)
+| VCL-DT runtime (Lean type checker wired to execution)
 | Next milestone
 
 | ZKP proof generation (proven-library / sanctify)
@@ -1987,11 +1987,11 @@ This section provides an honest assessment of what is implemented, partially imp
 [appendix]
 == Complete EBNF Grammar
 
-This is the normative grammar for VQL 2.0, reproduced from `vql-grammar.ebnf` (ISO/IEC 14977 EBNF notation).
+This is the normative grammar for VCL 2.0, reproduced from `vcl-grammar.ebnf` (ISO/IEC 14977 EBNF notation).
 
 [source,ebnf]
 ----
-(* VeriSim Query Language (VQL) Grammar *)
+(* VeriSim Consonance Language (VCL) Grammar *)
 (* Version: 2.0 — Dependent types, cross-modal correlation, write path *)
 
 (* 1. TOP-LEVEL STRUCTURE *)
@@ -2244,7 +2244,7 @@ keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
 [appendix]
 == Reserved Keywords
 
-Complete alphabetical list of all 70 reserved keywords. Keywords are case-insensitive in VQL source.
+Complete alphabetical list of all 70 reserved keywords. Keywords are case-insensitive in VCL source.
 
 [cols="4*"]
 |===
@@ -2717,32 +2717,32 @@ Complete alphabetical list of all 70 reserved keywords. Keywords are case-insens
 [appendix]
 == Related Specifications
 
-This specification is the authoritative reference for VQL language behaviour. The following documents provide deeper coverage of specific topics:
+This specification is the authoritative reference for VCL language behaviour. The following documents provide deeper coverage of specific topics:
 
 [cols="2,3"]
 |===
 | Document | Scope
 
-| link:vql-grammar.ebnf[`vql-grammar.ebnf`]
+| link:vcl-grammar.ebnf[`vcl-grammar.ebnf`]
 | Standalone EBNF grammar file (ISO/IEC 14977). Normative source reproduced in <<appendix-a>>.
 
-| link:vql-type-system.adoc[`vql-type-system.adoc`]
+| link:vcl-type-system.adoc[`vcl-type-system.adoc`]
 | Formal type system with LaTeX notation: type syntax, typing rules, type checking algorithm, subtyping, type equivalence, type safety proofs. 923 lines.
 
-| link:vql-formal-semantics.adoc[`vql-formal-semantics.adoc`]
+| link:vcl-formal-semantics.adoc[`vcl-formal-semantics.adoc`]
 | Operational semantics (big-step and small-step), denotational semantics, proof obligations, soundness theorems, drift semantics. 655 lines.
 
-| link:vql-examples.adoc[`vql-examples.adoc`]
-| 63 comprehensive examples covering all VQL constructs, both execution paths, error cases, and advanced use cases. 1078 lines.
+| link:vcl-examples.adoc[`vcl-examples.adoc`]
+| 63 comprehensive examples covering all VCL constructs, both execution paths, error cases, and advanced use cases. 1078 lines.
 
-| link:vql-architecture.adoc[`vql-architecture.adoc`]
+| link:vcl-architecture.adoc[`vcl-architecture.adoc`]
 | Dual-path routing architecture, ReScript/Elixir/Rust stack, metadata storage, audit trail, drift detection, API endpoint, performance comparison. 708 lines.
 
-| link:vql-vs-vql-dt.adoc[`vql-vs-vql-dt.adoc`]
-| Detailed comparison of Slipstream vs VQL-DT execution paths, six proof types, performance implications, honest implementation status. 282 lines.
+| link:vcl-vs-vcl-dt.adoc[`vcl-vs-vcl-dt.adoc`]
+| Detailed comparison of Slipstream vs VCL-DT execution paths, six proof types, performance implications, honest implementation status. 282 lines.
 
-| link:vql-vs-sql.adoc[`vql-vs-sql.adoc`]
-| Comparative guide between VQL and SQL for developers familiar with relational databases. 241 lines. Note: pre-dates v2.0 GROUP BY/ORDER BY/mutation additions.
+| link:vcl-vs-sql.adoc[`vcl-vs-sql.adoc`]
+| Comparative guide between VCL and SQL for developers familiar with relational databases. 241 lines. Note: pre-dates v2.0 GROUP BY/ORDER BY/mutation additions.
 |===
 
 === Implementation Files
@@ -2755,7 +2755,7 @@ This specification is the authoritative reference for VQL language behaviour. Th
 | ReScript parser (1154 lines). Monadic combinator library + grammar.
 
 | `src/vql/VQLTypes.res`
-| Core type definitions (296 lines). Modality, primitive, VQL, and proof types.
+| Core type definitions (296 lines). Modality, primitive, VCL, and proof types.
 
 | `src/vql/VQLBidir.res`
 | Bidirectional type inference engine (841 lines). 9-phase synthesis pipeline.
@@ -2773,39 +2773,39 @@ This specification is the authoritative reference for VQL language behaviour. Th
 | Elixir ↔ ReScript bridge (672 lines). Built-in fallback parser.
 
 | `elixir-orchestration/lib/verisim/query/vql_executor.ex`
-| Full VQL executor (1162 lines). Parse → type check → plan → route → aggregate.
+| Full VCL executor (1162 lines). Parse → type check → plan → route → aggregate.
 |===
 
 === Known Inconsistencies in Existing Documents
 
 For transparency, these inconsistencies exist between the pre-v2.0 documents:
 
-1. **`vql-vs-sql.adoc`** states VQL lacks GROUP BY, ORDER BY, aggregates, and mutations. This was true for v1.0 but is incorrect for v2.0. The grammar, parser, and executor all support these features.
+1. **`vcl-vs-sql.adoc`** states VCL lacks GROUP BY, ORDER BY, aggregates, and mutations. This was true for v1.0 but is incorrect for v2.0. The grammar, parser, and executor all support these features.
 
-2. **`vql-vs-vql-dt.adoc`** lists six proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION) which differ from the grammar's six (EXISTENCE, CITATION, ACCESS, INTEGRITY, PROVENANCE, CUSTOM). This specification follows the grammar and implementation.
+2. **`vcl-vs-vcl-dt.adoc`** lists six proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION) which differ from the grammar's six (EXISTENCE, CITATION, ACCESS, INTEGRITY, PROVENANCE, CUSTOM). This specification follows the grammar and implementation.
 
-3. **`vql-vs-sql.adoc`** describes VQL as "read-only" which is no longer accurate after v2.0 mutations.
+3. **`vcl-vs-sql.adoc`** describes VCL as "read-only" which is no longer accurate after v2.0 mutations.
 
 This specification resolves all three inconsistencies in favour of the implemented grammar and source code.
 
 // ============================================================================
-// APPENDIX E: VQL-dt++ EXTENSIONS (TYPELL INTEGRATION)
+// APPENDIX E: VCL-dt++ EXTENSIONS (TYPELL INTEGRATION)
 // ============================================================================
 
 [appendix]
-== VQL-dt++ Extensions (Typell Integration)
+== VCL-dt++ Extensions (Typell Integration)
 
-VQL-dt++ extends VQL v3.0 with six optional clauses that provide maximal type-theoretic strictness. These extensions are consumed by the **Typell verification kernel** (the formal verification substrate for PanLL) and are specified normatively in the grammar delta file:
+VCL-dt++ extends VCL v3.0 with six optional clauses that provide maximal type-theoretic strictness. These extensions are consumed by the **Typell verification kernel** (the formal verification substrate for PanLL) and are specified normatively in the grammar delta file:
 
 * link:../../typeql-experimental/docs/vql-dtpp-grammar.ebnf[`vql-dtpp-grammar.ebnf`] — EBNF grammar delta (199 lines)
 
-All six clauses are optional and composable in any combination. They append after the standard query structure with no keyword conflicts against VQL v3.0's 60+ reserved keywords.
+All six clauses are optional and composable in any combination. They append after the standard query structure with no keyword conflicts against VCL v3.0's 60+ reserved keywords.
 
-=== VQL-dt vs VQL-dt++ Feature Comparison
+=== VCL-dt vs VCL-dt++ Feature Comparison
 
 [cols="2,1,1,2"]
 |===
-| Feature | VQL-dt | VQL-dt++ | Typell Kernel Mapping
+| Feature | VCL-dt | VCL-dt++ | Typell Kernel Mapping
 
 | Dependent types (Pi, Sigma)
 | ✅
@@ -2999,7 +2999,7 @@ SELECT GRAPH.*, DOCUMENT.* FROM HEXAD 'entity-001'
 
 === Typell Integration
 
-VQL-dt++ queries are verified by the Typell kernel via JSON-RPC:
+VCL-dt++ queries are verified by the Typell kernel via JSON-RPC:
 
 [source]
 ----
@@ -3010,4 +3010,4 @@ The kernel returns: types, proof obligations, linear tracking, session protocol 
 
 === Status
 
-`[.planned]` All six VQL-dt++ clauses. Grammar formally specified. Implementation pending Typell kernel (Phase 3+).
+`[.planned]` All six VCL-dt++ clauses. Grammar formally specified. Implementation pending Typell kernel (Phase 3+).

@@ -1,5 +1,5 @@
 (* SPDX-License-Identifier: MPL-2.0 *)
-(* VeriSim Query Language (VQL) Grammar *)
+(* VeriSim Consonance Language (VCL) Grammar *)
 (* Format: Extended Backus-Naur Form (EBNF) *)
 (* Version: 3.0 — Octad (8 modalities), provenance conditions, spatial conditions *)
 (* Date: 2026-02-27 *)
@@ -292,7 +292,7 @@ comment = '--', { ? any character except newline ? }, '\n'  (* Line comment *)
 (* ============================================================================
    12. RESERVED KEYWORDS
    ============================================================================ *)
-(* Keywords are case-insensitive in VQL *)
+(* Keywords are case-insensitive in VCL *)
 keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
          | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL'
          | 'HEXAD' | 'FEDERATION' | 'STORE'

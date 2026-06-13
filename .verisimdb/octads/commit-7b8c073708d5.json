@@ -14,7 +14,7 @@
     }
   },
   "graph": {
-    "relationships": [{"predicate":"modifies","target":"file:README.adoc"},{"predicate":"modifies","target":"file:docs/error-handling-strategy.adoc"},{"predicate":"modifies","target":"file:docs/vql-formal-semantics.adoc"},{"predicate":"modifies","target":"file:docs/vql-type-system.adoc"}]
+    "relationships": [{"predicate":"modifies","target":"file:README.adoc"},{"predicate":"modifies","target":"file:docs/error-handling-strategy.adoc"},{"predicate":"modifies","target":"file:docs/vcl-formal-semantics.adoc"},{"predicate":"modifies","target":"file:docs/vcl-type-system.adoc"}]
   },
   "vector": {
     "embedding": [0.281250,-0.484375,0.898437,0.820312,-0.945312,-0.960937,0.976562,0.031250,0.984375,0.664062,-0.734375,0.226562,-0.882812,0.851562,-0.703125,0.601562,0.406250,0.140625,0.812500,0.703125,-0.101562,-0.671875,-0.070312,0.187500,-0.531250,0.023437,-0.234375,0.039062,-0.882812,0.773437,-0.546875,0.585937,0.281250,-0.484375,0.898437,0.820312,-0.945312,-0.960937,0.976562,0.031250,0.984375,0.664062,-0.734375,0.226562,-0.882812,0.851562,-0.703125,0.601562,0.406250,0.140625,0.812500,0.703125,-0.101562,-0.671875,-0.070312,0.187500,-0.531250,0.023437,-0.234375,0.039062,-0.882812,0.773437,-0.546875,0.585937],

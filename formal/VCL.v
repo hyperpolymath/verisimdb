@@ -6,7 +6,7 @@
     Mechanises the foundation-pack theorem V2 (vql_preservation) for
     VCL (the VeriSim Consonance Language; renamed from VQL on
     2026-04-05). The original semantics in
-    [docs/vql-formal-semantics.adoc] use BIG-STEP evaluation
+    [docs/vcl-formal-semantics.adoc] use BIG-STEP evaluation
     [e ⇓ v], which does not compose with preservation as classically
     stated. This module closes #92 by introducing a minimal
     SMALL-STEP calculus and proving preservation against it.

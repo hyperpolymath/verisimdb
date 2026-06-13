@@ -589,6 +589,6 @@ QueryCache.invalidate_by_tag("project:thesis-2025")
 
 - link:query-optimization-overview.adoc[Query Optimization Overview]
 - link:reversibility-design.adoc[Reversibility Design]
-- link:vql-architecture.adoc[VQL Architecture]
+- link:vcl-architecture.adoc[VQL Architecture]
 - link:../lib/verisim/query_cache.ex[Query Cache Implementation]
 - link:../lib/verisim/query_router_cached.ex[Cached Query Router]

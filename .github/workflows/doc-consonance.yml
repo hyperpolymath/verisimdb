@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MPL-2.0
+name: Doc Consonance Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  doc-consonance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Doc-consonance gate (no query-language misnomer in docs)
+        run: bash tests/doc-consonance-gate.sh

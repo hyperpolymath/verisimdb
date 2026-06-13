@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-= VQL Formal Semantics
+= VCL Formal Semantics
 :toc: left
 :toclevels: 4
 :sectnums:
@@ -8,7 +8,7 @@
 
 == Overview
 
-This document specifies the **formal operational semantics** and **static type system** for VeriSim Query Language (VQL). VQL has two execution paths with different semantic guarantees:
+This document specifies the **formal operational semantics** and **static type system** for VeriSim Consonance Language (VCL). VCL has two execution paths with different semantic guarantees:
 
 1. **Dependent-Type Path** - Queries with `PROOF` clause, formally verified via ZKP
 2. **Slipstream Path** - Queries without `PROOF` clause, fast but unverified
@@ -45,7 +45,7 @@ We use standard mathematical notation for formal semantics:
 
 == Syntax (Abstract)
 
-We define the abstract syntax of VQL (concrete syntax in link:vql-grammar.ebnf[vql-grammar.ebnf]):
+We define the abstract syntax of VCL (concrete syntax in link:vcl-grammar.ebnf[vcl-grammar.ebnf]):
 
 ----
 Query       ::= SELECT Modalities FROM Source [WHERE Condition]
@@ -72,7 +72,7 @@ ProofType   ::= EXISTENCE | CITATION | ACCESS | INTEGRITY | PROVENANCE | CUSTOM
 
 === Base Types
 
-VQL has the following base types:
+VCL has the following base types:
 
 ----
 τ ::= UUID                          -- 128-bit identifier
@@ -421,7 +421,7 @@ For each proof type, we specify the **proposition** stem:[\phi] that must be pro
 
 === Proof Generation
 
-For dependent-type queries, VQL delegates to **proven-library** (external ZKP framework):
+For dependent-type queries, VCL delegates to **proven-library** (external ZKP framework):
 
 [stem]
 ++++
@@ -645,8 +645,8 @@ Where stem:[\phi] is automatically inferred from the query structure.
 
 == References
 
-- link:vql-grammar.ebnf[VQL Grammar (ISO EBNF)]
-- link:vql-type-system.adoc[VQL Type System Specification]
+- link:vcl-grammar.ebnf[VCL Grammar (ISO EBNF)]
+- link:vcl-type-system.adoc[VCL Type System Specification]
 - link:backwards-compatibility.adoc[Backwards Compatibility (VERSION semantics)]
 - link:drift-handling.adoc[Drift Handling (DRIFT semantics)]
 - Pierce, B. C. (2002). *Types and Programming Languages*. MIT Press.

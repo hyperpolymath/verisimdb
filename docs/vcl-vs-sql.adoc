@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-= VQL vs SQL: A Comparative Guide
+= VCL vs SQL: A Comparative Guide
 :toc: left
 :toclevels: 3
 :sectnums:
 
 == Introduction
 
-VQL (VeriSim Query Language) is the query language for VeriSimDB, a 6-core multimodal database. While VQL borrows familiar keywords from SQL (`SELECT`, `FROM`, `WHERE`, `LIMIT`, `OFFSET`), it serves a fundamentally different purpose.
+VCL (VeriSim Consonance Language) is the query language for VeriSimDB, a 6-core multimodal database. While VCL borrows familiar keywords from SQL (`SELECT`, `FROM`, `WHERE`, `LIMIT`, `OFFSET`), it serves a fundamentally different purpose.
 
-VQL is **read-only**. It does not support `INSERT`, `UPDATE`, or `DELETE` statements. All mutations go through the Octad API (Rust core or Elixir orchestration layer). This is a deliberate design choice: VeriSimDB treats writes as coordinated multi-modal operations that must maintain consistency across all six modality stores (Graph, Vector, Tensor, Semantic, Document, Temporal). A simple `INSERT` statement cannot express the cross-modal invariants that a Octad write requires.
+VCL is **read-only**. It does not support `INSERT`, `UPDATE`, or `DELETE` statements. All mutations go through the Octad API (Rust core or Elixir orchestration layer). This is a deliberate design choice: VeriSimDB treats writes as coordinated multi-modal operations that must maintain consistency across all six modality stores (Graph, Vector, Tensor, Semantic, Document, Temporal). A simple `INSERT` statement cannot express the cross-modal invariants that a Octad write requires.
 
-VQL is **multimodal**. Where SQL selects columns from relational tables, VQL selects _modalities_ from _octad stores_ or _federations_. A single VQL query can retrieve graph edges, vector embeddings, tensor slices, semantic annotations, document text, and temporal versions in one pass.
+VCL is **multimodal**. Where SQL selects columns from relational tables, VCL selects _modalities_ from _octad stores_ or _federations_. A single VCL query can retrieve graph edges, vector embeddings, tensor slices, semantic annotations, document text, and temporal versions in one pass.
 
-VQL is **federation-aware**. Queries can target a local `STORE`, a specific `HEXAD` entity, or a `FEDERATION` of distributed VeriSimDB instances, with configurable drift policies governing cross-instance consistency.
+VCL is **federation-aware**. Queries can target a local `STORE`, a specific `HEXAD` entity, or a `FEDERATION` of distributed VeriSimDB instances, with configurable drift policies governing cross-instance consistency.
 
 == Concept Comparison
 
 [cols="2,3,3",options="header"]
 |===
-|Concept |VQL |SQL
+|Concept |VCL |SQL
 
 |**Column/Field Selection**
 |`SELECT` with _modalities_: `GRAPH`, `VECTOR`, `TENSOR`, `SEMANTIC`, `DOCUMENT`, `TEMPORAL`, or `*` (all six). Modalities can be combined: `SELECT GRAPH, VECTOR, SEMANTIC`.
@@ -39,7 +39,7 @@ VQL is **federation-aware**. Queries can target a local `STORE`, a specific `HEX
 |`JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `FULL OUTER JOIN`, `CROSS JOIN` with `ON` conditions.
 
 |**Mutations**
-|**None.** VQL is strictly read-only. All writes go through the Octad API: `POST /api/octads` (create), `PUT /api/octads/:id` (update), `DELETE /api/octads/:id` (delete). This ensures cross-modal consistency.
+|**None.** VCL is strictly read-only. All writes go through the Octad API: `POST /api/octads` (create), `PUT /api/octads/:id` (update), `DELETE /api/octads/:id` (delete). This ensures cross-modal consistency.
 |`INSERT INTO`, `UPDATE ... SET`, `DELETE FROM`, `MERGE`, `TRUNCATE`.
 
 |**Verification**
@@ -51,13 +51,13 @@ VQL is **federation-aware**. Queries can target a local `STORE`, a specific `HEX
 |`LIMIT n` and `OFFSET n` (or vendor-specific: `TOP`, `FETCH FIRST`).
 |===
 
-== What VQL Lacks That SQL Has
+== What VCL Lacks That SQL Has
 
-VQL is intentionally minimal. The following SQL features have no VQL equivalent:
+VCL is intentionally minimal. The following SQL features have no VCL equivalent:
 
 [cols="2,3",options="header"]
 |===
-|SQL Feature |VQL Status
+|SQL Feature |VCL Status
 
 |`GROUP BY`
 |Not supported. Aggregation is performed application-side or through the Elixir orchestration layer.
@@ -66,7 +66,7 @@ VQL is intentionally minimal. The following SQL features have no VQL equivalent:
 |Not supported. Result ordering is determined by the modality store (e.g., vector similarity ranking, graph traversal order, temporal chronological order).
 
 |Aggregate functions (`COUNT`, `SUM`, `AVG`, `MIN`, `MAX`)
-|Not supported. VQL returns raw data; aggregation is a consumer responsibility.
+|Not supported. VCL returns raw data; aggregation is a consumer responsibility.
 
 |Subqueries
 |Not supported. Queries are flat. Compose results in application code or use the Elixir query router for multi-step workflows.
@@ -90,14 +90,14 @@ VQL is intentionally minimal. The following SQL features have no VQL equivalent:
 |Not supported. Business logic lives in the Elixir orchestration layer.
 |===
 
-== What VQL Has That SQL Lacks
+== What VCL Has That SQL Lacks
 
 [cols="2,3",options="header"]
 |===
-|VQL Feature |Description
+|VCL Feature |Description
 
 |`PROOF` clause
-|Requests a verifiable proof certificate alongside query results. Six proof types cover existence, integrity, consistency, provenance, freshness, and authorization guarantees. Enables dependent-type verification via the VQL-DT path.
+|Requests a verifiable proof certificate alongside query results. Six proof types cover existence, integrity, consistency, provenance, freshness, and authorization guarantees. Enables dependent-type verification via the VCL-DT path.
 
 |Multimodal `SELECT`
 |Select specific modalities (`GRAPH`, `VECTOR`, `TENSOR`, `SEMANTIC`, `DOCUMENT`, `TEMPORAL`) or all (`*`). No SQL equivalent for querying fundamentally different data representations of the same entity.
@@ -133,14 +133,14 @@ FROM entities
 WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ----
 
-**VQL (Slipstream):**
+**VCL (Slipstream):**
 [source,vql]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 ----
 
-The VQL version returns all six modalities for that octad. The SQL version returns only the columns in the `entities` table.
+The VCL version returns all six modalities for that octad. The SQL version returns only the columns in the `entities` table.
 
 === Finding Related Entities
 
@@ -155,7 +155,7 @@ WHERE e1.id = '550e8400-e29b-41d4-a716-446655440000'
   AND r.type = 'CITES';
 ----
 
-**VQL (graph traversal):**
+**VCL (graph traversal):**
 [source,vql]
 ----
 SELECT GRAPH
@@ -163,7 +163,7 @@ FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 WHERE (h)-[:CITES]->(target)
 ----
 
-VQL eliminates the triple-table JOIN pattern entirely. Graph relationships are native.
+VCL eliminates the triple-table JOIN pattern entirely. Graph relationships are native.
 
 === Full-Text Search
 
@@ -175,7 +175,7 @@ FROM documents
 WHERE to_tsvector('english', content) @@ to_tsquery('quantum & computing');
 ----
 
-**VQL:**
+**VCL:**
 [source,vql]
 ----
 SELECT DOCUMENT
@@ -195,7 +195,7 @@ ORDER BY embedding <-> '[0.1, 0.2, 0.3, 0.4]'
 LIMIT 10;
 ----
 
-**VQL:**
+**VCL:**
 [source,vql]
 ----
 SELECT VECTOR
@@ -206,7 +206,7 @@ LIMIT 10
 
 === Verified Query (No SQL Equivalent)
 
-**VQL-DT (dependent type path):**
+**VCL-DT (dependent type path):**
 [source,vql]
 ----
 SELECT *
@@ -220,7 +220,7 @@ This returns the octad data _plus_ a cryptographic proof certificate asserting d
 
 [cols="2,1,1",options="header"]
 |===
-|Capability |SQL |VQL
+|Capability |SQL |VCL
 
 |Relational queries |Yes |No
 |Multimodal queries |No |Yes
@@ -237,4 +237,4 @@ This returns the octad data _plus_ a cryptographic proof certificate asserting d
 |Pagination (LIMIT/OFFSET) |Yes |Yes
 |===
 
-VQL is not a replacement for SQL. It is a purpose-built query language for a multimodal database that treats entities as six simultaneous representations rather than rows in flat tables. Use SQL when you need relational algebra. Use VQL when you need to query across modalities with optional formal verification.
+VCL is not a replacement for SQL. It is a purpose-built query language for a multimodal database that treats entities as six simultaneous representations rather than rows in flat tables. Use SQL when you need relational algebra. Use VCL when you need to query across modalities with optional formal verification.

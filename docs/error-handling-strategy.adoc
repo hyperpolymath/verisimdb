@@ -1252,7 +1252,7 @@ Parse Error at 1:8: Expected 'GRAPH', 'VECTOR', ..., found 'GRPH'
 
 == References
 
-- link:vql-architecture.adoc[VQL Architecture]
+- link:vcl-architecture.adoc[VQL Architecture]
 - link:caching-strategy.adoc[Caching Strategy]
 - link:reversibility-design.adoc[Reversibility Design]
 - link:../src/vql/VQLError.res[VQL Error Types]

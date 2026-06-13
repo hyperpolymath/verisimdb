@@ -72,7 +72,7 @@
 | verisim-api            | `████████░░` 80%             | Active       |
 | Elixir OTP layer       | `███████░░░` 70%             | Active       |
 | VQL parser             | `█████████░` 95%             | Active       |
-| VQL-DT (Lean checker)  | `░░░░░░░░░░` 0%              | Not started  |
+| VCL-DT (Lean checker)  | `░░░░░░░░░░` 0%              | Not started  |
 | Idris2 ABI             | `████░░░░░░` 40%             | In progress  |
 | Zig FFI                | `████░░░░░░` 40%             | In progress  |
 | Containerfile          | `██████████` 100%            | Complete     |

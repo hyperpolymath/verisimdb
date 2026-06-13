@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-DT (Dependent Type Path) Wiring Assessment
+= VCL-DT (Dependent Type Path) Wiring Assessment
 :author: Jonathan D.A. Jewell (hyperpolymath)
 :date: 2026-02-27
 :repo: verisimdb
@@ -9,7 +9,7 @@
 
 == Executive Summary
 
-VQL-DT has *substantially more real implementation than initially expected*.
+VCL-DT has *substantially more real implementation than initially expected*.
 The ReScript type checker and Rust proof/semantic layer are genuinely functional
 with real algorithms, tests, and meaningful code. However, the three layers
 (ReScript, Rust, Elixir) are **not wired together end-to-end**. Each layer
@@ -19,7 +19,7 @@ works in isolation but the integration seams are broken or stubbed.
 |===
 | Layer | Implementation | Integration | Assessment
 
-| ReScript VQL
+| ReScript VCL
 | ~85% real code
 | 0% connected to Elixir executor
 | *Impressive standalone work, needs integration*
@@ -40,12 +40,12 @@ works in isolation but the integration seams are broken or stubbed.
 | *No formal type checker present*
 |===
 
-**Honest overall VQL-DT completion: ~35%** (individual components exist;
+**Honest overall VCL-DT completion: ~35%** (individual components exist;
 end-to-end pipeline does not).
 
 == Layer-by-Layer Assessment
 
-=== 1. ReScript VQL Layer (`src/vql/`)
+=== 1. ReScript VCL Layer (`src/vql/`)
 
 ==== What Is Actually Implemented (Real Working Code)
 
@@ -125,10 +125,10 @@ end-to-end pipeline does not).
 ==== What Is Missing
 
 1. **No integration with Elixir executor.** The ReScript type checker runs
-   entirely client-side (in the browser or via Deno/Node). The Elixir VQL
+   entirely client-side (in the browser or via Deno/Node). The Elixir VCL
    executor comment says "Type-check if PROOF clause present (VQLTypeChecker
    -> VQLBidir)" but this invocation never happens. The Elixir executor
-   parses VQL independently using its own built-in parser.
+   parses VCL independently using its own built-in parser.
 
 2. **No proof generation triggered from type checker.** The type checker
    produces a `ProvedResultType` and `composedProofPlan`, but these are not
@@ -192,7 +192,7 @@ end-to-end pipeline does not).
 | `sanctify_bridge.rs` (414 lines)
 | *FULLY IMPLEMENTED.* Parses sanctify-php security reports, security issue
   types, severity levels, contract validation, proof blob conversion.
-  Tangential to VQL-DT but functional.
+  Tangential to VCL-DT but functional.
 |===
 
 ==== What Is Stubbed/Incomplete
@@ -225,9 +225,9 @@ two for `:zkp` and `:proven` proof types.
 
 ==== What Is NOT Exposed
 
-The Rust VQL endpoint (`vql.rs`) is a **Slipstream-only parser**. It handles
+The Rust VCL endpoint (`vql.rs`) is a **Slipstream-only parser**. It handles
 SELECT, SEARCH, INSERT, DELETE, SHOW, COUNT, EXPLAIN but has *zero PROOF
-clause handling*. Any VQL query with a PROOF clause sent to the Rust VQL
+clause handling*. Any VCL query with a PROOF clause sent to the Rust VCL
 endpoint would fail or be silently ignored.
 
 === 3. Elixir Orchestration Layer (`elixir-orchestration/lib/verisim/query/`)
@@ -240,7 +240,7 @@ endpoint would fail or be silently ignored.
 
 | `vql_bridge.ex` (672 lines)
 | *IMPLEMENTED with degraded fallback.* GenServer managing a Deno/Node
-  subprocess that runs compiled ReScript VQL parser. Falls back to built-in
+  subprocess that runs compiled ReScript VCL parser. Falls back to built-in
   Elixir parser when subprocess unavailable. `parse_dependent/2` exists but
   the fallback parser only collects PROOF tokens as raw strings, not
   structured proof specs.
@@ -253,7 +253,7 @@ endpoint would fail or be silently ignored.
 
 | `query_router.ex` (187 lines)
 | *IMPLEMENTED.* Routes queries by type (:text, :vector, :graph, :semantic,
-  :temporal, :multi) to RustClient. No VQL-DT-specific logic.
+  :temporal, :multi) to RustClient. No VCL-DT-specific logic.
 |===
 
 ==== The Critical Proof Verification Gap
@@ -296,7 +296,7 @@ core is down, ALL proof verification silently passes.
 ==== What The Elixir Executor Does NOT Do
 
 1. Does **not invoke the ReScript bidirectional type checker**
-2. Does **not type-check VQL-DT queries** (only the ReScript layer does this,
+2. Does **not type-check VCL-DT queries** (only the ReScript layer does this,
    client-side)
 3. Does **not generate actual proof obligations** from PROOF clauses (only the
    ReScript `VQLProofObligation.res` does this, client-side)
@@ -310,10 +310,10 @@ core is down, ALL proof verification silently passes.
 
 **Does not exist.** The Idris2 files found in `src/abi/` (Types.idr,
 Layout.idr, Foreign.idr) are standard ABI definitions for VeriSimDB's FFI
-layer, not VQL type checkers. No `.lean` files exist anywhere in the
+layer, not VCL type checkers. No `.lean` files exist anywhere in the
 repository.
 
-The CLAUDE.md Known Issues section acknowledges: "VQL-DT not connected to VQL
+The CLAUDE.md Known Issues section acknowledges: "VCL-DT not connected to VCL
 PROOF runtime (Lean type checker not invoked)." This is accurate — no Lean
 type checker has been written.
 
@@ -342,8 +342,8 @@ type checker has been written.
 | *BROKEN.* Executor never calls `/proofs/generate-with-circuit`.
 
 | Elixir executor
-| Rust VQL endpoint
-| *PARTIAL.* The Rust VQL endpoint has no PROOF handling.
+| Rust VCL endpoint
+| *PARTIAL.* The Rust VCL endpoint has no PROOF handling.
 
 | proven library (external)
 | Rust proven_bridge
@@ -356,10 +356,10 @@ type checker has been written.
 
 === Data Flow: What Should Happen vs What Actually Happens
 
-**Intended VQL-DT data flow:**
+**Intended VCL-DT data flow:**
 [source]
 ----
-Client sends VQL with PROOF clause
+Client sends VCL with PROOF clause
   -> Elixir executor receives query
   -> ReScript type checker validates types + generates proof obligations
   -> Proof obligations sent to Rust ZKP bridge
@@ -371,7 +371,7 @@ Client sends VQL with PROOF clause
 **What actually happens today:**
 [source]
 ----
-Client sends VQL with PROOF clause
+Client sends VCL with PROOF clause
   -> Elixir executor receives query (via fallback parser)
   -> PROOF tokens collected as raw strings
   -> verify_single_proof() called per spec
@@ -463,7 +463,7 @@ To get real ZK-SNARKs:
 The CLAUDE.md mentions a Lean type checker but none exists. Building one would
 mean:
 
-1. Define VQL-DT's type system in Lean 4 or Idris2.
+1. Define VCL-DT's type system in Lean 4 or Idris2.
 2. Implement bidirectional type checking with dependent types.
 3. Generate proof obligations as Lean/Idris2 terms.
 4. Verify proof obligations against the type system.
@@ -478,7 +478,7 @@ checker is sufficient for practical use.
 |===
 | Component | Code Written | Code Working | End-to-End Wired
 
-| ReScript VQL Parser
+| ReScript VCL Parser
 | 95%
 | 95%
 | 0%
@@ -518,12 +518,12 @@ checker is sufficient for practical use.
 | 90%
 | 0%
 
-| Elixir VQL Bridge
+| Elixir VCL Bridge
 | 70%
 | 70%
 | 40%
 
-| Elixir VQL Executor (proof path)
+| Elixir VCL Executor (proof path)
 | 30%
 | 30%
 | 15%
@@ -538,7 +538,7 @@ checker is sufficient for practical use.
 | 0%
 | 0%
 
-| *Overall VQL-DT Pipeline*
+| *Overall VCL-DT Pipeline*
 | *~60%*
 | *~55%*
 | *~10%*
@@ -546,7 +546,7 @@ checker is sufficient for practical use.
 
 NOTE: "Code Written" and "Code Working" are high because real algorithms are
 implemented and tests pass. "End-to-End Wired" is abysmal because the layers
-do not talk to each other for the VQL-DT path.
+do not talk to each other for the VCL-DT path.
 
 == Key Takeaways
 
@@ -558,7 +558,7 @@ do not talk to each other for the VQL-DT path.
    as isolated islands. The Elixir executor's proof verification is the weakest
    link — it's largely hardcoded `:ok` returns.
 
-3. **The shortest path to a working VQL-DT pipeline** is wiring the ReScript
+3. **The shortest path to a working VCL-DT pipeline** is wiring the ReScript
    type checker to the Elixir executor (Priority 1) and connecting proof
    obligations to the Rust ZKP bridge (Priority 2). This would give ~60%
    end-to-end functionality in roughly 1-2 weeks of focused work.
@@ -568,5 +568,5 @@ do not talk to each other for the VQL-DT path.
    provides no actual zero-knowledge properties. This is the honest truth.
 
 5. **The Lean type checker is aspirational.** The ReScript type checker is
-   capable enough for practical VQL-DT use. A Lean version would provide
+   capable enough for practical VCL-DT use. A Lean version would provide
    formal verification guarantees but is not blocking functionality.

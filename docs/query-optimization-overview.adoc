@@ -475,8 +475,8 @@ LIMIT 10
 
 == References
 
-- link:vql-architecture.adoc[VQL Architecture] - Dual-path router design
-- link:vql-examples.adoc[VQL Examples] - 35+ example queries
+- link:vcl-architecture.adoc[VQL Architecture] - Dual-path router design
+- link:vcl-examples.adoc[VQL Examples] - 35+ example queries
 - link:reversibility-design.adoc[Reversibility Design] - Full technical specification
 - link:../lib/verisim/query_planner_config.ex[Query Planner Config] - Source code
 - link:../lib/verisim/query_planner_bidirectional.ex[Bidirectional Optimization] - Source code

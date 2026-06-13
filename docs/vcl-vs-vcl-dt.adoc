@@ -1,38 +1,38 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-= VQL Execution Modes & Safety Architecture
+= VCL Execution Modes & Safety Architecture
 :toc: left
 :toclevels: 3
 :sectnums:
 
 == Overview
 
-VQL has two distinct concerns, cleanly separated:
+VCL has two distinct concerns, cleanly separated:
 
-1. **VQL** -- The query language itself. Parsing, basic types, execution. What users write.
-2. **VQL-UT** -- The safety pipeline. Applies 10 progressive type-safety levels behind VQL.
-   Users write VQL; VQL-UT validates it.
+1. **VCL** -- The query language itself. Parsing, basic types, execution. What users write.
+2. **VCL-UT** -- The safety pipeline. Applies 10 progressive type-safety levels behind VCL.
+   Users write VCL; VCL-UT validates it.
 
-Within VQL execution, there are two modes, determined by the presence or absence
+Within VCL execution, there are two modes, determined by the presence or absence
 of a `PROOF` clause:
 
-* **Slipstream** -- Fast, progressive safety (VQL-UT levels apply automatically based
+* **Slipstream** -- Fast, progressive safety (VCL-UT levels apply automatically based
   on query complexity — simple queries exit early at L1-L2, complex queries go deeper).
 * **Proof-carrying** -- Formally verified queries. The `PROOF` clause triggers dependent
   type checking, proof obligation generation, and a proof certificate attached to the
-  result. This corresponds to VQL-UT levels L9-L10.
+  result. This corresponds to VCL-UT levels L9-L10.
 
 Both modes use the same parser and produce the same AST. They diverge at the query
 router, which inspects the AST for a `PROOF` node and selects the appropriate pipeline.
 
-=== Historical Note: VQL-DT
+=== Historical Note: VCL-DT
 
-VQL-DT (Dependent Types) was the original name for the proof-carrying execution mode.
-It is not a separate codebase or product — it is an internal execution path within VQL,
-now folded into VQL-UT's L9 (Proof Attachment) and L10 (Cross-Cutting) levels. All
-references to "VQL-DT" in older documentation should be read as "VQL proof-carrying mode"
-or "VQL-UT L9-L10".
+VCL-DT (Dependent Types) was the original name for the proof-carrying execution mode.
+It is not a separate codebase or product — it is an internal execution path within VCL,
+now folded into VCL-UT's L9 (Proof Attachment) and L10 (Cross-Cutting) levels. All
+references to "VCL-DT" in older documentation should be read as "VCL proof-carrying mode"
+or "VCL-UT L9-L10".
 
 == The Two-Tier Model
 
@@ -40,19 +40,19 @@ or "VQL-UT L9-L10".
 |===
 | Tier | What | How
 
-| **VQL**
+| **VCL**
 | The query language
 | Parser (ReScript) → AST → basic validation. Everyone uses this.
 
-| **VQL-UT**
+| **VCL-UT**
 | The safety pipeline
-| 10 progressive levels. Sits behind VQL. Applies automatically.
+| 10 progressive levels. Sits behind VCL. Applies automatically.
   Simple queries short-circuit at L1-L2. Complex/federated/proof-carrying
-  queries go through L5-L10. No separate syntax — VQL-UT is invisible
+  queries go through L5-L10. No separate syntax — VCL-UT is invisible
   to the user except when they add a `PROOF` clause.
 |===
 
-== VQL-UT Safety Levels (Progressive)
+== VCL-UT Safety Levels (Progressive)
 
 The pipeline is progressive — each query enters at L1 and exits as soon as
 remaining levels don't apply. A simple `SELECT` exits at L2. A `PROOF INTEGRITY`
@@ -75,7 +75,7 @@ query goes all the way to L10.
 |===
 
 Levels L1-L8 apply automatically (slipstream). Levels L9-L10 activate when the
-query includes a `PROOF` clause — this is what was previously called "VQL-DT".
+query includes a `PROOF` clause — this is what was previously called "VCL-DT".
 
 == Slipstream Mode (Default)
 
@@ -94,7 +94,7 @@ WHERE CONTAINS(h.content, "neural network")
 LIMIT 50
 ----
 
-This query enters VQL-UT at L1 (injection prevention), passes L2 (schema
+This query enters VCL-UT at L1 (injection prevention), passes L2 (schema
 check), and exits. L3-L10 don't apply — no connections to leak, no proofs
 requested.
 
@@ -115,7 +115,7 @@ FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 PROOF INTEGRITY(DataIntegrityContract)
 ----
 
-This query passes through all 10 VQL-UT levels. At L9, proof obligations are
+This query passes through all 10 VCL-UT levels. At L9, proof obligations are
 generated. At L10, the proof certificate is assembled and attached to the result.
 
 == The Six PROOF Types
@@ -198,12 +198,12 @@ that apply — a simple SELECT is essentially free beyond parsing.
 [source,text]
 ----
                   ┌──────────────────┐
-                  │  VQL Query       │
+                  │  VCL Query       │
                   │  (raw string)    │
                   └────────┬─────────┘
                            │
                   ┌────────▼─────────┐
-                  │  VQL Parser      │
+                  │  VCL Parser      │
                   │  (ReScript)      │
                   └────────┬─────────┘
                            │
@@ -212,7 +212,7 @@ that apply — a simple SELECT is essentially free beyond parsing.
                   └────────┬─────────┘
                            │
               ┌────────────▼────────────┐
-              │   VQL-UT Pipeline       │
+              │   VCL-UT Pipeline       │
               │                         │
               │  L1: Construction ──┐   │
               │  L2: Schema ────────┤   │
@@ -243,7 +243,7 @@ that apply — a simple SELECT is essentially free beyond parsing.
 | Phase | Work | Status
 
 | Phase 1
-| VQL parser handles PROOF clauses, AST includes proof nodes, query router branches correctly.
+| VCL parser handles PROOF clauses, AST includes proof nodes, query router branches correctly.
 | Done
 
 | Phase 2

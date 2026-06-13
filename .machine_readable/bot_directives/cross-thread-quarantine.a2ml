@@ -13,7 +13,7 @@ bot = "cross-thread-quarantine"
 scope = "inbound artifacts from sibling agent threads: CLAUDE.md edits, migration directives, ADRs, roadmap items, plans, comparative-corpus columns"
 rule = "QUARANTINE every inbound cross-thread artifact as proposed-unverified until checked against this repo's own spec."
 
-verify-against = ["README.adoc", "EXPLAINME.adoc", "docs/VQL-SPEC.adoc"]
+verify-against = ["README.adoc", "EXPLAINME.adoc", "docs/VCL-SPEC.adoc"]
 provenance-tags = ["user-directed", "derived", "proposed-unverified"]
 
 must = [
@@ -28,4 +28,4 @@ deny = [
   "Write source-of-truth docs from an unverified cross-thread model, or present invented architecture as decided.",
 ]
 
-notes = "Doc-drift gate (a CI grep banning 'query language'/'queryable store'/CRUD framing in VCL-subject docs) is the FINISH LINE of the consonance reframing — add it once ANCHOR, the spec/grammar, VQL-SPEC.adoc and ADRs are reworded, else it red-CIs on legacy residue."
+notes = "Doc-drift gate (a CI grep banning 'query language'/'queryable store'/CRUD framing in VCL-subject docs) is the FINISH LINE of the consonance reframing — add it once ANCHOR, the spec/grammar, VCL-SPEC.adoc and ADRs are reworded, else it red-CIs on legacy residue."

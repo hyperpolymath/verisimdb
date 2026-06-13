@@ -77,7 +77,7 @@ These are hard requirements: CI and pre-commit hooks fail if any check fails.
 - run: test -f .editorconfig
 - severity: warning
 
-## VQL (VeriSim Query Language)
+## VQL (VeriSim Consonance Language)
 
 ### vql-rescript-parser
 - description: ReScript VQL parser source must exist
@@ -89,7 +89,7 @@ These are hard requirements: CI and pre-commit hooks fail if any check fails.
 - run: test -f elixir-orchestration/lib/verisim/query/vql_bridge.ex
 - severity: high
 
-### vql-examples-present
+### vcl-examples-present
 - description: At least one .vql example/fixture must exist
 - run: test -n "$(find . -name '*.vql' -not -path '*/.git/*' 2>/dev/null)"
 - severity: warning

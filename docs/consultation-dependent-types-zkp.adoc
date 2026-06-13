@@ -1114,7 +1114,7 @@ e ::= x | n | true | false | ()
 
 === A.2 Typing Rules (Complete)
 
-See docs/vql-type-system.adoc for full 30+ typing rules.
+See docs/vcl-type-system.adoc for full 30+ typing rules.
 
 ---
 
