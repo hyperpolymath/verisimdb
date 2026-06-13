@@ -6,7 +6,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
     VQL string → parse → typecheck → plan → execute → result
 
-  These tests validate the VCL-SPEC contract by exercising every major
+  These tests validate the VQL-SPEC contract by exercising every major
   language feature through the complete pipeline. They are designed to
   pass both with and without the Rust core running:
 
@@ -18,7 +18,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
   1. **Full pipeline round-trip** — parse → typecheck → execute for each query shape
   2. **Proof certificate round-trip** — typecheck → generate cert → verify cert
-  3. **VCL-SPEC grammar coverage** — every production in vcl-grammar.ebnf tested
+  3. **VQL-SPEC grammar coverage** — every production in vql-grammar.ebnf tested
   4. **Error paths** — malformed queries, invalid proof types, bad modality combos
   5. **Cross-modal condition evaluation** — drift, consistency, exists checks
   6. **Mutation pipeline** — INSERT/UPDATE/DELETE parse → execute routing
@@ -249,10 +249,10 @@ defmodule VeriSim.Query.VQLE2ETest do
   end
 
   # ===========================================================================
-  # 3. VCL-SPEC grammar coverage
+  # 3. VQL-SPEC grammar coverage
   # ===========================================================================
 
-  describe "VCL-SPEC grammar coverage" do
+  describe "VQL-SPEC grammar coverage" do
     test "SELECT with column projection (not star)" do
       query = "SELECT DOCUMENT.title, DOCUMENT.body FROM HEXAD 'entity-001'"
       ast = H.parse!(query)
