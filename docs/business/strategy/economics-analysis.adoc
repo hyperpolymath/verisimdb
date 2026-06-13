@@ -216,7 +216,7 @@ Cloud service is in beta.
 | Full-featured open source. Cloud adds managed infrastructure.
 
 | *VeriSimDB*
-| Community Edition (PMPL)
+| Community Edition (MPL-2.0)
 | Standard: $25,000/year; Professional: $40,000/year; Enterprise: $75,000/year
 | Full-featured community edition. Commercial licence provides support and SLA,
 not additional features.

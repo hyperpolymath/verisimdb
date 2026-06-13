@@ -311,7 +311,7 @@ infrastructure without requiring data migration.
 | 3
 
 | Open source
-| PMPL
+| MPL-2.0
 | GPLv3
 | No
 | BSD-3
@@ -344,7 +344,7 @@ dynamics are:
 |===
 | Tier | Description
 
-| *Community Edition (PMPL)*
+| *Community Edition (MPL-2.0)*
 | Full-featured VeriSimDB with all 8 modalities, drift detection,
   self-normalisation, VQL, and federation. Free, open source under MPL-2.0.
 
@@ -366,7 +366,7 @@ The community edition is intentionally full-featured. Revenue comes from the
 * Maximises adoption and community growth
 * Creates a large funnel of users who may convert to commercial support
 * Avoids the "open core bait-and-switch" perception that damages developer trust
-* Aligns with the PMPL license philosophy
+* Aligns with the MPL-2.0 file-level copyleft philosophy
 
 === Revenue Streams
 
@@ -567,10 +567,11 @@ profitability faster and at higher margins.
 | Full-featured community edition builds trust; commercial support addresses
   operational needs (SLA, priority patches) that free users do not require
 
-| PMPL license unfamiliarity
-| Enterprise legal teams may hesitate on non-OSI license
-| PMPL is permissive and well-documented; MPL-2.0 fallback available where
-  required; commercial license option for enterprises that require it
+| MPL-2.0 licence adoption
+| Enterprise legal teams may require licence review
+| MPL-2.0 is an OSI-approved, well-understood licence with file-level copyleft;
+  permissive for embedding in proprietary products at the application level;
+  commercial licence option available for enterprises that require it
 |===
 
 == Conclusion
