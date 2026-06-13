@@ -130,7 +130,7 @@ K9!
     },
 
     "add-license" = {
-      description = "Add PMPL-1.0 license",
+      description = "Add MPL-2.0 license",
       commands = [
         "curl -sL https://raw.githubusercontent.com/hyperpolymath/pmpl/main/LICENSE -o LICENSE",
         "echo '✓ License added'",

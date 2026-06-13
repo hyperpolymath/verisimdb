@@ -228,7 +228,7 @@ Legend: {check} = Full support | {half} = Partial/limited | {cross} = Not suppor
 7+h| *Engineering & Operations*
 
 | Open source
-| PMPL
+| MPL-2.0
 | GPLv3
 | Proprietary
 | BSD-3-Clause
@@ -299,7 +299,7 @@ Legend: {check} = Full support | {half} = Partial/limited | {cross} = Not suppor
 * *No temporal versioning:* No built-in bitemporal queries or time-travel.
 * *No provenance:* Lineage tracking requires external tooling.
 * *No federation:* Cannot federate with other databases.
-* *GPLv3 license:* More restrictive than PMPL for embedding in proprietary
+* *GPLv3 license:* More restrictive than MPL-2.0 for embedding in proprietary
   products.
 
 === Pinecone

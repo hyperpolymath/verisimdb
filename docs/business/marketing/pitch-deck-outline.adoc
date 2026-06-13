@@ -291,7 +291,7 @@ the category rather than compete within an established one.
 
 ----
 ┌─────────────────────────────────────────────┐
-│           Community Edition (PMPL)          │
+│           Community Edition (MPL-2.0)        │
 │  All 8 modalities, drift detection,        │
 │  self-normalisation, VQL, federation       │
 │  FREE — forever                            │
@@ -341,7 +341,7 @@ funnel and a natural conversion path.
 | *Formal proofs*    | * |   |   |   |   |
 | Federation         | * |   |   |   |   |
 | Modalities/entity  | 8 | 1 | 1 | 2 | 3 | 3
-| Open source        | PMPL | GPLv3 | No | BSD-3 | Apache | BSL
+| Open source        | MPL-2.0 | GPLv3 | No | BSD-3 | Apache | BSL
 |===
 
 _* = supported_

@@ -152,7 +152,7 @@ has strong developer ergonomics.
 Like ArangoDB, SurrealDB stores multiple models but does not check consistency
 between them. It has no drift detection, no self-normalisation, no formal query
 verification, and no federation. Its Business Source License (BSL 1.1) restricts
-commercial use, while VeriSimDB's PMPL license is permissive.
+commercial use, while VeriSimDB is released under MPL-2.0, an OSI-approved licence.
 
 == Technical Architecture
 
@@ -221,12 +221,13 @@ a permissive open-source license. The community edition is full-featured with
 no artificial restrictions -- all 8 modalities, drift detection,
 self-normalisation, VQL, and federation are included.
 
-=== What is the PMPL license?
+=== What licence is VeriSimDB under?
 
-The Palimpsest License (MPL-2.0) is a permissive open-source license
-developed by hyperpolymath. It allows free use, modification, and distribution
-of the software with minimal restrictions. For projects that require an
-OSI-approved license, an MPL-2.0 fallback is available.
+VeriSimDB is released under the Mozilla Public License 2.0 (MPL-2.0), an
+OSI-approved open-source licence. MPL-2.0 applies copyleft at the file level:
+modified MPL-2.0 files must be shared under MPL-2.0, but larger works that
+incorporate VeriSimDB as a component may be distributed under different terms.
+This makes it suitable for embedding in proprietary products.
 
 === Is there a commercial version?
 

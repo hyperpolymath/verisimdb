@@ -46,7 +46,7 @@ before downstream systems consume contradictory data.
    of query correctness using Idris2
 5. *Heterogeneous federation* -- Unified querying across PostgreSQL, ArangoDB,
    Elasticsearch, and Neo4j without data migration
-6. *Open source (PMPL)* -- Full-featured community edition with no artificial
+6. *Open source (MPL-2.0)* -- Full-featured community edition with no artificial
    restrictions
 
 == Technical Audience (Database Engineers, Backend Developers)
@@ -153,7 +153,7 @@ continuously and repairs it automatically.
 
 === Proof Points
 
-* Open source under PMPL (permissive licence, MPL-2.0 fallback available)
+* Open source under MPL-2.0 (OSI-approved; file-level copyleft, permissive for embedding)
 * Enterprise support target ACV: $40,000/year
 * Built on battle-tested foundations: Rust (memory safety), Elixir/OTP
   (fault tolerance, 99.9999% uptime heritage from telecom)
@@ -301,7 +301,7 @@ community edition. There is no "enterprise edition" that gates features.
 === Use These Phrases
 
 * "Full-featured community edition" (emphasise no feature gating)
-* "Permissive licence" (PMPL is permissive; say so explicitly)
+* "Mozilla Public License 2.0" or "MPL-2.0" (OSI-approved; say so explicitly)
 * "Contributions welcome in [Rust/Elixir/ReScript/docs]" (specific, not generic)
 
 === Avoid These Phrases
