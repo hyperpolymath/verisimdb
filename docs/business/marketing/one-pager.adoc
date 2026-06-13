@@ -40,7 +40,7 @@ cross-modal consistency monitoring.
   with optional dependent-type proofs (VQL-DT) for compile-time query verification
 * *Federation* -- Bring drift detection to existing infrastructure by federating
   across PostgreSQL, ArangoDB, Elasticsearch, Neo4j, and more
-* *Open source* -- Full-featured community edition under the Palimpsest License
+* *Open source* -- Full-featured community edition under the Mozilla Public License 2.0 (MPL-2.0)
   (MPL-2.0); no feature gating
 
 === Technical Differentiators
@@ -76,4 +76,4 @@ cross-modal consistency monitoring.
 ''''
 
 _VeriSimDB is developed by Jonathan D.A. Jewell at hyperpolymath._
-_Licensed under MPL-2.0 (Palimpsest License)._
+_Licensed under MPL-2.0._

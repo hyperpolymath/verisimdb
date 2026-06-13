@@ -12,7 +12,7 @@
     dcterms:description "Linked data from verisimdb project" ;
     dcterms:creator <https://verisimdb.dev#creator> ;
     dcterms:publisher <https://verisimdb.dev#publisher> ;
-    dcterms:license <https://palimpsest.spdx.dev> ;
+    dcterms:license <https://spdx.org/licenses/MPL-2.0.html> ;
     dcterms:created "2026-01-31T16:49:57Z"^^xsd:dateTime ;
     dcterms:modified "2026-01-31T16:49:57Z"^^xsd:dateTime ;
 

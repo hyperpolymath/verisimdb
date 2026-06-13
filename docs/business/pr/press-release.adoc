@@ -54,7 +54,7 @@ data migration.
 
 === Availability and Licensing
 
-VeriSimDB is available immediately as open source under the *Palimpsest License
+VeriSimDB is available immediately as open source under the *Mozilla Public License 2.0 (MPL-2.0)
 (MPL-2.0)*, a permissive open-source license. The community edition
 is full-featured with no artificial restrictions. Commercial support licenses
 with enterprise SLAs, priority security patches, and deployment consulting are
