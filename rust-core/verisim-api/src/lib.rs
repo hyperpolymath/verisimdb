@@ -77,9 +77,9 @@ use verisim_temporal::RedbVersionStore;
 use verisim_tensor::InMemoryTensorStore;
 #[cfg(feature = "persistent")]
 use verisim_tensor::RedbTensorStore;
+use verisim_vector::DistanceMetric;
 #[cfg(not(feature = "persistent"))]
 use verisim_vector::HnswVectorStore;
-use verisim_vector::DistanceMetric;
 #[cfg(feature = "persistent")]
 use verisim_vector::RedbVectorStore;
 
