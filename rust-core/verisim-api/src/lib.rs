@@ -78,7 +78,7 @@ use verisim_tensor::InMemoryTensorStore;
 #[cfg(feature = "persistent")]
 use verisim_tensor::RedbTensorStore;
 #[cfg(not(feature = "persistent"))]
-use verisim_vector::BruteForceVectorStore;
+use verisim_vector::HnswVectorStore;
 use verisim_vector::DistanceMetric;
 #[cfg(feature = "persistent")]
 use verisim_vector::RedbVectorStore;
@@ -91,7 +91,7 @@ use verisim_vector::RedbVectorStore;
 #[cfg(not(feature = "persistent"))]
 pub type ConcreteOctadStore = InMemoryOctadStore<
     SimpleGraphStore,
-    BruteForceVectorStore,
+    HnswVectorStore,
     TantivyDocumentStore,
     InMemoryTensorStore,
     InMemorySemanticStore,
@@ -580,7 +580,7 @@ impl AppState {
             .map_err(|e| ApiError::Internal(e.to_string()))?,
         );
         #[cfg(not(feature = "persistent"))]
-        let vector = Arc::new(BruteForceVectorStore::new(
+        let vector = Arc::new(HnswVectorStore::with_defaults(
             config.vector_dimension,
             DistanceMetric::Cosine,
         ));
@@ -1153,18 +1153,17 @@ async fn text_search_handler(
     };
     let limit = validate_limit(query.limit.unwrap_or(10));
 
-    let octads = state
+    let scored = state
         .octad_store
-        .search_text(&q, limit)
+        .search_text_scored(&q, limit)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let results: Vec<SearchResultResponse> = octads
+    let results: Vec<SearchResultResponse> = scored
         .iter()
-        .enumerate()
-        .map(|(i, h)| SearchResultResponse {
+        .map(|(h, score)| SearchResultResponse {
             id: h.id.to_string(),
-            score: 1.0 - (i as f32 * 0.1), // Approximate score based on ranking
+            score: *score, // Tantivy BM25 relevance score
             title: h.document.as_ref().map(|d| d.title.clone()),
         })
         .collect();
@@ -1189,18 +1188,17 @@ async fn vector_search_handler(
     }
     validate_vector(&request.vector)?;
 
-    let octads = state
+    let scored = state
         .octad_store
-        .search_similar(&request.vector, k)
+        .search_similar_scored(&request.vector, k)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let results: Vec<SearchResultResponse> = octads
+    let results: Vec<SearchResultResponse> = scored
         .iter()
-        .enumerate()
-        .map(|(i, h)| SearchResultResponse {
+        .map(|(h, score)| SearchResultResponse {
             id: h.id.to_string(),
-            score: 1.0 - (i as f32 * 0.1), // Approximate score based on ranking
+            score: *score, // cosine similarity from the vector index
             title: h.document.as_ref().map(|d| d.title.clone()),
         })
         .collect();
@@ -1594,25 +1592,24 @@ async fn similar_queries_handler(
     validate_vector(&request.vector)?;
 
     // Search for similar octads (which includes query-octads)
-    let octads = state
+    let scored = state
         .octad_store
-        .search_similar(&request.vector, k)
+        .search_similar_scored(&request.vector, k)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     // Filter to only query octads (those with "vql_query" type in document fields)
-    let results: Vec<SearchResultResponse> = octads
+    let results: Vec<SearchResultResponse> = scored
         .iter()
-        .filter(|h| {
+        .filter(|(h, _score)| {
             h.document
                 .as_ref()
                 .map(|d| d.title.starts_with("VQL Query:"))
                 .unwrap_or(false)
         })
-        .enumerate()
-        .map(|(i, h)| SearchResultResponse {
+        .map(|(h, score)| SearchResultResponse {
             id: h.id.to_string(),
-            score: 1.0 - (i as f32 * 0.1),
+            score: *score, // cosine similarity from the vector index
             title: h.document.as_ref().map(|d| d.title.clone()),
         })
         .collect();
@@ -2809,6 +2806,76 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Vector search must surface the index's real cosine scores, not a
+    /// synthetic rank sequence (the old `1.0 - 0.1*i`). The discriminator:
+    /// `[0.9, 0.1, 0.0]` is ~0.994 cosine to `[1,0,0]`, whereas the old
+    /// scheme would have reported the second hit as exactly 0.9.
+    #[tokio::test]
+    async fn test_vector_search_returns_real_cosine_scores() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let make = |embedding: Vec<f32>, title: &str| OctadRequest {
+            title: Some(title.to_string()),
+            body: Some("body".to_string()),
+            embedding: Some(embedding),
+            types: None,
+            relationships: None,
+            tensor: None,
+            metadata: None,
+            provenance: None,
+            spatial: None,
+        };
+
+        post_octad(&app, &make(vec![1.0, 0.0, 0.0], "aligned")).await;
+        post_octad(&app, &make(vec![0.9, 0.1, 0.0], "near")).await;
+        post_octad(&app, &make(vec![0.0, 1.0, 0.0], "orthogonal")).await;
+
+        let request = VectorSearchRequest {
+            vector: vec![1.0, 0.0, 0.0],
+            k: Some(3),
+        };
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/search/vector")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&request).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let results: Vec<SearchResultResponse> = serde_json::from_slice(&body).unwrap();
+        assert!(results.len() >= 2, "expected at least two hits");
+
+        // Top hit is the identical-direction vector: cosine ~1.0.
+        assert!(
+            results[0].score > 0.99,
+            "top cosine score should be ~1.0, got {}",
+            results[0].score
+        );
+        // Second hit's real cosine is ~0.994; the old synthetic scheme would
+        // have reported exactly 0.9. This is the load-bearing assertion.
+        assert!(
+            results[1].score > 0.95,
+            "second hit must carry its real cosine (~0.994), not synthetic 0.9; got {}",
+            results[1].score
+        );
+        // Scores are non-increasing in relevance order.
+        for pair in results.windows(2) {
+            assert!(
+                pair[0].score >= pair[1].score,
+                "scores must be in descending relevance order"
+            );
+        }
     }
 
     #[tokio::test]

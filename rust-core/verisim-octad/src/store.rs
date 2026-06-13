@@ -1385,6 +1385,19 @@ where
     }
 
     async fn search_similar(&self, embedding: &[f32], k: usize) -> Result<Vec<Octad>, OctadError> {
+        Ok(self
+            .search_similar_scored(embedding, k)
+            .await?
+            .into_iter()
+            .map(|(octad, _score)| octad)
+            .collect())
+    }
+
+    async fn search_similar_scored(
+        &self,
+        embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<(Octad, f32)>, OctadError> {
         let results =
             self.vector
                 .search(embedding, k)
@@ -1394,10 +1407,12 @@ where
                     message: e.to_string(),
                 })?;
 
+        // Preserve the vector store's relevance order and carry each score
+        // through to the caller (the API surfaces it; no fabricated ranking).
         let mut octads = Vec::new();
         for result in results {
             if let Some(octad) = self.load_octad(&OctadId::new(&result.id)).await? {
-                octads.push(octad);
+                octads.push((octad, result.score));
             }
         }
 
@@ -1405,6 +1420,19 @@ where
     }
 
     async fn search_text(&self, query: &str, limit: usize) -> Result<Vec<Octad>, OctadError> {
+        Ok(self
+            .search_text_scored(query, limit)
+            .await?
+            .into_iter()
+            .map(|(octad, _score)| octad)
+            .collect())
+    }
+
+    async fn search_text_scored(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(Octad, f32)>, OctadError> {
         let results =
             self.document
                 .search(query, limit)
@@ -1417,7 +1445,7 @@ where
         let mut octads = Vec::new();
         for result in results {
             if let Some(octad) = self.load_octad(&OctadId::new(&result.id)).await? {
-                octads.push(octad);
+                octads.push((octad, result.score));
             }
         }
 

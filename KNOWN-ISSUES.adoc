@@ -107,13 +107,13 @@ Added `rescript.json` for build configuration.
 
 **Impact:** None (resolved). Documented here for audit trail completeness.
 
-=== 9. HNSW Implementation Is Real
+=== 9. HNSW Implementation Is Real — and now the default
 
-**Location:** `rust-core/verisim-vector/src/hnsw.rs`
+**Location:** `rust-core/verisim-vector/src/hnsw.rs`, `rust-core/verisim-api/src/lib.rs`
 
-**Current state:** The HNSW (Hierarchical Navigable Small World) implementation in `verisim-vector` is a genuine, functional implementation at approximately 670 lines of Rust. A previous audit incorrectly claimed this was brute-force search. This is **not** an issue -- it is a correction of a previous mischaracterization.
+**Current state:** The HNSW (Hierarchical Navigable Small World) implementation in `verisim-vector` is a genuine, functional implementation at approximately 670 lines of Rust (real Malkov–Yashunin layered graph, configurable `M`/`ef_construction`/`ef_search`, cosine/euclidean/dot metrics).
 
-**Impact:** None (this is a positive clarification). The vector modality store uses a real approximate nearest-neighbor algorithm, not a naive linear scan.
+**Resolved (wiring):** 2026-06-13. Until now this module was *built but orphaned* — the API's `ConcreteOctadStore` used `BruteForceVectorStore` (exact O(n) linear scan), so the "HNSW similarity search" claim was aspirational at the product boundary. The in-memory `ConcreteOctadStore` now uses `HnswVectorStore` as its vector backend, so the default build performs real approximate nearest-neighbor search. (The persistent/redb vector backend remains brute-force over an mmap'd store — a separate follow-on.)
 
 **Note:** This entry exists to prevent future audits from repeating the same incorrect claim.
 
@@ -267,3 +267,11 @@ Added `rescript.json` for build configuration.
 * `temporal_consistency_drift` works at 1-second timestamp resolution, so two writes within the same second register as a (mild) conflict signal.
 
 **Original issue:** The product's core claim — drift detection — ran on no real data anywhere in the system.
+
+=== 27. Search Scores Were Fabricated From Rank — ✅ RESOLVED
+
+**Location:** `rust-core/verisim-api/src/lib.rs`, `rust-core/verisim-octad/src/{lib,store}.rs`
+
+**Resolved:** 2026-06-13. The text, vector, and similar-query search endpoints all reported `score: 1.0 - (i as f32 * 0.1)` — a synthetic sequence derived from result position, discarding the real relevance scores the modality stores already compute (Tantivy BM25 for documents, cosine similarity for vectors). The octad store now exposes `search_text_scored` / `search_similar_scored` (returning `Vec<(Octad, f32)>`); the three handlers surface those real scores. Test `test_vector_search_returns_real_cosine_scores` pins the distinction (the second hit reports its true ~0.994 cosine, not synthetic 0.9).
+
+**Original issue:** API search responses carried fabricated scores, so any client ranking or thresholding on `score` was meaningless.
