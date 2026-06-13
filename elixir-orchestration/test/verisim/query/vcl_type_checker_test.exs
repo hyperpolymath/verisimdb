@@ -61,7 +61,9 @@ defmodule VeriSim.Query.VCLTypeCheckerTest do
 
     test "handles three proofs" do
       specs =
-        VCLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(a) AND PROVENANCE(b) AND INTEGRITY(c)"})
+        VCLTypeChecker.parse_proof_specs(%{
+          raw: "EXISTENCE(a) AND PROVENANCE(b) AND INTEGRITY(c)"
+        })
 
       assert length(specs) == 3
       assert Enum.map(specs, & &1.proofType) == ["EXISTENCE", "PROVENANCE", "INTEGRITY"]

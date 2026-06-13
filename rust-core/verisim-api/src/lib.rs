@@ -128,6 +128,9 @@ pub enum ApiError {
 
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl IntoResponse for ApiError {
@@ -135,6 +138,7 @@ impl IntoResponse for ApiError {
         let (status, client_message) = match &self {
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            ApiError::NotImplemented(msg) => (StatusCode::NOT_IMPLEMENTED, msg.clone()),
             ApiError::Internal(msg) => {
                 error!(error = %msg, "Internal server error");
                 (
@@ -1840,108 +1844,74 @@ async fn slow_queries_handler(
 }
 
 // --- Transaction Handlers ---
+//
+// Cross-request transactions are not yet implemented. The transaction
+// manager correctly tracks begin/commit/rollback lifecycle in memory, but
+// write handlers (create/update/delete octad) do not honour a txn_id — so
+// a committed transaction has no effect on the store. These handlers
+// return HTTP 501 until the write path is wired to the transaction log.
+// Roadmap: verisimdb issue #tx1 (cross-request txn write wiring).
 
-/// Begin a new transaction
-#[instrument(skip(state))]
+const TXN_NOT_IMPLEMENTED_MSG: &str = "Cross-request transactions are not implemented in 0.x. \
+     The transaction manager tracks lifecycle but writes are not \
+     transaction-scoped; commits are no-ops against the store. \
+     Planned for a future release.";
+
+#[instrument(skip(_state))]
 async fn transaction_begin_handler(
-    State(state): State<AppState>,
-) -> Result<(StatusCode, Json<transaction::TransactionStatus>), ApiError> {
-    let txn_id = state
-        .transaction_manager
-        .begin()
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    Ok((StatusCode::CREATED, Json(status)))
+    State(_state): State<AppState>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-/// Commit a transaction
-#[instrument(skip(state))]
+#[instrument(skip(_state))]
 async fn transaction_commit_handler(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_string(&id);
-
-    let _ops = state
-        .transaction_manager
-        .commit(&txn_id)
-        .await
-        .map_err(|e| match e {
-            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
-            _ => ApiError::BadRequest(e.to_string()),
-        })?;
-
-    // In a full implementation, ops would be applied to the octad store here
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    Ok(Json(status))
+    State(_state): State<AppState>,
+    Path(_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-/// Rollback a transaction
-#[instrument(skip(state))]
+#[instrument(skip(_state))]
 async fn transaction_rollback_handler(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_string(&id);
-
-    let _discarded = state
-        .transaction_manager
-        .rollback(&txn_id)
-        .await
-        .map_err(|e| match e {
-            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
-            _ => ApiError::BadRequest(e.to_string()),
-        })?;
-
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    Ok(Json(status))
+    State(_state): State<AppState>,
+    Path(_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-/// Get transaction status
-#[instrument(skip(state))]
+#[instrument(skip(_state))]
 async fn transaction_status_handler(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_string(&id);
-
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| match e {
-            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
-            _ => ApiError::Internal(e.to_string()),
-        })?;
-
-    Ok(Json(status))
+    State(_state): State<AppState>,
+    Path(_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-// --- ZKP Proof Handlers ---
+// --- Integrity-Commitment Proof Handlers ---
+//
+// NOTE: These endpoints provide SHA-256 commitment-reveal, Merkle membership,
+// and R1CS constraint checking — NOT zero-knowledge proofs in the
+// cryptographic sense. The "ZKP" / "zero_knowledge" label refers to a planned
+// ZK-SNARK integration (via the `sanctify` crate, not yet compiled in).
+// The API surface retains "ZKP" identifiers for backwards compatibility;
+// see KNOWN-ISSUES.adoc for the full gap description.
 
-/// API request for proof generation
+/// API request for integrity-commitment proof generation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProofGenerateRequest {
     /// The claim to prove (base64-encoded or plain text)
     pub claim: String,
     /// Privacy level: "public", "private", or "zero_knowledge"
+    /// (note: "zero_knowledge" provides blinded Merkle commitment, not ZK-SNARK)
     pub privacy_level: Option<String>,
     /// Optional membership set for Merkle inclusion proofs
     pub membership_set: Option<Vec<String>>,

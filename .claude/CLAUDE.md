@@ -8,10 +8,13 @@ VeriSimDB (Veridical Simulacrum Database) is a cross-system **identity-consonanc
 
 ## Machine-Readable Artefacts
 
-The following files in `.machine_readable/` contain structured project metadata:
-- `STATE.scm` - Current project state and progress
-- `META.scm` - Architecture decisions and development practices
-- `ECOSYSTEM.scm` - Position in the ecosystem and related projects
+`.machine_readable/` contains a2ml/Nickel estate spec artefacts:
+- `6a2/` — L1 specs: `STATE.a2ml`, `META.a2ml`, `ECOSYSTEM.a2ml`, `PLAYBOOK.a2ml`, `AGENTIC.a2ml`, `NEUROSYM.a2ml`, `0-AI-MANIFEST.a2ml`
+- `contractiles/` — per-repo contracts: `must/`, `trust/`, `intend/`, `adjust/`, `dust/`, `bust/`
+- `bot_directives/` — per-bot directives (echidnabot, hypatia, finishbot, …)
+- `anchors/` — anchor declarations
+- `svc/` — service-level specs
+- `ENSAID_CONFIG.a2ml` — top-level estate config
 
 ## Architecture
 
@@ -159,7 +162,7 @@ An Octad is one entity with 8 synchronized representations:
 - **Document**: Full-text searchable content
 - **Temporal**: Version history and time-series
 - **Provenance**: Origin tracking, transformation chain, actor trail (implemented — hash-chain integrity, actor search)
-- **Spatial**: Geospatial coordinates, geometries, proximity queries (implemented — R-tree index, radius/bounds/nearest search)
+- **Spatial**: Geospatial coordinates, geometries, proximity queries (implemented — haversine brute-force; R-tree index planned)
 
 ### Drift Detection
 Drift is measured as divergence between modalities:

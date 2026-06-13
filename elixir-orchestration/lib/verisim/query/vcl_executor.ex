@@ -23,7 +23,7 @@ defmodule VeriSim.Query.VCLExecutor do
   require Logger
 
   alias VeriSim.{QueryRouter, RustClient, Telemetry}
-  alias VeriSim.Query.VCLProofCertificate
+  alias VeriSim.Query.{VCLProofCertificate, VCLTGate}
 
   @doc """
   Execute a parsed VCL query.
@@ -92,14 +92,21 @@ defmodule VeriSim.Query.VCLExecutor do
 
   @doc """
   Execute a VCL query string (includes parsing).
+
+  Epistemic statements (INSPECT / VERIFY / SELECT) are checked against the
+  vclt-gate binary before execution when `VERISIM_VCLT_GATE` is set.
+  Mutations (INSERT / UPDATE / DELETE) bypass the gate and use proof
+  verification instead.
   """
   def execute_string(query_string, opts \\ []) do
     start_time = System.monotonic_time()
 
     result =
-      case VeriSim.Query.VCLBridge.parse(query_string) do
-        {:ok, ast} -> execute(ast, opts)
-        {:error, reason} -> {:error, {:parse_error, reason}}
+      with :ok <- gate_check(query_string) do
+        case VeriSim.Query.VCLBridge.parse(query_string) do
+          {:ok, ast} -> execute(ast, opts)
+          {:error, reason} -> {:error, {:parse_error, reason}}
+        end
       end
 
     # Emit telemetry for product insights (aggregate-only, no query content).
@@ -768,12 +775,36 @@ defmodule VeriSim.Query.VCLExecutor do
 
       {:ok, _artifacts} ->
         case RustClient.delete_octad(octad_id) do
-          {:ok, _} -> {:ok, %{octad_id: octad_id, operation: :delete}}
+          :ok -> {:ok, %{octad_id: octad_id, operation: :delete}}
           {:error, reason} -> {:error, {:delete_failed, reason}}
         end
     end
   rescue
     e -> {:error, {:delete_failed, Exception.message(e)}}
+  end
+
+  # ===========================================================================
+  # VCL-Total Gate Check
+  # ===========================================================================
+
+  # Returns :ok to allow the with-pipeline to continue, or {:error, reason}
+  # to short-circuit.  Mutations bypass the gate — they use proof verification.
+  @mutation_prefixes ~w(INSERT UPDATE DELETE)
+
+  defp gate_check(query_string) do
+    upper = query_string |> String.trim() |> String.upcase()
+    is_mutation = Enum.any?(@mutation_prefixes, &String.starts_with?(upper, &1))
+
+    if is_mutation do
+      :ok
+    else
+      case VCLTGate.check(query_string) do
+        :skip -> :ok
+        :admit -> :ok
+        {:reject, reasons} -> {:error, {:vclt_gate_rejected, reasons}}
+        {:error, :gate_failed} -> {:error, :vclt_gate_unavailable}
+      end
+    end
   end
 
   # ===========================================================================

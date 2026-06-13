@@ -96,12 +96,14 @@ defmodule VeriSim.MixProject do
       {:postgrex, "~> 0.22 and >= 0.22.2", optional: true},
       {:redix, "~> 1.5", optional: true},
       {:exqlite, "~> 0.27", optional: true},
-      {:bolt_sips, "~> 2.0", optional: true},
 
       # Development
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+
+      # Override transitive dep to get OTP 25+ fix (erl_syntax:string/1 removed)
+      {:parse_trans, "3.4.2", override: true}
     ]
   end
 
