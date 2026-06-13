@@ -24,6 +24,17 @@ defmodule VeriSim.Query.VCLExecutorTest do
   use ExUnit.Case, async: false
 
   alias VeriSim.Query.VCLExecutor
+  alias VeriSim.Test.VCLTestHelpers, as: H
+
+  setup_all do
+    # `execute_string/2` routes through the VCLBridge parser singleton. Every
+    # other VCL test file starts that GenServer in its own setup; this file did
+    # not, so its execute_string tests passed only when a bridge-starting file
+    # happened to run earlier (a seed-order dependency). Start it explicitly so
+    # the suite is order-independent.
+    H.ensure_bridge_started()
+    :ok
+  end
 
   describe "execute/2 with :explain option" do
     test "returns a structured plan with the documented keys" do
