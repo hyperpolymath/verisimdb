@@ -275,3 +275,15 @@ Added `rescript.json` for build configuration.
 **Resolved:** 2026-06-13. The text, vector, and similar-query search endpoints all reported `score: 1.0 - (i as f32 * 0.1)` — a synthetic sequence derived from result position, discarding the real relevance scores the modality stores already compute (Tantivy BM25 for documents, cosine similarity for vectors). The octad store now exposes `search_text_scored` / `search_similar_scored` (returning `Vec<(Octad, f32)>`); the three handlers surface those real scores. Test `test_vector_search_returns_real_cosine_scores` pins the distinction (the second hit reports its true ~0.994 cosine, not synthetic 0.9).
 
 **Original issue:** API search responses carried fabricated scores, so any client ranking or thresholding on `score` was meaningless.
+
+=== 28. NIF Transport Faked Success (Silent Data Loss) — ✅ RESOLVED
+
+**Location:** `rust-core/verisim-nif/src/lib.rs`, `elixir-orchestration/lib/verisim/{nif_bridge,transport}.ex`
+
+**Resolved:** 2026-06-13. The `verisim-nif` Rustler bridge is a scaffold — no operation is wired to the store — but every NIF returned *canned success* JSON: `delete_octad` replied `{"status":"deleted"}`, `create_octad` `{"status":"created"}`, `get_drift_score` all-zeros. When the `.so` was compiled in, `:erlang.load_nif` overrode the honest Elixir fallback stubs with these, `NifBridge.loaded?` reported `true`, and `VERISIM_TRANSPORT=nif` *or* `auto` selected the NIF — so a write returned success having stored/deleted nothing: **silent data loss reported as success.** (Without the `.so`, the pure-Elixir stubs already returned `{:error, :nif_not_loaded}`, so the danger was the compiled artifact only.)
+
+Now every NIF returns `{:error, :not_implemented}` — fail loudly, never fake. The compiled NIF and the absent-library stub are now indistinguishable to callers (both non-operational, both error). `NifBridge.loaded?` is redefined to mean *operational* (a probe returns a real result), so `auto` correctly falls back to HTTP; explicit `nif` surfaces the error rather than fabricating data; and `Transport.health/0` no longer returns a hardcoded `healthy` under nif. Regression test `VeriSim.TransportTest` asserts no operation ever returns fake success.
+
+This was an instance of the project's recurring *silent fake-success* defect class (see also issues 26, 27): code returning a success value without performing the named effect. None of the CI scanners (Hypatia, panic-attack, gitleaks) flag it — it has no dangerous *shape* — so it is caught only by reading code against its claims.
+
+**Original issue:** The NIF bridge fabricated success for unimplemented operations, risking silent data loss under the NIF/auto transports.

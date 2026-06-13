@@ -71,10 +71,21 @@ defmodule VeriSim.Transport do
 
   @doc """
   Check health of the Rust core.
+
+  Under `:http` (and `:auto`, which falls back to HTTP while the NIF is
+  non-operational) this probes the real verisim-api. Under an explicit
+  `:nif` it reports honestly that the NIF transport is not operational
+  rather than fabricating a `healthy` status — the NIF has no implemented
+  operations to be healthy about.
   """
   def health do
     if use_nif?() do
-      {:ok, %{"status" => "healthy", "transport" => "nif"}}
+      Logger.warning(
+        "VERISIM_TRANSPORT=nif selected but the NIF bridge has no implemented " <>
+          "operations; reporting not operational. Use VERISIM_TRANSPORT=http."
+      )
+
+      {:error, :nif_not_operational}
     else
       RustClient.health()
     end
