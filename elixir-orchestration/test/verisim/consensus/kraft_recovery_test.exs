@@ -37,6 +37,55 @@ defmodule VeriSim.Consensus.KRaftRecoveryTest do
     :exit, _ -> :ok
   end
 
+  # Propose `command` through whichever node is currently the leader, retrying
+  # across re-elections and following {:not_leader, _} redirects, until the
+  # cluster accepts it (-> {:ok, index}) or `timeout_ms` elapses. Deterministic
+  # alternative to "read diagnostics once, propose once", which races with a
+  # leader step-down on a freshly-started cluster.
+  defp propose_when_leader(ids, command, timeout_ms \\ 5_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_propose_when_leader(ids, command, deadline)
+  end
+
+  defp do_propose_when_leader(ids, command, deadline) do
+    leader =
+      Enum.find_value(ids, fn id ->
+        case safe_diagnostics(id) do
+          %{role: :leader} -> id
+          _ -> nil
+        end
+      end)
+
+    result = if leader, do: safe_propose(leader, command), else: {:error, :no_leader}
+
+    case result do
+      {:ok, _} = ok ->
+        ok
+
+      _other ->
+        if System.monotonic_time(:millisecond) < deadline do
+          Process.sleep(50)
+          do_propose_when_leader(ids, command, deadline)
+        else
+          result
+        end
+    end
+  end
+
+  # GenServer.call wrappers that tolerate a node being mid-transition: a call can
+  # time out or the process can be briefly unavailable during an election.
+  defp safe_diagnostics(id) do
+    KRaftNode.diagnostics(id)
+  catch
+    :exit, _ -> %{role: :unknown}
+  end
+
+  defp safe_propose(id, command) do
+    KRaftNode.propose(id, command)
+  catch
+    :exit, _ -> {:error, :unavailable}
+  end
+
   # ===========================================================================
   # WAL persistence during normal operation
   # ===========================================================================
@@ -236,22 +285,19 @@ defmodule VeriSim.Consensus.KRaftRecoveryTest do
           start_node(id, peers: peers, wal_path: wal_path)
         end)
 
-      # Wait for election
-      Process.sleep(1_500)
+      # Propose through whichever node is currently the leader, retrying across
+      # re-elections. A freshly-started 3-node cluster can re-elect during the
+      # first election cycles, so reading diagnostics once and proposing to that
+      # node races with a step-down (-> {:error, {:not_leader, _}}). Await a node
+      # that is leader *and* accepts the proposal, following any not_leader
+      # redirect — a deterministic barrier rather than a fixed sleep.
+      assert {:ok, _} =
+               propose_when_leader(
+                 ids,
+                 {:register_store, "cluster-store", "http://cluster:8080", ["graph"]}
+               )
 
-      # Find the leader
-      {leader_id, _} =
-        ids
-        |> Enum.map(fn id -> {id, KRaftNode.diagnostics(id)} end)
-        |> Enum.find(fn {_id, diag} -> diag.role == :leader end)
-
-      # Propose a command through the leader
-      {:ok, _} =
-        KRaftNode.propose(
-          leader_id,
-          {:register_store, "cluster-store", "http://cluster:8080", ["graph"]}
-        )
-
+      # Let the commit replicate to the followers so every WAL records a term.
       Process.sleep(500)
 
       # All nodes should have WAL data
