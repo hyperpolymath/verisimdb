@@ -17,7 +17,7 @@
 //! honest stub is the correct behaviour until the store is actually wired in.
 //!
 //! When an operation is implemented, replace its `not_implemented` body with a
-//! real call through the shared [`runtime`]/store; the Elixir transport then
+//! real call through the shared `runtime`/store; the Elixir transport then
 //! observes a real result instead of an error and begins routing to the NIF.
 //!
 //! ## Transport selection (Elixir side)
