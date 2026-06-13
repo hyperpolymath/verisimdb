@@ -172,7 +172,7 @@ cargo fmt --check
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the **MPL-2.0** (Palimpsest License). All source files must include:
+By contributing, you agree that your contributions will be licensed under the **MPL-2.0**. All source files must include:
 
 ```
 // SPDX-License-Identifier: MPL-2.0

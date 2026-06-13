@@ -216,7 +216,7 @@ operate as a standalone database without any external connections.
 
 === Is VeriSimDB open source?
 
-Yes. VeriSimDB is released under the *Palimpsest License (MPL-2.0)*,
+Yes. VeriSimDB is released under the *Mozilla Public License 2.0 (MPL-2.0)*,
 a permissive open-source license. The community edition is full-featured with
 no artificial restrictions -- all 8 modalities, drift detection,
 self-normalisation, VQL, and federation are included.

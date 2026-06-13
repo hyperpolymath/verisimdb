@@ -33,7 +33,7 @@ downstream systems consume stale or contradictory information.
 This capability positions VeriSimDB at the intersection of three high-growth
 markets: data quality tools ($2.3B by 2027), graph databases ($5.6B), and the
 emerging multimodal database segment ($800M+). The open-core business model
-provides a free, full-featured community edition under the Palimpsest License
+provides a free, full-featured community edition under the Mozilla Public License 2.0 (MPL-2.0)
 (MPL-2.0), with revenue generated through commercial support licenses,
 enterprise SLAs, and deployment consulting.
 
