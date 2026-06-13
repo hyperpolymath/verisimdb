@@ -197,14 +197,23 @@ defmodule VeriSim.Telemetry do
 
   @doc false
   def measure_entity_count do
-    # Count entity servers
+    # Count entity servers. The registry may not be running (e.g. in the test
+    # env, where the full supervision tree isn't started), so guard against the
+    # "unknown registry" ArgumentError rather than letting telemetry_poller log
+    # a crashed measurement on every tick.
     count =
-      case Registry.count(VeriSim.EntityRegistry) do
+      case registered_entity_count() do
         n when is_integer(n) -> n
         _ -> 0
       end
 
     :telemetry.execute([:verisim, :entities], %{count: count}, %{})
+  end
+
+  defp registered_entity_count do
+    Registry.count(VeriSim.EntityRegistry)
+  rescue
+    ArgumentError -> 0
   end
 
   @doc false
