@@ -9,6 +9,49 @@ All notable changes to VeriSimDB are documented here. This project uses https://
 
 == [Unreleased]
 
+== [0.2.0] — 2026-06-13
+
+=== Added — July-1 credibility: honesty over fake success (2026-06-13)
+
+==== VCLTGate — admissibility gate (C)
+- *`VeriSim.Query.VCLTGate`*: new Elixir module; reads `VERISIM_VCLT_GATE` env var, writes JSON payload to a temp file, invokes the gate binary via `sh -c`, and maps exit codes: 0 → `:admit`, 1 → `{:reject, reasons}`, 2 → `{:error, :gate_failed}`. 5 s timeout per call.
+- *`VCLExecutor.gate_check/1`*: wired into `execute_string/2`; mutations (INSERT/UPDATE/DELETE prefixed statements) bypass the gate; all other statements are gate-checked before reaching the store.
+- *`just demo-admissibility`* recipe and `scripts/demo-admissibility.sh` demonstrate the admit/reject/gate-failed protocol using the `vclt-gate` binary from the sibling `vcl-ut` repo.
+
+==== `at_time` temporal reconstruction (A1)
+- *`OctadTemporalStore::at_time`*: now reconstructs a full `Octad` from the `OctadSnapshot` stored at the requested timestamp — previously returned the current state with a patched version number. Modality flags in `ModalityStatus` gate which modality arms are reconstructed. Tensor `dtype` defaults to `Float64`; semantic properties become `TypedLiteral` XSD strings; geometry types are parsed from the stored string field.
+- Regression test `test_at_time_returns_historical_not_current` verifies that querying between two writes returns the first version's document, not the current one.
+
+=== Fixed — Honest gaps: 501s, removed fakes, correct docs (2026-06-13)
+
+==== HTTP API — honest 501 (A2)
+- Transaction endpoints (`POST /tx/begin`, `POST /tx/commit`, `POST /tx/rollback`, `GET /tx/{id}`) now return `501 Not Implemented` with a JSON error body. Previously returned 200 with fake success objects. Documented in KNOWN-ISSUES #30.
+
+==== ZKP / sanctify surface — honest names (A3)
+- `verify_proof` Commitment arm error changed from `ZkpError::InvalidWitness` to `ZkpError::NotImplemented` with a message explaining that the commitment scheme is not yet implemented.
+- zkp_bridge `verifyProof` returns `{:error, "commitment scheme not yet implemented"}` instead of fake success.
+
+==== Auth documentation (A4)
+- README `Run` section now carries an explicit `WARNING`: HTTP API has no authentication; never expose to untrusted networks.
+- KNOWN-ISSUES #29 added: HTTP API has no authentication (open).
+- KNOWN-ISSUES #31 added: `at_time` returns partial data for multi-update entities (snapshot design).
+
+==== Dependency cleanup (A5, A6)
+- `burn = "0.21"` removed from workspace (unused after Tier 2 test work removed the only consumer).
+- Duplicate root-level `CHANGELOG.md` deleted; `CHANGELOG.adoc` is the canonical file.
+
+==== Documentation accuracy (A7)
+- README, CLAUDE.md, `docs/papers/verisimdb-federated-consistency.adoc`, and `docs/papers/verisimdb-idaptik-case-study.adoc` corrected: spatial index described as "Haversine brute-force (R-tree planned)" — previously claimed "R-tree index".
+- CLAUDE.md `Machine-Readable Artefacts` section updated to match the actual `.machine_readable/` directory layout (was listing non-existent `.scm` files).
+
+==== Elixir infrastructure
+- `Resolver.register_peer` and `Resolver.deregister_peer` now notify the Rust core asynchronously (`Task.start`) so a blocked/absent core cannot freeze the GenServer.
+- Timed-out `Task.yield_many` tasks killed without blocking: `Process.unlink` + `Process.demonitor([:flush])` + `Process.exit(:kill)` instead of `Task.shutdown(:brutal_kill)`.
+- `RustClient.normalize/1` return branch corrected from `{:ok, _}` to `:ok` in `EntityServer`; `delete_octad/1` branch similarly corrected in `VCLExecutor`.
+- `rust_core_timeout` lowered to 2 s in test env (was 5 s, racing with the 5 s GenServer.call default timeout).
+- `bolt_sips` removed from deps (unused; OTP-25-incompatible Poison.Encoder protocol compilation); related unused transitive deps unlocked from mix.lock.
+- `parse_trans` bumped to 3.4.2 (override) to pick up upstream fixes.
+
 === Fixed — Main-branch reds + workspace license (2026-06-02)
 
 ==== PR #99 — five root-cause main fixes
