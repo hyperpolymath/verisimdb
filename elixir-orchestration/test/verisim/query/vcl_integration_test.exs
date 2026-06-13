@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLIntegrationTest do
+defmodule VeriSim.Query.VCLIntegrationTest do
   @moduledoc """
-  VQL Slipstream end-to-end integration tests.
+  VCL Slipstream end-to-end integration tests.
 
   Exercises the full parse → classify → execute → aggregate pipeline for the
   Slipstream (no-proof) path across all 8 octad modalities.
@@ -25,8 +25,8 @@ defmodule VeriSim.Query.VQLIntegrationTest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.{VQLBridge, VQLExecutor}
-  alias VeriSim.Test.VQLTestHelpers, as: H
+  alias VeriSim.Query.{VCLBridge, VCLExecutor}
+  alias VeriSim.Test.VCLTestHelpers, as: H
 
   setup_all do
     pid = H.ensure_bridge_started()
@@ -209,7 +209,7 @@ defmodule VeriSim.Query.VQLIntegrationTest do
       # COUNT(*) is an aggregate function — the built-in parser may not recognize
       # it as a modality during SELECT parsing, which is acceptable. The full
       # ReScript parser handles aggregates natively.
-      result = VQLBridge.parse("SELECT COUNT(*) FROM FEDERATION /*")
+      result = VCLBridge.parse("SELECT COUNT(*) FROM FEDERATION /*")
 
       case result do
         {:ok, ast} ->
@@ -293,7 +293,7 @@ defmodule VeriSim.Query.VQLIntegrationTest do
     test "parses REFLECT query — queries the query store itself" do
       # REFLECT is a source type: SELECT ... FROM REFLECT
       # The built-in parser may not support this directly, but it should not crash.
-      result = VQLBridge.parse("SELECT * FROM REFLECT")
+      result = VCLBridge.parse("SELECT * FROM REFLECT")
 
       case result do
         {:ok, ast} ->
@@ -315,7 +315,7 @@ defmodule VeriSim.Query.VQLIntegrationTest do
       query = "SELECT GRAPH.*, DOCUMENT.* FROM HEXAD 'entity-001'"
       ast = H.parse!(query)
 
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
 
       assert is_map(plan)
       assert Map.has_key?(plan, :strategy)
@@ -329,15 +329,15 @@ defmodule VeriSim.Query.VQLIntegrationTest do
 
   describe "error handling" do
     test "empty string returns parse error" do
-      assert {:error, {:parse_error, _}} = VQLExecutor.execute_string("")
+      assert {:error, {:parse_error, _}} = VCLExecutor.execute_string("")
     end
 
     test "nonsense returns parse error" do
-      assert {:error, {:parse_error, _}} = VQLExecutor.execute_string("JABBERWOCKY SNARK")
+      assert {:error, {:parse_error, _}} = VCLExecutor.execute_string("JABBERWOCKY SNARK")
     end
 
     test "missing FROM clause returns parse error" do
-      assert {:error, {:parse_error, _}} = VQLExecutor.execute_string("SELECT GRAPH.*")
+      assert {:error, {:parse_error, _}} = VCLExecutor.execute_string("SELECT GRAPH.*")
     end
   end
 end

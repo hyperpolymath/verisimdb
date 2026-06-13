@@ -1,30 +1,30 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLBridge do
+defmodule VeriSim.Query.VCLBridge do
   @moduledoc """
-  Bridge between the ReScript VQL parser and Elixir VQL executor.
+  Bridge between the ReScript VCL parser and Elixir VCL executor.
 
   Manages a long-running Deno/Node process that runs the compiled ReScript
-  VQL parser. Communication uses JSON over stdin/stdout with length-prefixed
+  VCL parser. Communication uses JSON over stdin/stdout with length-prefixed
   framing for reliable message boundaries.
 
   ## Architecture
 
-      VQL String ──► VQLBridge (GenServer)
+      VCL String ──► VCLBridge (GenServer)
                         │
                         ▼
                      Port (stdin/stdout JSON)
                         │
                         ▼
-                     Deno process running compiled VQLParser.res
+                     Deno process running compiled VCLParser.res
                         │
                         ▼
-                     Parsed AST (JSON) ──► VQLExecutor
+                     Parsed AST (JSON) ──► VCLExecutor
 
   ## Usage
 
-      {:ok, ast} = VQLBridge.parse("SELECT GRAPH, VECTOR FROM HEXAD abc-123")
-      {:ok, results} = VQLExecutor.execute(ast)
+      {:ok, ast} = VCLBridge.parse("SELECT GRAPH, VECTOR FROM HEXAD abc-123")
+      {:ok, results} = VCLExecutor.execute(ast)
   """
 
   use GenServer
@@ -42,9 +42,9 @@ defmodule VeriSim.Query.VQLBridge do
   end
 
   @doc """
-  Parse a VQL query string into an AST map.
+  Parse a VCL query string into an AST map.
 
-  Returns `{:ok, ast}` where ast is a map matching the VQLParser.AST types,
+  Returns `{:ok, ast}` where ast is a map matching the VCLParser.AST types,
   or `{:error, reason}` on parse failure.
   """
   def parse(query_string, timeout \\ @default_timeout) do
@@ -66,44 +66,44 @@ defmodule VeriSim.Query.VQLBridge do
   end
 
   @doc """
-  Parse a VQL mutation (INSERT / UPDATE / DELETE).
+  Parse a VCL mutation (INSERT / UPDATE / DELETE).
   """
   def parse_mutation(query_string, timeout \\ @default_timeout) do
     GenServer.call(__MODULE__, {:parse_mutation, query_string}, timeout)
   end
 
   @doc """
-  Parse a VQL statement (query or mutation).
+  Parse a VCL statement (query or mutation).
   """
   def parse_statement(query_string, timeout \\ @default_timeout) do
     GenServer.call(__MODULE__, {:parse_statement, query_string}, timeout)
   end
 
   @doc """
-  Parse and execute a VQL query string in one call.
-  Combines VQLBridge.parse/1 with VQLExecutor.execute/2.
+  Parse and execute a VCL query string in one call.
+  Combines VCLBridge.parse/1 with VCLExecutor.execute/2.
   """
   def parse_and_execute(query_string, opts \\ []) do
     case parse(query_string) do
-      {:ok, ast} -> VeriSim.Query.VQLExecutor.execute(ast, opts)
+      {:ok, ast} -> VeriSim.Query.VCLExecutor.execute(ast, opts)
       {:error, _} = error -> error
     end
   end
 
   @doc """
-  Parse and execute a VQL statement (query or mutation).
+  Parse and execute a VCL statement (query or mutation).
   """
   def parse_and_execute_statement(query_string, opts \\ []) do
     case parse_statement(query_string) do
-      {:ok, ast} -> VeriSim.Query.VQLExecutor.execute_statement(ast, opts)
+      {:ok, ast} -> VeriSim.Query.VCLExecutor.execute_statement(ast, opts)
       {:error, _} = error -> error
     end
   end
 
   @doc """
-  Type-check a parsed VQL-DT AST.
+  Type-check a parsed VCL-DT AST.
 
-  Sends the AST to the ReScript type checker (VQLBidir.synthesizeQuery)
+  Sends the AST to the ReScript type checker (VCLBidir.synthesizeQuery)
   via the Deno/Node subprocess. Returns inferred types, proof obligations,
   and composition strategy.
 
@@ -142,12 +142,12 @@ defmodule VeriSim.Query.VQLBridge do
 
     case start_port(state) do
       {:ok, port} ->
-        Logger.info("VQLBridge started with #{runtime}")
+        Logger.info("VCLBridge started with #{runtime}")
         {:ok, %{state | port: port}}
 
       {:error, reason} ->
         Logger.warning(
-          "VQLBridge: parser process unavailable (#{reason}), falling back to built-in parser"
+          "VCLBridge: parser process unavailable (#{reason}), falling back to built-in parser"
         )
 
         {:ok, state}
@@ -157,7 +157,7 @@ defmodule VeriSim.Query.VQLBridge do
   @impl true
   def handle_call({:typecheck, _ast}, _from, %{port: nil} = state) do
     # Type checking requires the ReScript subprocess — no fallback.
-    # Callers MUST handle this error; silently passing would defeat VQL-DT.
+    # Callers MUST handle this error; silently passing would defeat VCL-DT.
     {:reply, {:error, :type_checker_unavailable}, state}
   end
 
@@ -240,14 +240,14 @@ defmodule VeriSim.Query.VQLBridge do
         end
 
       {:error, _} ->
-        Logger.warning("VQLBridge: received malformed data from parser port")
+        Logger.warning("VCLBridge: received malformed data from parser port")
         {:noreply, state}
     end
   end
 
   @impl true
   def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
-    Logger.warning("VQLBridge: parser process exited with status #{status}")
+    Logger.warning("VCLBridge: parser process exited with status #{status}")
 
     # Reply to all pending requests with error
     for {_id, from} <- state.pending do
@@ -257,7 +257,7 @@ defmodule VeriSim.Query.VQLBridge do
     # Try to restart
     case start_port(state) do
       {:ok, new_port} ->
-        Logger.info("VQLBridge: parser process restarted")
+        Logger.info("VCLBridge: parser process restarted")
         {:noreply, %{state | port: new_port, pending: %{}}}
 
       {:error, _} ->
@@ -486,7 +486,7 @@ defmodule VeriSim.Query.VQLBridge do
 
     # Split multi-proof specs on AND/OR connectors into a list.
     # "EXISTENCE(a) AND PROVENANCE(b)" → [%{raw: "EXISTENCE(a)"}, %{raw: "PROVENANCE(b)"}]
-    specs = VeriSim.Query.VQLTypeChecker.parse_proof_specs(%{raw: raw})
+    specs = VeriSim.Query.VCLTypeChecker.parse_proof_specs(%{raw: raw})
 
     proof =
       case specs do
@@ -556,7 +556,7 @@ defmodule VeriSim.Query.VQLBridge do
 
       :error ->
         raise ArgumentError,
-              "Unknown VQL token #{inspect(str)} — not in @safe_atoms allowlist"
+              "Unknown VCL token #{inspect(str)} — not in @safe_atoms allowlist"
     end
   end
 

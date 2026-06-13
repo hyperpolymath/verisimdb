@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLE2ETest do
+defmodule VeriSim.Query.VCLE2ETest do
   @moduledoc """
-  VQL end-to-end tests exercising the full pipeline:
+  VCL end-to-end tests exercising the full pipeline:
 
-    VQL string → parse → typecheck → plan → execute → result
+    VCL string → parse → typecheck → plan → execute → result
 
   These tests validate the VCL-SPEC contract by exercising every major
   language feature through the complete pipeline. They are designed to
@@ -28,8 +28,8 @@ defmodule VeriSim.Query.VQLE2ETest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.{VQLBridge, VQLTypeChecker, VQLProofCertificate}
-  alias VeriSim.Test.VQLTestHelpers, as: H
+  alias VeriSim.Query.{VCLBridge, VCLTypeChecker, VCLProofCertificate}
+  alias VeriSim.Test.VCLTestHelpers, as: H
 
   setup_all do
     pid = H.ensure_bridge_started()
@@ -157,7 +157,7 @@ defmodule VeriSim.Query.VQLE2ETest do
       @pt_upper @pt |> Atom.to_string() |> String.upcase()
 
       test "#{@pt_upper} proof: typecheck → certificate → verify" do
-        # Build a VQL-DT query with this proof type
+        # Build a VCL-DT query with this proof type
         contract =
           if @pt in [:integrity, :citation, :custom, :sanctify] do
             "(my_contract)"
@@ -170,7 +170,7 @@ defmodule VeriSim.Query.VQLE2ETest do
         H.assert_has_proof(ast)
 
         # Type check returns {:ok, %{proof_obligations: [...], ...}}
-        case VQLTypeChecker.typecheck(ast) do
+        case VCLTypeChecker.typecheck(ast) do
           {:ok, tc_result} ->
             obligations = tc_result[:proof_obligations] || tc_result.proof_obligations
             assert is_list(obligations)
@@ -181,7 +181,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
             # Generate certificate with mock witness data
             witness = build_mock_witness(@pt)
-            {:ok, cert} = VQLProofCertificate.generate_certificate(obligation, witness)
+            {:ok, cert} = VCLProofCertificate.generate_certificate(obligation, witness)
 
             # Certificate structure
             assert cert.type == @pt
@@ -190,7 +190,7 @@ defmodule VeriSim.Query.VQLE2ETest do
             assert byte_size(cert.hash) == 32
 
             # Verify round-trip
-            assert :ok == VQLProofCertificate.verify_certificate(cert)
+            assert :ok == VCLProofCertificate.verify_certificate(cert)
 
           {:error, _reason} ->
             # Some proof types may fail if modality requirements not met
@@ -207,7 +207,7 @@ defmodule VeriSim.Query.VQLE2ETest do
       ast = H.parse!(query)
       H.assert_has_proof(ast)
 
-      {:ok, tc_result} = VQLTypeChecker.typecheck(ast)
+      {:ok, tc_result} = VCLTypeChecker.typecheck(ast)
       obligations = tc_result[:proof_obligations] || tc_result.proof_obligations
       assert is_list(obligations)
       assert length(obligations) >= 2
@@ -218,9 +218,9 @@ defmodule VeriSim.Query.VQLE2ETest do
           {obl, build_mock_witness(obl[:type])}
         end)
 
-      {:ok, certs} = VQLProofCertificate.generate_batch(witnesses)
+      {:ok, certs} = VCLProofCertificate.generate_batch(witnesses)
       assert length(certs) >= 2
-      assert :ok == VQLProofCertificate.verify_batch(certs)
+      assert :ok == VCLProofCertificate.verify_batch(certs)
     end
 
     test "tampered certificate fails verification" do
@@ -239,12 +239,12 @@ defmodule VeriSim.Query.VQLE2ETest do
         "modality_count" => 8
       }
 
-      {:ok, cert} = VQLProofCertificate.generate_certificate(obligation, witness)
-      assert :ok == VQLProofCertificate.verify_certificate(cert)
+      {:ok, cert} = VCLProofCertificate.generate_certificate(obligation, witness)
+      assert :ok == VCLProofCertificate.verify_certificate(cert)
 
       # Tamper with the witness
       tampered = %{cert | witness: Map.put(cert.witness, "modality_count", 999)}
-      assert {:error, :invalid_hash} == VQLProofCertificate.verify_certificate(tampered)
+      assert {:error, :invalid_hash} == VCLProofCertificate.verify_certificate(tampered)
     end
   end
 
@@ -292,19 +292,19 @@ defmodule VeriSim.Query.VQLE2ETest do
 
   describe "error paths" do
     test "empty query string returns parse error" do
-      assert {:error, _reason} = VQLBridge.parse("")
+      assert {:error, _reason} = VCLBridge.parse("")
     end
 
     test "gibberish returns parse error" do
-      assert {:error, _reason} = VQLBridge.parse("FROBNICATE THE WIDGET")
+      assert {:error, _reason} = VCLBridge.parse("FROBNICATE THE WIDGET")
     end
 
     test "unknown proof type is rejected by type checker" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF TELEPORT(entity-001)"
 
-      case VQLBridge.parse(query) do
+      case VCLBridge.parse(query) do
         {:ok, ast} ->
-          result = VQLTypeChecker.typecheck(ast)
+          result = VCLTypeChecker.typecheck(ast)
           assert {:error, _reason} = result
 
         {:error, _} ->
@@ -316,9 +316,9 @@ defmodule VeriSim.Query.VQLE2ETest do
     test "INTEGRITY proof without semantic modality is rejected" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF INTEGRITY(my_contract)"
 
-      case VQLBridge.parse(query) do
+      case VCLBridge.parse(query) do
         {:ok, ast} ->
-          case VQLTypeChecker.typecheck(ast) do
+          case VCLTypeChecker.typecheck(ast) do
             {:error, reason} ->
               # reason may be a tuple like {:modality_mismatch, "..."}
               reason_str = inspect(reason)
@@ -337,9 +337,9 @@ defmodule VeriSim.Query.VQLE2ETest do
     test "PROVENANCE proof without provenance modality is rejected" do
       query = "SELECT GRAPH.* FROM HEXAD 'entity-001' PROOF PROVENANCE(entity-001)"
 
-      case VQLBridge.parse(query) do
+      case VCLBridge.parse(query) do
         {:ok, ast} ->
-          case VQLTypeChecker.typecheck(ast) do
+          case VCLTypeChecker.typecheck(ast) do
             {:error, reason} ->
               reason_str = inspect(reason)
               assert reason_str =~ "provenance" or reason_str =~ "modality"
@@ -443,7 +443,7 @@ defmodule VeriSim.Query.VQLE2ETest do
   describe "mutation pipeline" do
     test "INSERT HEXAD parses via parse_statement" do
       query = "INSERT HEXAD WITH DOCUMENT(title = 'Test Entity', body = 'Integration test body')"
-      {:ok, ast} = VQLBridge.parse_statement(query)
+      {:ok, ast} = VCLBridge.parse_statement(query)
 
       # Mutation AST shape: %{TAG: "Mutation", _0: %{TAG: "Insert", ...}}
       assert ast[:TAG] == "Mutation" or ast[:type] == :insert or ast[:mutation_type] == :insert
@@ -456,7 +456,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
     test "UPDATE HEXAD parses with SET clause" do
       query = "UPDATE HEXAD 'entity-001' SET DOCUMENT.title = 'Updated Title'"
-      {:ok, ast} = VQLBridge.parse_statement(query)
+      {:ok, ast} = VCLBridge.parse_statement(query)
 
       assert ast[:TAG] == "Mutation" or ast[:type] == :update or ast[:mutation_type] == :update
       inner = ast[:_0] || ast
@@ -468,7 +468,7 @@ defmodule VeriSim.Query.VQLE2ETest do
 
     test "DELETE HEXAD parses with entity ID" do
       query = "DELETE HEXAD 'entity-to-delete'"
-      {:ok, ast} = VQLBridge.parse_statement(query)
+      {:ok, ast} = VCLBridge.parse_statement(query)
 
       assert ast[:TAG] == "Mutation" or ast[:type] == :delete or ast[:mutation_type] == :delete
       inner = ast[:_0] || ast

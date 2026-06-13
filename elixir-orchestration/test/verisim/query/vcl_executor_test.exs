@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLExecutorTest do
+defmodule VeriSim.Query.VCLExecutorTest do
   @moduledoc """
-  Tests for VeriSim.Query.VQLExecutor — the 1812-LOC central executor
-  for parsed VQL queries and mutations.
+  Tests for VeriSim.Query.VCLExecutor — the 1812-LOC central executor
+  for parsed VCL queries and mutations.
 
-  The executor sits between the parser (VQLBridge) and the Rust core
+  The executor sits between the parser (VCLBridge) and the Rust core
   (via RustClient).  In test environments the Rust core is unreachable,
   so most real execution paths bottom out in `{:error, ...}` tuples.
   These tests cover what's testable independently:
@@ -23,12 +23,12 @@ defmodule VeriSim.Query.VQLExecutorTest do
 
   use ExUnit.Case, async: false
 
-  alias VeriSim.Query.VQLExecutor
+  alias VeriSim.Query.VCLExecutor
 
   describe "execute/2 with :explain option" do
     test "returns a structured plan with the documented keys" do
       ast = %{modalities: [:graph], source: {:octad, "abc-123"}}
-      assert {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      assert {:ok, plan} = VCLExecutor.execute(ast, explain: true)
 
       assert is_map(plan)
       assert Map.has_key?(plan, :strategy)
@@ -41,13 +41,13 @@ defmodule VeriSim.Query.VQLExecutorTest do
 
     test "default strategy is :sequential when no cross-modal conditions" do
       ast = %{modalities: [:graph], source: {:octad, "abc-123"}}
-      assert {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      assert {:ok, plan} = VCLExecutor.execute(ast, explain: true)
       assert plan.strategy == :sequential
     end
 
     test "octad source produces an 'Octad lookup' step" do
       ast = %{modalities: [:graph], source: {:octad, "entity-xyz"}}
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
 
       ops = Enum.map(plan.steps, & &1.operation)
       assert "Octad lookup" in ops
@@ -59,21 +59,21 @@ defmodule VeriSim.Query.VQLExecutorTest do
         source: {:federation, "/universities/*", :tolerate}
       }
 
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
       ops = Enum.map(plan.steps, & &1.operation)
       assert "Federation fan-out" in ops
     end
 
     test "store source produces a 'Store query' step" do
       ast = %{modalities: [:graph], source: {:store, "store-1"}}
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
       ops = Enum.map(plan.steps, & &1.operation)
       assert "Store query" in ops
     end
 
     test "reflect source produces a REFLECT step" do
       ast = %{modalities: [:graph], source: :reflect}
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
       ops = Enum.map(plan.steps, & &1.operation)
       assert Enum.any?(ops, &String.contains?(&1, "REFLECT"))
     end
@@ -82,8 +82,8 @@ defmodule VeriSim.Query.VQLExecutorTest do
       base_ast = %{modalities: [:graph], source: {:octad, "x"}}
       proof_ast = Map.put(base_ast, :proof, [%{type: "EXISTENCE", target: "y"}])
 
-      {:ok, base} = VQLExecutor.execute(base_ast, explain: true)
-      {:ok, with_proof} = VQLExecutor.execute(proof_ast, explain: true)
+      {:ok, base} = VCLExecutor.execute(base_ast, explain: true)
+      {:ok, with_proof} = VCLExecutor.execute(proof_ast, explain: true)
 
       assert with_proof.total_cost_ms > base.total_cost_ms
       assert with_proof.has_proof == true
@@ -98,8 +98,8 @@ defmodule VeriSim.Query.VQLExecutorTest do
         source: {:octad, "x"}
       }
 
-      {:ok, p1} = VQLExecutor.execute(one, explain: true)
-      {:ok, p5} = VQLExecutor.execute(five, explain: true)
+      {:ok, p1} = VCLExecutor.execute(one, explain: true)
+      {:ok, p5} = VCLExecutor.execute(five, explain: true)
       assert p5.total_cost_ms > p1.total_cost_ms
     end
 
@@ -109,7 +109,7 @@ defmodule VeriSim.Query.VQLExecutorTest do
         source: {:octad, "x"}
       }
 
-      {:ok, plan} = VQLExecutor.execute(ast, explain: true)
+      {:ok, plan} = VCLExecutor.execute(ast, explain: true)
       sum = Enum.reduce(plan.steps, 0, fn s, acc -> acc + Map.get(s, :cost_ms, 0) end)
       assert plan.total_cost_ms == sum
     end
@@ -117,12 +117,12 @@ defmodule VeriSim.Query.VQLExecutorTest do
 
   describe "execute_mutation/2 — routing" do
     test "unknown mutation tag returns {:error, {:invalid_mutation, _}}" do
-      assert {:error, {:invalid_mutation, _}} = VQLExecutor.execute_mutation(%{TAG: "Bogus"})
+      assert {:error, {:invalid_mutation, _}} = VCLExecutor.execute_mutation(%{TAG: "Bogus"})
     end
 
     test "Insert routes to execute_insert (errors when RustClient unreachable)" do
       mutation = %{TAG: "Insert", modalities: %{graph: %{}}, proof: nil}
-      result = VQLExecutor.execute_mutation(mutation)
+      result = VCLExecutor.execute_mutation(mutation)
       # In test env RustClient.create_octad/1 returns {:error, _}; the
       # executor wraps that as {:insert_failed, _}.  Either path is
       # acceptable — what we're verifying is that the dispatch reached
@@ -132,13 +132,13 @@ defmodule VeriSim.Query.VQLExecutorTest do
 
     test "Update routes to execute_update without raising" do
       mutation = %{TAG: "Update", octadId: "abc", sets: %{graph: %{}}, proof: nil}
-      result = VQLExecutor.execute_mutation(mutation)
+      result = VCLExecutor.execute_mutation(mutation)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
 
     test "Delete routes to execute_delete without raising" do
       mutation = %{TAG: "Delete", octadId: "abc", proof: nil}
-      result = VQLExecutor.execute_mutation(mutation)
+      result = VCLExecutor.execute_mutation(mutation)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
   end
@@ -150,22 +150,22 @@ defmodule VeriSim.Query.VQLExecutorTest do
         _0: %{modalities: [:graph], source: {:octad, "x"}}
       }
 
-      assert {:ok, _plan} = VQLExecutor.execute_statement(stmt, explain: true)
+      assert {:ok, _plan} = VCLExecutor.execute_statement(stmt, explain: true)
     end
 
     test "%{TAG: \"Mutation\", _0: mutation} dispatches to execute_mutation" do
       stmt = %{TAG: "Mutation", _0: %{TAG: "Bogus"}}
-      assert {:error, {:invalid_mutation, _}} = VQLExecutor.execute_statement(stmt)
+      assert {:error, {:invalid_mutation, _}} = VCLExecutor.execute_statement(stmt)
     end
 
     test "%{type: :query, ...} dispatches to execute/2" do
       stmt = %{type: :query, modalities: [:graph], source: {:octad, "x"}}
-      assert {:ok, _plan} = VQLExecutor.execute_statement(stmt, explain: true)
+      assert {:ok, _plan} = VCLExecutor.execute_statement(stmt, explain: true)
     end
 
     test "%{type: :mutation, mutation: ...} dispatches to execute_mutation" do
       stmt = %{type: :mutation, mutation: %{TAG: "Bogus"}}
-      assert {:error, {:invalid_mutation, _}} = VQLExecutor.execute_statement(stmt)
+      assert {:error, {:invalid_mutation, _}} = VCLExecutor.execute_statement(stmt)
     end
 
     test "unrecognised statement shape falls through to execute/2" do
@@ -173,22 +173,22 @@ defmodule VeriSim.Query.VQLExecutorTest do
       # as a query AST.  With :explain we get back a plan without
       # needing the Rust core.
       stmt = %{modalities: [:graph], source: {:octad, "x"}}
-      assert {:ok, _plan} = VQLExecutor.execute_statement(stmt, explain: true)
+      assert {:ok, _plan} = VCLExecutor.execute_statement(stmt, explain: true)
     end
   end
 
   describe "execute_string/2 — parse error propagation" do
     test "garbage input returns {:error, {:parse_error, _}}" do
-      assert {:error, {:parse_error, _}} = VQLExecutor.execute_string("THIS IS NOT VALID VQL", [])
+      assert {:error, {:parse_error, _}} = VCLExecutor.execute_string("THIS IS NOT VALID VCL", [])
     end
 
     test "empty string returns {:error, {:parse_error, _}}" do
-      assert {:error, {:parse_error, _}} = VQLExecutor.execute_string("", [])
+      assert {:error, {:parse_error, _}} = VCLExecutor.execute_string("", [])
     end
 
     test "valid query string with :explain returns a plan" do
       assert {:ok, plan} =
-               VQLExecutor.execute_string(
+               VCLExecutor.execute_string(
                  "SELECT GRAPH FROM HEXAD abc-123",
                  explain: true
                )
@@ -202,20 +202,20 @@ defmodule VeriSim.Query.VQLExecutorTest do
     test ":timeout defaults to 30_000 ms" do
       # Indirectly verified: passing no opts shouldn't raise.
       ast = %{modalities: [:graph], source: {:octad, "x"}}
-      assert {:ok, _} = VQLExecutor.execute(ast, explain: true)
+      assert {:ok, _} = VCLExecutor.execute(ast, explain: true)
     end
 
     test ":explain false (default) attempts real execution" do
       ast = %{modalities: [:graph], source: {:octad, "x"}}
       # Real execution hits RustClient.  Without it available, we
       # expect an error — but the call must not raise.
-      result = VQLExecutor.execute(ast)
+      result = VCLExecutor.execute(ast)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
 
     test ":explain false explicitly attempts real execution" do
       ast = %{modalities: [:graph], source: {:octad, "x"}}
-      result = VQLExecutor.execute(ast, explain: false)
+      result = VCLExecutor.execute(ast, explain: false)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
   end

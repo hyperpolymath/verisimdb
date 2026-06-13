@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-defmodule VeriSim.Query.VQLExecutor do
+defmodule VeriSim.Query.VCLExecutor do
   @moduledoc """
-  VQL Executor - Executes VQL queries and mutations parsed by the ReScript VQL parser.
+  VCL Executor - Executes VCL queries and mutations parsed by the ReScript VCL parser.
 
   Supports three phases:
   1. Dependent-type queries with multi-proof composition
@@ -11,9 +11,9 @@ defmodule VeriSim.Query.VQLExecutor do
 
   ## Execution Pipeline
 
-  1. Parse VQL query (done by ReScript VQLParser)
-  2. Type-check if PROOF clause present (VQLTypeChecker → VQLBidir)
-  3. Generate execution plan (VQLExplain)
+  1. Parse VCL query (done by ReScript VCLParser)
+  2. Type-check if PROOF clause present (VCLTypeChecker → VCLBidir)
+  3. Generate execution plan (VCLExplain)
   4. Classify conditions (pushdown vs cross-modal)
   5. Route to appropriate modality stores
   6. Evaluate cross-modal conditions post-fetch
@@ -23,14 +23,14 @@ defmodule VeriSim.Query.VQLExecutor do
   require Logger
 
   alias VeriSim.{QueryRouter, RustClient, Telemetry}
-  alias VeriSim.Query.VQLProofCertificate
+  alias VeriSim.Query.VCLProofCertificate
 
   @doc """
-  Execute a parsed VQL query.
+  Execute a parsed VCL query.
 
   ## Parameters
 
-  - `query_ast` - Parsed VQL query from ReScript VQLParser
+  - `query_ast` - Parsed VCL query from ReScript VCLParser
   - `opts` - Execution options
 
   ## Options
@@ -56,7 +56,7 @@ defmodule VeriSim.Query.VQLExecutor do
   end
 
   @doc """
-  Execute a VQL mutation (INSERT / UPDATE / DELETE).
+  Execute a VCL mutation (INSERT / UPDATE / DELETE).
   """
   def execute_mutation(mutation_ast, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, 30_000)
@@ -77,7 +77,7 @@ defmodule VeriSim.Query.VQLExecutor do
   end
 
   @doc """
-  Execute a VQL statement (query or mutation).
+  Execute a VCL statement (query or mutation).
   """
   def execute_statement(statement_ast, opts \\ []) do
     case statement_ast do
@@ -91,13 +91,13 @@ defmodule VeriSim.Query.VQLExecutor do
   end
 
   @doc """
-  Execute a VQL query string (includes parsing).
+  Execute a VCL query string (includes parsing).
   """
   def execute_string(query_string, opts \\ []) do
     start_time = System.monotonic_time()
 
     result =
-      case VeriSim.Query.VQLBridge.parse(query_string) do
+      case VeriSim.Query.VCLBridge.parse(query_string) do
         {:ok, ast} -> execute(ast, opts)
         {:error, reason} -> {:error, {:parse_error, reason}}
       end
@@ -165,7 +165,7 @@ defmodule VeriSim.Query.VQLExecutor do
     projections = extract_projections(query_ast)
 
     if proof_specs do
-      # VQL-DT path: type-check → execute → verify proofs → bundle certificate
+      # VCL-DT path: type-check → execute → verify proofs → bundle certificate
       execute_dt_query(
         query_ast,
         proof_specs,
@@ -228,7 +228,7 @@ defmodule VeriSim.Query.VQLExecutor do
     end
   end
 
-  # VQL-DT execution — type check, execute, verify proofs, bundle certificate
+  # VCL-DT execution — type check, execute, verify proofs, bundle certificate
   defp execute_dt_query(
          query_ast,
          proof_specs,
@@ -243,15 +243,15 @@ defmodule VeriSim.Query.VQLExecutor do
          projections,
          timeout
        ) do
-    alias VeriSim.Query.{VQLBridge, VQLTypeChecker}
+    alias VeriSim.Query.{VCLBridge, VCLTypeChecker}
 
     # Step 1: Type-check the query to get proof obligations and composition strategy.
     # Tries three strategies in order:
-    #   1. ReScript bidirectional type checker (VQLBridge.typecheck — full formal system)
-    #   2. Elixir-native type checker (VQLTypeChecker — validates types, generates obligations)
+    #   1. ReScript bidirectional type checker (VCLBridge.typecheck — full formal system)
+    #   2. Elixir-native type checker (VCLTypeChecker — validates types, generates obligations)
     #   3. Bare AST extraction (last resort — no validation, just structuring)
     type_info =
-      case VQLBridge.typecheck(query_ast) do
+      case VCLBridge.typecheck(query_ast) do
         {:ok, info} ->
           info
 
@@ -259,26 +259,26 @@ defmodule VeriSim.Query.VQLExecutor do
           # ReScript subprocess not running. Use the Elixir-native type checker
           # which validates proof types, modality compatibility, and composition.
           Logger.info(
-            "VQL-DT: Using Elixir-native type checker (ReScript subprocess unavailable)"
+            "VCL-DT: Using Elixir-native type checker (ReScript subprocess unavailable)"
           )
 
-          case VQLTypeChecker.typecheck(query_ast) do
+          case VCLTypeChecker.typecheck(query_ast) do
             {:ok, info} ->
               info
 
             {:error, reason} ->
               # Native type checker rejected the query — this is a real type error.
-              Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
+              Logger.error("VCL-DT: Type checking failed: #{inspect(reason)}")
               nil
           end
 
         {:error, reason} ->
-          Logger.error("VQL-DT: Type checking failed: #{inspect(reason)}")
+          Logger.error("VCL-DT: Type checking failed: #{inspect(reason)}")
           nil
       end
 
     if is_nil(type_info) do
-      {:error, {:type_check_failed, "VQL-DT query type checking failed"}}
+      {:error, {:type_check_failed, "VCL-DT query type checking failed"}}
     else
       # Step 2: Execute the query (get data)
       {pushdown_conditions, cross_modal_conditions} = classify_conditions(where_clause)
@@ -314,7 +314,7 @@ defmodule VeriSim.Query.VQLExecutor do
                   :conjunction
 
               # Step 4b: Generate independently verifiable certificates for
-              # each proof obligation using VQLProofCertificate. Each artifact
+              # each proof obligation using VCLProofCertificate. Each artifact
               # from the verifier becomes the witness for its corresponding
               # obligation, yielding a hash-sealed certificate.
               verifiable_certificates =
@@ -323,7 +323,7 @@ defmodule VeriSim.Query.VQLExecutor do
                 |> Enum.map(fn {obligation, artifact} ->
                   witness = if is_map(artifact), do: artifact, else: %{raw: artifact}
 
-                  case VQLProofCertificate.generate_certificate(obligation, witness) do
+                  case VCLProofCertificate.generate_certificate(obligation, witness) do
                     {:ok, cert} -> cert
                     {:error, _} -> nil
                   end
@@ -875,7 +875,7 @@ defmodule VeriSim.Query.VQLExecutor do
         else
           # No specific entity — log a warning but allow for global queries.
           Logger.warning(
-            "VQL-DT: Access proof without entity ID — global query, skipping entity-level check"
+            "VCL-DT: Access proof without entity ID — global query, skipping entity-level check"
           )
 
           {:ok, %{type: :access, entity_id: nil, authorized: true, scope: :global}}
@@ -1209,7 +1209,7 @@ defmodule VeriSim.Query.VQLExecutor do
   # ---------------------------------------------------------------------------
 
   # Proof obligation structuring and composition determination are now handled
-  # by VeriSim.Query.VQLTypeChecker, which provides richer validation and
+  # by VeriSim.Query.VCLTypeChecker, which provides richer validation and
   # enrichment (witness fields, circuit names, time estimates).
 
   # ===========================================================================
@@ -2019,7 +2019,7 @@ defmodule VeriSim.Query.VQLExecutor do
         steps = []
 
         # Step 1: Parse (already done)
-        steps = [%{operation: "Parse VQL", cost_ms: 1, notes: "Already completed"} | steps]
+        steps = [%{operation: "Parse VCL", cost_ms: 1, notes: "Already completed"} | steps]
 
         # Step 2: Type check (if proofs present)
         steps =

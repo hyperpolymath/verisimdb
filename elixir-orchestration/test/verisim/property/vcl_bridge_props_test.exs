@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLBridgePropsTest do
+defmodule VeriSim.Query.VCLBridgePropsTest do
   @moduledoc """
-  Property-based tests for the VQLBridge built-in parser.
+  Property-based tests for the VCLBridge built-in parser.
 
   Invariants verified across the input space:
 
@@ -20,12 +20,12 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias VeriSim.Query.VQLBridge
+  alias VeriSim.Query.VCLBridge
 
   setup do
-    case GenServer.whereis(VQLBridge) do
+    case GenServer.whereis(VCLBridge) do
       nil ->
-        {:ok, _pid} = VQLBridge.start_link([])
+        {:ok, _pid} = VCLBridge.start_link([])
         :ok
 
       _pid ->
@@ -59,7 +59,7 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
 
   property "parse never panics on arbitrary UTF-8 input" do
     check all(input <- string(:ascii, max_length: 200)) do
-      result = VQLBridge.parse(input)
+      result = VCLBridge.parse(input)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
   end
@@ -68,7 +68,7 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
     check all(uuid <- uuid_like()) do
       query = "SELECT GRAPH FROM HEXAD #{uuid}"
 
-      case VQLBridge.parse(query) do
+      case VCLBridge.parse(query) do
         {:ok, ast} ->
           assert ast.source == {:octad, uuid}
 
@@ -83,7 +83,7 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
     check all(mods <- list_of(modality_token(), min_length: 1, max_length: 6)) do
       query = "SELECT #{Enum.join(mods, ", ")} FROM HEXAD abc-123"
 
-      case VQLBridge.parse(query) do
+      case VCLBridge.parse(query) do
         {:ok, ast} ->
           parsed_mods = ast.modalities
           # :all is also acceptable (SELECT *) but for explicit token lists
@@ -101,7 +101,7 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
 
   property "SELECT * always produces :all in modalities" do
     check all(uuid <- uuid_like()) do
-      case VQLBridge.parse("SELECT * FROM HEXAD #{uuid}") do
+      case VCLBridge.parse("SELECT * FROM HEXAD #{uuid}") do
         {:ok, ast} -> assert :all in ast.modalities
         {:error, _} -> :ok
       end
@@ -116,8 +116,8 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
       proof_clause = if include_proof, do: " PROOF EXISTENCE(target-1)", else: ""
       query = "SELECT GRAPH FROM HEXAD #{uuid}#{proof_clause}"
 
-      slipstream = VQLBridge.parse_slipstream(query)
-      dependent = VQLBridge.parse_dependent(query)
+      slipstream = VCLBridge.parse_slipstream(query)
+      dependent = VCLBridge.parse_dependent(query)
 
       slipstream_ok? = match?({:ok, _}, slipstream)
       dependent_ok? = match?({:ok, _}, dependent)
@@ -135,7 +135,7 @@ defmodule VeriSim.Query.VQLBridgePropsTest do
     check all(uuid <- uuid_like()) do
       query = "SELECT GRAPH, VECTOR FROM HEXAD #{uuid}"
 
-      case {VQLBridge.parse(query), VQLBridge.parse(query)} do
+      case {VCLBridge.parse(query), VCLBridge.parse(query)} do
         {{:ok, a}, {:ok, b}} ->
           assert a.modalities == b.modalities
           assert a.source == b.source

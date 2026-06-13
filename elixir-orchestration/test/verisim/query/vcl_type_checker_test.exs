@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-defmodule VeriSim.Query.VQLTypeCheckerTest do
+defmodule VeriSim.Query.VCLTypeCheckerTest do
   @moduledoc """
-  Tests for the Elixir-native VQL-DT type checker.
+  Tests for the Elixir-native VCL-DT type checker.
 
   Verifies that the type checker:
   1. Validates proof types are known
@@ -15,7 +15,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
 
   use ExUnit.Case, async: true
 
-  alias VeriSim.Query.VQLTypeChecker
+  alias VeriSim.Query.VCLTypeChecker
 
   # ===========================================================================
   # parse_proof_specs/1 — multi-proof splitting
@@ -24,7 +24,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
   describe "parse_proof_specs/1" do
     test "splits AND-connected proofs" do
       specs =
-        VQLTypeChecker.parse_proof_specs(%{
+        VCLTypeChecker.parse_proof_specs(%{
           raw: "EXISTENCE(entity-001) AND PROVENANCE(entity-001)"
         })
 
@@ -36,7 +36,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
     end
 
     test "splits OR-connected proofs" do
-      specs = VQLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(a) OR INTEGRITY(b)"})
+      specs = VCLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(a) OR INTEGRITY(b)"})
 
       assert length(specs) == 2
       assert Enum.at(specs, 0).proofType == "EXISTENCE"
@@ -44,7 +44,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
     end
 
     test "handles single proof spec" do
-      specs = VQLTypeChecker.parse_proof_specs(%{raw: "INTEGRITY(my_contract)"})
+      specs = VCLTypeChecker.parse_proof_specs(%{raw: "INTEGRITY(my_contract)"})
 
       assert length(specs) == 1
       assert Enum.at(specs, 0).proofType == "INTEGRITY"
@@ -52,7 +52,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
     end
 
     test "handles proof without parentheses" do
-      specs = VQLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE entity-001"})
+      specs = VCLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE entity-001"})
 
       assert length(specs) == 1
       assert Enum.at(specs, 0).proofType == "EXISTENCE"
@@ -61,7 +61,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
 
     test "handles three proofs" do
       specs =
-        VQLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(a) AND PROVENANCE(b) AND INTEGRITY(c)"})
+        VCLTypeChecker.parse_proof_specs(%{raw: "EXISTENCE(a) AND PROVENANCE(b) AND INTEGRITY(c)"})
 
       assert length(specs) == 3
       assert Enum.map(specs, & &1.proofType) == ["EXISTENCE", "PROVENANCE", "INTEGRITY"]
@@ -69,14 +69,14 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
 
     test "passes through structured specs unchanged" do
       input = %{proofType: "EXISTENCE", contractName: "entity-001"}
-      specs = VQLTypeChecker.parse_proof_specs(input)
+      specs = VCLTypeChecker.parse_proof_specs(input)
 
       assert length(specs) == 1
       assert Enum.at(specs, 0) == input
     end
 
     test "handles nil" do
-      assert VQLTypeChecker.parse_proof_specs(nil) == []
+      assert VCLTypeChecker.parse_proof_specs(nil) == []
     end
 
     test "handles list of specs" do
@@ -85,14 +85,14 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         %{proofType: "INTEGRITY", contractName: "b"}
       ]
 
-      specs = VQLTypeChecker.parse_proof_specs(input)
+      specs = VCLTypeChecker.parse_proof_specs(input)
 
       assert length(specs) == 2
     end
 
     test "handles list containing raw specs" do
       input = [%{raw: "EXISTENCE(a) AND PROVENANCE(b)"}]
-      specs = VQLTypeChecker.parse_proof_specs(input)
+      specs = VCLTypeChecker.parse_proof_specs(input)
 
       assert length(specs) == 2
     end
@@ -109,7 +109,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "EXISTENCE", contractName: "entity-001"}]
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert length(info.proof_obligations) == 1
       assert Enum.at(info.proof_obligations, 0).type == :existence
       assert info.composition_strategy == :independent
@@ -124,7 +124,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         ]
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert length(info.proof_obligations) == 2
       assert info.composition_strategy == :conjunction
     end
@@ -135,7 +135,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "PROVENANCE", contractName: "entity-001"}]
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert Enum.at(info.proof_obligations, 0).type == :provenance
     end
 
@@ -145,7 +145,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "INTEGRITY", contractName: "contract-001"}]
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert Enum.at(info.proof_obligations, 0).type == :integrity
     end
 
@@ -155,7 +155,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "CONSISTENCY", contractName: "entity-001"}]
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert Enum.at(info.proof_obligations, 0).type == :consistency
     end
 
@@ -165,7 +165,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "FRESHNESS", contractName: "entity-001"}]
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert Enum.at(info.proof_obligations, 0).type == :freshness
     end
 
@@ -175,7 +175,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: %{raw: "EXISTENCE(entity-001)"}
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert length(info.proof_obligations) == 1
     end
 
@@ -185,7 +185,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: %{raw: "EXISTENCE(entity-001) AND PROVENANCE(entity-001)"}
       }
 
-      assert {:ok, info} = VQLTypeChecker.typecheck(ast)
+      assert {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert length(info.proof_obligations) == 2
     end
   end
@@ -197,7 +197,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "BOGUS", contractName: "entity-001"}]
       }
 
-      assert {:error, {:unknown_proof_type, msg}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:unknown_proof_type, msg}} = VCLTypeChecker.typecheck(ast)
       assert msg =~ "BOGUS"
     end
 
@@ -207,7 +207,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "INTEGRITY"}]
       }
 
-      assert {:error, {:missing_contract, _}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:missing_contract, _}} = VCLTypeChecker.typecheck(ast)
     end
 
     test "rejects CITATION proof without contract" do
@@ -216,7 +216,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "CITATION"}]
       }
 
-      assert {:error, {:missing_contract, _}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:missing_contract, _}} = VCLTypeChecker.typecheck(ast)
     end
 
     test "rejects INTEGRITY proof with wrong modality" do
@@ -225,7 +225,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "INTEGRITY", contractName: "contract-001"}]
       }
 
-      assert {:error, {:modality_mismatch, msg}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:modality_mismatch, msg}} = VCLTypeChecker.typecheck(ast)
       assert msg =~ "semantic"
     end
 
@@ -235,7 +235,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "PROVENANCE", contractName: "entity-001"}]
       }
 
-      assert {:error, {:modality_mismatch, msg}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:modality_mismatch, msg}} = VCLTypeChecker.typecheck(ast)
       assert msg =~ "provenance"
     end
 
@@ -245,7 +245,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "FRESHNESS", contractName: "entity-001"}]
       }
 
-      assert {:error, {:modality_mismatch, msg}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:modality_mismatch, msg}} = VCLTypeChecker.typecheck(ast)
       assert msg =~ "temporal"
     end
 
@@ -255,7 +255,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: []
       }
 
-      assert {:error, {:missing_proof, _}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:missing_proof, _}} = VCLTypeChecker.typecheck(ast)
     end
 
     test "rejects query with nil proof" do
@@ -264,7 +264,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: nil
       }
 
-      assert {:error, {:missing_proof, _}} = VQLTypeChecker.typecheck(ast)
+      assert {:error, {:missing_proof, _}} = VCLTypeChecker.typecheck(ast)
     end
   end
 
@@ -279,7 +279,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "EXISTENCE", contractName: "entity-001"}]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       obligation = Enum.at(info.proof_obligations, 0)
 
       assert is_list(obligation.witness_fields)
@@ -293,7 +293,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "EXISTENCE", contractName: "entity-001"}]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       obligation = Enum.at(info.proof_obligations, 0)
 
       assert obligation.circuit == "existence-proof-v1"
@@ -308,7 +308,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         ]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
 
       assert info.total_estimated_ms > 0
 
@@ -323,7 +323,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "PROVENANCE", contractName: "entity-001"}]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert Enum.at(info.proof_obligations, 0).circuit == "provenance-proof-v1"
     end
 
@@ -333,7 +333,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "INTEGRITY", contractName: "contract-001"}]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert Enum.at(info.proof_obligations, 0).circuit == "integrity-proof-v1"
     end
   end
@@ -349,7 +349,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         proof: [%{proofType: "EXISTENCE", contractName: "entity-001"}]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert info.composition_strategy == :independent
       assert info.is_parallelizable == true
     end
@@ -363,7 +363,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         ]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert info.composition_strategy == :sequential
       assert info.is_parallelizable == false
     end
@@ -377,7 +377,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
         ]
       }
 
-      {:ok, info} = VQLTypeChecker.typecheck(ast)
+      {:ok, info} = VCLTypeChecker.typecheck(ast)
       assert info.composition_strategy == :conjunction
     end
   end
@@ -412,7 +412,7 @@ defmodule VeriSim.Query.VQLTypeCheckerTest do
           proof: [%{proofType: proof_type_str, contractName: contract}]
         }
 
-        result = VQLTypeChecker.typecheck(ast)
+        result = VCLTypeChecker.typecheck(ast)
 
         assert {:ok, info} = result,
                "#{proof_type_str} should be accepted, got: #{inspect(result)}"
