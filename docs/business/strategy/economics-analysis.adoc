@@ -227,7 +227,7 @@ not additional features.
 ==== Principle: No Feature Gating
 
 VeriSimDB's commercial licence does *not* add features beyond the community
-edition. All 8 modalities, drift detection, self-normalisation, VQL, VCL-DT,
+edition. All 8 modalities, drift detection, self-normalisation, VCL, VCL-DT,
 and federation ship in the open-source release.
 
 This is a deliberate strategic choice:

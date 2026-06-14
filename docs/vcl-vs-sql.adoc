@@ -134,7 +134,7 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ----
 
 **VCL (Slipstream):**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -156,7 +156,7 @@ WHERE e1.id = '550e8400-e29b-41d4-a716-446655440000'
 ----
 
 **VCL (graph traversal):**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -176,7 +176,7 @@ WHERE to_tsvector('english', content) @@ to_tsquery('quantum & computing');
 ----
 
 **VCL:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM STORE research_papers
@@ -196,7 +196,7 @@ LIMIT 10;
 ----
 
 **VCL:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR
 FROM STORE research_papers
@@ -207,7 +207,7 @@ LIMIT 10
 === Verified Query (No SQL Equivalent)
 
 **VCL-DT (dependent type path):**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000

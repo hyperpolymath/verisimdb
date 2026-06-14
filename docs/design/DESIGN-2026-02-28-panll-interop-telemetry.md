@@ -12,7 +12,7 @@ in PanLL's Model, with VeriSimDB-specific messages and Tauri commands. This mean
 1. **No plugin architecture** for other databases (QuandleDB, LithoGlyph)
 2. **No telemetry** — we have `:telemetry` events defined but no aggregation, export, or UI
 3. **No product development feedback loop** — we don't know how the system is used
-4. **Each playground is standalone** — VQL Playground, future KQL/GQL playgrounds are islands
+4. **Each playground is standalone** — VCL Playground, future KQL/GQL playgrounds are islands
 
 ## Design Goals
 
@@ -119,7 +119,7 @@ The reporter aggregates raw telemetry into actionable insights:
 - `Model.res` — `verisimdbState` with drift scores, proof obligations
 - `Msg.res` — `verisimdbMsg` with health, query, drift, normalise, entity detail
 - `TauriCmd.res` — 7 VeriSimDB Tauri commands
-- `PaneW.res` — Database tools panel, drift heatmap, VQL query area
+- `PaneW.res` — Database tools panel, drift heatmap, VCL query area
 
 **New (this session):**
 - `Model.res` — add `telemetryState` to verisimdbState
@@ -156,9 +156,9 @@ The reporter aggregates raw telemetry into actionable insights:
 
 ### Phase 4: Playground Gallery (Future)
 
-1. Abstract VQL Playground as a PanLL module
+1. Abstract VCL Playground as a PanLL module
 2. Define playground protocol (editor, linter, formatter, executor)
-3. Register VQL, future KQL, future GQL playgrounds
+3. Register VCL, future KQL, future GQL playgrounds
 4. PanLL manages playground lifecycle
 
 ## Files Changed/Created

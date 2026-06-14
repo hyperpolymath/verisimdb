@@ -8,7 +8,7 @@
 
 == Purpose and verdict
 
-A full fresh review of VeriSimDB (Rust core, Elixir orchestration, VQL/VCL
+A full fresh review of VeriSimDB (Rust core, Elixir orchestration, VCL/VCL
 surface, docs, CI), conducted 2026-06-11, with a targeted three-week plan to
 make the project genuinely plausible and respectable by 2026-07-01. The plan
 optimises for *truth and demonstrability*, not feature count: close the gap
@@ -34,7 +34,7 @@ work is wiring, not invention.
   (this session).
 * Test culture is substantive: dedicated atomicity suite for the octad
   store, proptests on the WAL, insta snapshot tests on the planner,
-  criterion benches, a libfuzzer target for the VQL tokenizer.
+  criterion benches, a libfuzzer target for the VCL tokenizer.
 * Zero `todo!`/`unimplemented!`/`FIXME` in the Rust tree; several crates
   carry `#![forbid(unsafe_code)]`.
 
@@ -109,7 +109,7 @@ EXPLAIN/EXPLAIN ANALYZE; wired into `/query/plan` + `/query/explain`.
 No executor consumes `PhysicalPlan` yet — honest framing needed.
 
 |verisim-api (9.0k, 53 tests)
-|REAL CRUD/search/VQL; theatre at drift/normalize endpoints
+|REAL CRUD/search/VCL; theatre at drift/normalize endpoints
 |REST + GraphQL + gRPC genuinely served. `/drift/status` returns
 initialized-to-zero metrics forever; `/drift/entity/{id}` returns global
 zeros labelled per-entity (`lib.rs:1189-1233`); `POST
@@ -135,9 +135,9 @@ DynamicSupervisor, DriftMonitor, QueryRouter, SchemaRegistry, KRaft
 consensus node (single-node bootstrap), Federation Resolver. Transport
 defaults to HTTP. 14 federation adapters (237–650 LOC each) with real
 modality->capability mapping and optional native wire drivers (postgrex,
-redix, exqlite, bolt_sips). VQL surface exists three times over: ReScript
+redix, exqlite, bolt_sips). VCL surface exists three times over: ReScript
 (`src/vql`, incl. bidirectional type checker + proof obligations), Elixir
-(`query/vql_*`), and the Rust planner bridge consuming the ReScript AST
+(`query/vcl_*`), and the Rust planner bridge consuming the ReScript AST
 JSON. Coq models for Octad/Drift/Normalizer/Planner under `formal/` with a
 CI build.
 
@@ -226,7 +226,7 @@ M = 1–2 days.
   `vcltotal-parse` already builds standalone (verified: 19/19 tests) and
   has a wire format + decider. Ship a tiny `vclt-gate` binary there
   (stdin: statement, stdout: verdict JSON with level-tagged reasons,
-  static levels L1–L4). VeriSimDB's VQL execute path invokes it when
+  static levels L1–L4). VeriSimDB's VCL execute path invokes it when
   present (env/feature-gated). The README triad becomes executable.
 . *Scripted demo II: admissibility (S).* Well-formed DECLARE/ASSERT
   admitted; malformed/unsafe statement rejected with reasons. Transcript
