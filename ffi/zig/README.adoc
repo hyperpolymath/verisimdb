@@ -68,7 +68,7 @@ Targets recent Zig (0.14+).
 | GET    | `/api/v1/health`          | Combined (gateway + Rust + Elixir)
 | GET    | `/api/v1/octads*`         | Rust core
 | POST   | `/api/v1/octads`          | Rust core
-| POST   | `/api/v1/vql/execute`     | Rust core
+| POST   | `/api/v1/vcl/execute`     | Rust core
 | GET    | `/api/v1/drift/*`         | Rust core
 | GET/POST | `/api/v1/search/*`      | Rust core
 | GET    | `/api/v1/provenance/*`    | Rust core
@@ -90,14 +90,14 @@ type Query {
 }
 
 type Mutation {
-  executeVql(query: String!): VqlResult
+  executeVcl(query: String!): VclResult
 }
 ----
 
 Variables expected:
 
 * `driftScore`  — `variables.entityId` (string)
-* `executeVql` — `variables.query` (string)
+* `executeVcl` — `variables.query` (string)
 
 == Configuration (env vars)
 
