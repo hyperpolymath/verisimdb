@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
-# VeriSimDB Julia Client — VQL (VeriSimDB Query Language) operations.
+# VeriSimDB Julia Client — VCL (VeriSimDB Query Language) operations.
 #
-# VQL is VeriSimDB's native query language for multi-modal queries that span
+# VCL is VeriSimDB's native query language for multi-modal queries that span
 # graph traversals, vector similarity, spatial filters, and temporal constraints
 # in a single statement. This file provides execution and explain functions.
 
 """
-    execute_vql(client, query; params=Dict()) -> VqlResult
+    execute_vcl(client, query; params=Dict()) -> VclResult
 
-Execute a VQL query and return the result set.
+Execute a VCL query and return the result set.
 
-VQL queries can combine modalities — for example:
+VCL queries can combine modalities — for example:
 ```
 FIND octads WHERE vector_similar(\$embedding, 0.8)
   AND spatial_within(51.5, -0.1, 10km)
@@ -21,46 +21,46 @@ FIND octads WHERE vector_similar(\$embedding, 0.8)
 
 # Arguments
 - `client::Client` — The authenticated client.
-- `query::String` — The VQL query string.
+- `query::String` — The VCL query string.
 
 # Keyword Arguments
 - `params::Dict{String,String}` — Named parameters for parameterised queries.
 
 # Returns
-A `VqlResult` containing columns, rows, count, and execution time.
+A `VclResult` containing columns, rows, count, and execution time.
 """
-function execute_vql(
+function execute_vcl(
     client::Client,
     query::String;
     params::Dict{String,String}=Dict{String,String}()
-)::VqlResult
+)::VclResult
     body = Dict("query" => query, "params" => params)
-    resp = do_post(client, "/api/v1/vql/execute", body)
-    return parse_response(VqlResult, resp)
+    resp = do_post(client, "/api/v1/vcl/execute", body)
+    return parse_response(VclResult, resp)
 end
 
 """
-    explain_vql(client, query; params=Dict()) -> VqlExplanation
+    explain_vcl(client, query; params=Dict()) -> VclExplanation
 
-Return the query execution plan for a VQL statement without running it.
+Return the query execution plan for a VCL statement without running it.
 Useful for debugging and optimising queries.
 
 # Arguments
 - `client::Client` — The authenticated client.
-- `query::String` — The VQL query string.
+- `query::String` — The VCL query string.
 
 # Keyword Arguments
 - `params::Dict{String,String}` — Named parameters.
 
 # Returns
-A `VqlExplanation` containing the plan, estimated cost, and warnings.
+A `VclExplanation` containing the plan, estimated cost, and warnings.
 """
-function explain_vql(
+function explain_vcl(
     client::Client,
     query::String;
     params::Dict{String,String}=Dict{String,String}()
-)::VqlExplanation
+)::VclExplanation
     body = Dict("query" => query, "params" => params)
-    resp = do_post(client, "/api/v1/vql/explain", body)
-    return parse_response(VqlExplanation, resp)
+    resp = do_post(client, "/api/v1/vcl/explain", body)
+    return parse_response(VclExplanation, resp)
 end

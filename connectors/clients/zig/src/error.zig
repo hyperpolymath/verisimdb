@@ -24,8 +24,8 @@ pub const VeriSimErrorCode = enum {
     modality_unavailable,
     drift_computation,
     provenance_invalid,
-    vql_parse_error,
-    vql_execution_error,
+    vcl_parse_error,
+    vcl_execution_error,
     federation_error,
     // Client-side
     connection_error,
@@ -49,8 +49,8 @@ pub const VeriSimErrorCode = enum {
             .{ "MODALITY_UNAVAILABLE", .modality_unavailable },
             .{ "DRIFT_COMPUTATION", .drift_computation },
             .{ "PROVENANCE_INVALID", .provenance_invalid },
-            .{ "VQL_PARSE_ERROR", .vql_parse_error },
-            .{ "VQL_EXECUTION_ERROR", .vql_execution_error },
+            .{ "VCL_PARSE_ERROR", .vcl_parse_error },
+            .{ "VCL_EXECUTION_ERROR", .vcl_execution_error },
             .{ "FEDERATION_ERROR", .federation_error },
         };
         inline for (map) |entry| {

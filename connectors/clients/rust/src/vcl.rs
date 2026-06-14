@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-//! VeriSim Query Language (VQL) execution.
+//! VeriSim Query Language (VCL) execution.
 //!
-//! VQL is VeriSimDB's native query language, supporting SQL-like syntax extended
+//! VCL is VeriSimDB's native query language, supporting SQL-like syntax extended
 //! with multi-modal operations (vector similarity, graph traversal, spatial
 //! predicates, drift thresholds, etc.). This module provides methods to execute
-//! VQL statements and retrieve explain / query plans.
+//! VCL statements and retrieve explain / query plans.
 
 use serde::{Deserialize, Serialize};
 
 use crate::client::VeriSimClient;
 use crate::error::Result;
 
-/// Response from a VQL query execution or explain request.
+/// Response from a VCL query execution or explain request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VqlResponse {
+pub struct VclResponse {
     /// Whether the query executed successfully.
     pub success: bool,
-    /// The type of VQL statement ("SELECT", "INSERT", "UPDATE", "DELETE", "EXPLAIN", etc.).
+    /// The type of VCL statement ("SELECT", "INSERT", "UPDATE", "DELETE", "EXPLAIN", etc.).
     pub statement_type: String,
     /// Number of rows affected or returned.
     pub row_count: usize,
@@ -28,45 +28,45 @@ pub struct VqlResponse {
     pub message: Option<String>,
 }
 
-/// Internal request body for VQL execution.
+/// Internal request body for VCL execution.
 #[derive(Debug, Serialize)]
-struct VqlRequest {
+struct VclRequest {
     query: String,
 }
 
 impl VeriSimClient {
-    /// Execute a VQL statement against the VeriSimDB instance.
+    /// Execute a VCL statement against the VeriSimDB instance.
     ///
     /// Supports SELECT, INSERT, UPDATE, DELETE, and VeriSimDB-specific
     /// statements like `DRIFT CHECK`, `NORMALIZE`, and `FEDERATE`.
     ///
     /// # Arguments
     ///
-    /// * `query` — The VQL statement string.
+    /// * `query` — The VCL statement string.
     ///
     /// # Errors
     ///
     /// Returns [`VeriSimError::Server`] if the query has syntax errors or
     /// the server rejects it for semantic reasons.
-    pub async fn execute_vql(&self, query: &str) -> Result<VqlResponse> {
-        let body = VqlRequest {
+    pub async fn execute_vcl(&self, query: &str) -> Result<VclResponse> {
+        let body = VclRequest {
             query: query.to_owned(),
         };
-        self.post("/api/v1/vql/execute", &body).await
+        self.post("/api/v1/vcl/execute", &body).await
     }
 
-    /// Request an explain / query plan for a VQL statement without executing it.
+    /// Request an explain / query plan for a VCL statement without executing it.
     ///
     /// Useful for understanding which modalities, indices, and federation peers
     /// would be involved in a query.
     ///
     /// # Arguments
     ///
-    /// * `query` — The VQL statement string to explain.
-    pub async fn explain_vql(&self, query: &str) -> Result<VqlResponse> {
-        let body = VqlRequest {
+    /// * `query` — The VCL statement string to explain.
+    pub async fn explain_vcl(&self, query: &str) -> Result<VclResponse> {
+        let body = VclRequest {
             query: query.to_owned(),
         };
-        self.post("/api/v1/vql/explain", &body).await
+        self.post("/api/v1/vcl/explain", &body).await
     }
 }

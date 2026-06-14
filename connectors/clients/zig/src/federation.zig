@@ -20,7 +20,7 @@ pub const FederatedQueryRequest = struct {
 pub const PeerQueryResult = struct {
     peer_id: []const u8,
     peer_name: []const u8,
-    result: types.VqlResult,
+    result: types.VclResult,
     elapsed_ms: f64 = 0.0,
     @"error": ?[]const u8 = null,
 };
