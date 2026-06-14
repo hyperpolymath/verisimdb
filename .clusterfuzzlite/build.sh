@@ -53,9 +53,9 @@ build_target() {
 }
 
 build_target "${SRC}/verisimdb/fuzz" fuzz_octad_id
-build_target "${SRC}/verisimdb/fuzz" fuzz_vql_parser
+build_target "${SRC}/verisimdb/fuzz" fuzz_vcl_parser
 
 # Optional seed corpora — empty for now, will populate as we discover
 # interesting inputs.  Comment in once corpora exist:
 # cp -r "${SRC}/verisimdb/fuzz/corpus/fuzz_octad_id" "${OUT}/fuzz_octad_id_seed_corpus" 2>/dev/null || true
-# cp -r "${SRC}/verisimdb/rust-core/fuzz/corpus/fuzz_vql_parser" "${OUT}/fuzz_vql_parser_seed_corpus" 2>/dev/null || true
+# cp -r "${SRC}/verisimdb/rust-core/fuzz/corpus/fuzz_vcl_parser" "${OUT}/fuzz_vcl_parser_seed_corpus" 2>/dev/null || true
