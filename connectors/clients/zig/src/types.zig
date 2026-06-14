@@ -152,14 +152,14 @@ pub const SearchResult = struct {
     score: f64 = 0.0,
 };
 
-pub const VqlResult = struct {
+pub const VclResult = struct {
     columns: []const []const u8,
     rows: []const []const []const u8,
     count: u64 = 0,
     elapsed_ms: f64 = 0.0,
 };
 
-pub const VqlExplanation = struct {
+pub const VclExplanation = struct {
     query: []const u8,
     plan: []const u8,
     cost: f64 = 0.0,

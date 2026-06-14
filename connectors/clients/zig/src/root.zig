@@ -19,7 +19,7 @@ pub const octad = @import("octad.zig");
 pub const drift = @import("drift.zig");
 pub const provenance = @import("provenance.zig");
 pub const search = @import("search.zig");
-pub const vql = @import("vql.zig");
+pub const vcl = @import("vcl.zig");
 pub const federation = @import("federation.zig");
 
 pub const Client = @import("client.zig").Client;
@@ -40,8 +40,8 @@ pub const ProvenanceEvent = types.ProvenanceEvent;
 pub const ProvenanceChain = types.ProvenanceChain;
 pub const PaginatedResponse = types.PaginatedResponse;
 pub const SearchResult = types.SearchResult;
-pub const VqlResult = types.VqlResult;
-pub const VqlExplanation = types.VqlExplanation;
+pub const VclResult = types.VclResult;
+pub const VclExplanation = types.VclExplanation;
 pub const FederationPeer = types.FederationPeer;
 
 test {
@@ -53,6 +53,6 @@ test {
     _ = @import("drift.zig");
     _ = @import("provenance.zig");
     _ = @import("search.zig");
-    _ = @import("vql.zig");
+    _ = @import("vcl.zig");
     _ = @import("federation.zig");
 }

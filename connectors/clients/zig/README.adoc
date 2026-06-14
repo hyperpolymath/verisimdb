@@ -27,7 +27,7 @@ rather than via a maintained per-language SDK.
 | `src/drift.zig`       | Drift: `score / status / normalize`.
 | `src/provenance.zig`  | Provenance: `chain / record / verify`.
 | `src/search.zig`      | Multi-modal search: text / vector / spatial / nearest / related.
-| `src/vql.zig`         | VCL: `execute / explain`.
+| `src/vcl.zig`         | VCL: `execute / explain`.
 | `src/federation.zig`  | Federation: `registerPeer / listPeers / query`.
 |===
 
