@@ -8,15 +8,18 @@ on:
     paths:
       - "elixir-orchestration/**"
       - ".github/workflows/elixir-ci.yml"
+  # No pull_request paths-filter: 'benchee scripts compile' and 'hex audit' are
+  # REQUIRED status checks, so they must report on every PR (a path-filtered required
+  # check deadlocks PRs that don't touch its paths). The "Detect relevant changes"
+  # step in each job gates the heavy work; non-required jobs are gated the same way so
+  # they don't run on every unrelated PR.
   pull_request:
     branches: [main, master]
-    paths:
-      - "elixir-orchestration/**"
-      - ".github/workflows/elixir-ci.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read   # change-detector reads the PR's file list
 
 env:
   MIX_ENV: test
@@ -40,11 +43,31 @@ jobs:
             otp: "27"
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
-      - uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
+      - name: Detect relevant changes
+        id: detect
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PATTERN='^elixir-orchestration/'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
+            fi
+          else
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             elixir-orchestration/deps
@@ -52,10 +75,14 @@ jobs:
           key: ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('elixir-orchestration/mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-
-      - run: mix deps.get
-      - run: mix format --check-formatted
-      - run: mix compile --warnings-as-errors
-      - run: mix test
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix deps.get
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix format --check-formatted
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix compile --warnings-as-errors
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix test
 
   coverage:
     # Unit-test coverage only: the federation adapters are exercised by the
@@ -69,19 +96,42 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
-      - uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
+      - name: Detect relevant changes
+        id: detect
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PATTERN='^elixir-orchestration/'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
+            fi
+          else
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
         with:
           elixir-version: "1.17"
           otp-version: "27"
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             elixir-orchestration/deps
             elixir-orchestration/_build
           key: ${{ runner.os }}-mix-coverage-${{ hashFiles('elixir-orchestration/mix.lock') }}
-      - run: mix deps.get
-      - run: mix coveralls.json
-      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix deps.get
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix coveralls.json
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: elixir-orchestration/cover/excoveralls.json
           flags: elixir
@@ -97,18 +147,40 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
-      - uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
+      - name: Detect relevant changes
+        id: detect
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PATTERN='^elixir-orchestration/'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
+            fi
+          else
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
         with:
           elixir-version: "1.17"
           otp-version: "27"
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             elixir-orchestration/deps
             elixir-orchestration/_build
           key: ${{ runner.os }}-mix-bench-${{ hashFiles('elixir-orchestration/mix.lock') }}
-      - run: mix deps.get
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix deps.get
       - name: Syntax check all bench scripts
+        if: steps.detect.outputs.relevant == 'true'
         run: |
           for f in bench/*.exs; do
             elixir -e "Code.string_to_quoted!(File.read!(\"$f\"))"
@@ -124,11 +196,32 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
-
-      - uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
+      - name: Detect relevant changes
+        id: detect
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PATTERN='^elixir-orchestration/'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
+            fi
+          else
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.detect.outputs.relevant == 'true'
+        uses: erlef/setup-beam@e6d7c94229049569db56a7ad5a540c051a010af9 # v1.20.4
         with:
           elixir-version: "1.17"
           otp-version: "27"
-      - run: mix deps.get
-      - run: mix hex.audit
-      - run: mix deps.unlock --check-unused
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix deps.get
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix hex.audit
+      - if: steps.detect.outputs.relevant == 'true'
+        run: mix deps.unlock --check-unused
