@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //!
-//! VQL syntax highlighting for the interactive REPL.
+//! VCL syntax highlighting for the interactive REPL.
 //!
-//! Implements `rustyline::highlight::Highlighter` to colour VQL keywords,
+//! Implements `rustyline::highlight::Highlighter` to colour VCL keywords,
 //! modality names, string literals, and numeric literals as the user types.
 
 use colored::Colorize;
 use rustyline::highlight::Highlighter;
 use std::borrow::Cow;
 
-/// VQL keywords that are highlighted in blue/bold.
-const VQL_KEYWORDS: &[&str] = &[
+/// VCL keywords that are highlighted in blue/bold.
+const VCL_KEYWORDS: &[&str] = &[
     "SELECT",
     "FROM",
     "WHERE",
@@ -67,10 +67,10 @@ const VQL_KEYWORDS: &[&str] = &[
     "DISTINCT",
 ];
 
-/// VQL modality names highlighted in green.
+/// VCL modality names highlighted in green.
 /// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
 /// Provenance, Spatial.
-const VQL_MODALITIES: &[&str] = &[
+const VCL_MODALITIES: &[&str] = &[
     "GRAPH",
     "VECTOR",
     "TENSOR",
@@ -81,18 +81,18 @@ const VQL_MODALITIES: &[&str] = &[
     "SPATIAL",
 ];
 
-/// Syntax highlighter for VQL input lines.
+/// Syntax highlighter for VCL input lines.
 ///
 /// This is used by the rustyline `Editor` to provide real-time syntax
 /// colouring as the user types queries.
-pub struct VqlHighlighter;
+pub struct VclHighlighter;
 
-impl Highlighter for VqlHighlighter {
+impl Highlighter for VclHighlighter {
     /// Highlight the input line with ANSI colour codes.
     ///
     /// The highlighting strategy is token-based:
     /// 1. String literals (single or double quoted) are coloured yellow.
-    /// 2. Tokens matching VQL keywords are coloured blue and bold.
+    /// 2. Tokens matching VCL keywords are coloured blue and bold.
     /// 3. Tokens matching modality names are coloured green and bold.
     /// 4. Numeric tokens are coloured cyan.
     /// 5. Everything else is left uncoloured.
@@ -136,7 +136,7 @@ impl Highlighter for VqlHighlighter {
     }
 }
 
-/// Apply syntax highlighting to a single line of VQL input.
+/// Apply syntax highlighting to a single line of VCL input.
 ///
 /// Handles quoted strings as atomic units so that keywords inside strings
 /// are not incorrectly coloured.
@@ -185,9 +185,9 @@ fn highlight_line(line: &str) -> String {
             let word: String = chars[start..i].iter().collect();
             let upper = word.to_uppercase();
 
-            if VQL_MODALITIES.contains(&upper.as_str()) {
+            if VCL_MODALITIES.contains(&upper.as_str()) {
                 result.push_str(&word.green().bold().to_string());
-            } else if VQL_KEYWORDS.contains(&upper.as_str()) {
+            } else if VCL_KEYWORDS.contains(&upper.as_str()) {
                 result.push_str(&word.blue().bold().to_string());
             } else {
                 result.push_str(&word);
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_highlight_returns_something() {
-        let hl = VqlHighlighter;
+        let hl = VclHighlighter;
         let output = hl.highlight("SELECT FROM octad", 0);
         // Just verify it does not panic and returns non-empty output.
         assert!(!output.is_empty());
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn test_highlight_char_always_true() {
-        let hl = VqlHighlighter;
+        let hl = VclHighlighter;
         assert!(hl.highlight_char("test", 0, rustyline::highlight::CmdKind::Other));
     }
 

@@ -2,7 +2,7 @@
 
 [package]
 name = "verisim-repl"
-description = "Interactive VQL REPL for VeriSimDB"
+description = "Interactive VCL REPL for VeriSimDB"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,7 +10,7 @@ license.workspace = true
 publish = false  # workspace-internal; path deps cannot be published to crates.io
 
 [[bin]]
-name = "vql"
+name = "vcl"
 path = "src/main.rs"
 
 [dependencies]
@@ -29,5 +29,5 @@ clap = { version = "4", features = ["derive"] }
 comfy-table = "7"
 colored = "3"
 
-# Home directory resolution (history file, .vqlrc)
+# Home directory resolution (history file, .vclrc)
 dirs = "6"
