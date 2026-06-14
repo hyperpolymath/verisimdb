@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-//! QueryOctad Builder — Creates a octad from a VQL query.
+//! QueryOctad Builder — Creates a octad from a VCL query.
 //!
-//! Homoiconicity: queries are data. A VQL query stored as a octad has:
+//! Homoiconicity: queries are data. A VCL query stored as a octad has:
 //! - **Document**: query text (searchable via full-text)
 //! - **Graph**: parse tree as subject → predicate → object triples
 //! - **Vector**: embedding of query text (for similarity search of past queries)
@@ -31,7 +31,7 @@ pub struct QueryExecution {
     pub estimated_cost: f64,
 }
 
-/// A builder for creating octads from VQL queries
+/// A builder for creating octads from VCL queries
 #[derive(Debug)]
 pub struct QueryOctadBuilder {
     query_text: String,
@@ -45,7 +45,7 @@ pub struct QueryOctadBuilder {
 }
 
 impl QueryOctadBuilder {
-    /// Create a new builder from a VQL query string
+    /// Create a new builder from a VCL query string
     pub fn new(query_text: impl Into<String>) -> Self {
         Self {
             query_text: query_text.into(),
@@ -112,11 +112,11 @@ impl QueryOctadBuilder {
 
         // Document modality: query text (searchable)
         input.document = Some(OctadDocumentInput {
-            title: format!("VQL Query: {}", truncate(&self.query_text, 80)),
+            title: format!("VCL Query: {}", truncate(&self.query_text, 80)),
             body: self.query_text.clone(),
             fields: {
                 let mut fields = HashMap::new();
-                fields.insert("type".to_string(), "vql_query".to_string());
+                fields.insert("type".to_string(), "vcl_query".to_string());
                 fields.insert("query_text".to_string(), self.query_text);
                 if !self.executions.is_empty() {
                     fields.insert(
@@ -211,7 +211,7 @@ mod tests {
         assert!(input.semantic.is_some());
 
         let doc = input.document.unwrap();
-        assert!(doc.title.starts_with("VQL Query:"));
+        assert!(doc.title.starts_with("VCL Query:"));
         assert!(doc.body.contains("drift"));
     }
 

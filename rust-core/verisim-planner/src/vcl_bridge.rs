@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //!
-//! VQL AST to LogicalPlan bridge.
+//! VCL AST to LogicalPlan bridge.
 //!
-//! Deserializes VQL JSON produced by the ReScript parser (BuckleScript encoding)
+//! Deserializes VCL JSON produced by the ReScript parser (BuckleScript encoding)
 //! and converts it into the [`LogicalPlan`] representation used by the planner.
 //!
 //! ## BuckleScript Encoding
@@ -29,35 +29,35 @@ use crate::plan::{ConditionKind, LogicalPlan, PlanNode, PostProcessing, QuerySou
 use crate::Modality;
 
 // ---------------------------------------------------------------------------
-// VQL AST types (mirrors BuckleScript JSON encoding)
+// VCL AST types (mirrors BuckleScript JSON encoding)
 // ---------------------------------------------------------------------------
 
-/// Top-level VQL statement as emitted by the ReScript parser.
+/// Top-level VCL statement as emitted by the ReScript parser.
 ///
 /// BuckleScript encodes this as `{"TAG": "Query", "_0": { ... }}`.
 /// We use a custom deserializer because serde's internally-tagged enum
 /// (`#[serde(tag = "TAG")]`) does not support positional `_0` content fields.
 #[derive(Debug, Clone)]
-pub enum VqlAst {
+pub enum VclAst {
     /// A SELECT-style query.
-    Query(VqlQuery),
+    Query(VclQuery),
 }
 
-impl<'de> Deserialize<'de> for VqlAst {
+impl<'de> Deserialize<'de> for VclAst {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct VqlAstVisitor;
+        struct VclAstVisitor;
 
-        impl<'de> Visitor<'de> for VqlAstVisitor {
-            type Value = VqlAst;
+        impl<'de> Visitor<'de> for VclAstVisitor {
+            type Value = VclAst;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a VQL AST object with TAG and _0 fields")
+                formatter.write_str("a VCL AST object with TAG and _0 fields")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<VqlAst, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<VclAst, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -78,48 +78,48 @@ impl<'de> Deserialize<'de> for VqlAst {
                 match tag.as_str() {
                     "Query" => {
                         let body = payload.ok_or_else(|| de::Error::missing_field("_0"))?;
-                        let query: VqlQuery =
+                        let query: VclQuery =
                             serde_json::from_value(body).map_err(de::Error::custom)?;
-                        Ok(VqlAst::Query(query))
+                        Ok(VclAst::Query(query))
                     }
                     other => Err(de::Error::unknown_variant(other, &["Query"])),
                 }
             }
         }
 
-        deserializer.deserialize_map(VqlAstVisitor)
+        deserializer.deserialize_map(VclAstVisitor)
     }
 }
 
-/// Body of a VQL query.
+/// Body of a VCL query.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VqlQuery {
+pub struct VclQuery {
     /// Requested modalities (`Graph`, `Vector`, ..., or `All`).
-    pub modalities: Vec<VqlModality>,
+    pub modalities: Vec<VclModality>,
     /// Data source (Octad, Federation, Store).
-    pub source: VqlSource,
+    pub source: VclSource,
     /// Optional WHERE clause.
     #[serde(default, rename = "where")]
-    pub where_clause: Option<VqlCondition>,
+    pub where_clause: Option<VclCondition>,
     /// Optional field projections.
     #[serde(default)]
-    pub projections: Option<Vec<VqlProjection>>,
+    pub projections: Option<Vec<VclProjection>>,
     /// Optional aggregate functions.
     #[serde(default)]
-    pub aggregates: Option<Vec<VqlAggregate>>,
+    pub aggregates: Option<Vec<VclAggregate>>,
     /// Optional GROUP BY fields.
     #[serde(default)]
-    pub group_by: Option<Vec<VqlFieldRef>>,
+    pub group_by: Option<Vec<VclFieldRef>>,
     /// Optional HAVING clause.
     #[serde(default)]
-    pub having: Option<VqlCondition>,
+    pub having: Option<VclCondition>,
     /// Optional PROOF specifications.
     #[serde(default)]
-    pub proof: Option<Vec<VqlProofSpec>>,
+    pub proof: Option<Vec<VclProofSpec>>,
     /// Optional ORDER BY clauses.
     #[serde(default)]
-    pub order_by: Option<Vec<VqlOrderBy>>,
+    pub order_by: Option<Vec<VclOrderBy>>,
     /// Optional result limit.
     #[serde(default)]
     pub limit: Option<usize>,
@@ -128,12 +128,12 @@ pub struct VqlQuery {
     pub offset: Option<usize>,
 }
 
-/// A VQL modality tag.
+/// A VCL modality tag.
 ///
 /// The ReScript parser emits modalities as `{"TAG": "Graph"}` etc.
 /// `All` is a special sentinel meaning "expand to all 6 modalities".
 #[derive(Debug, Clone)]
-pub enum VqlModality {
+pub enum VclModality {
     Graph,
     Vector,
     Tensor,
@@ -143,21 +143,21 @@ pub enum VqlModality {
     All,
 }
 
-impl<'de> Deserialize<'de> for VqlModality {
+impl<'de> Deserialize<'de> for VclModality {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct VqlModalityVisitor;
+        struct VclModalityVisitor;
 
-        impl<'de> Visitor<'de> for VqlModalityVisitor {
-            type Value = VqlModality;
+        impl<'de> Visitor<'de> for VclModalityVisitor {
+            type Value = VclModality;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a VQL modality object with TAG field")
+                formatter.write_str("a VCL modality object with TAG field")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<VqlModality, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<VclModality, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -171,13 +171,13 @@ impl<'de> Deserialize<'de> for VqlModality {
                     }
                 }
                 match tag.as_deref() {
-                    Some("Graph") => Ok(VqlModality::Graph),
-                    Some("Vector") => Ok(VqlModality::Vector),
-                    Some("Tensor") => Ok(VqlModality::Tensor),
-                    Some("Semantic") => Ok(VqlModality::Semantic),
-                    Some("Document") => Ok(VqlModality::Document),
-                    Some("Temporal") => Ok(VqlModality::Temporal),
-                    Some("All") => Ok(VqlModality::All),
+                    Some("Graph") => Ok(VclModality::Graph),
+                    Some("Vector") => Ok(VclModality::Vector),
+                    Some("Tensor") => Ok(VclModality::Tensor),
+                    Some("Semantic") => Ok(VclModality::Semantic),
+                    Some("Document") => Ok(VclModality::Document),
+                    Some("Temporal") => Ok(VclModality::Temporal),
+                    Some("All") => Ok(VclModality::All),
                     Some(other) => Err(de::Error::unknown_variant(
                         other,
                         &[
@@ -189,14 +189,14 @@ impl<'de> Deserialize<'de> for VqlModality {
             }
         }
 
-        deserializer.deserialize_map(VqlModalityVisitor)
+        deserializer.deserialize_map(VclModalityVisitor)
     }
 }
 
 /// Data source as emitted by the ReScript parser.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "TAG")]
-pub enum VqlSource {
+pub enum VclSource {
     /// Single octad store. `_0` is an optional UUID filter.
     Octad {
         #[serde(rename = "_0")]
@@ -212,26 +212,26 @@ pub enum VqlSource {
     /// Direct store access for a specific modality.
     Store {
         #[serde(rename = "_0")]
-        modality: VqlModality,
+        modality: VclModality,
     },
 }
 
-/// A VQL condition (WHERE clause tree).
+/// A VCL condition (WHERE clause tree).
 ///
 /// BuckleScript encodes each variant with TAG + positional args.
 #[derive(Debug, Clone)]
-pub enum VqlCondition {
+pub enum VclCondition {
     /// Conjunction.
-    And(Box<VqlCondition>, Box<VqlCondition>),
+    And(Box<VclCondition>, Box<VclCondition>),
     /// Disjunction.
-    Or(Box<VqlCondition>, Box<VqlCondition>),
+    Or(Box<VclCondition>, Box<VclCondition>),
     /// Negation.
-    Not(Box<VqlCondition>),
+    Not(Box<VclCondition>),
     /// Leaf condition.
-    Simple(VqlSimpleCondition),
+    Simple(VclSimpleCondition),
 }
 
-impl<'de> Deserialize<'de> for VqlCondition {
+impl<'de> Deserialize<'de> for VclCondition {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -242,8 +242,8 @@ impl<'de> Deserialize<'de> for VqlCondition {
     }
 }
 
-/// Parse a `VqlCondition` from a `serde_json::Value`.
-fn parse_condition(value: &serde_json::Value) -> Result<VqlCondition, String> {
+/// Parse a `VclCondition` from a `serde_json::Value`.
+fn parse_condition(value: &serde_json::Value) -> Result<VclCondition, String> {
     let obj = value.as_object().ok_or("condition must be a JSON object")?;
     let tag = obj
         .get("TAG")
@@ -258,7 +258,7 @@ fn parse_condition(value: &serde_json::Value) -> Result<VqlCondition, String> {
             let rhs = obj
                 .get("_1")
                 .ok_or("And condition missing _1 (right operand)")?;
-            Ok(VqlCondition::And(
+            Ok(VclCondition::And(
                 Box::new(parse_condition(lhs)?),
                 Box::new(parse_condition(rhs)?),
             ))
@@ -270,28 +270,28 @@ fn parse_condition(value: &serde_json::Value) -> Result<VqlCondition, String> {
             let rhs = obj
                 .get("_1")
                 .ok_or("Or condition missing _1 (right operand)")?;
-            Ok(VqlCondition::Or(
+            Ok(VclCondition::Or(
                 Box::new(parse_condition(lhs)?),
                 Box::new(parse_condition(rhs)?),
             ))
         }
         "Not" => {
             let inner = obj.get("_0").ok_or("Not condition missing _0 (operand)")?;
-            Ok(VqlCondition::Not(Box::new(parse_condition(inner)?)))
+            Ok(VclCondition::Not(Box::new(parse_condition(inner)?)))
         }
         "Simple" => {
             let inner = obj.get("_0").ok_or("Simple condition missing _0")?;
-            let simple: VqlSimpleCondition =
+            let simple: VclSimpleCondition =
                 serde_json::from_value(inner.clone()).map_err(|e| e.to_string())?;
-            Ok(VqlCondition::Simple(simple))
+            Ok(VclCondition::Simple(simple))
         }
         other => Err(format!("unknown condition TAG: {other}")),
     }
 }
 
-/// Leaf-level condition kinds from VQL.
+/// Leaf-level condition kinds from VCL.
 #[derive(Debug, Clone)]
-pub enum VqlSimpleCondition {
+pub enum VclSimpleCondition {
     /// Full-text search: `CONTAINS "search text"`.
     FulltextContains(String),
     /// Vector similarity: `SIMILAR TO [embedding] THRESHOLD threshold`.
@@ -303,33 +303,33 @@ pub enum VqlSimpleCondition {
     },
     /// Field condition: `field op value`.
     FieldCondition {
-        field: VqlFieldRef,
+        field: VclFieldRef,
         operator: String,
         value: serde_json::Value,
     },
     /// Cross-modal field comparison.
     CrossModalFieldCompare {
-        left: VqlFieldRef,
+        left: VclFieldRef,
         operator: String,
-        right: VqlFieldRef,
+        right: VclFieldRef,
     },
     /// Modality drift check.
     ModalityDrift {
-        modality: VqlModality,
+        modality: VclModality,
         threshold: f64,
     },
     /// Modality existence check.
-    ModalityExists(VqlModality),
+    ModalityExists(VclModality),
     /// Modality non-existence check.
-    ModalityNotExists(VqlModality),
+    ModalityNotExists(VclModality),
     /// Cross-modality consistency check.
     ModalityConsistency {
-        modalities: Vec<VqlModality>,
+        modalities: Vec<VclModality>,
         threshold: f64,
     },
 }
 
-impl<'de> Deserialize<'de> for VqlSimpleCondition {
+impl<'de> Deserialize<'de> for VclSimpleCondition {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -339,8 +339,8 @@ impl<'de> Deserialize<'de> for VqlSimpleCondition {
     }
 }
 
-/// Parse a `VqlSimpleCondition` from raw JSON.
-fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleCondition, String> {
+/// Parse a `VclSimpleCondition` from raw JSON.
+fn parse_simple_condition(value: &serde_json::Value) -> Result<VclSimpleCondition, String> {
     let obj = value
         .as_object()
         .ok_or("simple condition must be a JSON object")?;
@@ -355,7 +355,7 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
                 .get("_0")
                 .and_then(|v| v.as_str())
                 .ok_or("FulltextContains missing _0 (search text)")?;
-            Ok(VqlSimpleCondition::FulltextContains(text.to_string()))
+            Ok(VclSimpleCondition::FulltextContains(text.to_string()))
         }
         "VectorSimilar" => {
             let embedding = obj
@@ -372,7 +372,7 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
                 .get("_1")
                 .and_then(|v| v.as_f64())
                 .ok_or("VectorSimilar missing _1 (threshold)")?;
-            Ok(VqlSimpleCondition::VectorSimilar {
+            Ok(VclSimpleCondition::VectorSimilar {
                 embedding,
                 threshold,
             })
@@ -384,11 +384,11 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
                 .ok_or("GraphPattern missing _0 (predicate)")?
                 .to_string();
             let depth = obj.get("_1").and_then(|v| v.as_u64()).map(|d| d as u32);
-            Ok(VqlSimpleCondition::GraphPattern { predicate, depth })
+            Ok(VclSimpleCondition::GraphPattern { predicate, depth })
         }
         "FieldCondition" => {
             let field_val = obj.get("_0").ok_or("FieldCondition missing _0 (field)")?;
-            let field: VqlFieldRef =
+            let field: VclFieldRef =
                 serde_json::from_value(field_val.clone()).map_err(|e| e.to_string())?;
             let operator = obj
                 .get("_1")
@@ -399,7 +399,7 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
                 .get("_2")
                 .cloned()
                 .ok_or("FieldCondition missing _2 (value)")?;
-            Ok(VqlSimpleCondition::FieldCondition {
+            Ok(VclSimpleCondition::FieldCondition {
                 field,
                 operator,
                 value: val,
@@ -409,7 +409,7 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
             let left_val = obj
                 .get("_0")
                 .ok_or("CrossModalFieldCompare missing _0 (left)")?;
-            let left: VqlFieldRef =
+            let left: VclFieldRef =
                 serde_json::from_value(left_val.clone()).map_err(|e| e.to_string())?;
             let operator = obj
                 .get("_1")
@@ -419,9 +419,9 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
             let right_val = obj
                 .get("_2")
                 .ok_or("CrossModalFieldCompare missing _2 (right)")?;
-            let right: VqlFieldRef =
+            let right: VclFieldRef =
                 serde_json::from_value(right_val.clone()).map_err(|e| e.to_string())?;
-            Ok(VqlSimpleCondition::CrossModalFieldCompare {
+            Ok(VclSimpleCondition::CrossModalFieldCompare {
                 left,
                 operator,
                 right,
@@ -429,13 +429,13 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
         }
         "ModalityDrift" => {
             let mod_val = obj.get("_0").ok_or("ModalityDrift missing _0 (modality)")?;
-            let modality: VqlModality =
+            let modality: VclModality =
                 serde_json::from_value(mod_val.clone()).map_err(|e| e.to_string())?;
             let threshold = obj
                 .get("_1")
                 .and_then(|v| v.as_f64())
                 .ok_or("ModalityDrift missing _1 (threshold)")?;
-            Ok(VqlSimpleCondition::ModalityDrift {
+            Ok(VclSimpleCondition::ModalityDrift {
                 modality,
                 threshold,
             })
@@ -444,29 +444,29 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
             let mod_val = obj
                 .get("_0")
                 .ok_or("ModalityExists missing _0 (modality)")?;
-            let modality: VqlModality =
+            let modality: VclModality =
                 serde_json::from_value(mod_val.clone()).map_err(|e| e.to_string())?;
-            Ok(VqlSimpleCondition::ModalityExists(modality))
+            Ok(VclSimpleCondition::ModalityExists(modality))
         }
         "ModalityNotExists" => {
             let mod_val = obj
                 .get("_0")
                 .ok_or("ModalityNotExists missing _0 (modality)")?;
-            let modality: VqlModality =
+            let modality: VclModality =
                 serde_json::from_value(mod_val.clone()).map_err(|e| e.to_string())?;
-            Ok(VqlSimpleCondition::ModalityNotExists(modality))
+            Ok(VclSimpleCondition::ModalityNotExists(modality))
         }
         "ModalityConsistency" => {
             let mods_val = obj
                 .get("_0")
                 .ok_or("ModalityConsistency missing _0 (modalities)")?;
-            let modalities: Vec<VqlModality> =
+            let modalities: Vec<VclModality> =
                 serde_json::from_value(mods_val.clone()).map_err(|e| e.to_string())?;
             let threshold = obj
                 .get("_1")
                 .and_then(|v| v.as_f64())
                 .ok_or("ModalityConsistency missing _1 (threshold)")?;
-            Ok(VqlSimpleCondition::ModalityConsistency {
+            Ok(VclSimpleCondition::ModalityConsistency {
                 modalities,
                 threshold,
             })
@@ -477,19 +477,19 @@ fn parse_simple_condition(value: &serde_json::Value) -> Result<VqlSimpleConditio
 
 /// A field reference with optional modality qualifier.
 #[derive(Debug, Clone, Deserialize)]
-pub struct VqlFieldRef {
+pub struct VclFieldRef {
     /// Optional modality qualifier for the field.
     #[serde(default)]
-    pub modality: Option<VqlModality>,
+    pub modality: Option<VclModality>,
     /// Field name.
     pub field: String,
 }
 
 /// A projection entry.
 #[derive(Debug, Clone, Deserialize)]
-pub struct VqlProjection {
+pub struct VclProjection {
     /// The field being projected.
-    pub field: VqlFieldRef,
+    pub field: VclFieldRef,
     /// Optional alias.
     #[serde(default)]
     pub alias: Option<String>,
@@ -497,37 +497,37 @@ pub struct VqlProjection {
 
 /// An aggregate function call.
 #[derive(Debug, Clone, Deserialize)]
-pub struct VqlAggregate {
+pub struct VclAggregate {
     /// Function name (COUNT, SUM, AVG, MIN, MAX, etc.).
     pub function: String,
     /// Field to aggregate (None for COUNT(*)).
     #[serde(default)]
-    pub field: Option<VqlFieldRef>,
+    pub field: Option<VclFieldRef>,
     /// Optional alias for the result.
     #[serde(default)]
     pub alias: Option<String>,
 }
 
-/// A proof specification from the VQL PROOF clause.
+/// A proof specification from the VCL PROOF clause.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VqlProofSpec {
+pub struct VclProofSpec {
     /// Type of proof required.
-    pub proof_type: VqlProofType,
+    pub proof_type: VclProofType,
     /// Name of the verification contract.
     pub contract_name: String,
 }
 
 /// Proof type tag.
 #[derive(Debug, Clone)]
-pub enum VqlProofType {
+pub enum VclProofType {
     Citation,
     Zkp,
     Attestation,
     Custom(String),
 }
 
-impl<'de> Deserialize<'de> for VqlProofType {
+impl<'de> Deserialize<'de> for VclProofType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -535,13 +535,13 @@ impl<'de> Deserialize<'de> for VqlProofType {
         struct ProofTypeVisitor;
 
         impl<'de> Visitor<'de> for ProofTypeVisitor {
-            type Value = VqlProofType;
+            type Value = VclProofType;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a VQL proof type object with TAG field")
+                formatter.write_str("a VCL proof type object with TAG field")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<VqlProofType, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<VclProofType, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -554,10 +554,10 @@ impl<'de> Deserialize<'de> for VqlProofType {
                     }
                 }
                 match tag.as_deref() {
-                    Some("Citation") => Ok(VqlProofType::Citation),
-                    Some("Zkp") => Ok(VqlProofType::Zkp),
-                    Some("Attestation") => Ok(VqlProofType::Attestation),
-                    Some(other) => Ok(VqlProofType::Custom(other.to_string())),
+                    Some("Citation") => Ok(VclProofType::Citation),
+                    Some("Zkp") => Ok(VclProofType::Zkp),
+                    Some("Attestation") => Ok(VclProofType::Attestation),
+                    Some(other) => Ok(VclProofType::Custom(other.to_string())),
                     None => Err(de::Error::missing_field("TAG")),
                 }
             }
@@ -569,21 +569,21 @@ impl<'de> Deserialize<'de> for VqlProofType {
 
 /// An ORDER BY clause entry.
 #[derive(Debug, Clone, Deserialize)]
-pub struct VqlOrderBy {
+pub struct VclOrderBy {
     /// Field to order by.
-    pub field: VqlFieldRef,
+    pub field: VclFieldRef,
     /// Sort direction.
-    pub direction: VqlDirection,
+    pub direction: VclDirection,
 }
 
 /// Sort direction tag.
 #[derive(Debug, Clone)]
-pub enum VqlDirection {
+pub enum VclDirection {
     Asc,
     Desc,
 }
 
-impl<'de> Deserialize<'de> for VqlDirection {
+impl<'de> Deserialize<'de> for VclDirection {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -591,13 +591,13 @@ impl<'de> Deserialize<'de> for VqlDirection {
         struct DirectionVisitor;
 
         impl<'de> Visitor<'de> for DirectionVisitor {
-            type Value = VqlDirection;
+            type Value = VclDirection;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a VQL direction object with TAG field")
+                formatter.write_str("a VCL direction object with TAG field")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<VqlDirection, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<VclDirection, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -610,8 +610,8 @@ impl<'de> Deserialize<'de> for VqlDirection {
                     }
                 }
                 match tag.as_deref() {
-                    Some("Asc") => Ok(VqlDirection::Asc),
-                    Some("Desc") => Ok(VqlDirection::Desc),
+                    Some("Asc") => Ok(VclDirection::Asc),
+                    Some("Desc") => Ok(VclDirection::Desc),
                     Some(other) => Err(de::Error::unknown_variant(other, &["Asc", "Desc"])),
                     None => Err(de::Error::missing_field("TAG")),
                 }
@@ -623,11 +623,11 @@ impl<'de> Deserialize<'de> for VqlDirection {
 }
 
 // ---------------------------------------------------------------------------
-// Conversion: VqlAst -> LogicalPlan
+// Conversion: VclAst -> LogicalPlan
 // ---------------------------------------------------------------------------
 
-impl VqlAst {
-    /// Deserialize a VQL AST from JSON emitted by the ReScript parser.
+impl VclAst {
+    /// Deserialize a VCL AST from JSON emitted by the ReScript parser.
     ///
     /// # Errors
     ///
@@ -637,11 +637,11 @@ impl VqlAst {
         serde_json::from_str(json).map_err(PlannerError::Serialization)
     }
 
-    /// Convert the VQL AST into a [`LogicalPlan`].
+    /// Convert the VCL AST into a [`LogicalPlan`].
     ///
     /// This is the primary bridge function. It:
     /// 1. Expands `All` modality into all six concrete modalities.
-    /// 2. Maps the VQL source to [`QuerySource`].
+    /// 2. Maps the VCL source to [`QuerySource`].
     /// 3. Distributes WHERE conditions to per-modality [`PlanNode`]s.
     /// 4. Extracts LIMIT, OFFSET, ORDER BY, GROUP BY into [`PostProcessing`].
     /// 5. Maps PROOF specs into [`ConditionKind::ProofVerification`] on Semantic nodes.
@@ -650,7 +650,7 @@ impl VqlAst {
     ///
     /// Returns `PlannerError::EmptyPlan` if no modalities are requested.
     pub fn to_logical_plan(&self) -> Result<LogicalPlan, PlannerError> {
-        let VqlAst::Query(query) = self;
+        let VclAst::Query(query) = self;
 
         // 1. Resolve modalities (expand All).
         let modalities = resolve_modalities(&query.modalities)?;
@@ -726,7 +726,7 @@ impl VqlAst {
             let fields: Vec<(String, bool)> = order_fields
                 .iter()
                 .map(|o| {
-                    let ascending = matches!(o.direction, VqlDirection::Asc);
+                    let ascending = matches!(o.direction, VclDirection::Asc);
                     (field_ref_name(&o.field), ascending)
                 })
                 .collect();
@@ -787,17 +787,17 @@ impl VqlAst {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/// Resolve VQL modalities to concrete `Modality` values, expanding `All`.
-fn resolve_modalities(vql_mods: &[VqlModality]) -> Result<Vec<Modality>, PlannerError> {
+/// Resolve VCL modalities to concrete `Modality` values, expanding `All`.
+fn resolve_modalities(vcl_mods: &[VclModality]) -> Result<Vec<Modality>, PlannerError> {
     let mut result = Vec::new();
-    for vm in vql_mods {
+    for vm in vcl_mods {
         match vm {
-            VqlModality::All => {
+            VclModality::All => {
                 // Expand to all six modalities.
                 result.extend_from_slice(&Modality::ALL);
             }
             other => {
-                result.push(vql_modality_to_planner(other)?);
+                result.push(vcl_modality_to_planner(other)?);
             }
         }
     }
@@ -807,16 +807,16 @@ fn resolve_modalities(vql_mods: &[VqlModality]) -> Result<Vec<Modality>, Planner
     Ok(result)
 }
 
-/// Map a single VQL modality to the planner `Modality` enum.
-fn vql_modality_to_planner(vm: &VqlModality) -> Result<Modality, PlannerError> {
+/// Map a single VCL modality to the planner `Modality` enum.
+fn vcl_modality_to_planner(vm: &VclModality) -> Result<Modality, PlannerError> {
     match vm {
-        VqlModality::Graph => Ok(Modality::Graph),
-        VqlModality::Vector => Ok(Modality::Vector),
-        VqlModality::Tensor => Ok(Modality::Tensor),
-        VqlModality::Semantic => Ok(Modality::Semantic),
-        VqlModality::Document => Ok(Modality::Document),
-        VqlModality::Temporal => Ok(Modality::Temporal),
-        VqlModality::All => {
+        VclModality::Graph => Ok(Modality::Graph),
+        VclModality::Vector => Ok(Modality::Vector),
+        VclModality::Tensor => Ok(Modality::Tensor),
+        VclModality::Semantic => Ok(Modality::Semantic),
+        VclModality::Document => Ok(Modality::Document),
+        VclModality::Temporal => Ok(Modality::Temporal),
+        VclModality::All => {
             // Should have been expanded already.
             Err(PlannerError::InvalidConfig(
                 "All modality should be expanded before individual mapping".to_string(),
@@ -825,21 +825,21 @@ fn vql_modality_to_planner(vm: &VqlModality) -> Result<Modality, PlannerError> {
     }
 }
 
-/// Map a VQL source to a planner `QuerySource`.
-fn map_source(src: &VqlSource) -> Result<QuerySource, PlannerError> {
+/// Map a VCL source to a planner `QuerySource`.
+fn map_source(src: &VclSource) -> Result<QuerySource, PlannerError> {
     match src {
-        VqlSource::Octad { .. } => Ok(QuerySource::Octad),
-        VqlSource::Federation { nodes, .. } => Ok(QuerySource::Federation {
+        VclSource::Octad { .. } => Ok(QuerySource::Octad),
+        VclSource::Federation { nodes, .. } => Ok(QuerySource::Federation {
             nodes: nodes.clone(),
         }),
-        VqlSource::Store { modality } => {
-            let m = vql_modality_to_planner(modality)?;
+        VclSource::Store { modality } => {
+            let m = vcl_modality_to_planner(modality)?;
             Ok(QuerySource::Store { modality: m })
         }
     }
 }
 
-/// Flatten a VQL condition tree into per-modality condition lists.
+/// Flatten a VCL condition tree into per-modality condition lists.
 ///
 /// Strategy:
 /// - Leaf conditions that target a specific modality go only to that node.
@@ -848,16 +848,16 @@ fn map_source(src: &VqlSource) -> Result<QuerySource, PlannerError> {
 /// - `Or`/`Not` are converted to `Predicate` expressions (the physical executor
 ///   handles them). They are broadcast to all active modalities.
 fn flatten_conditions(
-    cond: &VqlCondition,
+    cond: &VclCondition,
     active_modalities: &[Modality],
     out: &mut HashMap<Modality, Vec<ConditionKind>>,
 ) -> Result<(), PlannerError> {
     match cond {
-        VqlCondition::And(lhs, rhs) => {
+        VclCondition::And(lhs, rhs) => {
             flatten_conditions(lhs, active_modalities, out)?;
             flatten_conditions(rhs, active_modalities, out)?;
         }
-        VqlCondition::Or(lhs, rhs) => {
+        VclCondition::Or(lhs, rhs) => {
             // OR cannot be trivially split per-modality. Encode as a predicate
             // string on all active modalities.
             let desc = format!(
@@ -871,7 +871,7 @@ fn flatten_conditions(
                 });
             }
         }
-        VqlCondition::Not(inner) => {
+        VclCondition::Not(inner) => {
             let desc = format!("NOT({})", describe_condition(inner));
             for &m in active_modalities {
                 out.entry(m).or_default().push(ConditionKind::Predicate {
@@ -879,7 +879,7 @@ fn flatten_conditions(
                 });
             }
         }
-        VqlCondition::Simple(simple) => {
+        VclCondition::Simple(simple) => {
             let (target_modality, condition_kind) = map_simple_condition(simple)?;
             match target_modality {
                 Some(m) if out.contains_key(&m) => {
@@ -907,22 +907,22 @@ fn flatten_conditions(
     Ok(())
 }
 
-/// Map a VQL simple condition to a `ConditionKind` and an optional target modality.
+/// Map a VCL simple condition to a `ConditionKind` and an optional target modality.
 ///
 /// Returns `(target_modality, condition_kind)` where `target_modality` is `Some`
 /// if the condition naturally targets a specific modality, `None` if it should be
 /// broadcast.
 fn map_simple_condition(
-    simple: &VqlSimpleCondition,
+    simple: &VclSimpleCondition,
 ) -> Result<(Option<Modality>, ConditionKind), PlannerError> {
     match simple {
-        VqlSimpleCondition::FulltextContains(text) => Ok((
+        VclSimpleCondition::FulltextContains(text) => Ok((
             Some(Modality::Document),
             ConditionKind::Fulltext {
                 query: text.clone(),
             },
         )),
-        VqlSimpleCondition::VectorSimilar {
+        VclSimpleCondition::VectorSimilar {
             embedding,
             threshold: _,
         } => {
@@ -935,14 +935,14 @@ fn map_simple_condition(
                 ConditionKind::Similarity { k: embedding.len() },
             ))
         }
-        VqlSimpleCondition::GraphPattern { predicate, depth } => Ok((
+        VclSimpleCondition::GraphPattern { predicate, depth } => Ok((
             Some(Modality::Graph),
             ConditionKind::Traversal {
                 predicate: predicate.clone(),
                 depth: *depth,
             },
         )),
-        VqlSimpleCondition::FieldCondition {
+        VclSimpleCondition::FieldCondition {
             field,
             operator,
             value,
@@ -950,7 +950,7 @@ fn map_simple_condition(
             let target = field
                 .modality
                 .as_ref()
-                .and_then(|vm| vql_modality_to_planner(vm).ok());
+                .and_then(|vm| vcl_modality_to_planner(vm).ok());
             let field_name = field.field.clone();
             let value_str = match value {
                 serde_json::Value::String(s) => s.clone(),
@@ -977,7 +977,7 @@ fn map_simple_condition(
             };
             Ok((target, kind))
         }
-        VqlSimpleCondition::CrossModalFieldCompare {
+        VclSimpleCondition::CrossModalFieldCompare {
             left,
             operator,
             right,
@@ -999,31 +999,31 @@ fn map_simple_condition(
             );
             Ok((None, ConditionKind::Predicate { expression: desc }))
         }
-        VqlSimpleCondition::ModalityDrift {
+        VclSimpleCondition::ModalityDrift {
             modality,
             threshold,
         } => {
-            let m = vql_modality_to_planner(modality)?;
+            let m = vcl_modality_to_planner(modality)?;
             let desc = format!("drift({m}) > {threshold}");
             Ok((Some(m), ConditionKind::Predicate { expression: desc }))
         }
-        VqlSimpleCondition::ModalityExists(modality) => {
-            let m = vql_modality_to_planner(modality)?;
+        VclSimpleCondition::ModalityExists(modality) => {
+            let m = vcl_modality_to_planner(modality)?;
             let desc = format!("exists({m})");
             Ok((Some(m), ConditionKind::Predicate { expression: desc }))
         }
-        VqlSimpleCondition::ModalityNotExists(modality) => {
-            let m = vql_modality_to_planner(modality)?;
+        VclSimpleCondition::ModalityNotExists(modality) => {
+            let m = vcl_modality_to_planner(modality)?;
             let desc = format!("not_exists({m})");
             Ok((Some(m), ConditionKind::Predicate { expression: desc }))
         }
-        VqlSimpleCondition::ModalityConsistency {
+        VclSimpleCondition::ModalityConsistency {
             modalities,
             threshold,
         } => {
             let names: Vec<String> = modalities
                 .iter()
-                .filter_map(|vm| vql_modality_to_planner(vm).ok())
+                .filter_map(|vm| vcl_modality_to_planner(vm).ok())
                 .map(|m| m.to_string())
                 .collect();
             let desc = format!("consistency({}) > {threshold}", names.join(", "));
@@ -1033,23 +1033,23 @@ fn map_simple_condition(
 }
 
 /// Produce a human-readable description of a condition (for predicate encoding).
-fn describe_condition(cond: &VqlCondition) -> String {
+fn describe_condition(cond: &VclCondition) -> String {
     match cond {
-        VqlCondition::And(l, r) => {
+        VclCondition::And(l, r) => {
             format!("({} AND {})", describe_condition(l), describe_condition(r))
         }
-        VqlCondition::Or(l, r) => {
+        VclCondition::Or(l, r) => {
             format!("({} OR {})", describe_condition(l), describe_condition(r))
         }
-        VqlCondition::Not(inner) => format!("NOT({})", describe_condition(inner)),
-        VqlCondition::Simple(s) => format!("{s:?}"),
+        VclCondition::Not(inner) => format!("NOT({})", describe_condition(inner)),
+        VclCondition::Simple(s) => format!("{s:?}"),
     }
 }
 
-/// Build a per-modality projection map from VQL projections.
+/// Build a per-modality projection map from VCL projections.
 fn build_projection_map(
     modalities: &[Modality],
-    projections: Option<&[VqlProjection]>,
+    projections: Option<&[VclProjection]>,
 ) -> HashMap<Modality, Vec<String>> {
     let mut map: HashMap<Modality, Vec<String>> = HashMap::new();
     let Some(projs) = projections else {
@@ -1063,7 +1063,7 @@ fn build_projection_map(
             .unwrap_or_else(|| proj.field.field.clone());
 
         if let Some(ref vm) = proj.field.modality {
-            if let Ok(m) = vql_modality_to_planner(vm) {
+            if let Ok(m) = vcl_modality_to_planner(vm) {
                 if modalities.contains(&m) {
                     map.entry(m).or_default().push(field_name);
                 }
@@ -1078,8 +1078,8 @@ fn build_projection_map(
     map
 }
 
-/// Render a `VqlFieldRef` as a dotted name string.
-fn field_ref_name(f: &VqlFieldRef) -> String {
+/// Render a `VclFieldRef` as a dotted name string.
+fn field_ref_name(f: &VclFieldRef) -> String {
     match &f.modality {
         Some(m) => format!("{m:?}.{}", f.field),
         None => f.field.clone(),
@@ -1094,9 +1094,9 @@ fn field_ref_name(f: &VqlFieldRef) -> String {
 mod tests {
     use super::*;
 
-    /// Helper: parse JSON string into VqlAst and convert to LogicalPlan.
+    /// Helper: parse JSON string into VclAst and convert to LogicalPlan.
     fn parse_and_plan(json: &str) -> Result<LogicalPlan, PlannerError> {
-        let ast = VqlAst::from_json(json)?;
+        let ast = VclAst::from_json(json)?;
         ast.to_logical_plan()
     }
 
@@ -1343,7 +1343,7 @@ mod tests {
             "_0": {}
         }"#;
 
-        let result = VqlAst::from_json(json);
+        let result = VclAst::from_json(json);
         assert!(result.is_err(), "should reject unknown TAG");
     }
 
@@ -1353,7 +1353,7 @@ mod tests {
             "no_tag_field": "oops"
         }"#;
 
-        let result = VqlAst::from_json(json);
+        let result = VclAst::from_json(json);
         assert!(result.is_err(), "should reject missing TAG");
     }
 

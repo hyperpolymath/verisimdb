@@ -2,7 +2,7 @@
 
 # Retained for the native `cargo check` matrix leg in rust-ci.yml. The
 # ClusterFuzzLite build uses the top-level fuzz/ crate (cargo-fuzz resolves a
-# single fuzz dir per project), where fuzz_vql_parser is canonically hosted.
+# single fuzz dir per project), where fuzz_vcl_parser is canonically hosted.
 [package]
 name = "verisimdb-fuzz"
 version = "0.0.0"
@@ -23,7 +23,7 @@ path = "../verisim-api"
 members = ["."]
 
 [[bin]]
-name = "fuzz_vql_parser"
-path = "fuzz_targets/fuzz_vql_parser.rs"
+name = "fuzz_vcl_parser"
+path = "fuzz_targets/fuzz_vcl_parser.rs"
 test = false
 doc = false

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //!
-//! VQL query formatter.
+//! VCL query formatter.
 //!
-//! Provides canonical formatting for VQL queries:
+//! Provides canonical formatting for VCL queries:
 //! - Keywords uppercased
 //! - Consistent indentation for clauses
 //! - Normalized whitespace
 //! - Aligned modality lists
 
-/// VQL keywords that should be uppercased.
-const VQL_KEYWORDS: &[&str] = &[
+/// VCL keywords that should be uppercased.
+const VCL_KEYWORDS: &[&str] = &[
     "SELECT",
     "FROM",
     "WHERE",
@@ -67,10 +67,10 @@ const VQL_KEYWORDS: &[&str] = &[
     "ANALYZE",
 ];
 
-/// VQL modality names that should be uppercased.
+/// VCL modality names that should be uppercased.
 /// All 8 octad modalities: Graph, Vector, Tensor, Semantic, Document, Temporal,
 /// Provenance, Spatial.
-const VQL_MODALITIES: &[&str] = &[
+const VCL_MODALITIES: &[&str] = &[
     "GRAPH",
     "VECTOR",
     "TENSOR",
@@ -87,7 +87,7 @@ const CLAUSE_STARTERS: &[&str] = &[
     "SET", "INTO", "VALUES", "TRAVERSE", "PROOF", "EXPLAIN",
 ];
 
-/// Format a VQL query string into canonical form.
+/// Format a VCL query string into canonical form.
 ///
 /// Applies:
 /// 1. Keyword uppercasing
@@ -95,7 +95,7 @@ const CLAUSE_STARTERS: &[&str] = &[
 /// 3. Clause-level newlines and indentation
 /// 4. Whitespace normalization
 /// 5. String literal preservation
-pub fn format_vql(query: &str) -> String {
+pub fn format_vcl(query: &str) -> String {
     let tokens = tokenize(query);
     let formatted_tokens = uppercase_keywords(&tokens);
     let indented = indent_clauses(&formatted_tokens);
@@ -103,7 +103,7 @@ pub fn format_vql(query: &str) -> String {
 }
 
 /// Compact format — normalize whitespace and case without indentation.
-pub fn format_vql_compact(query: &str) -> String {
+pub fn format_vcl_compact(query: &str) -> String {
     let tokens = tokenize(query);
     let formatted = uppercase_keywords(&tokens);
     let mut result = String::with_capacity(query.len());
@@ -150,7 +150,7 @@ pub fn format_vql_compact(query: &str) -> String {
     result.trim().to_string()
 }
 
-/// Token types in VQL input.
+/// Token types in VCL input.
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
     Keyword(String),
@@ -162,7 +162,7 @@ enum Token {
     Punctuation(char),
 }
 
-/// Tokenize VQL input into a sequence of tokens.
+/// Tokenize VCL input into a sequence of tokens.
 ///
 /// Preserves string literals as atomic units.
 fn tokenize(input: &str) -> Vec<Token> {
@@ -252,9 +252,9 @@ fn uppercase_keywords(tokens: &[Token]) -> Vec<Token> {
         .map(|t| match t {
             Token::Word(w) => {
                 let upper = w.to_uppercase();
-                if VQL_KEYWORDS.contains(&upper.as_str()) {
+                if VCL_KEYWORDS.contains(&upper.as_str()) {
                     Token::Keyword(upper)
-                } else if VQL_MODALITIES.contains(&upper.as_str()) {
+                } else if VCL_MODALITIES.contains(&upper.as_str()) {
                     Token::Modality(upper)
                 } else {
                     Token::Word(w.clone())
@@ -356,7 +356,7 @@ mod tests {
     #[test]
     fn test_keyword_uppercasing() {
         let input = "select graph from octad where id = 'abc'";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("SELECT"));
         assert!(output.contains("GRAPH"));
         assert!(output.contains("FROM"));
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn test_modality_uppercasing() {
         let input = "select vector, tensor from octad";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("VECTOR"));
         assert!(output.contains("TENSOR"));
     }
@@ -375,14 +375,14 @@ mod tests {
     #[test]
     fn test_string_literals_preserved() {
         let input = "select graph from octad where name = 'hello world'";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("'hello world'"));
     }
 
     #[test]
     fn test_clause_newlines() {
         let input = "SELECT GRAPH FROM OCTAD WHERE id = 'abc' LIMIT 10";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         // FROM should be on a new line
         assert!(output.contains("\nFROM"));
         // WHERE should be on a new line
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn test_and_or_indentation() {
         let input = "SELECT GRAPH FROM OCTAD WHERE a = 1 AND b = 2 OR c = 3";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("\n  AND"));
         assert!(output.contains("\n  OR"));
     }
@@ -402,21 +402,21 @@ mod tests {
     #[test]
     fn test_compact_format() {
         let input = "  select   graph   from   octad  ";
-        let output = format_vql_compact(input);
+        let output = format_vcl_compact(input);
         assert_eq!(output, "SELECT GRAPH FROM OCTAD");
     }
 
     #[test]
     fn test_whitespace_normalization() {
         let input = "SELECT    GRAPH    FROM     OCTAD";
-        let compact = format_vql_compact(input);
+        let compact = format_vcl_compact(input);
         assert_eq!(compact, "SELECT GRAPH FROM OCTAD");
     }
 
     #[test]
     fn test_number_preservation() {
         let input = "select graph from octad limit 42 offset 10";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("42"));
         assert!(output.contains("10"));
     }
@@ -424,7 +424,7 @@ mod tests {
     #[test]
     fn test_mixed_case_keywords() {
         let input = "Select Graph From Octad Where Id = 'test'";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("SELECT"));
         assert!(output.contains("GRAPH"));
         assert!(output.contains("FROM"));
@@ -435,14 +435,14 @@ mod tests {
     #[test]
     fn test_non_keyword_preserved() {
         let input = "SELECT graph FROM octad WHERE entity_name = 'test'";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("entity_name"));
     }
 
     #[test]
     fn test_explain_select_same_line() {
         let input = "explain select graph from octad";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         // EXPLAIN and SELECT should stay on the same line
         let first_line = output.lines().next().unwrap();
         assert!(first_line.contains("EXPLAIN"));
@@ -451,8 +451,8 @@ mod tests {
 
     #[test]
     fn test_empty_input() {
-        assert_eq!(format_vql(""), "");
-        assert_eq!(format_vql_compact(""), "");
+        assert_eq!(format_vcl(""), "");
+        assert_eq!(format_vcl_compact(""), "");
     }
 
     #[test]
@@ -469,7 +469,7 @@ mod tests {
     #[test]
     fn test_traverse_depth_formatting() {
         let input = "select graph from octad traverse relates_to depth 3";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("TRAVERSE"));
         assert!(output.contains("DEPTH"));
         assert!(output.contains("3"));
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn test_proof_clause_formatting() {
         let input = "select semantic from octad proof existence threshold 0.95";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("SEMANTIC"));
         assert!(output.contains("PROOF"));
         assert!(output.contains("THRESHOLD"));
@@ -488,14 +488,14 @@ mod tests {
     #[test]
     fn test_comma_spacing() {
         let input = "select graph , vector , tensor from octad";
-        let compact = format_vql_compact(input);
+        let compact = format_vcl_compact(input);
         assert!(compact.contains("GRAPH, VECTOR, TENSOR"));
     }
 
     #[test]
     fn test_federation_formatting() {
         let input = "select graph from federation store 'remote-1' octad";
-        let output = format_vql(input);
+        let output = format_vcl(input);
         assert!(output.contains("FEDERATION"));
         assert!(output.contains("STORE"));
         assert!(output.contains("'remote-1'"));
@@ -504,8 +504,8 @@ mod tests {
     #[test]
     fn test_roundtrip_idempotent() {
         let input = "SELECT GRAPH\nFROM OCTAD\nWHERE id = 'abc'\nLIMIT 10";
-        let first = format_vql(input);
-        let second = format_vql(&first);
+        let first = format_vcl(input);
+        let second = format_vcl(&first);
         assert_eq!(first, second, "Formatting should be idempotent");
     }
 }

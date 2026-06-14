@@ -20,7 +20,7 @@
 //! # Architecture
 //!
 //! ```text
-//! VQL PROOF clause → Elixir executor → Rust API → ZkpBridge
+//! VCL PROOF clause → Elixir executor → Rust API → ZkpBridge
 //!                                                    │
 //!                    ┌───────────────────────────────┘
 //!                    │
