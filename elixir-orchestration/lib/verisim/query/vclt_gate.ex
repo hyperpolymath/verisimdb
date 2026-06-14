@@ -155,7 +155,7 @@ defmodule VeriSim.Query.VCLTGate do
       {:ok, %{"levels" => levels}} when is_list(levels) ->
         failed =
           levels
-          |> Enum.reject(fn l -> l["admitted"] == true end)
+          |> Enum.filter(fn l -> l["status"] == "fail" end)
           |> Enum.map(fn l ->
             "#{l["name"]} (L#{l["level"]}): #{l["reason"] || "rejected"}"
           end)

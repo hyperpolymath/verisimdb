@@ -54,7 +54,7 @@ defmodule VeriSim.Query.VCLTGateTest do
 
       File.write!(stub, """
       #!/bin/sh
-      echo '{"certified_level":-1,"levels":[{"level":4,"name":"InjectionProof","admitted":false,"reason":"SQL injection detected"}]}'
+      echo '{"certified_level":-1,"levels":[{"level":4,"name":"InjectionProof","status":"fail","reason":"SQL injection detected"}]}'
       exit 1
       """)
 
