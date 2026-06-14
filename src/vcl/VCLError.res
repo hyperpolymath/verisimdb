@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /**
- * VQL Error Types - Structured error representation
+ * VCL Error Types - Structured error representation
  *
- * Provides comprehensive error types for all VQL failure modes:
+ * Provides comprehensive error types for all VCL failure modes:
  * - Parse errors (syntax)
  * - Type errors (dependent-type verification)
  * - Runtime errors (execution)
@@ -194,13 +194,13 @@ type federationError = {
 // Composite Error Type
 // ============================================================================
 
-type vqlError =
+type vclError =
   | ParseError(parseError)
   | TypeError(typeError)
   | RuntimeError(runtimeError)
   | ModalityError(modalityError)
   | FederationError(federationError)
-  | MultipleErrors(array<vqlError>)
+  | MultipleErrors(array<vclError>)
 
 // ============================================================================
 // Error Formatting
@@ -398,7 +398,7 @@ let formatFederationError = (err: federationError): string => {
   `Federation Error [${err.federation_pattern}]: ${kindStr}`
 }
 
-let format = (err: vqlError): string => {
+let format = (err: vclError): string => {
   switch err {
   | ParseError(e) => formatParseError(e)
   | TypeError(e) => formatTypeError(e)
@@ -419,7 +419,7 @@ let format = (err: vqlError): string => {
 // Error Helpers
 // ============================================================================
 
-let isRecoverable = (err: vqlError): bool => {
+let isRecoverable = (err: vclError): bool => {
   switch err {
   | RuntimeError(e) => e.recoverable
   | FederationError({kind: PartialResults(_)}) => true
@@ -428,28 +428,28 @@ let isRecoverable = (err: vqlError): bool => {
   }
 }
 
-let getErrorCode = (err: vqlError): string => {
+let getErrorCode = (err: vclError): string => {
   switch err {
-  | ParseError(_) => "VQL_PARSE_ERROR"
-  | TypeError(_) => "VQL_TYPE_ERROR"
-  | RuntimeError({kind: StoreUnavailable(_)}) => "VQL_STORE_UNAVAILABLE"
-  | RuntimeError({kind: QueryTimeout(_)}) => "VQL_QUERY_TIMEOUT"
-  | RuntimeError({kind: DriftDetected(_)}) => "VQL_DRIFT_DETECTED"
-  | RuntimeError({kind: PermissionDenied(_)}) => "VQL_PERMISSION_DENIED"
-  | RuntimeError({kind: ResourceExhausted(_)}) => "VQL_RESOURCE_EXHAUSTED"
-  | RuntimeError(_) => "VQL_RUNTIME_ERROR"
-  | ModalityError(GraphError(_)) => "VQL_GRAPH_ERROR"
-  | ModalityError(VectorError(_)) => "VQL_VECTOR_ERROR"
-  | ModalityError(TensorError(_)) => "VQL_TENSOR_ERROR"
-  | ModalityError(SemanticError(_)) => "VQL_SEMANTIC_ERROR"
-  | ModalityError(DocumentError(_)) => "VQL_DOCUMENT_ERROR"
-  | ModalityError(TemporalError(_)) => "VQL_TEMPORAL_ERROR"
-  | FederationError(_) => "VQL_FEDERATION_ERROR"
-  | MultipleErrors(_) => "VQL_MULTIPLE_ERRORS"
+  | ParseError(_) => "VCL_PARSE_ERROR"
+  | TypeError(_) => "VCL_TYPE_ERROR"
+  | RuntimeError({kind: StoreUnavailable(_)}) => "VCL_STORE_UNAVAILABLE"
+  | RuntimeError({kind: QueryTimeout(_)}) => "VCL_QUERY_TIMEOUT"
+  | RuntimeError({kind: DriftDetected(_)}) => "VCL_DRIFT_DETECTED"
+  | RuntimeError({kind: PermissionDenied(_)}) => "VCL_PERMISSION_DENIED"
+  | RuntimeError({kind: ResourceExhausted(_)}) => "VCL_RESOURCE_EXHAUSTED"
+  | RuntimeError(_) => "VCL_RUNTIME_ERROR"
+  | ModalityError(GraphError(_)) => "VCL_GRAPH_ERROR"
+  | ModalityError(VectorError(_)) => "VCL_VECTOR_ERROR"
+  | ModalityError(TensorError(_)) => "VCL_TENSOR_ERROR"
+  | ModalityError(SemanticError(_)) => "VCL_SEMANTIC_ERROR"
+  | ModalityError(DocumentError(_)) => "VCL_DOCUMENT_ERROR"
+  | ModalityError(TemporalError(_)) => "VCL_TEMPORAL_ERROR"
+  | FederationError(_) => "VCL_FEDERATION_ERROR"
+  | MultipleErrors(_) => "VCL_MULTIPLE_ERRORS"
   }
 }
 
-let toJson = (err: vqlError): Js.Json.t => {
+let toJson = (err: vclError): Js.Json.t => {
   Js.Dict.fromArray([
     ("error_code", Js.Json.string(getErrorCode(err))),
     ("message", Js.Json.string(format(err))),

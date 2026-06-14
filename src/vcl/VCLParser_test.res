@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Parser Tests
+// VCL Parser Tests
 
-open VQLParser
+open VCLParser
 
 // Test helper
 let assertOk = (result: Result<'a, 'b>, testName: string) => {
@@ -22,7 +22,7 @@ let assertError = (result: Result<'a, 'b>, testName: string) => {
 // Test Suite
 // ============================================================================
 
-Js.Console.log("\n=== VQL Parser Tests ===\n")
+Js.Console.log("\n=== VCL Parser Tests ===\n")
 
 // Test 1: Simple hexad query
 let test1 = `

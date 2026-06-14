@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Context — Typing environment for bidirectional type checking
+// VCL Context — Typing environment for bidirectional type checking
 //
 // Maintains bindings, contract registry, modality field registries,
 // and store capabilities.
 
-module Types = VQLTypes
+module Types = VCLTypes
 
 // ============================================================================
 // Contract Specification
@@ -32,7 +32,7 @@ type fieldEntry = {
 // ============================================================================
 
 type context = {
-  bindings: Js.Dict.t<Types.vqlType>,
+  bindings: Js.Dict.t<Types.vclType>,
   contracts: Js.Dict.t<contractSpec>,
   modalityFields: Js.Dict.t<array<fieldEntry>>,
   storeModalities: Js.Dict.t<array<Types.modalityType>>,
@@ -139,13 +139,13 @@ let defaultContext = (): context => {
 // Lookup operations
 // ============================================================================
 
-let bind = (ctx: context, name: string, ty: Types.vqlType): context => {
+let bind = (ctx: context, name: string, ty: Types.vclType): context => {
   let newBindings = Js.Dict.fromArray(Js.Dict.entries(ctx.bindings))
   Js.Dict.set(newBindings, name, ty)
   {...ctx, bindings: newBindings}
 }
 
-let lookup = (ctx: context, name: string): option<Types.vqlType> => {
+let lookup = (ctx: context, name: string): option<Types.vclType> => {
   Js.Dict.get(ctx.bindings, name)
 }
 

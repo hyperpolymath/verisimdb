@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL keyword definitions shared across syntax highlighting, completion, and linting.
+// VCL keyword definitions shared across syntax highlighting, completion, and linting.
 // Updated for the octad architecture (8 modalities) and 11 proof types.
 
 let keywords = [
@@ -20,15 +20,15 @@ let modalities = [
   "PROVENANCE", "SPATIAL",
 ]
 
-/// All 11 proof types supported by the VQL-DT type checker.
+/// All 11 proof types supported by the VCL-DT type checker.
 let proofTypes = [
   "EXISTENCE", "CONSISTENCY", "INTEGRITY", "PROVENANCE",
   "FRESHNESS", "ACCESS", "CITATION", "CUSTOM",
   "ZKP", "PROVEN", "SANCTIFY",
 ]
 
-/// VQL-DT specific keywords (only active in VQL-DT mode).
-let vqlDtKeywords = [
+/// VCL-DT specific keywords (only active in VCL-DT mode).
+let vclDtKeywords = [
   "PROOF", "THRESHOLD", "VERIFY", "CERTIFY", "ATTEST",
   "WITNESS", "CIRCUIT", "COMMITMENT",
 ]

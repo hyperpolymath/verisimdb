@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Circuit DSL — Defines types for custom ZKP circuits in VQL.
+// VCL Circuit DSL — Defines types for custom ZKP circuits in VCL.
 //
-// Usage in VQL:
+// Usage in VCL:
 //   PROOF CUSTOM "circuit-name" WITH (threshold=0.5, min_score=0.1)
 
 /// Gate types available in custom circuits
@@ -34,7 +34,7 @@ type constraint = {
   c: array<(int, float)>,
 }
 
-/// A circuit definition from VQL PROOF CUSTOM clause
+/// A circuit definition from VCL PROOF CUSTOM clause
 type circuitDef = {
   name: string,
   wires: array<wire>,
@@ -42,7 +42,7 @@ type circuitDef = {
   parameters: array<string>,
 }
 
-/// Parameters passed via VQL WITH clause
+/// Parameters passed via VCL WITH clause
 type circuitParams = {
   values: Js.Dict.t<string>,
 }
@@ -56,7 +56,7 @@ type verificationResult = {
   totalConstraints: int,
 }
 
-/// Parse a PROOF CUSTOM clause from VQL
+/// Parse a PROOF CUSTOM clause from VCL
 let parseCustomProof = (circuitName: string, withParams: array<(string, string)>): (string, circuitParams) => {
   let dict = Js.Dict.empty()
   withParams->Array.forEach(((key, value)) => {
