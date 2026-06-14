@@ -617,7 +617,7 @@ Conditions compose via logical operators:
 
 Future versions may support **refinement predicates** in query syntax:
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR
 FROM verisim:semantic

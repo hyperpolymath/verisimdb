@@ -26,7 +26,7 @@ Rust core and integration tests at the Elixir↔Rust HTTP boundary.
 The coverage floor is set at **60%** to start, with the intention of
 ratcheting upward as the test suite matures. The industry baseline is 80%
 line coverage (per Codecov's published guidance); we'll move there once
-the bigger gap modules (vql_executor) have richer coverage.
+the bigger gap modules (vcl_executor) have richer coverage.
 
 ## Rust standards
 
@@ -108,7 +108,7 @@ Patterns adopted:
 
 Established examples:
 - `test/verisim/property/schema_registry_props_test.exs` (7 properties)
-- `test/verisim/property/vql_bridge_props_test.exs` (6 properties)
+- `test/verisim/property/vcl_bridge_props_test.exs` (6 properties)
 
 ### Benchmarks — `benchee`
 
@@ -225,7 +225,7 @@ Mutation score targets:
 
 These are documented for future work; no current CI gate enforces them.
 
-- **Snapshot testing (Elixir)**: `mneme` for built-in VQL parser output.
+- **Snapshot testing (Elixir)**: `mneme` for built-in VCL parser output.
   Skipped initially because `mneme`'s interactive accept/reject doesn't
   fit batch CI; we'd need to wire `MNEME_REPLY=accept` workflow.
 - **Differential testing**: SQLancer-style queries through redb vs
@@ -235,6 +235,6 @@ These are documented for future work; no current CI gate enforces them.
   transactions; `concuerror` for Elixir supervision tree.
 - **Bench-as-PR-gate**: `codspeed-criterion-compat` or `bencher.dev`
   for noise-resistant perf regression detection.
-- **AFL++ alongside libFuzzer**: structure-aware fuzzing of the VQL
+- **AFL++ alongside libFuzzer**: structure-aware fuzzing of the VCL
   grammar via `arbitrary` derive on AST types, corpus sync across
   cargo-fuzz / AFL++ / honggfuzz.

@@ -21,7 +21,7 @@
                     │  │ octad)   │ │ Schema Registry  │  │
                     │  └──────────┘ └──────────────────┘  │
                     │  ┌──────────┐ ┌──────────────────┐  │
-                    │  │ Query    │ │ VQL Parser        │  │
+                    │  │ Query    │ │ VCL Parser        │  │
                     │  │ Router   │ │ (ReScript)        │  │
                     │  └──────────┘ └──────────────────┘  │
                     └────────────────┬────────────────────┘
@@ -71,7 +71,7 @@
 | verisim-normalizer     | `██████░░░░` 60%             | Active       |
 | verisim-api            | `████████░░` 80%             | Active       |
 | Elixir OTP layer       | `███████░░░` 70%             | Active       |
-| VQL parser             | `█████████░` 95%             | Active       |
+| VCL parser             | `█████████░` 95%             | Active       |
 | VCL-DT (Lean checker)  | `░░░░░░░░░░` 0%              | Not started  |
 | Idris2 ABI             | `████░░░░░░` 40%             | In progress  |
 | Zig FFI                | `████░░░░░░` 40%             | In progress  |

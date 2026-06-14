@@ -66,16 +66,16 @@ alertable condition -- not an invisible failure mode.
   reloading, and battle-tested concurrency. Rust provides near-C performance with
   memory safety.
 
-* *VQL (Verisimilitude Query Language)*: Purpose-built query language for
+* *VCL (Verisimilitude Query Language)*: Purpose-built query language for
   cross-modal operations. Familiar to SQL users but supports modality-specific
   operations (graph traversals, vector similarity, tensor ops, temporal
   time-travel, spatial containment) in a unified syntax.
 
 * *VCL-DT*: Optional dependent-type layer using Idris2. Proves query type
   correctness, semantic compatibility of cross-modal joins, and threshold
-  validity at compile time. Entirely opt-in -- plain VQL works without it.
+  validity at compile time. Entirely opt-in -- plain VCL works without it.
 
-* *Federation*: Connectors translate between VQL and native query languages
+* *Federation*: Connectors translate between VCL and native query languages
   (SQL, Cypher, AQL, Query DSL). Each connector independently tested with
   fallback to local-only mode. No vendor lock-in.
 
@@ -112,7 +112,7 @@ alertable condition -- not an invisible failure mode.
   (federation) or operates standalone; it does not replace PostgreSQL
 * "AI-native database" -- VeriSimDB serves AI workloads (GraphRAG) but is not
   limited to AI; the core value is data consistency
-* "NoSQL" -- VeriSimDB has its own query language (VQL); calling it NoSQL implies
+* "NoSQL" -- VeriSimDB has its own query language (VCL); calling it NoSQL implies
   it competes with document stores
 
 == Business Audience (CTOs, VP Engineering, Data Leaders)
@@ -198,7 +198,7 @@ proofs of query correctness.
   multi-model databases store multiple models but do not track inter-model
   consistency.
 
-* *Formal semantics*: VQL has published formal semantics (denotational and
+* *Formal semantics*: VCL has published formal semantics (denotational and
   operational). VCL-DT extends these with dependent-type judgements formalised in
   Idris2, providing machine-checkable proofs of query properties.
 
@@ -221,7 +221,7 @@ proofs of query correctness.
   in Heterogeneous Database Federations"
 * Case study: IDApTIK game level architecture with Idris2 dependent-type proofs
 * 14-module ABI with 5 cross-domain proofs, zero `believe_me` usage
-* Formal VQL grammar (EBNF) and type system specification
+* Formal VCL grammar (EBNF) and type system specification
 
 === Venues
 
@@ -256,7 +256,7 @@ proofs of query correctness.
 [quote]
 VeriSimDB is a full-featured multimodal database released under a permissive
 open-source licence (MPL-2.0, with MPL-2.0 fallback). All 8
-modalities, drift detection, self-normalisation, VQL, and federation are in the
+modalities, drift detection, self-normalisation, VCL, and federation are in the
 community edition. There is no "enterprise edition" that gates features.
 
 === Supporting Points

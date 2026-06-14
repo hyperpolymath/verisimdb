@@ -98,7 +98,7 @@ module VCL = {
     if (useDependentTypes) {
       // Dependent-Type Path
       rawQuery
-      -> VQLParser.parseToTypedAST
+      -> VCLParser.parseToTypedAST
       -> TypeChecker.validateWithProvenLibrary
       -> DriftMonitor.checkConsistency  // Check for drift
       -> FederatedExecutor.executeWithZKP
@@ -107,7 +107,7 @@ module VCL = {
     } else {
       // Slipstream Path
       rawQuery
-      -> VQLParser.parseToUntypedAST
+      -> VCLParser.parseToUntypedAST
       -> FederatedExecutor.executeUnverified
       -> TemporalLog.appendResult(queryId)  // Still log (no proof)
       -> Response.withoutProof
@@ -444,22 +444,22 @@ module Endpoint = {
 
 [source,rescript]
 // Client SDK for VCL
-module VQLClient = {
+module VCLClient = {
   type queryOptions = {
     useDependentTypes: bool,
     driftPolicy: option<[#Strict | #Repair | #Tolerate | #Latest]>,
     timeout: option<int>,
   }
 
-  let query = async (vql: string, options: queryOptions) => {
+  let query = async (vcl: string, options: queryOptions) => {
     let headers = options.useDependentTypes
-      ? {"X-VCL-Safe": "true", "Content-Type": "text/vql"}
-      : {"Content-Type": "text/vql"}
+      ? {"X-VCL-Safe": "true", "Content-Type": "text/vcl"}
+      : {"Content-Type": "text/vcl"}
 
     let response = await fetch("/api/v1/query", {
       method: "POST",
       headers: headers,
-      body: vql,
+      body: vcl,
     })
 
     let result = await response->Response.json
@@ -480,7 +480,7 @@ module VQLClient = {
 
 // Usage example
 let searchPapers = async () => {
-  let vql = `
+  let vcl = `
     SELECT GRAPH, VECTOR
     FROM FEDERATION /universities/*
     WHERE (h)-[:CITES]->(target)
@@ -489,7 +489,7 @@ let searchPapers = async () => {
     LIMIT 100
   `
 
-  let result = await VQLClient.query(vql, {
+  let result = await VCLClient.query(vcl, {
     useDependentTypes: true,
     driftPolicy: Some(#Repair),
     timeout: Some(30000),
