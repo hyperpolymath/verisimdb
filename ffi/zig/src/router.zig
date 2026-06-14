@@ -2,7 +2,7 @@
 // REST route dispatch. Mirrors the V gateway endpoints:
 //   /api/v1/health          combined gateway+rust+elixir health
 //   /api/v1/octads*         → Rust core /octads*
-//   /api/v1/vql/execute     → Rust core /vql/execute
+//   /api/v1/vcl/execute     → Rust core /vcl/execute
 //   /api/v1/drift/*         → Rust core /drift/*
 //   /api/v1/search/*        → Rust core /search/*
 //   /api/v1/provenance/*    → Rust core /provenance/*
@@ -53,7 +53,7 @@ pub fn route(
     if (std.mem.startsWith(u8, subpath, "/octads")) {
         return forward(allocator, cfg.rust_url, subpath, method, request_body);
     }
-    if (std.mem.eql(u8, subpath, "/vql/execute") and method == .POST) {
+    if (std.mem.eql(u8, subpath, "/vcl/execute") and method == .POST) {
         return forward(allocator, cfg.rust_url, subpath, method, request_body);
     }
     if (std.mem.startsWith(u8, subpath, "/drift/") and method == .GET) {

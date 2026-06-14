@@ -2,7 +2,7 @@
 // Minimal GraphQL routing — parses { "query": "...", "variables": {} } and
 // dispatches by query-substring to backend HTTP calls. Matches the V gateway's
 // field-routing approach: not a full GraphQL parser, but enough to expose
-// health / telemetry / octads / driftScore / executeVql.
+// health / telemetry / octads / driftScore / executeVcl.
 
 const std = @import("std");
 const Config = @import("config.zig").Config;
@@ -93,30 +93,30 @@ pub fn handle(
         }
     }
 
-    // executeVql mutation
-    if (std.mem.indexOf(u8, query, "executeVql") != null or
+    // executeVcl mutation
+    if (std.mem.indexOf(u8, query, "executeVcl") != null or
         std.mem.indexOf(u8, query, "mutation") != null)
     {
-        const vql_val = variables.get("query") orelse {
-            return errorBody(allocator, 200, "VQL mutation requires variables.query");
+        const vcl_val = variables.get("query") orelse {
+            return errorBody(allocator, 200, "VCL mutation requires variables.query");
         };
-        if (vql_val != .string) {
+        if (vcl_val != .string) {
             return errorBody(allocator, 200, "variables.query must be a string");
         }
-        const payload = try std.fmt.allocPrint(allocator, "{{\"query\":\"{s}\"}}", .{vql_val.string});
+        const payload = try std.fmt.allocPrint(allocator, "{{\"query\":\"{s}\"}}", .{vcl_val.string});
         defer allocator.free(payload);
-        const url = try std.fmt.allocPrint(allocator, "{s}/vql/execute", .{cfg.rust_url});
+        const url = try std.fmt.allocPrint(allocator, "{s}/vcl/execute", .{cfg.rust_url});
         defer allocator.free(url);
         if (proxy.postJson(allocator, url, payload)) |r| {
             defer allocator.free(r.body);
             const out = try std.fmt.allocPrint(
                 allocator,
-                "{{\"data\":{{\"executeVql\":{s}}}}}",
+                "{{\"data\":{{\"executeVcl\":{s}}}}}",
                 .{r.body},
             );
             return .{ .status = 200, .body = out };
         } else |_| {
-            return dataNull(allocator, "executeVql", "VQL execution failed");
+            return dataNull(allocator, "executeVcl", "VCL execution failed");
         }
     }
 
@@ -150,7 +150,7 @@ pub fn handle(
     return errorBody(
         allocator,
         200,
-        "Unrecognised query. Supported: health, telemetry, octads, driftScore, executeVql",
+        "Unrecognised query. Supported: health, telemetry, octads, driftScore, executeVcl",
     );
 }
 
