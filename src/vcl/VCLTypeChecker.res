@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Type Checker — Thin facade over VQLBidir bidirectional type inference
+// VCL Type Checker — Thin facade over VCLBidir bidirectional type inference
 //
 // Maintains backward-compatible public API (checkQuery, planProofGeneration)
-// while delegating to the real type system in VQLBidir.
+// while delegating to the real type system in VCLBidir.
 
-module AST = VQLParser.AST
-module Error = VQLError
-module Types = VQLTypes
-module Ctx = VQLContext
-module Bidir = VQLBidir
-module ProofObl = VQLProofObligation
+module AST = VCLParser.AST
+module Error = VCLError
+module Types = VCLTypes
+module Ctx = VCLContext
+module Bidir = VCLBidir
+module ProofObl = VCLProofObligation
 
 // ============================================================================
 // Type Context (backward-compatible)
@@ -113,7 +113,7 @@ let checkQuery = (query: AST.query, context: typeContext): typeCheckResult => {
     switch Bidir.synthesizeQuery(bidirCtx, query) {
     | Ok(_type) => Ok()
     | Error(typeErr) =>
-      // Convert Bidir.typeError to VQLError.typeError
+      // Convert Bidir.typeError to VCLError.typeError
       Error({
         kind: Error.TypeMismatch({
           expected: "well-typed query",

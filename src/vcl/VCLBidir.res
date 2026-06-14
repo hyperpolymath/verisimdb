@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Bidirectional Type Inference
+// VCL Bidirectional Type Inference
 //
-// Implements bidirectional type checking for VQL queries:
+// Implements bidirectional type checking for VCL queries:
 // - synthesize: infer the type of a query from its structure
 // - check: verify a query expression has an expected type
 //
@@ -9,17 +9,17 @@
 // verifying that all field references, operators, aggregates, and
 // proof obligations are well-typed.
 
-module AST = VQLParser.AST
-module Types = VQLTypes
-module Ctx = VQLContext
-module Sub = VQLSubtyping
+module AST = VCLParser.AST
+module Types = VCLTypes
+module Ctx = VCLContext
+module Sub = VCLSubtyping
 
 // ============================================================================
 // Type Error
 // ============================================================================
 
 type typeError =
-  | SubtypingFailed({expected: Types.vqlType, got: Types.vqlType, reason: string})
+  | SubtypingFailed({expected: Types.vclType, got: Types.vclType, reason: string})
   | FieldTypeMismatch({field: string, expected: Types.primitiveType, got: Types.primitiveType})
   | OperatorTypeMismatch({op: string, leftType: Types.primitiveType, rightType: Types.primitiveType})
   | VectorDimensionMismatch({expected: int, got: int})
@@ -49,7 +49,7 @@ type typeError =
 let formatTypeError = (err: typeError): string => {
   switch err {
   | SubtypingFailed({expected, got, reason}) =>
-    `Subtyping failed: expected ${Types.vqlTypeToString(expected)}, got ${Types.vqlTypeToString(got)}: ${reason}`
+    `Subtyping failed: expected ${Types.vclTypeToString(expected)}, got ${Types.vclTypeToString(got)}: ${reason}`
   | FieldTypeMismatch({field, expected, got}) =>
     `Field '${field}' type mismatch: expected ${Types.primitiveTypeToString(expected)}, got ${Types.primitiveTypeToString(got)}`
   | OperatorTypeMismatch({op, leftType, rightType}) =>
@@ -87,7 +87,7 @@ let formatTypeError = (err: typeError): string => {
 // Synthesize: Infer type of a complete query
 // ============================================================================
 
-type synthesizeResult = Result<Types.vqlType, typeError>
+type synthesizeResult = Result<Types.vclType, typeError>
 
 let synthesizeQuery = (ctx: Ctx.context, query: AST.query): synthesizeResult => {
   // 1. Resolve modalities to type-level representations
@@ -160,7 +160,7 @@ let synthesizeQuery = (ctx: Ctx.context, query: AST.query): synthesizeResult => 
 let checkQuery = (
   ctx: Ctx.context,
   query: AST.query,
-  expectedType: Types.vqlType,
+  expectedType: Types.vclType,
 ): Result<unit, typeError> => {
   switch synthesizeQuery(ctx, query) {
   | Error(e) => Error(e)

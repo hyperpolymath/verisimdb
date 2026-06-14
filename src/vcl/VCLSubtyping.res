@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Subtyping — Subtype relation for the VQL type system
+// VCL Subtyping — Subtype relation for the VCL type system
 //
 // Implements the 6 subtyping rules from the formal spec (Section 4):
 // 1. Reflexivity: t <: t
@@ -9,13 +9,13 @@
 // 5. Hexad modality contravariance: requesting fewer modalities subtypes requesting more
 // 6. Refinement subsumption: DEFERRED (needs SMT solver)
 
-module Types = VQLTypes
+module Types = VCLTypes
 
 type subtypeResult = Result<unit, subtypeError>
 
 and subtypeError = {
-  expected: Types.vqlType,
-  got: Types.vqlType,
+  expected: Types.vclType,
+  got: Types.vclType,
   reason: string,
 }
 
@@ -37,7 +37,7 @@ let isSubPrimitive = (sub: Types.primitiveType, sup: Types.primitiveType): bool 
 // Core subtype relation
 // ============================================================================
 
-let rec isSubtype = (sub: Types.vqlType, sup: Types.vqlType): subtypeResult => {
+let rec isSubtype = (sub: Types.vclType, sup: Types.vclType): subtypeResult => {
   // Rule 1: Reflexivity
   if Types.eqType(sub, sup) {
     Ok()
@@ -46,7 +46,7 @@ let rec isSubtype = (sub: Types.vqlType, sup: Types.vqlType): subtypeResult => {
   }
 }
 
-and checkStructuralSubtype = (sub: Types.vqlType, sup: Types.vqlType): subtypeResult => {
+and checkStructuralSubtype = (sub: Types.vclType, sup: Types.vclType): subtypeResult => {
   switch (sub, sup) {
   // Primitive widening
   | (Primitive(ps), Primitive(pp)) =>
@@ -145,7 +145,7 @@ and checkStructuralSubtype = (sub: Types.vqlType, sup: Types.vqlType): subtypeRe
     Error({
       expected: sup,
       got: sub,
-      reason: `${Types.vqlTypeToString(sub)} is not a subtype of ${Types.vqlTypeToString(sup)}`,
+      reason: `${Types.vclTypeToString(sub)} is not a subtype of ${Types.vclTypeToString(sup)}`,
     })
   }
 }
@@ -178,9 +178,9 @@ and isSubQueryResult = (
 // ============================================================================
 
 let transitiveSubtype = (
-  a: Types.vqlType,
-  b: Types.vqlType,
-  c: Types.vqlType,
+  a: Types.vclType,
+  b: Types.vclType,
+  c: Types.vclType,
 ): subtypeResult => {
   switch isSubtype(a, b) {
   | Ok() =>
@@ -209,7 +209,7 @@ let transitiveSubtype = (
 // Given two types and an operator, check if comparison is valid
 let checkOperatorTypes = (
   leftType: Types.primitiveType,
-  op: VQLParser.AST.operator,
+  op: VCLParser.AST.operator,
   rightType: Types.primitiveType,
 ): subtypeResult => {
   // Types must be compatible (one subtype of the other, or same)

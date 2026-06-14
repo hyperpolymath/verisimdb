@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Slipstream Parser - Untyped AST
+// VCL Slipstream Parser - Untyped AST
 // Phase 1: Simple parser for slipstream queries (no dependent types)
 
 // ============================================================================
@@ -353,7 +353,7 @@ module Parser = {
 }
 
 // ============================================================================
-// VQL Grammar Parsers
+// VCL Grammar Parsers
 // ============================================================================
 
 module Grammar = {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Types — Core type definitions for the bidirectional type checker
+// VCL Types — Core type definitions for the bidirectional type checker
 //
 // Implements the type system from vcl-type-system.adoc:
 // - Pi types (dependent function types)
@@ -9,7 +9,7 @@
 // - Query result types
 // - Proof types
 
-module AST = VQLParser.AST
+module AST = VCLParser.AST
 
 // ============================================================================
 // Modality Types (type-level representation)
@@ -40,19 +40,19 @@ type primitiveType =
   | TimestampType
 
 // ============================================================================
-// Core VQL Type System
+// Core VCL Type System
 // ============================================================================
 
-type rec vqlType =
+type rec vclType =
   | Primitive(primitiveType)
-  | ArrayType(vqlType)
+  | ArrayType(vclType)
   | ModalityType(modalityType)
   | HexadType(array<modalityType>) // hexad carrying specific modalities
   | QueryResultType(queryResultInfo) // result of a SELECT query
   | ProofType(proofKind, string) // Proof<kind, contract>
   | ProvedResultType(queryResultInfo, proofKind, string) // Sigma(result, proof)
-  | PiType(string, vqlType, vqlType) // Pi(x, domain, codomain)
-  | SigmaType(string, vqlType, vqlType) // Sigma(x, fst, snd)
+  | PiType(string, vclType, vclType) // Pi(x, domain, codomain)
+  | SigmaType(string, vclType, vclType) // Sigma(x, fst, snd)
   | UnitType
   | NeverType
 
@@ -198,10 +198,10 @@ let proofKindToString = (pk: proofKind): string => {
   }
 }
 
-let rec vqlTypeToString = (t: vqlType): string => {
+let rec vclTypeToString = (t: vclType): string => {
   switch t {
   | Primitive(pt) => primitiveTypeToString(pt)
-  | ArrayType(inner) => `Array<${vqlTypeToString(inner)}>`
+  | ArrayType(inner) => `Array<${vclTypeToString(inner)}>`
   | ModalityType(m) => modalityTypeToString(m)
   | HexadType(mods) => {
       let modStrs = mods->Belt.Array.map(modalityTypeToString)->Js.Array2.joinWith(", ")
@@ -217,9 +217,9 @@ let rec vqlTypeToString = (t: vqlType): string => {
       `Sigma(QueryResult<${modStrs}>, Proof<${proofKindToString(kind)}, ${contract}>)`
     }
   | PiType(x, domain, codomain) =>
-    `Pi(${x}: ${vqlTypeToString(domain)}) -> ${vqlTypeToString(codomain)}`
+    `Pi(${x}: ${vclTypeToString(domain)}) -> ${vclTypeToString(codomain)}`
   | SigmaType(x, fst, snd) =>
-    `Sigma(${x}: ${vqlTypeToString(fst)}, ${vqlTypeToString(snd)})`
+    `Sigma(${x}: ${vclTypeToString(fst)}, ${vclTypeToString(snd)})`
   | UnitType => "Unit"
   | NeverType => "Never"
   }
@@ -262,7 +262,7 @@ let eqModalityType = (a: modalityType, b: modalityType): bool => {
   }
 }
 
-let rec eqType = (a: vqlType, b: vqlType): bool => {
+let rec eqType = (a: vclType, b: vclType): bool => {
   switch (a, b) {
   | (Primitive(pa), Primitive(pb)) => eqPrimitiveType(pa, pb)
   | (ArrayType(ia), ArrayType(ib)) => eqType(ia, ib)

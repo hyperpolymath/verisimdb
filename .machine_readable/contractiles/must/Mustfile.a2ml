@@ -9,7 +9,7 @@
 
 @abstract:
 Physical-state invariants for VeriSimDB — the cross-modal (octad) entity
-consistency engine. Rust core + Elixir/OTP orchestration + ReScript VQL.
+consistency engine. Rust core + Elixir/OTP orchestration + ReScript VCL.
 These are hard requirements: CI and pre-commit hooks fail if any check fails.
 @end
 
@@ -77,11 +77,11 @@ These are hard requirements: CI and pre-commit hooks fail if any check fails.
 - run: test -f .editorconfig
 - severity: warning
 
-## VQL (VeriSim Consonance Language)
+## VCL (VeriSim Consonance Language)
 
-### vql-rescript-parser
-- description: ReScript VQL parser source must exist
-- run: test -d src/vql
+### vcl-rescript-parser
+- description: ReScript VCL parser source must exist
+- run: test -d src/vcl
 - severity: critical
 
 ### vql-elixir-bridge

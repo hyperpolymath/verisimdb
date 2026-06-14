@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL Proof Obligation — Generates typed proof obligations from queries
+// VCL Proof Obligation — Generates typed proof obligations from queries
 //
 // For each PROOF spec in a dependent-type query, generates a structured
 // obligation that the executor must satisfy. Handles multi-proof
 // composition validation and conflict detection.
 
-module AST = VQLParser.AST
-module Types = VQLTypes
-module Ctx = VQLContext
+module AST = VCLParser.AST
+module Types = VCLTypes
+module Ctx = VCLContext
 
 // ============================================================================
 // Proof Obligation Types

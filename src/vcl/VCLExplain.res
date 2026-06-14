@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-// VQL EXPLAIN - Query Plan Visualization
+// VCL EXPLAIN - Query Plan Visualization
 
-module AST = VQLParser.AST
+module AST = VCLParser.AST
 
 type planNode = {
   step: int,
@@ -46,7 +46,7 @@ let formatPlan = (plan: executionPlan): string => {
 
   // Header
   lines->Js.Array2.push("╔════════════════════════════════════════════════════════════════╗")
-  lines->Js.Array2.push("║              VQL QUERY EXECUTION PLAN                          ║")
+  lines->Js.Array2.push("║              VCL QUERY EXECUTION PLAN                          ║")
   lines->Js.Array2.push("╚════════════════════════════════════════════════════════════════╝")
   lines->Js.Array2.push("")
 
@@ -183,7 +183,7 @@ let explainQuery = (query: string): Result<string, string> => {
   switch parseExplain(query) {
   | Ok((true, actualQuery)) => {
       // Parse the query
-      switch VQLParser.parse(actualQuery) {
+      switch VCLParser.parse(actualQuery) {
       | Ok(ast) => {
           // Generate plan (this would call Elixir QueryPlanner)
           let plan = generatePlanFromAst(ast)
@@ -198,7 +198,7 @@ let explainQuery = (query: string): Result<string, string> => {
 }
 
 // Generate plan based on actual AST analysis (replaces hardcoded mock)
-let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
+let generatePlanFromAst = (ast: VCLParser.query): executionPlan => {
   let nodes = ast.modalities->Belt.Array.mapWithIndex((idx, modality) => {
     let modalityStr = switch modality {
     | Graph => "GRAPH"
@@ -383,7 +383,7 @@ let generatePlanFromAst = (ast: VQLParser.query): executionPlan => {
 }
 
 // Deprecated: Use generatePlanFromAst instead. Kept for test compatibility only.
-let generateMockPlan = (ast: VQLParser.query): executionPlan => {
+let generateMockPlan = (ast: VCLParser.query): executionPlan => {
   let nodes = ast.modalities->Belt.Array.mapWithIndex((idx, modality) => {
     let modalityStr = switch modality {
     | Graph => "GRAPH"
