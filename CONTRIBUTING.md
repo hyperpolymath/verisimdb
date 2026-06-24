@@ -1,6 +1,6 @@
 # Contributing to VeriSimDB
 
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 <!-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> -->
 
 Thank you for your interest in contributing to VeriSimDB. This document explains how to get started, our development workflow, and how to submit changes.
@@ -175,7 +175,7 @@ cargo fmt --check
 By contributing, you agree that your contributions will be licensed under the **MPL-2.0**. All source files must include:
 
 ```
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 ```
 
 ---
