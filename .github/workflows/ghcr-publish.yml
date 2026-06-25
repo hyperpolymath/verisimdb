@@ -30,6 +30,11 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write       # mint the OIDC token the attestation is signed with
+      attestations: write   # write the build-provenance attestation (the "claim")
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -55,10 +60,26 @@ jobs:
           podman rm -f verisim-smoke
 
       - name: Push to GHCR
+        id: push
         if: github.event_name != 'pull_request'
         run: |
           SHORT_SHA="${GITHUB_SHA::12}"
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # --digestfile records the real sha256 of the pushed manifest so the
+          # attestation binds to exactly what the registry received.
+          podman push --digestfile=/tmp/ghcr-digest "$IMAGE:$SHORT_SHA"
           podman push "$IMAGE:latest"
-          podman push "$IMAGE:$SHORT_SHA"
+          echo "digest=$(cat /tmp/ghcr-digest)" >> "$GITHUB_OUTPUT"
+
+      # GitHub native artifact attestation (build provenance) for the pushed
+      # image. Verify with:
+      #   gh attest verify oci://ghcr.io/hyperpolymath/verisimdb-api:<tag> \
+      #     --repo ${{ github.repository }}
+      - name: Attest container provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ghcr.io/hyperpolymath/verisimdb-api
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
