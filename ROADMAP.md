@@ -97,7 +97,7 @@ Currently in-memory only. Need pluggable backends.
 ### 2.4 Snapshots & Backup
 **Criticality: HIGH** | Effort: Medium
 
-- Point-in-time snapshots (consistent across all 6 modalities)
+- Point-in-time snapshots (consistent across all 8 modalities)
 - Incremental backup (WAL-based)
 - Restore from snapshot + WAL replay
 - Export/import in portable format

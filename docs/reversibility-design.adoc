@@ -151,7 +151,7 @@ Each modality can be made reversible:
 
 === Level 3: Full Multi-Modal Reversibility (MODERATE COST)
 
-**What:** All six modalities support revert.
+**What:** All eight modalities support revert.
 
 **Implementation:**
 

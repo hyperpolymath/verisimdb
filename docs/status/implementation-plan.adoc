@@ -4,6 +4,11 @@
 
 // SPDX-License-Identifier: CC-BY-SA-4.0
 
+[WARNING]
+====
+*SUPERSEDED (2026-07-07)* — historical planning document. The described architecture (Week 1–16 plan, "10% completion", six modality stores) no longer reflects the repo. See `KNOWN-ISSUES.adoc` and `ROADMAP.md` for current truth.
+====
+
 [.lead]
 **Bringing VeriSimDB from 10% to 70% completion**
 

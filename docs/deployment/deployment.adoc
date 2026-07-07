@@ -70,7 +70,7 @@ This guide covers all deployment modes with focus on production readiness, secur
 
 === Mode 1: Standalone Database
 
-Single-node deployment with all 6 modalities local.
+Single-node deployment with all 8 modalities local.
 
 ==== Use Cases
 

@@ -3,6 +3,8 @@
 
 # VeriSimDB System Specifications
 
+> ⚠️ **SUPERSEDED (2026-07-07)** — this is an early template spec describing a pre-octad design (modality set Textual/Numeric/Categorical…, `verisimdb-core`/`-nif` Rustler crate layout). It matches neither the octad nor the real `verisim-*` crates. The implemented system is the eight-modality octad documented in `README.adoc`/`EXPLAINME.adoc` and `spec/grammar.ebnf`.
+
 VeriSimDB is a multi-modal verification database with 8 modality stores and
 built-in proof verification. Implementation stack: Rust core storage engine,
 Elixir/OTP API layer, ReScript frontend.
