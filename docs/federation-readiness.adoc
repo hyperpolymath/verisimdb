@@ -8,7 +8,7 @@
 
 == What Federation Means in VeriSimDB
 
-Federation is the ability for multiple VeriSimDB instances to coordinate queries across their respective octad stores. Each instance maintains its own six modality stores (Graph, Vector, Tensor, Semantic, Document, Temporal) and its own set of octad entities. A federated query spans multiple instances, retrieving and correlating data from peers that may be geographically distributed, operated by different organizations, or running different versions of VeriSimDB.
+Federation is the ability for multiple VeriSimDB instances to coordinate queries across their respective octad stores. Each instance maintains its own eight modality stores (the octad: Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial) and its own set of octad entities. A federated query spans multiple instances, retrieving and correlating data from peers that may be geographically distributed, operated by different organizations, or running different versions of VeriSimDB.
 
 Federation in VeriSimDB is distinct from database replication. Replicated databases maintain identical copies of the same data. Federated VeriSimDB instances hold _different_ octad entities that may reference each other through graph edges, share semantic vocabularies, or have vector embeddings in the same latent space. The federation layer coordinates cross-instance queries while each instance retains sovereignty over its own data.
 
@@ -60,7 +60,7 @@ If VCL were removed or not used, VeriSimDB would lose the following federation-c
 
 === Normalizer Regeneration Strategies Are Stubs
 
-The `verisim-normalizer` crate's regeneration strategies currently return hardcoded `[regenerated]` placeholder values. When drift is detected and normalization is triggered, the normalizer identifies the authoritative modality and calls the appropriate regeneration strategy, but that strategy does not actually regenerate the drifted modality's data. Each of the six modalities needs a real regeneration implementation:
+The `verisim-normalizer` crate's regeneration strategies currently return hardcoded `[regenerated]` placeholder values. When drift is detected and normalization is triggered, the normalizer identifies the authoritative modality and calls the appropriate regeneration strategy, but that strategy does not actually regenerate the drifted modality's data. Each of the eight modalities needs a real regeneration implementation:
 
 * **Graph**: Re-derive edges from document content and semantic annotations.
 * **Vector**: Re-embed from document text using the configured embedding model.
@@ -68,6 +68,8 @@ The `verisim-normalizer` crate's regeneration strategies currently return hardco
 * **Semantic**: Re-extract type annotations and RDF triples from document and graph.
 * **Document**: Re-generate searchable text from graph, semantic, and temporal data.
 * **Temporal**: Re-build version chain from modification history.
+* **Provenance**: Re-build the hash-linked provenance chain from recorded modification events.
+* **Spatial**: Re-derive spatial geometry and coordinates from document and semantic references.
 
 === Federation Executor Always Returns Empty
 
@@ -109,7 +111,7 @@ Drift detection works: the `verisim-drift` crate computes drift scores across mo
 
 |**Normalizer (regeneration)**
 |Stub
-|Returns hardcoded `[regenerated]`. Six modality-specific strategies needed.
+|Returns hardcoded `[regenerated]`. Eight modality-specific strategies needed.
 
 |**Consensus Protocol**
 |Design only
@@ -152,7 +154,7 @@ Drift detection works: the `verisim-drift` crate computes drift scores across mo
 * Add authentication and authorization for peer-to-peer communication (mTLS or signed requests).
 * Implement query result merging in `FederationExecutor` with configurable merge strategies (union, intersection, ranked).
 * Add timeout and fallback handling for unreachable peers.
-* Implement remaining normalizer regeneration strategies for all six modalities.
+* Implement remaining normalizer regeneration strategies for all eight modalities.
 * Add federation-scoped drift detection: compute drift across instances, not just within one.
 
 === Phase 3: Verified Federation

@@ -514,7 +514,7 @@ With N modalities: latency scales with max(Store1, Store2, ..., StoreN)
 
 **Amplification Factors:**
 - **2 modalities:** 2x network calls
-- **6 modalities:** 6x network calls (if not optimized)
+- **8 modalities:** 8x network calls (if not optimized)
 - **Failure Probability:** P(any store fails) = 1 - ∏(1 - P(store_i fails))
 
 **Example:**
@@ -628,7 +628,7 @@ Monthly bandwidth:
 |Charge $0.01/query (cost recovery)
 
 |**Modality Support**
-|All 6 modalities
+|All 8 modalities
 |Graph and Document only (limited resources)
 
 |**Schema Changes**

@@ -9,6 +9,12 @@ All notable changes to VeriSimDB are documented here. This project uses https://
 
 == [Unreleased]
 
+=== Changed — Docs hygiene: retire fossil specs, fix six→eight modality drift (2026-07-07)
+
+- Stale-stamped three fossil documents with prominent superseded/historical banners: `docs/status/implementation-plan.adoc` (Week 1–16 / 10%-completion plan), `docs/releases/v0.1.0-alpha.md` ("Production-Ready" / "100% Complete" claims contradicted by KNOWN-ISSUES #29/#30/#31), and `spec/system-specs.md` (pre-octad template spec with a Textual/Numeric/Categorical modality set and `verisimdb-core`/`-nif` Rustler crate layout matching neither the octad nor the real `verisim-*` crates).
+- Corrected modality-count drift ("six"/"6" → eight/octad) in current docs: `docs/deployment-modes.adoc`, `docs/federation-readiness.adoc`, `docs/challenges-standalone.adoc`, `docs/challenges-federated.adoc`, `docs/challenges-hybrid.adoc`, `docs/reversibility-design.adoc`, `docs/vcl-vs-sql.adoc`, `docs/deployment/deployment.adoc`, and `ROADMAP.md`. Where a doc enumerated only the legacy six concrete stores, added the missing Provenance (hash-chain lineage) and Spatial (R-tree) entries.
+- Left deliberate references untouched: HEXAD grammar keyword, VCL "six proof types" / VCL-dt++ "six clauses", and dated historical records in CHANGELOG/KNOWN-ISSUES/design docs/papers. The "is VeriSimDB a database?" positioning prose is unchanged pending owner decision D1.
+
 == [0.2.0] — 2026-06-13
 
 === Added — July-1 credibility: honesty over fake success (2026-06-13)

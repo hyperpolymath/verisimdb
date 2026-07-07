@@ -8,7 +8,7 @@ VeriSimDB is **both** a database and a federation coordinator—the architecture
 
 === Mode 1: Standalone Database (Traditional)
 
-Deploy VeriSimDB as a **complete database system** with all six modalities local.
+Deploy VeriSimDB as a **complete database system** with all eight modalities (the octad) local.
 
 [cols="1,3"]
 |===
@@ -18,7 +18,7 @@ Deploy VeriSimDB as a **complete database system** with all six modalities local
 |Local in-memory namespace
 
 |Modality Stores
-|All 6 modalities running on the same machine/cluster
+|All 8 modalities running on the same machine/cluster
 
 |Use Case
 |Single institution, traditional database replacement
