@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MPL-2.0
+# cargo-audit configuration for VeriSimDB.
+# Run: cargo audit    (CI: rustsec/audit-check in .github/workflows/rust-ci.yml)
+#
+# This is NOT a mirror of `deny.toml` `[advisories].ignore`, deliberately.
+# cargo-deny walks a feature-aware dependency graph and never sees crates
+# reachable only through non-default features. cargo-audit reads Cargo.lock
+# directly and sees every optional dependency. So an advisory on an opt-in
+# feature's dependency is visible to cargo-audit alone, and belongs here alone
+# — putting it in deny.toml only yields an `advisory-not-detected` warning.
+#
+# Policy: an entry is only permitted when there is no version of this tree
+# that resolves the advisory. "We haven't got round to it" is not a reason —
+# bump the dependency instead. Re-check every entry when its blocking upstream
+# publishes a release.
+
+[advisories]
+ignore = [
+    # quick-xml 0.37.5 — two DoS advisories, both fixed upstream in 0.41.0.
+    # Reached ONLY through oxigraph → {oxrdfxml, sparesults}. oxigraph 0.5.9 is
+    # the latest published release and still requires quick-xml ^0.37, so no
+    # resolution of this lockfile avoids it.
+    # Exposure: verisim-graph's `oxigraph-backend` feature is NOT in `default`,
+    # so a stock build never links quick-xml.
+    # REMOVE WHEN: oxigraph publishes a release depending on quick-xml >= 0.41.
+    "RUSTSEC-2026-0194",  # quadratic duplicate-attribute check
+    "RUSTSEC-2026-0195",  # unbounded namespace-declaration allocation
+]
+
+# Informational advisories (unmaintained / unsound / notice) are reported but
+# do not fail the build; vulnerabilities do.
+informational_warnings = ["unmaintained", "unsound", "notice"]

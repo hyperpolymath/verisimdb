@@ -270,7 +270,9 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
             .map_err(|_| TemporalError::LockPoisoned)?;
         let versions = store.entry(entity_id.to_string()).or_default();
 
-        let next_version = versions.keys().last().map(|v| v + 1).unwrap_or(1);
+        // `next_back` on the BTreeMap key iterator is O(log n); `last` would
+        // walk every existing version, making an N-version history O(N^2).
+        let next_version = versions.keys().next_back().map(|v| v + 1).unwrap_or(1);
         let mut version = Version::new(next_version, data, author);
         if let Some(msg) = message {
             version = version.with_message(msg);
@@ -287,7 +289,7 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
             .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
-            .and_then(|versions| versions.values().last().cloned()))
+            .and_then(|versions| versions.values().next_back().cloned()))
     }
 
     async fn at_version(
@@ -314,11 +316,9 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
             .read()
             .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store.get(entity_id).and_then(|versions| {
-            versions
-                .values()
-                .filter(|v| v.timestamp <= time)
-                .last()
-                .cloned()
+            // Values ascend by version; scanning backwards finds the newest
+            // version at or before `time` without traversing the whole map.
+            versions.values().rfind(|v| v.timestamp <= time).cloned()
         }))
     }
 

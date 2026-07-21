@@ -61,6 +61,19 @@ defmodule VeriSim.MixProject do
       # GHSA-468c-vq7p-gh64 fix (multipart-header buffer exhaustion, High).
       {:plug, "~> 1.19 and >= 1.19.2"},
 
+      # hpax is a transitive of bandit (and of mint) but pinned directly to
+      # enforce the GHSA-jj2p-32j7-whj2 fix — unbounded HPACK integer decoding
+      # allows an unauthenticated DoS (CVE-2026-58226, High).
+      {:hpax, "~> 1.0 and >= 1.0.4"},
+
+      # mint is a transitive of req -> finch but pinned directly to enforce four
+      # fixes landed across 1.9.1-1.9.3:
+      #   GHSA-qrfr-wh4c-3qhw  unbounded HTTP/1 header + trailer accumulation (High)
+      #   GHSA-c59h-fq4p-r36r  whole chunked body buffered in decode_body/5 (High)
+      #   GHSA-8pf6-g464-h6h9  zero-length HTTP/2 CONTINUATION cap bypass (Medium)
+      #   GHSA-x3x7-96vm-6h2w  sign-tolerant chunk-size parser -> smuggling (Medium)
+      {:mint, "~> 1.9 and >= 1.9.3"},
+
       # JSON encoding/decoding
       {:jason, "~> 1.4"},
 

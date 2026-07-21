@@ -1,5 +1,5 @@
-# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 # SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 name: OSSF Scorecard
 
 on:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   scorecard:
-    uses: hyperpolymath/standards/.github/workflows/scorecard-reusable.yml@d7c22711e830e1f383846472f6e9b99debdb201e
+    uses: hyperpolymath/standards/.github/workflows/scorecard-reusable.yml@45108f95e404e8e17896a56596d0db1cc7883c46
     permissions:
       contents: read
       security-events: write
