@@ -59,4 +59,15 @@
     (category "UnsafeDeserialization")
     (audit "VeriSimSearch.res:80-200 — six try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+
+  ;; ── Allocation bounded by an explicit guard the scanner cannot see ──
+  ;; assail flags the growth pattern (String::new + push_str in a loop)
+  ;; syntactically; it does not prove bounds, so the guard added below does
+  ;; not clear the finding. Re-verified 2026-07-21: still reported after the
+  ;; fix, hence this entry rather than a code change alone.
+  (classification
+    (file "rust-core/verisim-repl/src/main.rs")
+    (category "UnboundedAllocation")
+    (audit "main.rs — REPL backslash-continuation buffer `query_buf`; guarded by MAX_QUERY_BUF_BYTES (1 MiB) since 2026-07-21")
+    (rationale "growth is bounded: the continuation branch checks query_buf.len() + line + 1 against MAX_QUERY_BUF_BYTES and clears the buffer on overflow, so the allocation cannot exceed 1 MiB regardless of input length"))
 )
