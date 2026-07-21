@@ -2,12 +2,11 @@
 # cargo-audit configuration for VeriSimDB.
 # Run: cargo audit    (CI: rustsec/audit-check in .github/workflows/rust-ci.yml)
 #
-# This is NOT a mirror of `deny.toml` `[advisories].ignore`, deliberately.
-# cargo-deny walks a feature-aware dependency graph and never sees crates
-# reachable only through non-default features. cargo-audit reads Cargo.lock
-# directly and sees every optional dependency. So an advisory on an opt-in
-# feature's dependency is visible to cargo-audit alone, and belongs here alone
-# — putting it in deny.toml only yields an `advisory-not-detected` warning.
+# Keep this list in step with `deny.toml` `[advisories].ignore`. They are
+# separate tools with separate config and they resolve the dependency graph
+# differently — cargo-audit reads Cargo.lock directly, cargo-deny resolves
+# features — so the same advisory can surface in one and not the other. An
+# entry justified for one is justified for both; edit the two files together.
 #
 # Policy: an entry is only permitted when there is no version of this tree
 # that resolves the advisory. "We haven't got round to it" is not a reason —
