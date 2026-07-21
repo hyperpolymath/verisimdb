@@ -5,10 +5,13 @@ name: Security Scan
 on:
   push:
     branches: [main]
-  # TEMPORARY (removed before merge): this workflow has no pull_request
-  # trigger, so a fix to it can never be verified pre-merge. Added so the
-  # reusable-resolution fix below is proven by an actual run on this PR.
-  pull_request:
+  # No `pull_request:` trigger by design -- this scan pushes a report to
+  # verisimdb-data, which should happen for main, not for every PR. That does
+  # mean a change to THIS file cannot be verified pre-merge; a temporary
+  # `pull_request:` trigger was added on this branch to prove the fix below,
+  # then removed. Verifying run: 29831433656 (commit 4cd3f20) -- the workflow
+  # loaded, the scan executed, and only the dispatch step failed (HTTP 401,
+  # expired VERISIMDB_PAT). Re-add the trigger the same way if you touch this.
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
   workflow_dispatch:
