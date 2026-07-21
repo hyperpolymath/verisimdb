@@ -36,6 +36,14 @@ use formatter::{format_value, OutputFormat};
 /// VeriSimDB version string, pulled from Cargo.toml at compile time.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Upper bound on the multiline query buffer, in bytes.
+///
+/// Backslash continuation appends to `query_buf` without ever executing, so a
+/// non-interactive stdin (a piped script, a generated `.vclrc`) could grow the
+/// buffer until the process is OOM-killed. 1 MiB is orders of magnitude beyond
+/// any hand-written VCL query while still bounding the allocation.
+const MAX_QUERY_BUF_BYTES: usize = 1024 * 1024;
+
 // ---------------------------------------------------------------------------
 // CLI argument parsing
 // ---------------------------------------------------------------------------
@@ -176,6 +184,17 @@ fn main() {
                 // Multiline continuation: if the line ends with '\', append
                 // the line (minus the backslash) and continue reading.
                 if let Some(without_continuation) = trimmed.strip_suffix('\\') {
+                    // Bound the buffer: this branch never executes the query,
+                    // so without a cap a continuation-only stream grows it
+                    // without limit.
+                    if query_buf.len() + without_continuation.len() + 1 > MAX_QUERY_BUF_BYTES {
+                        eprintln!(
+                            "{} query buffer exceeded {MAX_QUERY_BUF_BYTES} bytes; discarded",
+                            "Error:".red().bold()
+                        );
+                        query_buf.clear();
+                        continue;
+                    }
                     if !query_buf.is_empty() {
                         query_buf.push(' ');
                     }
