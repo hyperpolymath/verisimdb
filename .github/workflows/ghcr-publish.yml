@@ -64,6 +64,19 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           SHORT_SHA="${GITHUB_SHA::12}"
+          # Point podman's credential store at the DOCKER config path instead
+          # of its default ${XDG_RUNTIME_DIR}/containers/auth.json.
+          # REGISTRY_AUTH_FILE is honoured by both `podman login` and
+          # `podman push`, so one export covers the whole step.
+          #
+          # Why: the `attest-build-provenance` step below runs with
+          # `push-to-registry: true` and resolves registry credentials via the
+          # Docker config. With podman's default store it finds none and fails
+          # with "No credentials found for registry ghcr.io" — AFTER the image
+          # has already been pushed, which is why the image exists but the run
+          # is red.
+          mkdir -p "$HOME/.docker"
+          export REGISTRY_AUTH_FILE="$HOME/.docker/config.json"
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
           # --digestfile records the real sha256 of the pushed manifest so the

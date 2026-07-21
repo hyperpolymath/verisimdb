@@ -99,9 +99,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.102"
+version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "arc-swap"
@@ -771,9 +771,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.18"
+version = "0.9.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+checksum = "2d6914041f254d6e9176c01941b21115dcfb7089e55135a35411081bd106ef3f"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -1973,9 +1973,9 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "memmap2"
-version = "0.9.10"
+version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
+checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
 dependencies = [
  "libc",
 ]
@@ -2185,9 +2185,9 @@ dependencies = [
 
 [[package]]
 name = "oxigraph"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ee83ce0422e6dce39a325810a9c66af71577a0a6fb5d887764bf3ae6304667"
+checksum = "6d945cbe78640ab719a73697b9bd250054ea82c60470754efea79c21d5fc1cd1"
 dependencies = [
  "dashmap",
  "getrandom 0.3.4",
@@ -2203,7 +2203,7 @@ dependencies = [
  "sparesults",
  "spareval",
  "spargebra",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2231,7 +2231,7 @@ dependencies = [
  "oxiri",
  "oxrdf",
  "ryu-js",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2246,7 +2246,7 @@ dependencies = [
  "oxsdatatypes",
  "rand",
  "sha2 0.10.9",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2259,7 +2259,7 @@ dependencies = [
  "oxrdf",
  "oxrdfxml",
  "oxttl",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2272,14 +2272,14 @@ dependencies = [
  "oxiri",
  "oxrdf",
  "quick-xml",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "oxrocksdb-sys"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b7ff9cbbbc3cd628be238ca7f22b4c31ab85c3fc1349ff452fd9fac78615e60"
+checksum = "6977c1d1827fcbf14480e768e4dede0b39c2961f6028497d012f9c04bcda91c6"
 dependencies = [
  "bindgen",
  "cc",
@@ -2291,7 +2291,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06fa874d87eae638daae9b4e3198864fe2cce68589f227c0b2cf5b62b1530516"
 dependencies = [
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2304,7 +2304,7 @@ dependencies = [
  "oxilangtag",
  "oxiri",
  "oxrdf",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3282,7 +3282,7 @@ dependencies = [
  "memchr",
  "oxrdf",
  "quick-xml",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3305,7 +3305,7 @@ dependencies = [
  "sparesults",
  "spargebra",
  "sparopt",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3319,7 +3319,7 @@ dependencies = [
  "oxrdf",
  "peg",
  "rand",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3335,9 +3335,9 @@ dependencies = [
 
 [[package]]
 name = "spin"
-version = "0.9.8"
+version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 
 [[package]]
 name = "stable_deref_trait"
