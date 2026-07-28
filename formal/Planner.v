@@ -20,18 +20,58 @@
     direction: optimize is a permutation. Semantic equivalence then
     follows once per-operator semantics are formalised.
 
-    Declared axiom: [optimize_is_permutation]. This is a structural
-    contract on the Rust optimizer enforced by inspection of
-    [Planner::optimize] (no node insertion, no node deletion, only
-    reordering via [Vec::sort_by]). A property test added alongside
-    Provenance.v's chain-link integrity check would exercise this in
-    Rust.
+    [optimize_is_permutation] was an [Axiom] until 2026-07-28. It is now a
+    [Theorem]. The change matters because, as an axiom over a [Parameter]
+    [optimize], it was not merely unproven — it was *unprovable*: nothing
+    constrained [optimize], so [fun _ => []] inhabited the parameter and
+    refuted the statement. Assuming it was therefore assuming the conclusion.
+
+    The discharge replaces the parameter with a definition, which is what
+    makes the statement provable at all:
+
+      - [modality] becomes an [Inductive] mirroring [crate::Modality]'s six
+        constructors, with [execution_priority] transcribing the Rust match
+        arms exactly (verisim-planner/src/lib.rs).
+      - [optimize] becomes [Mergesort]'s [sort] over a decidable total order
+        on nodes: execution priority first, cost as tie-breaker — the same
+        key [Optimizer::optimize]'s [sort_by] comparator uses.
+      - The permutation property is then discharged by the standard library's
+        [Permuted_sort], which is itself closed under the global context.
+
+    Two [Parameter]s remain by design, and being parametric in them makes the
+    result stronger rather than weaker — the theorem holds for *any* condition
+    representation and *any* cost function:
+
+      - [condition] : the Rust [ConditionKind] has nine constructors carrying
+        [String]/[usize] payloads; none of that is relevant to a permutation.
+      - [node_cost] : abstracts [CostModel::estimate]'s [time_ms]. Modelling
+        the real cost model would constrain the theorem to one cost function
+        for no gain.
+
+    Two honest gaps between this model and the Rust, neither affecting the
+    permutation property, both worth stating rather than eliding:
+
+      - [node_cost] returns [nat]; the Rust tie-breaker is [f64] compared with
+        [partial_cmp(...).unwrap_or(Equal)]. A NaN would make that comparator
+        non-transitive and break [sort_by]'s contract. NaN is unreachable today
+        (the only division in [CostModel::estimate] is guarded and feeds
+        [selectivity], not [time_ms]) but nothing in the Rust types enforces it.
+      - The Rust [optimize] is partial — it returns [PlannerError::EmptyPlan]
+        for an empty plan — whereas [sort []] is [[]]. Total here, partial there.
+
+    Full Q1 (semantic equivalence) remains MODERATE and open; [exec_node_comm]
+    in PlannerSemantic.v is a genuine spec axiom needing per-operator semantics,
+    not something this change touches.
 
     Tracking issue: hyperpolymath/verisimdb#77.
 *)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Sorting.Permutation.
+Require Import Coq.Sorting.Mergesort.
+Require Import Coq.Structures.Orders.
+Require Import Coq.Arith.PeanoNat.
+Require Import Lia.
 
 (* Keep Print Assumptions output on one line per axiom: the CI and Justfile
    guards match /^name :/ with awk, and Coq's default ~78-column wrap would
@@ -42,9 +82,38 @@ Import ListNotations.
 
 (** ** Domain *)
 
-(** Opaque modality and condition types. Mirrors [crate::Modality]
-    and [crate::plan::Condition] in the Rust source. *)
-Parameter modality : Type.
+(** [modality] mirrors [crate::Modality] (verisim-planner/src/lib.rs).
+
+    Six constructors, not the octad's eight: the planner declares its own
+    canonical enum and does not cover Provenance or Spatial, even though both
+    are full crates. That gap is real and tracked separately; this module
+    mirrors the Rust as it is rather than as it should be, because a model
+    that covered eight would no longer describe the code it validates. *)
+Inductive modality : Type :=
+  | Graph
+  | Vector
+  | Tensor
+  | Semantic
+  | Document
+  | Temporal.
+
+(** Transcribes [Modality::execution_priority] arm for arm. Lower runs
+    earlier: Temporal first (often cached), Vector/Document next (selective
+    indexes), Graph middle, Tensor moderate, Semantic last (ZKP expensive). *)
+Definition execution_priority (m : modality) : nat :=
+  match m with
+  | Temporal => 10
+  | Vector   => 20
+  | Document => 30
+  | Graph    => 40
+  | Tensor   => 50
+  | Semantic => 90
+  end.
+
+(** Conditions stay opaque. [crate::plan::ConditionKind] has nine constructors
+    (Equality, Range, Fulltext, Similarity, Traversal, AtTime,
+    ProofVerification, TensorOp, Predicate), none of whose structure bears on
+    whether the optimizer reorders or loses nodes. *)
 Parameter condition : Type.
 
 (** A plan node is a (modality, condition list) pair. *)
@@ -60,14 +129,53 @@ Definition logical_plan : Type := list node.
     structural-preservation property below. *)
 Definition physical_plan : Type := list node.
 
-(** ** Optimizer contract
+(** ** Optimizer
 
-    The optimizer is a permutation: it reorders the input nodes but
-    neither adds nor drops any. *)
-Parameter optimize : logical_plan -> physical_plan.
+    [CostModel::estimate]'s [time_ms], abstracted. See the header for why this
+    stays a [Parameter] and what the [nat]-vs-[f64] gap is. *)
+Parameter node_cost : node -> nat.
 
-Axiom optimize_is_permutation :
+(** The comparator from [Optimizer::optimize]'s [sort_by]: execution priority
+    first, total cost as tie-breaker. *)
+Definition node_leb (a b : node) : bool :=
+  if Nat.ltb (execution_priority (fst a)) (execution_priority (fst b)) then true
+  else if Nat.ltb (execution_priority (fst b)) (execution_priority (fst a)) then false
+  else Nat.leb (node_cost a) (node_cost b).
+
+(** Totality — the property [f64] with [unwrap_or(Equal)] cannot guarantee, and
+    the reason the cost carrier is [nat] here. *)
+Lemma node_leb_total : forall a b, node_leb a b = true \/ node_leb b a = true.
+Proof.
+  intros a b. unfold node_leb.
+  destruct (Nat.ltb (execution_priority (fst a)) (execution_priority (fst b))) eqn:Hab.
+  - left; reflexivity.
+  - destruct (Nat.ltb (execution_priority (fst b)) (execution_priority (fst a))) eqn:Hba.
+    + right; reflexivity.
+    + apply Nat.ltb_ge in Hab. apply Nat.ltb_ge in Hba.
+      destruct (Nat.leb_spec (node_cost a) (node_cost b)) as [H|H].
+      * left; reflexivity.
+      * right. apply Nat.leb_le. lia.
+Qed.
+
+Module PlanOrder <: TotalLeBool.
+  Definition t := node.
+  Definition leb := node_leb.
+  Infix "<=?" := leb (at level 70, no associativity).
+  Theorem leb_total : forall a1 a2, leb a1 a2 = true \/ leb a2 a1 = true.
+  Proof. exact node_leb_total. Qed.
+End PlanOrder.
+
+Module PlanSort := Sort PlanOrder.
+
+(** The optimizer: a stable mergesort under [node_leb]. *)
+Definition optimize (lp : logical_plan) : physical_plan := PlanSort.sort lp.
+
+(** The former axiom, now discharged from [Permuted_sort]. *)
+Theorem optimize_is_permutation :
   forall lp, Permutation lp (optimize lp).
+Proof.
+  intro lp. apply PlanSort.Permuted_sort.
+Qed.
 
 (** ** Q1-lite corollaries *)
 

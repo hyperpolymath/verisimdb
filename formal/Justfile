@@ -37,7 +37,7 @@ normalizer:
 vcl:
     {{COQC}} -q VCL.v > VCL.out
 
-planner-semantic:
+planner-semantic: planner
     {{COQC}} -q PlannerSemantic.v > PlannerSemantic.out
 
 octad:
@@ -81,11 +81,11 @@ check-transaction: transaction
 check-planner: planner
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Planner.out \
       | sort -u \
-      | grep -vE '^(modality|condition|optimize|optimize_is_permutation)$' \
+      | grep -vE '^(condition|node_cost)$' \
       | { if read -r line; then \
             echo "ERROR(Planner): unexpected axiom: $line"; cat; exit 1; \
           else \
-            echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"; \
+            echo "OK(Planner): Q1-lite 3 theorems x 2 parameters whitelisted (0 propositional axioms)"; \
           fi; }
 
 check-wal: wal
@@ -120,7 +120,7 @@ check-vcl: vcl
 check-planner-semantic: planner-semantic
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' PlannerSemantic.out \
       | sort -u \
-      | grep -vE '^(modality|condition|octad|exec_node|exec_node_comm|optimize|optimize_is_permutation)$' \
+      | grep -vE '^(condition|node_cost|octad|exec_node|exec_node_comm)$' \
       | { if read -r line; then \
             echo "ERROR(PlannerSemantic): unexpected axiom: $line"; cat; exit 1; \
           else \
