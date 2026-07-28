@@ -321,6 +321,8 @@ mod tests {
                     },
                     optimization_hint: None,
                     pushed_predicates: vec![],
+                    projections: vec![],
+                    early_limit: None,
                 })
                 .collect(),
             strategy: if steps.len() >= 2 {
