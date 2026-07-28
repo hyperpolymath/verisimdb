@@ -17,31 +17,31 @@ all: provenance drift transaction planner wal normalizer vcl planner-semantic oc
 # --- Per-module compile recipes -------------------------------------------
 
 provenance:
-    {{COQC}} -q Provenance.v | tee Provenance.out
+    {{COQC}} -q Provenance.v > Provenance.out
 
 drift:
-    {{COQC}} -q Drift.v | tee Drift.out
+    {{COQC}} -q Drift.v > Drift.out
 
 transaction:
-    {{COQC}} -q Transaction.v | tee Transaction.out
+    {{COQC}} -q Transaction.v > Transaction.out
 
 planner:
-    {{COQC}} -q Planner.v | tee Planner.out
+    {{COQC}} -q Planner.v > Planner.out
 
 wal:
-    {{COQC}} -q WAL.v | tee WAL.out
+    {{COQC}} -q WAL.v > WAL.out
 
 normalizer:
-    {{COQC}} -q Normalizer.v | tee Normalizer.out
+    {{COQC}} -q Normalizer.v > Normalizer.out
 
 vcl:
-    {{COQC}} -q VCL.v | tee VCL.out
+    {{COQC}} -q VCL.v > VCL.out
 
 planner-semantic:
-    {{COQC}} -q PlannerSemantic.v | tee PlannerSemantic.out
+    {{COQC}} -q PlannerSemantic.v > PlannerSemantic.out
 
 octad:
-    {{COQC}} -q Octad.v | tee Octad.out
+    {{COQC}} -q Octad.v > Octad.out
 
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
