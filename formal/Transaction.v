@@ -43,9 +43,6 @@ Require Import Coq.Init.Logic.
    split a longer axiom type across lines and silently escape the check. *)
 Set Printing Width 400.
 
-(* Keep Print Assumptions output on one line per axiom: the CI and Justfile
-   guards match /^name :/ with awk, and Coq's default ~78-column wrap would
-   split a longer axiom type across lines and silently escape the check. *)
 
 (** ** Domain *)
 
