@@ -154,10 +154,18 @@ jobs:
         working-directory: formal
         run: |
           set -euo pipefail
-          # Whitelist: modality, condition, optimize, optimize_is_permutation
+          # Whitelist: condition, node_cost.
+          #
+          # Tightened 2026-07-28. Was: modality, condition, optimize,
+          # optimize_is_permutation. `optimize_is_permutation` is now a Theorem
+          # discharged from Coq.Sorting.Mergesort's Permuted_sort, and both
+          # `modality` and `optimize` are concrete definitions, so all three
+          # must NOT reappear here. Re-adding any of them would let the axiom
+          # come back silently -- this list is the acceptance test for that
+          # work, not bookkeeping.
           UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Planner.out \
             | sort -u \
-            | grep -vE '^(modality|condition|optimize|optimize_is_permutation)$' || true)
+            | grep -vE '^(condition|node_cost)$' || true)
           if [ -n "$UNEXPECTED" ]; then
             echo "ERROR(Planner): unexpected axiom(s) in Print Assumptions:"
             echo "$UNEXPECTED"
@@ -165,7 +173,7 @@ jobs:
             cat Planner.out
             exit 1
           fi
-          echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"
+          echo "OK(Planner): Q1-lite 3 theorems x 2 parameters whitelisted (0 propositional axioms)"
 
       - name: Verify WAL assumptions whitelist
         working-directory: formal
@@ -219,7 +227,7 @@ jobs:
           set -euo pipefail
           UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' PlannerSemantic.out \
             | sort -u \
-            | grep -vE '^(modality|condition|octad|exec_node|exec_node_comm|optimize|optimize_is_permutation)$' || true)
+            | grep -vE '^(condition|node_cost|octad|exec_node|exec_node_comm)$' || true)
           if [ -n "$UNEXPECTED" ]; then
             echo "ERROR(PlannerSemantic): unexpected axiom(s):"
             echo "$UNEXPECTED"
