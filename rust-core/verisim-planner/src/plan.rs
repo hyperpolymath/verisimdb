@@ -113,6 +113,24 @@ pub struct PlanStep {
     pub optimization_hint: Option<String>,
     /// Pushed-down predicates.
     pub pushed_predicates: Vec<String>,
+    /// Fields to project, carried through from [`PlanNode::projections`]
+    /// (empty = all fields).
+    ///
+    /// Until 2026-07-28 this was absent, so projection pushdown was computed
+    /// on the logical node and then discarded at the physical boundary — the
+    /// executor had no way to see it.
+    #[serde(default)]
+    pub projections: Vec<String>,
+    /// Early row limit pushed down to the store, carried through from
+    /// [`PlanNode::early_limit`].
+    ///
+    /// Also absent until 2026-07-28, which was the more consequential half of
+    /// the same gap: [`CostModel::estimate`] *already* discounts a node
+    /// carrying an early limit (it scales `selectivity` and takes `time_ms`
+    /// down to as low as 50% of base), so a plan was scored cheaper for a
+    /// pushdown the physical plan could not actually perform.
+    #[serde(default)]
+    pub early_limit: Option<usize>,
 }
 
 /// An optimized physical plan ready for execution.
@@ -182,6 +200,8 @@ mod tests {
                 },
                 optimization_hint: Some("HNSW ANN".to_string()),
                 pushed_predicates: vec!["k=10".to_string()],
+                projections: vec![],
+                early_limit: None,
             }],
             strategy: ExecutionStrategy::Sequential,
             total_cost: CostEstimate {

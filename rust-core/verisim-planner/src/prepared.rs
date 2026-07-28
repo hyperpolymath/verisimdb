@@ -755,6 +755,8 @@ mod tests {
                 },
                 optimization_hint: Some("depth-limited BFS".to_string()),
                 pushed_predicates: vec!["relates_to".to_string()],
+                projections: vec![],
+                early_limit: None,
             }],
             strategy: ExecutionStrategy::Sequential,
             total_cost: CostEstimate {

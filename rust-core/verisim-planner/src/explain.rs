@@ -254,6 +254,8 @@ mod tests {
                     },
                     optimization_hint: Some("HNSW ANN search (k=10)".to_string()),
                     pushed_predicates: vec!["Similarity { k: 10 }".to_string()],
+                    projections: vec![],
+                    early_limit: None,
                 },
                 PlanStep {
                     step: 2,
@@ -266,6 +268,8 @@ mod tests {
                         io_cost: 135.0,
                         cpu_cost: 90.0,
                     },
+                    projections: vec![],
+                    early_limit: None,
                     optimization_hint: Some("Graph traversal: relates_to (depth=2)".to_string()),
                     pushed_predicates: vec!["Traversal { predicate: relates_to }".to_string()],
                 },
@@ -334,6 +338,8 @@ mod tests {
                 },
                 optimization_hint: Some("ZKP verification — expensive".to_string()),
                 pushed_predicates: vec![],
+                projections: vec![],
+                early_limit: None,
             }],
             strategy: ExecutionStrategy::Sequential,
             total_cost: CostEstimate {
