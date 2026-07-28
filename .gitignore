@@ -114,3 +114,19 @@ ai-cli-crash-capture/
 # Fuzz harness build artifacts
 fuzz/target/
 rust-core/fuzz/target/
+
+# Local database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Local caches and agent worktrees
+.cache/
+.claude/
+
+# Local export and build outputs
+/exports/*.json
+/exports/*.lgt
+composer/*.beam
+composer/build/
