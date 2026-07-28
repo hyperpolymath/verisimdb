@@ -14,7 +14,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sanitizer: [address, undefined]
+        # `undefined` is NOT a valid cargo-fuzz sanitizer. cargo-fuzz accepts
+        # only address/leak/memory/thread/none, so the UBSan leg failed at
+        # "Build Fuzzers (undefined)" every week from at least 2026-06-07 to
+        # 2026-07-26 with:
+        #   error: invalid value 'undefined' for '--sanitizer <SANITIZER>'
+        # It is schedule-triggered, so it never showed on the main-branch
+        # board. cflite_pr.yml was already corrected; this file was missed.
+        sanitizer: [address]
     steps:
       - name: Build Fuzzers (${{ matrix.sanitizer }})
         id: build

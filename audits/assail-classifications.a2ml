@@ -30,7 +30,7 @@
   ;; inside `try { } catch` returning result<_, VeriSimError.t>. The
   ;; graceful degradation the finding asks for is already present.
   (classification
-    (file "connectors/clients/rescript/src/VeriSimVql.res")
+    (file "connectors/clients/rescript/src/VeriSimVcl.res")
     (category "UnsafeDeserialization")
     (audit "try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
