@@ -125,7 +125,7 @@ pub struct PlanStep {
     /// [`PlanNode::early_limit`].
     ///
     /// Also absent until 2026-07-28, which was the more consequential half of
-    /// the same gap: [`CostModel::estimate`] *already* discounts a node
+    /// the same gap: [`crate::cost::CostModel::estimate`] *already* discounts a node
     /// carrying an early limit (it scales `selectivity` and takes `time_ms`
     /// down to as low as 50% of base), so a plan was scored cheaper for a
     /// pushdown the physical plan could not actually perform.
