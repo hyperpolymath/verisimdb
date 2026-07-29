@@ -122,9 +122,7 @@ fn logical_multiset(plan: &LogicalPlan) -> BTreeMap<(String, String), usize> {
     }))
 }
 
-fn physical_multiset(
-    plan: &verisim_planner::PhysicalPlan,
-) -> BTreeMap<(String, String), usize> {
+fn physical_multiset(plan: &verisim_planner::PhysicalPlan) -> BTreeMap<(String, String), usize> {
     multiset(
         plan.steps
             .iter()
