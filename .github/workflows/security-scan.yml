@@ -38,6 +38,6 @@ jobs:
     # Pin refreshed at the same time: the previous pin (2dc1393c, 2026-05-20)
     # predates the upstream fix that skips the cross-repo dispatch when
     # VERISIMDB_PAT is absent and that chunks oversized payloads.
-    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@870fed7d37bee251d0c9ef9f1bcfa6df0bac6119 # main 2026-07-19
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@774dceb6373d798ad4d96a9e40c3993942c2836e # main 2026-07-19
     secrets:
       VERISIMDB_PAT: ${{ secrets.VERISIMDB_PAT }}
