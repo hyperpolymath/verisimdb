@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8e6fbd88c3fa2d5269cef93616a351d9b34388225b8e7c668f437b7b347a0ce1 # shrinks to plan = LogicalPlan { source: Octad, nodes: [PlanNode { modality: Graph, conditions: [], projections: [], early_limit: None }], post_processing: [] }
+cc 79f109ba4370312b0340787559709863d24b909839030468c36179d945fb4601 # shrinks to plan = LogicalPlan { source: Octad, nodes: [PlanNode { modality: Graph, conditions: [], projections: [], early_limit: None }], post_processing: [] }
