@@ -254,12 +254,12 @@ only — they're not wiki-friendly formats. View them at:
 
 ## VQL language
 
-- [VQL-SPEC.adoc](VQL-SPEC.adoc) — full VQL specification
-- [VQL-vql-grammar.ebnf](VQL-vql-grammar.ebnf) — formal EBNF (or browse the file in the repo)
+- [VCL-SPEC.adoc](VCL-SPEC.adoc) — full VCL specification
+- [vcl-grammar.ebnf](vcl-grammar.ebnf) — formal EBNF (or browse the file in the repo)
 - [VQL-getting-started.adoc](getting-started.adoc) — step-by-step setup
-- [VQL-vql-formal-semantics.adoc](vql-formal-semantics.adoc) — operational semantics
-- [VQL-vql-type-system.adoc](vql-type-system.adoc) — dependent types + bidirectional checking
-- [VQL-vql-examples.adoc](vql-examples.adoc) — worked examples
+- [vcl-formal-semantics.adoc](vcl-formal-semantics.adoc) — operational semantics
+- [vcl-type-system.adoc](vcl-type-system.adoc) — dependent types + bidirectional checking
+- [vcl-examples.adoc](vcl-examples.adoc) — worked examples
 
 …and many more under the synced page list — see the sidebar.
 

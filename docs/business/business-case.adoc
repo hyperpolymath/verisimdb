@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Business Case
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -33,7 +33,7 @@ downstream systems consume stale or contradictory information.
 This capability positions VeriSimDB at the intersection of three high-growth
 markets: data quality tools ($2.3B by 2027), graph databases ($5.6B), and the
 emerging multimodal database segment ($800M+). The open-core business model
-provides a free, full-featured community edition under the Palimpsest License
+provides a free, full-featured community edition under the Mozilla Public License 2.0 (MPL-2.0)
 (MPL-2.0), with revenue generated through commercial support licenses,
 enterprise SLAs, and deployment consulting.
 
@@ -133,10 +133,10 @@ When drift exceeds configurable thresholds, VeriSimDB can:
 3. *Self-normalise* -- automatically reconcile representations using
    configurable resolution strategies
 
-=== Formal Verification: VQL-DT
+=== Formal Verification: VCL-DT
 
-VeriSimDB's query language, VQL (Verisimilitude Query Language), includes an
-optional dependent-type layer (VQL-DT) that provides *compile-time proofs* of
+VeriSimDB's query language, VCL (Verisimilitude Query Language), includes an
+optional dependent-type layer (VCL-DT) that provides *compile-time proofs* of
 query correctness. This means:
 
 * Type errors in queries are caught before execution
@@ -286,7 +286,7 @@ infrastructure without requiring data migration.
 | No
 | No
 
-| *Formal proofs (VQL-DT)*
+| *Formal proofs (VCL-DT)*
 | *Yes*
 | No
 | No
@@ -311,7 +311,7 @@ infrastructure without requiring data migration.
 | 3
 
 | Open source
-| PMPL
+| MPL-2.0
 | GPLv3
 | No
 | BSD-3
@@ -344,9 +344,9 @@ dynamics are:
 |===
 | Tier | Description
 
-| *Community Edition (PMPL)*
+| *Community Edition (MPL-2.0)*
 | Full-featured VeriSimDB with all 8 modalities, drift detection,
-  self-normalisation, VQL, and federation. Free, open source under MPL-2.0.
+  self-normalisation, VCL, and federation. Free, open source under MPL-2.0.
 
 | *Commercial Support License*
 | Enterprise SLA (99.9% uptime guarantee), priority security patches (24-hour
@@ -366,7 +366,7 @@ The community edition is intentionally full-featured. Revenue comes from the
 * Maximises adoption and community growth
 * Creates a large funnel of users who may convert to commercial support
 * Avoids the "open core bait-and-switch" perception that damages developer trust
-* Aligns with the PMPL license philosophy
+* Aligns with the MPL-2.0 file-level copyleft philosophy
 
 === Revenue Streams
 
@@ -374,7 +374,7 @@ The community edition is intentionally full-featured. Revenue comes from the
    organisation size and SLA level
 2. *Deployment consulting* -- architecture review, migration planning,
    performance tuning, integration with existing infrastructure
-3. *Training and certification* -- VQL/VQL-DT training for development teams
+3. *Training and certification* -- VCL/VCL-DT training for development teams
 4. *OEM licensing* -- for vendors embedding VeriSimDB in their products
 
 == Financial Projections
@@ -518,9 +518,9 @@ profitability faster and at higher margins.
   fault-tolerant concurrency; extensive benchmark suite (510 Rust tests + 152
   Elixir tests, 0 failures)
 
-| VQL-DT complexity deters adoption
+| VCL-DT complexity deters adoption
 | Developers find dependent-type proofs intimidating
-| VQL (without DT) is the default; VQL-DT is opt-in for teams that want formal
+| VCL (without DT) is the default; VCL-DT is opt-in for teams that want formal
   guarantees. Progressive disclosure: start simple, add proofs when ready.
 
 | Federation reliability across heterogeneous backends
@@ -537,7 +537,7 @@ profitability faster and at higher margins.
 
 | Neo4j or ArangoDB adds drift detection
 | Reduces differentiation
-| VeriSimDB's octad model and VQL-DT provide deep moat; 8-modality consistency
+| VeriSimDB's octad model and VCL-DT provide deep moat; 8-modality consistency
   is architecturally difficult to retrofit onto existing databases
 
 | Market education required (new category)
@@ -567,10 +567,11 @@ profitability faster and at higher margins.
 | Full-featured community edition builds trust; commercial support addresses
   operational needs (SLA, priority patches) that free users do not require
 
-| PMPL license unfamiliarity
-| Enterprise legal teams may hesitate on non-OSI license
-| PMPL is permissive and well-documented; MPL-2.0 fallback available where
-  required; commercial license option for enterprises that require it
+| MPL-2.0 licence adoption
+| Enterprise legal teams may require licence review
+| MPL-2.0 is an OSI-approved, well-understood licence with file-level copyleft;
+  permissive for embedding in proprietary products at the application level;
+  commercial licence option available for enterprises that require it
 |===
 
 == Conclusion

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 = Applying Multimodal Database Technology to Game Level Architecture: A VeriSimDB Case Study
@@ -598,7 +598,7 @@ Storage overhead::
 
 Query complexity::
   Cross-modal queries (e.g., "find all guards in zones near a specific device,
-  sorted by level similarity") require understanding VQL's modality-spanning
+  sorted by level similarity") require understanding VCL's modality-spanning
   syntax. Single-modality queries are straightforward.
 
 The overhead is justified when the benefits -- drift detection, version history,
@@ -719,7 +719,7 @@ unfair player experience, the answer is yes.
 | Document | Yes | Level names, briefings, notes | Full-text searchable
 | Temporal | Yes | Version history, design iterations | Bitemporal queries
 | Provenance | Yes | Designer decisions, playtest origins | Hash-chain integrity
-| Spatial | Yes | Zone coordinates, guard positions | R-tree indexed
+| Spatial | Yes | Zone coordinates, guard positions | Haversine search (R-tree planned)
 |===
 
 [appendix]

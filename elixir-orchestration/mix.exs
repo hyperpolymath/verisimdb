@@ -61,6 +61,19 @@ defmodule VeriSim.MixProject do
       # GHSA-468c-vq7p-gh64 fix (multipart-header buffer exhaustion, High).
       {:plug, "~> 1.19 and >= 1.19.2"},
 
+      # hpax is a transitive of bandit (and of mint) but pinned directly to
+      # enforce the GHSA-jj2p-32j7-whj2 fix — unbounded HPACK integer decoding
+      # allows an unauthenticated DoS (CVE-2026-58226, High).
+      {:hpax, "~> 1.0 and >= 1.0.4"},
+
+      # mint is a transitive of req -> finch but pinned directly to enforce four
+      # fixes landed across 1.9.1-1.9.3:
+      #   GHSA-qrfr-wh4c-3qhw  unbounded HTTP/1 header + trailer accumulation (High)
+      #   GHSA-c59h-fq4p-r36r  whole chunked body buffered in decode_body/5 (High)
+      #   GHSA-8pf6-g464-h6h9  zero-length HTTP/2 CONTINUATION cap bypass (Medium)
+      #   GHSA-x3x7-96vm-6h2w  sign-tolerant chunk-size parser -> smuggling (Medium)
+      {:mint, "~> 1.9 and >= 1.9.3"},
+
       # JSON encoding/decoding
       {:jason, "~> 1.4"},
 
@@ -96,12 +109,14 @@ defmodule VeriSim.MixProject do
       {:postgrex, "~> 0.22 and >= 0.22.2", optional: true},
       {:redix, "~> 1.5", optional: true},
       {:exqlite, "~> 0.27", optional: true},
-      {:bolt_sips, "~> 2.0", optional: true},
 
       # Development
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+
+      # Override transitive dep to get OTP 25+ fix (erl_syntax:string/1 removed)
+      {:parse_trans, "3.4.2", override: true}
     ]
   end
 

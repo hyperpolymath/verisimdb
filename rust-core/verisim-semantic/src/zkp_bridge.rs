@@ -1,18 +1,26 @@
 // SPDX-License-Identifier: MPL-2.0
-//! ZKP Bridge — Privacy-aware proof generation and verification.
+//! Integrity-Commitment Bridge — Privacy-aware proof generation and verification.
 //!
-//! Wraps the existing ZKP primitives (hash commitments, Merkle proofs,
-//! content integrity, circuit verification) with privacy-level routing:
+//! Implements cryptographic integrity proofs (SHA-256 commitment-reveal,
+//! Merkle membership, R1CS constraint checking) with privacy-level routing:
 //!
 //! - **Public**: Standard proof — data and proof are both visible.
 //! - **Private**: Hash commitment hides data; Merkle inclusion proves membership.
 //! - **ZeroKnowledge**: Blinded Merkle proof with committed witnesses.
-//!   (Full ZK-SNARK via sanctify is designed but not yet compiled in.)
+//!   NOTE: This is NOT a zero-knowledge proof in the cryptographic sense —
+//!   it is a blinded commitment-reveal over Merkle paths. A full ZK-SNARK
+//!   (planned via the `sanctify` crate) is not yet compiled in.
+//!
+//! Known limitations (as of 0.x):
+//! - The commitment nonce is deterministic (derived from secret || claim),
+//!   not random; this reduces hiding strength to computational binding.
+//! - `verification_key` fields are stored but never read during verification;
+//!   circuit-key binding is aspirational until `sanctify` is integrated.
 //!
 //! # Architecture
 //!
 //! ```text
-//! VQL PROOF clause → Elixir executor → Rust API → ZkpBridge
+//! VCL PROOF clause → Elixir executor → Rust API → ZkpBridge
 //!                                                    │
 //!                    ┌───────────────────────────────┘
 //!                    │

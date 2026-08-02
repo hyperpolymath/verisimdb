@@ -1,6 +1,6 @@
 # Contributing to VeriSimDB
 
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 <!-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> -->
 
 Thank you for your interest in contributing to VeriSimDB. This document explains how to get started, our development workflow, and how to submit changes.
@@ -47,11 +47,11 @@ verisimdb/
 │   ├── verisim-drift/        # Drift detection
 │   ├── verisim-normalizer/   # Self-normalization
 │   ├── verisim-planner/      # Cost-based query planner
-│   ├── verisim-repl/         # Interactive VQL REPL
+│   ├── verisim-repl/         # Interactive VCL REPL
 │   ├── verisim-wal/          # Write-ahead log
 │   └── verisim-storage/      # Storage backend abstraction
 ├── elixir-orchestration/     # Elixir/OTP coordination layer
-├── playground/               # VQL Playground PWA (ReScript)
+├── playground/               # VCL Playground PWA (ReScript)
 ├── container/                # Containerfile for Podman builds
 ├── docs/                     # Architecture and design documents
 ├── contractiles/             # Trust, security, and policy contracts
@@ -158,8 +158,8 @@ cargo fmt --check
 |----------|----------|
 | **Rust** | Core database engine, modality stores, CLI tools |
 | **Elixir** | OTP orchestration, distributed coordination |
-| **ReScript** | VQL parser, playground PWA |
-| **VQL** | VeriSim Query Language (query interface) |
+| **ReScript** | VCL parser, playground PWA |
+| **VCL** | VeriSim Consonance Language (query interface) |
 
 ### Not Accepted
 
@@ -172,10 +172,10 @@ cargo fmt --check
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the **MPL-2.0** (Palimpsest License). All source files must include:
+By contributing, you agree that your contributions will be licensed under the **MPL-2.0**. All source files must include:
 
 ```
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 ```
 
 ---

@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= CODEOWNERS Policy — VeriSimDB conformance
+:toc: preamble
+
+The policy itself is estate-wide and lives at
+link:https://github.com/hyperpolymath/standards/blob/main/CODEOWNERS-POLICY.adoc[`hyperpolymath/standards` → `CODEOWNERS-POLICY.adoc`].
+This document does **not** restate it. It records what VeriSimDB does and why,
+so the state of `.github/CODEOWNERS` here is auditable without reading two
+repositories and guessing which one won.
+
+== Status
+
+VeriSimDB is **solo-maintained**, so *Rule 1* applies: no catch-all `*` line and
+no `/.github/` line. `.github/CODEOWNERS` carries a comment header only.
+
+*Rule 2* (path lines scoped to genuine co-owners) is not engaged — there are no
+co-owners. *Rule 3* (co-owner removal requires explicit confirmation) was
+likewise not engaged by the change described below, because no line mapped to
+anyone other than the sole maintainer; nobody's review gate was removed.
+
+== What changed, and why it was not merely cosmetic
+
+Until 2026-07-28 this repo's `CODEOWNERS` read:
+
+[source]
+----
+* @hyperpolymath
+/rust-core/ @hyperpolymath
+/elixir-orchestration/ @hyperpolymath
+/src/vcl/ @hyperpolymath
+/container/ @hyperpolymath
+/.github/ @hyperpolymath
+----
+
+Six lines, all naming the sole maintainer. That is precisely the shape Rule 1
+prohibits, and it is worth being clear that the prohibition is not stylistic:
+
+* The catch-all `*` line requests review from the sole maintainer on **every**
+  pull request, including every Dependabot bump. This repo receives frequent
+  automated dependency PRs.
+* The `/.github/` line fires again on any workflow or config change — so
+  CI-touching PRs generated two requests, not one.
+* Neither line gates anything. A sole maintainer cannot be blocked on their own
+  review, and the Base ruleset requires `0` approving reviews, so no merge was
+  ever actually held by these lines.
+* Attribution does not depend on them either: every file in this repository
+  carries an SPDX header, and `reuse lint` enforces that at 100% coverage.
+
+So the lines supplied no security property and no attribution, while generating
+review-request notifications proportional to Dependabot's activity. Removing
+them is a net reduction in noise with no loss of control.
+
+== Re-adding owner lines
+
+Add a path line **only** when a real co-owner exists, and scope it to that
+person — never to the sole maintainer (Rule 2). Removing or narrowing such a
+line later needs that co-owner's explicit confirmation (Rule 3), because it
+takes away a review gate they currently hold.
+
+An absent `CODEOWNERS` file is equally compliant under the estate policy. The
+comment-only file is kept here because it is the more useful of the two: it
+tells the next person *why* the lines are gone, which an absent file cannot.
+
+== Related
+
+* `MAINTAINERS.adoc` — who maintains this repository.
+* `.github/CODEOWNERS` — the file this document accounts for.
+* `GOVERNANCE.adoc` — decision-making and contribution lifecycle. **Not yet
+  written**; it is tracked in issue #204 and blocked on a perimeter ruling
+  (TPCF P1 vs P3). Named here so the gap is visible rather than implied.

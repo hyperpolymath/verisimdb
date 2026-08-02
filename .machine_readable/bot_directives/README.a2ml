@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# Converted from .scm format
+
+
+[bot-directives]
+notes = "Repo-specific constraints for verisimdb."
+version = "1.1"
+
+

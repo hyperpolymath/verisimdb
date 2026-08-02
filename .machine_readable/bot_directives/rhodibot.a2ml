@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# Converted from .scm format
+
+
+[bot-directive]
+allow = ["metadata", "docs", "repo-structure checks", "policy validation"]
+bot = "rhodibot"
+deny = ["destructive edits without approval", "deleting database data or backups"]
+notes = "First status line must include: ACK: verisimdb cleanup cadence loaded. Verify policy states: daily stale-prune (>14 days), weekly full clean, never touch persistent data without explicit approval."
+scope = "rsr-compliance"
+
+

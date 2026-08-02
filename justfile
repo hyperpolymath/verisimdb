@@ -76,6 +76,16 @@ serve:
 serve-otp:
     cd elixir-orchestration && MIX_ENV=dev mix run --no-halt
 
+# The consonance loop, live: dissonance -> measured drift -> repair -> re-measure
+demo-consonance:
+    scripts/demo-consonance.sh
+
+# VCLTGate admissibility — show admit / reject paths before any query reaches the store
+# Requires vclt-gate from vcl-ut; set VCLT_GATE=/path/to/binary or build it first:
+#   cd vcl-ut/src/interface/parse && cargo build --bin vclt-gate
+demo-admissibility:
+    scripts/demo-admissibility.sh
+
 # ── Container ──────────────────────────────────────────────────
 
 # Build container image with Podman

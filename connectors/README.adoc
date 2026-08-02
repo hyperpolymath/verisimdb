@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Connectors -- Federation Adapters & Client SDKs
 :toc: macro
@@ -22,7 +22,7 @@ target store.
 **Inbound (Client SDKs)**:: External applications reach _in_ to VeriSimDB
 through idiomatic client libraries.  Each SDK wraps the REST / gRPC API,
 handles authentication, connection pooling, and provides type-safe access to
-octad entities, VQL queries, and drift reports.
+octad entities, VCL queries, and drift reports.
 
 === Architecture Diagram
 

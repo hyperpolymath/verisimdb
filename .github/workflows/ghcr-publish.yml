@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: MPL-2.0
+#
+# Publish the verisim-api container image to GHCR.
+#
+# Downstream contract: echidna's S4 loop-closure CI (see
+# echidna/docs/handover/S4-LOOP-CLOSURE-RUNBOOK.md) waits on
+# ghcr.io/hyperpolymath/verisimdb-api existing as a pullable service
+# image. Tags published: `latest` (main HEAD) + the 12-char commit SHA.
+name: ghcr-publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust-core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "container/**"
+      - ".github/workflows/ghcr-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/hyperpolymath/verisimdb-api
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write       # mint the OIDC token the attestation is signed with
+      attestations: write   # write the build-provenance attestation (the "claim")
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image (Podman)
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          podman build \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:$SHORT_SHA" \
+            -f container/Containerfile .
+
+      - name: Smoke-test image
+        run: |
+          podman run -d --name verisim-smoke -p 8080:8080 \
+            -e VERISIM_ENABLE_IPV4=true "$IMAGE:latest"
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/health >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8080/health
+          # The S4 endpoints must answer at the documented /api/v1 prefix.
+          curl -sf "http://127.0.0.1:8080/api/v1/mv_prover_success_by_class?class=smoke" >/dev/null
+          podman rm -f verisim-smoke
+
+      - name: Push to GHCR
+        id: push
+        if: github.event_name != 'pull_request'
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          # Point podman's credential store at the DOCKER config path instead
+          # of its default ${XDG_RUNTIME_DIR}/containers/auth.json.
+          # REGISTRY_AUTH_FILE is honoured by both `podman login` and
+          # `podman push`, so one export covers the whole step.
+          #
+          # Why: the `attest-build-provenance` step below runs with
+          # `push-to-registry: true` and resolves registry credentials via the
+          # Docker config. With podman's default store it finds none and fails
+          # with "No credentials found for registry ghcr.io" — AFTER the image
+          # has already been pushed, which is why the image exists but the run
+          # is red.
+          mkdir -p "$HOME/.docker"
+          export REGISTRY_AUTH_FILE="$HOME/.docker/config.json"
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # --digestfile records the real sha256 of the pushed manifest so the
+          # attestation binds to exactly what the registry received.
+          podman push --digestfile=/tmp/ghcr-digest "$IMAGE:$SHORT_SHA"
+          podman push "$IMAGE:latest"
+          echo "digest=$(cat /tmp/ghcr-digest)" >> "$GITHUB_OUTPUT"
+
+      # GitHub native artifact attestation (build provenance) for the pushed
+      # image. Verify with:
+      #   gh attest verify oci://ghcr.io/hyperpolymath/verisimdb-api:<tag> \
+      #     --repo ${{ github.repository }}
+      - name: Attest container provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ghcr.io/hyperpolymath/verisimdb-api
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

@@ -13,7 +13,11 @@ defmodule VeriSim.NifBridge do
   The NIF shared library is loaded from `priv/native/libverisim_nif.so` (Linux)
   or `priv/native/libverisim_nif.dylib` (macOS). If the library is not present
   (e.g., in a pure-Elixir development setup), all functions return
-  `{:error, :nif_not_loaded}`.
+  `{:error, :nif_not_loaded}`. If the library IS present but an operation is
+  not yet wired to the store, that operation returns `{:error, :not_implemented}`
+  — it never fabricates success. Today every operation is a not-implemented
+  stub (see `rust-core/verisim-nif`), so the NIF is non-operational and `auto`
+  transport always falls back to HTTP.
 
   ## Transport Selection
 
@@ -107,12 +111,18 @@ defmodule VeriSim.NifBridge do
   def trigger_normalise(_octad_id), do: {:error, :nif_not_loaded}
 
   @doc """
-  Check whether the NIF bridge is loaded and operational.
+  Check whether the NIF bridge is loaded **and operational**.
+
+  Returns `true` only when a probe operation returns a real result. Both the
+  absent-library fallback (`{:error, :nif_not_loaded}`) and a loaded-but-
+  unimplemented NIF (`{:error, :not_implemented}`) read as *not operational*,
+  so `auto` transport never selects a NIF that cannot actually serve a
+  request. When every operation is a not-implemented stub, this is `false`.
   """
   def loaded? do
     case get_octad("__health_check__") do
-      {:error, :nif_not_loaded} -> false
-      _ -> true
+      result when is_binary(result) -> true
+      _ -> false
     end
   end
 end

@@ -95,7 +95,7 @@ K9!
       commands = [
         "mkdir -p src/ docs/ tests/ scripts/",
         "mkdir -p .github/workflows/",
-        "mkdir -p contractiles/k9/",
+        "mkdir -p .machine_readable/svc/k9/",
         "echo '✓ Directory structure created'",
       ],
     },
@@ -130,9 +130,9 @@ K9!
     },
 
     "add-license" = {
-      description = "Add PMPL-1.0 license",
+      description = "Add MPL-2.0 license",
       commands = [
-        "curl -sL https://raw.githubusercontent.com/hyperpolymath/pmpl/main/LICENSE -o LICENSE",
+        "curl -sL https://www.mozilla.org/media/MPL/2.0/index.txt -o LICENSE",
         "echo '✓ License added'",
       ],
     },

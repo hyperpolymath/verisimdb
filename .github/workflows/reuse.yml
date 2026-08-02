@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Fail-closed REUSE-3.3 compliance gate.
+# Runs reuse lint on every push and pull-request; the job fails if any file
+# is missing copyright/licence information or if an invalid SPDX expression
+# is detected.
+
+name: REUSE Compliance
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  reuse-lint:
+    name: reuse lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install reuse
+        run: pip install reuse
+
+      - name: REUSE lint
+        run: reuse lint

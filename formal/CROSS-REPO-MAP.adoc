@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VeriSimDB formal/ ↔ Echo-Types cross-repo mapping
 :toc:
@@ -74,10 +74,35 @@ Concretely:
 | `EchoSearchExample.agda` (existing) — "find the witness" pattern + `EchoTruncation.agda`
 | The `winner` function is a SEARCH for the authoritative modality — exactly `EchoSearchExample`'s pattern. The `winner_stable_off_drifted` axiom is the "search result depends only on non-drifted modalities" — direct lift of `EchoTruncation`'s decoupling lemma. N2 idempotence is then "search is idempotent on its own result" — a *truncated echo* fixed point.
 
-| V2 `vql_preservation` + `vql_progress`
+| V2 `vcl_preservation` + `vcl_progress`
 | `formal/VCL.v`
 | `EchoGradedComonadInterface.agda` (existing) — graded comonad for "well-typed at type τ"
 | Type-preservation under reduction is the comonad ε ∘ δ = id property in the graded comonad of "well-typed terms at type τ". Reduction is the comonad action. The V2 mechanisation here is the MINIMUM-VIABLE core (booleans + opaque proof terms + conditional), closing #92 blockers 1 (big-step → small-step) and 2 (proof terms as values, no β-reduction). Full VCL extends mechanically per added expression form. Progress bundled as the type-soundness companion.
+
+| O2 `modality_cardinality` + `modality_exhaustive`
+| `formal/Octad.v`
+| **Direct inductive — no echo-types lift needed** (finite-basis cardinality is structural, like C2)
+| The 8-element `modality` enum mirrors `ModalityStatus`'s eight booleans. Cardinality (= 8) and exhaustiveness are structural facts over a finite inductive; same deliberate non-port rationale as the Transaction.v 3-state automaton.
+
+| O10 `complete_iff_no_missing`
+| `formal/Octad.v`
+| `EchoCharacteristic.agda` (existing) — collapse / echo-true / echo-false
+| `present` partitions modalities into `Echo true` (a value) and `Echo false` (bot). `is_complete` (all present) iff `missing` (the false-fibre) is empty — the same true/false-fibre disjointness as D2. Doubles as a cross-method consistency check between `ModalityStatus::is_complete` and `ModalityStatus::missing`.
+
+| Projection `project_full` + `project_idempotent` + `project_compose`
+| `formal/Octad.v`
+| `EchoTruncation.agda` (existing) — same module N2 cites
+| `pi_M` truncates the modality section `phi` to a mask. `project_compose` (`pi_M . pi_N = pi_{M /\ N}`) is the meet-semilattice law — projections form a bounded meet-semilattice under composition, the "structural modularity" of octads. Direct lift of `EchoTruncation`'s decoupling lemma, restricted to a Boolean modality mask.
+
+| R1-R3 `merge_commutative` + `merge_associative` + `merge_idempotent`
+| `formal/Octad.v`
+| Candidate NEW abstraction — join-semilattice of partial sections (to be established in echo-types per standing directive)
+| The paper's `arcvix-octad-data-model.tex` Proposition "Merge Commutativity" had a one-line pen-and-paper proof; `merge_commutative` is it MECHANISED. Octad merge `(+)` inherits exactly the algebra of its conflict kernel `resolve`: `(+)` is commutative/associative/idempotent iff `resolve` is (R1/R2/R3 stated as implications). This is the honest resolution of verisimdb#77's "R1-R3 likely false as written": a CRDT-shaped `resolve` (join on a semilattice) instantiates all three; AutoMerge does not. Echo-types has no join-semilattice-of-sections module yet — companion issue to file per the standing directive.
+
+| Enrichment `enrich_sets_target` + `enrich_preserves_others` + `enrich_present`
+| `formal/Octad.v`
+| `EchoProvenance.agda` (existing) — for the audit-trail clause, via Provenance.v
+| `enrich_m` is the fundamental write primitive: sets modality `m`, preserves the rest, preserves `id` (`inv:persist`). The `def:enrichment` clause "every enrichment appends to phi(P) and phi(R)" (audit trail) is the hash-chain append already mechanised in `Provenance.v` (`append_preserves_verified`, mapping to `EchoProvenance.agda` above) — not re-modelled here.
 
 | Future: D7 `temporal_drift_zero_iff_monotone_unique`
 | _todo_
@@ -104,22 +129,38 @@ Concretely:
 . The verisimdb Coq module's docstring **MUST** name the corresponding echo-types module (or "no direct echo-types analogue, deliberate" with rationale).
 . Update `MEMORY.md` `[[verisimdb-proof-programme-started]]` cross-ref.
 
-== Status (2026-06-01)
+== Status (2026-06-03)
 
-**Foundation pack COMPLETE — 8 of 8 closed.**
+**Foundation pack COMPLETE — 10 of 10 closed** (P2, P3, P4, D1, D2, C2, C7, N2, Q1-lite, Q1-full, V2).
 
 * P2, P3 → `formal/Provenance.v` (PR #87)
 * D1, C2 → `formal/Drift.v`, `formal/Transaction.v` (PR #90)
 * D2, Q1-lite → `formal/Drift.v`, `formal/Planner.v` (PR #93)
 * C7 → `formal/WAL.v` (PR #94, closed #89)
 * N2 → `formal/Normalizer.v` (PR #95, closed #91)
-* **V2 → `formal/VCL.v` (PR #96, closed #92)**
+* V2 → `formal/VCL.v` (PR #96, closed #92)
+* Q1-full → `formal/PlannerSemantic.v` (PR #97)
+* P4 → `formal/Provenance.v` (PR #103)
+
+**Post-foundation — first module landed:**
+
+* **O-series + R1-R3 → `formal/Octad.v`** — the Modality Algebra of
+  `docs/papers/arcvix-octad-data-model.tex` (`sec:modality-algebra`)
+  mechanised: O2 (modality cardinality + exhaustiveness), O10
+  (present-totality / `is_complete` ↔ `missing`), Projection (`pi_M`
+  idempotent + composition-as-meet), the paper's **Merge Commutativity**
+  proposition (`merge_commutative`) plus its R2/R3 companions, and
+  Enrichment (`enrich_*`, `inv:persist`). Closes on `mval`, `ident` and
+  `functional_extensionality_dep` only — Print Assumptions confirms no
+  slippage.
 
 Cross-doc to echo-types established by this file.
 
 Future work:
 
+* File the echo-types companion issue for the merge join-semilattice
+  abstraction (R1-R3 row above) per the standing directive.
 * Port `WAL.v` + `Normalizer.v` + `VCL.v` to Agda within echo-types (refactor on top of `EchoResidue`, `EchoSearchExample`, `EchoGradedComonadInterface`).
 * Extend `VCL.v` from the 4-rule core to full VCL: filter expressions, projections, modality quantifiers, multi-proof composition. Each form adds one congruence step rule + one preservation case.
 * Add a CI check: every new `formal/*.v` module must reference an echo-types module name in its docstring (or `no-echo-types-analogue` with reason).
-* Tackle the post-foundation theorems (D3-D8, C1-C11, F1-F6, Q2-Q9, V1-V8, P1, P4, P5) per the #77 inventory.
+* Tackle the remaining post-foundation theorems (O1/O3-O9, D3-D8, C1/C3-C6/C8-C11, F1-F6, Q2-Q9, V1/V3-V8, P1, P5) per the #77 inventory.

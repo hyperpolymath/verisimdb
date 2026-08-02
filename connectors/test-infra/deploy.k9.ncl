@@ -10,8 +10,8 @@
 #
 # Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
-let pedigree = import "../../standards/k9-svc/pedigree.ncl" in
-let leash = import "../../standards/k9-svc/leash.ncl" in
+let pedigree = import "../../standards/self-validating/pedigree.ncl" in
+let leash = import "../../standards/self-validating/leash.ncl" in
 
 # ---------------------------------------------------------------------------
 # Component pedigree (self-description)

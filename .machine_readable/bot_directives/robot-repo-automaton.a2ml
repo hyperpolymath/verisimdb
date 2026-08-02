@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# Converted from .scm format
+
+
+[bot-directive]
+allow = ["low-risk automated edits", "build-artifact cleanup", "metadata hygiene"]
+bot = "robot-repo-automaton"
+deny = ["core logic changes without approval", "deleting database data or backups"]
+notes = "First status line must include: ACK: verisimdb cleanup cadence loaded. Daily: prune stale build artefacts (>14 days). Weekly: run full build clean. Always preserve persistent data and user datasets unless explicitly approved."
+scope = "automated repo maintenance and low-risk fixes"
+
+

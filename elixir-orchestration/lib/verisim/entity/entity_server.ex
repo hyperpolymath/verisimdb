@@ -162,7 +162,7 @@ defmodule VeriSim.EntityServer do
 
     Task.start(fn ->
       case RustClient.normalize(state.id) do
-        {:ok, _result} ->
+        :ok ->
           send(server_pid, {:normalization_complete, :success, drifted_modalities})
 
         {:error, reason} ->
