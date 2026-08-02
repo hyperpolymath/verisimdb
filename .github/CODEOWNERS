@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
-# VeriSimDB Code Owners
-# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-
-* @hyperpolymath
-/rust-core/ @hyperpolymath
-/elixir-orchestration/ @hyperpolymath
-/src/vql/ @hyperpolymath
-/container/ @hyperpolymath
-/.github/ @hyperpolymath
+# Solo-maintained hyperpolymath repo: no owner lines by policy.
+# See hyperpolymath/standards CODEOWNERS-POLICY.adoc (Rule 1), and
+# CODEOWNERS-POLICY.adoc in this repo for VeriSimDB's conformance record.
+#
+# Sole-maintainer review gating is moot, and attribution is already carried by
+# the SPDX header on every file, so owner lines here provided no security and
+# no attribution value — only a review request on every Dependabot PR.
+#
+# Do not re-add `*` or `/.github/` lines. If a genuine co-owner joins, add a
+# path line scoped to *them* (Rule 2), never a self-ping.

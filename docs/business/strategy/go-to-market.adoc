@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VeriSimDB -- Go-to-Market Strategy
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -95,7 +95,7 @@ cross-modal drift
 
 * Repository: https://github.com/hyperpolymath/verisimdb
 * Actions: Comprehensive README with architecture diagram, getting-started guide,
-  VQL examples, contribution guidelines
+  VCL examples, contribution guidelines
 * Metrics: Stars, forks, issues, PRs, unique cloners
 
 ==== Blog Posts (Hosted on GitHub Pages)
@@ -145,7 +145,7 @@ Target conferences for Year 1:
 * Respond to every GitHub issue within 48 hours
 * Engage in relevant Reddit/HN/Lobsters threads (with disclosure)
 * Contribute to adjacent projects (LangChain, Qdrant) where VeriSimDB adds value
-* Publish VQL examples and tutorials in `docs/`
+* Publish VCL examples and tutorials in `docs/`
 
 === Success Metrics (Month 12)
 
@@ -315,7 +315,7 @@ After establishing 5-10 commercial customers through developer-led adoption:
 
 * Engage system integrators (Accenture, Deloitte, Thoughtworks) who advise
   enterprise clients on data infrastructure
-* Create partner training programme (VQL certification)
+* Create partner training programme (VCL certification)
 * Provide referral incentives (10-15% of first-year ACV)
 
 === Commercial Support Licence

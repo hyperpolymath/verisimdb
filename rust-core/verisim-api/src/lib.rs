@@ -14,7 +14,7 @@ pub mod proof_attempts;
 pub mod rbac;
 pub mod regenerator;
 pub mod transaction;
-pub mod vql;
+pub mod vcl;
 
 use axum::{
     extract::{Path, Query, State},
@@ -77,9 +77,9 @@ use verisim_temporal::RedbVersionStore;
 use verisim_tensor::InMemoryTensorStore;
 #[cfg(feature = "persistent")]
 use verisim_tensor::RedbTensorStore;
-#[cfg(not(feature = "persistent"))]
-use verisim_vector::BruteForceVectorStore;
 use verisim_vector::DistanceMetric;
+#[cfg(not(feature = "persistent"))]
+use verisim_vector::HnswVectorStore;
 #[cfg(feature = "persistent")]
 use verisim_vector::RedbVectorStore;
 
@@ -91,7 +91,7 @@ use verisim_vector::RedbVectorStore;
 #[cfg(not(feature = "persistent"))]
 pub type ConcreteOctadStore = InMemoryOctadStore<
     SimpleGraphStore,
-    BruteForceVectorStore,
+    HnswVectorStore,
     TantivyDocumentStore,
     InMemoryTensorStore,
     InMemorySemanticStore,
@@ -128,6 +128,9 @@ pub enum ApiError {
 
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl IntoResponse for ApiError {
@@ -135,6 +138,7 @@ impl IntoResponse for ApiError {
         let (status, client_message) = match &self {
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            ApiError::NotImplemented(msg) => (StatusCode::NOT_IMPLEMENTED, msg.clone()),
             ApiError::Internal(msg) => {
                 error!(error = %msg, "Internal server error");
                 (
@@ -580,7 +584,7 @@ impl AppState {
             .map_err(|e| ApiError::Internal(e.to_string()))?,
         );
         #[cfg(not(feature = "persistent"))]
-        let vector = Arc::new(BruteForceVectorStore::new(
+        let vector = Arc::new(HnswVectorStore::with_defaults(
             config.vector_dimension,
             DistanceMetric::Cosine,
         ));
@@ -823,8 +827,8 @@ pub fn build_router(state: AppState) -> Router {
             post(spatial_bounds_search_handler),
         )
         .route("/spatial/search/nearest", post(spatial_nearest_handler))
-        // VQL text query endpoint (used by verisim-repl)
-        .route("/vql/execute", post(vql::vql_execute_handler))
+        // VCL text query endpoint (used by verisim-repl)
+        .route("/vcl/execute", post(vcl::vcl_execute_handler))
         // S4 learning loop — ECHIDNA proof attempts (see proof_attempts module docs)
         .route(
             "/proof_attempts",
@@ -1153,18 +1157,17 @@ async fn text_search_handler(
     };
     let limit = validate_limit(query.limit.unwrap_or(10));
 
-    let octads = state
+    let scored = state
         .octad_store
-        .search_text(&q, limit)
+        .search_text_scored(&q, limit)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let results: Vec<SearchResultResponse> = octads
+    let results: Vec<SearchResultResponse> = scored
         .iter()
-        .enumerate()
-        .map(|(i, h)| SearchResultResponse {
+        .map(|(h, score)| SearchResultResponse {
             id: h.id.to_string(),
-            score: 1.0 - (i as f32 * 0.1), // Approximate score based on ranking
+            score: *score, // Tantivy BM25 relevance score
             title: h.document.as_ref().map(|d| d.title.clone()),
         })
         .collect();
@@ -1189,18 +1192,17 @@ async fn vector_search_handler(
     }
     validate_vector(&request.vector)?;
 
-    let octads = state
+    let scored = state
         .octad_store
-        .search_similar(&request.vector, k)
+        .search_similar_scored(&request.vector, k)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let results: Vec<SearchResultResponse> = octads
+    let results: Vec<SearchResultResponse> = scored
         .iter()
-        .enumerate()
-        .map(|(i, h)| SearchResultResponse {
+        .map(|(h, score)| SearchResultResponse {
             id: h.id.to_string(),
-            score: 1.0 - (i as f32 * 0.1), // Approximate score based on ranking
+            score: *score, // cosine similarity from the vector index
             title: h.document.as_ref().map(|d| d.title.clone()),
         })
         .collect();
@@ -1528,7 +1530,7 @@ async fn planner_stats_handler(
 /// Store query request body
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StoreQueryRequest {
-    /// The VQL query text
+    /// The VCL query text
     pub query: String,
     /// Optional embedding for the query
     pub embedding: Option<Vec<f32>>,
@@ -1538,7 +1540,7 @@ pub struct StoreQueryRequest {
     pub proof_obligations: Option<Vec<String>>,
 }
 
-/// Store a VQL query as a octad (homoiconicity)
+/// Store a VCL query as a octad (homoiconicity)
 #[instrument(skip(state, request))]
 async fn store_query_handler(
     State(state): State<AppState>,
@@ -1594,25 +1596,24 @@ async fn similar_queries_handler(
     validate_vector(&request.vector)?;
 
     // Search for similar octads (which includes query-octads)
-    let octads = state
+    let scored = state
         .octad_store
-        .search_similar(&request.vector, k)
+        .search_similar_scored(&request.vector, k)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    // Filter to only query octads (those with "vql_query" type in document fields)
-    let results: Vec<SearchResultResponse> = octads
+    // Filter to only query octads (those with "vcl_query" type in document fields)
+    let results: Vec<SearchResultResponse> = scored
         .iter()
-        .filter(|h| {
+        .filter(|(h, _score)| {
             h.document
                 .as_ref()
-                .map(|d| d.title.starts_with("VQL Query:"))
+                .map(|d| d.title.starts_with("VCL Query:"))
                 .unwrap_or(false)
         })
-        .enumerate()
-        .map(|(i, h)| SearchResultResponse {
+        .map(|(h, score)| SearchResultResponse {
             id: h.id.to_string(),
-            score: 1.0 - (i as f32 * 0.1),
+            score: *score, // cosine similarity from the vector index
             title: h.document.as_ref().map(|d| d.title.clone()),
         })
         .collect();
@@ -1744,7 +1745,7 @@ async fn query_explain_analyze_handler(
 /// Request to create a prepared statement
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PreparedCreateRequest {
-    /// The VQL query text
+    /// The VCL query text
     pub query: String,
     /// The logical plan for the query
     pub plan: LogicalPlan,
@@ -1843,108 +1844,74 @@ async fn slow_queries_handler(
 }
 
 // --- Transaction Handlers ---
+//
+// Cross-request transactions are not yet implemented. The transaction
+// manager correctly tracks begin/commit/rollback lifecycle in memory, but
+// write handlers (create/update/delete octad) do not honour a txn_id — so
+// a committed transaction has no effect on the store. These handlers
+// return HTTP 501 until the write path is wired to the transaction log.
+// Roadmap: verisimdb issue #tx1 (cross-request txn write wiring).
 
-/// Begin a new transaction
-#[instrument(skip(state))]
+const TXN_NOT_IMPLEMENTED_MSG: &str = "Cross-request transactions are not implemented in 0.x. \
+     The transaction manager tracks lifecycle but writes are not \
+     transaction-scoped; commits are no-ops against the store. \
+     Planned for a future release.";
+
+#[instrument(skip(_state))]
 async fn transaction_begin_handler(
-    State(state): State<AppState>,
-) -> Result<(StatusCode, Json<transaction::TransactionStatus>), ApiError> {
-    let txn_id = state
-        .transaction_manager
-        .begin()
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    Ok((StatusCode::CREATED, Json(status)))
+    State(_state): State<AppState>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-/// Commit a transaction
-#[instrument(skip(state))]
+#[instrument(skip(_state))]
 async fn transaction_commit_handler(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_string(&id);
-
-    let _ops = state
-        .transaction_manager
-        .commit(&txn_id)
-        .await
-        .map_err(|e| match e {
-            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
-            _ => ApiError::BadRequest(e.to_string()),
-        })?;
-
-    // In a full implementation, ops would be applied to the octad store here
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    Ok(Json(status))
+    State(_state): State<AppState>,
+    Path(_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-/// Rollback a transaction
-#[instrument(skip(state))]
+#[instrument(skip(_state))]
 async fn transaction_rollback_handler(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_string(&id);
-
-    let _discarded = state
-        .transaction_manager
-        .rollback(&txn_id)
-        .await
-        .map_err(|e| match e {
-            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
-            _ => ApiError::BadRequest(e.to_string()),
-        })?;
-
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    Ok(Json(status))
+    State(_state): State<AppState>,
+    Path(_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-/// Get transaction status
-#[instrument(skip(state))]
+#[instrument(skip(_state))]
 async fn transaction_status_handler(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<transaction::TransactionStatus>, ApiError> {
-    let txn_id = transaction::TransactionId::from_string(&id);
-
-    let status = state
-        .transaction_manager
-        .status(&txn_id)
-        .await
-        .map_err(|e| match e {
-            transaction::TransactionError::NotFound(_) => ApiError::NotFound(e.to_string()),
-            _ => ApiError::Internal(e.to_string()),
-        })?;
-
-    Ok(Json(status))
+    State(_state): State<AppState>,
+    Path(_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Err(ApiError::NotImplemented(
+        TXN_NOT_IMPLEMENTED_MSG.to_string(),
+    ))
 }
 
-// --- ZKP Proof Handlers ---
+// --- Integrity-Commitment Proof Handlers ---
+//
+// NOTE: These endpoints provide SHA-256 commitment-reveal, Merkle membership,
+// and R1CS constraint checking — NOT zero-knowledge proofs in the
+// cryptographic sense. The "ZKP" / "zero_knowledge" label refers to a planned
+// ZK-SNARK integration (via the `sanctify` crate, not yet compiled in).
+// The API surface retains "ZKP" identifiers for backwards compatibility;
+// see KNOWN-ISSUES.adoc for the full gap description.
 
-/// API request for proof generation
+/// API request for integrity-commitment proof generation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProofGenerateRequest {
     /// The claim to prove (base64-encoded or plain text)
     pub claim: String,
     /// Privacy level: "public", "private", or "zero_knowledge"
+    /// (note: "zero_knowledge" provides blinded Merkle commitment, not ZK-SNARK)
     pub privacy_level: Option<String>,
     /// Optional membership set for Merkle inclusion proofs
     pub membership_set: Option<Vec<String>>,
@@ -2809,6 +2776,76 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Vector search must surface the index's real cosine scores, not a
+    /// synthetic rank sequence (the old `1.0 - 0.1*i`). The discriminator:
+    /// `[0.9, 0.1, 0.0]` is ~0.994 cosine to `[1,0,0]`, whereas the old
+    /// scheme would have reported the second hit as exactly 0.9.
+    #[tokio::test]
+    async fn test_vector_search_returns_real_cosine_scores() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+
+        let make = |embedding: Vec<f32>, title: &str| OctadRequest {
+            title: Some(title.to_string()),
+            body: Some("body".to_string()),
+            embedding: Some(embedding),
+            types: None,
+            relationships: None,
+            tensor: None,
+            metadata: None,
+            provenance: None,
+            spatial: None,
+        };
+
+        post_octad(&app, &make(vec![1.0, 0.0, 0.0], "aligned")).await;
+        post_octad(&app, &make(vec![0.9, 0.1, 0.0], "near")).await;
+        post_octad(&app, &make(vec![0.0, 1.0, 0.0], "orthogonal")).await;
+
+        let request = VectorSearchRequest {
+            vector: vec![1.0, 0.0, 0.0],
+            k: Some(3),
+        };
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/search/vector")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_string(&request).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let results: Vec<SearchResultResponse> = serde_json::from_slice(&body).unwrap();
+        assert!(results.len() >= 2, "expected at least two hits");
+
+        // Top hit is the identical-direction vector: cosine ~1.0.
+        assert!(
+            results[0].score > 0.99,
+            "top cosine score should be ~1.0, got {}",
+            results[0].score
+        );
+        // Second hit's real cosine is ~0.994; the old synthetic scheme would
+        // have reported exactly 0.9. This is the load-bearing assertion.
+        assert!(
+            results[1].score > 0.95,
+            "second hit must carry its real cosine (~0.994), not synthetic 0.9; got {}",
+            results[1].score
+        );
+        // Scores are non-increasing in relevance order.
+        for pair in results.windows(2) {
+            assert!(
+                pair[0].score >= pair[1].score,
+                "scores must be in descending relevance order"
+            );
+        }
     }
 
     #[tokio::test]

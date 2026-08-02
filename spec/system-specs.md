@@ -1,7 +1,9 @@
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: CC-BY-SA-4.0
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 # VeriSimDB System Specifications
+
+> ⚠️ **SUPERSEDED (2026-07-07)** — this is an early template spec describing a pre-octad design (modality set Textual/Numeric/Categorical…, `verisimdb-core`/`-nif` Rustler crate layout). It matches neither the octad nor the real `verisim-*` crates. The implemented system is the eight-modality octad documented in `README.adoc`/`EXPLAINME.adoc` and `spec/grammar.ebnf`.
 
 VeriSimDB is a multi-modal verification database with 8 modality stores and
 built-in proof verification. Implementation stack: Rust core storage engine,

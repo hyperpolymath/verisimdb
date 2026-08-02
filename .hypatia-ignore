@@ -2,10 +2,10 @@
 #
 # ReScript (.res) files are permitted in this repository per CLAUDE.md
 # language policy.  ReScript powers:
-#   - src/vql/         — VQL parser, type checker, circuits, subtyping
+#   - src/vcl/         — VCL parser, type checker, circuits, subtyping
 #   - src/registry/    — federation registry (Kraft consensus, metadata log)
 #   - src/abi/         — Idris2/ReScript ABI bridge
-#   - playground/      — VQL Playground web UI
+#   - playground/      — VCL Playground web UI
 #   - connectors/clients/rescript/ — ReScript client SDK
 #
 # Each file is whitelisted by absolute repo path.
@@ -18,7 +18,7 @@ cicd_rules/banned_language_file:connectors/clients/rescript/src/VeriSimHexad.res
 cicd_rules/banned_language_file:connectors/clients/rescript/src/VeriSimProvenance.res
 cicd_rules/banned_language_file:connectors/clients/rescript/src/VeriSimSearch.res
 cicd_rules/banned_language_file:connectors/clients/rescript/src/VeriSimTypes.res
-cicd_rules/banned_language_file:connectors/clients/rescript/src/VeriSimVql.res
+cicd_rules/banned_language_file:connectors/clients/rescript/src/VeriSimVcl.res
 cicd_rules/banned_language_file:debugger/examples/SafeDOMExample.res
 cicd_rules/banned_language_file:examples/SafeDOMExample.res
 cicd_rules/banned_language_file:playground/src/ApiClient.res
@@ -28,22 +28,22 @@ cicd_rules/banned_language_file:playground/src/Examples.res
 cicd_rules/banned_language_file:playground/src/Formatter.res
 cicd_rules/banned_language_file:playground/src/Highlighter.res
 cicd_rules/banned_language_file:playground/src/Linter.res
-cicd_rules/banned_language_file:playground/src/VqlKeywords.res
+cicd_rules/banned_language_file:playground/src/VclKeywords.res
 cicd_rules/banned_language_file:src/registry/KRaftCluster.res
 cicd_rules/banned_language_file:src/registry/KRaftSerializer.res
 cicd_rules/banned_language_file:src/registry/MetadataLog.res
 cicd_rules/banned_language_file:src/registry/Registry.res
-cicd_rules/banned_language_file:src/vql/VQLBidir.res
-cicd_rules/banned_language_file:src/vql/VQLCircuit.res
-cicd_rules/banned_language_file:src/vql/VQLContext.res
-cicd_rules/banned_language_file:src/vql/VQLError.res
-cicd_rules/banned_language_file:src/vql/VQLExplain.res
-cicd_rules/banned_language_file:src/vql/VQLParser.res
-cicd_rules/banned_language_file:src/vql/VQLParser_test.res
-cicd_rules/banned_language_file:src/vql/VQLProofObligation.res
-cicd_rules/banned_language_file:src/vql/VQLSubtyping.res
-cicd_rules/banned_language_file:src/vql/VQLTypeChecker.res
-cicd_rules/banned_language_file:src/vql/VQLTypes.res
+cicd_rules/banned_language_file:src/vcl/VCLBidir.res
+cicd_rules/banned_language_file:src/vcl/VCLCircuit.res
+cicd_rules/banned_language_file:src/vcl/VCLContext.res
+cicd_rules/banned_language_file:src/vcl/VCLError.res
+cicd_rules/banned_language_file:src/vcl/VCLExplain.res
+cicd_rules/banned_language_file:src/vcl/VCLParser.res
+cicd_rules/banned_language_file:src/vcl/VCLParser_test.res
+cicd_rules/banned_language_file:src/vcl/VCLProofObligation.res
+cicd_rules/banned_language_file:src/vcl/VCLSubtyping.res
+cicd_rules/banned_language_file:src/vcl/VCLTypeChecker.res
+cicd_rules/banned_language_file:src/vcl/VCLTypes.res
 
 # verisimdb-registry uses ReScript v11; rescript.json is its build config.
 cicd_rules/banned_config_file:rescript.json

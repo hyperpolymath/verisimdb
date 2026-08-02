@@ -125,6 +125,12 @@ impl Planner {
                 cost: cost.clone(),
                 optimization_hint: hint.clone(),
                 pushed_predicates,
+                // Carry both through to the physical plan. Dropping them here
+                // was not merely lossy: CostModel::estimate discounts a node
+                // that has an early_limit, so the plan was priced for a
+                // pushdown the executor could never see.
+                projections: node.projections.clone(),
+                early_limit: node.early_limit,
             });
 
             cost_estimates.push(cost.clone());
@@ -351,5 +357,72 @@ mod tests {
         assert!(explain.text_output.contains("Step"));
         assert!(explain.text_output.contains("Strategy"));
         assert!(explain.text_output.contains("vector"));
+    }
+
+    /// Projection and early-limit pushdown must survive optimization.
+    ///
+    /// Before 2026-07-28 both were computed on the logical node and dropped at
+    /// the physical boundary. That was worse than lossy: `CostModel::estimate`
+    /// discounts a node carrying an `early_limit` (scaling `selectivity` and
+    /// taking `time_ms` to as low as 50% of base), so plans were priced for a
+    /// pushdown the executor could not see. Nothing failed loudly — the plan
+    /// just quietly cost less than it ran.
+    #[test]
+    fn test_pushdown_survives_optimization() {
+        let logical = LogicalPlan {
+            source: QuerySource::Octad,
+            nodes: vec![
+                PlanNode {
+                    modality: Modality::Vector,
+                    conditions: vec![ConditionKind::Similarity { k: 10 }],
+                    projections: vec!["id".to_string(), "label".to_string()],
+                    early_limit: Some(25),
+                },
+                PlanNode {
+                    modality: Modality::Graph,
+                    conditions: vec![ConditionKind::Traversal {
+                        predicate: "relates_to".to_string(),
+                        depth: Some(2),
+                    }],
+                    projections: vec!["id".to_string()],
+                    early_limit: None,
+                },
+            ],
+            post_processing: vec![],
+        };
+
+        let planner = Planner::new(PlannerConfig::default());
+        let physical = planner.optimize(&logical).expect("optimize");
+
+        // Match on modality rather than position: the optimizer reorders by
+        // execution priority, so asserting on steps[0] would be asserting on
+        // the sort order, not on the pushdown.
+        let vector_step = physical
+            .steps
+            .iter()
+            .find(|s| s.modality == Modality::Vector)
+            .expect("vector step present");
+        assert_eq!(
+            vector_step.projections,
+            vec!["id".to_string(), "label".to_string()],
+            "projection pushdown was dropped at the physical boundary"
+        );
+        assert_eq!(
+            vector_step.early_limit,
+            Some(25),
+            "early-limit pushdown was dropped, but the cost model already \
+             discounted the plan for it"
+        );
+
+        let graph_step = physical
+            .steps
+            .iter()
+            .find(|s| s.modality == Modality::Graph)
+            .expect("graph step present");
+        assert_eq!(graph_step.projections, vec!["id".to_string()]);
+        assert_eq!(
+            graph_step.early_limit, None,
+            "a node without an early limit must not acquire one"
+        );
     }
 }

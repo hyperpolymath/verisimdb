@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 
 = VCL Type System Specification
 :toc: left
@@ -778,7 +778,7 @@ Some VCL constructs support **type inference**:
 
 From vector literal:
 
-[source,vql]
+[source,vcl]
 ----
 WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3]
 ----
@@ -789,7 +789,7 @@ Inferred: `Vector[3]`
 
 From conditions:
 
-[source,vql]
+[source,vcl]
 ----
 WHERE h.embedding SIMILAR TO v WITHIN 0.8
 ----

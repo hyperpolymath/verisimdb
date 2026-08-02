@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 = VeriSim Consonance Language (VCL) Specification
@@ -517,16 +517,16 @@ In slipstream mode, the type checker validates:
 .ReScript type representation
 [source,rescript]
 ----
-type rec vqlType =
+type rec vclType =
   | Primitive(primitiveType)
-  | ArrayType(vqlType)
+  | ArrayType(vclType)
   | ModalityType(modalityType)
   | OctadType(array<modalityType>)
   | QueryResultType(queryResultInfo)
   | ProofType(proofKind, string)
   | ProvedResultType(queryResultInfo, proofKind, string)
-  | PiType(string, vqlType, vqlType)
-  | SigmaType(string, vqlType, vqlType)
+  | PiType(string, vclType, vclType)
+  | SigmaType(string, vclType, vclType)
   | UnitType
   | NeverType
 ----
@@ -696,7 +696,7 @@ There are three kinds of select items:
 
 Select entire modalities by name:
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH                          -- single modality
 SELECT GRAPH, VECTOR, DOCUMENT        -- multiple modalities
@@ -714,14 +714,14 @@ SELECT DOCUMENT(title, abstract)      -- document fields only
 
 Select specific fields from a modality using dot notation (`MODALITY.field`):
 
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity
 ----
 
 Field projections may be mixed with full modality selections:
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT.name, DOCUMENT.severity
 ----
@@ -766,7 +766,7 @@ SELECT SUM(DOCUMENT.title)   -- ERROR: AggregateTypeMismatch
 ----
 
 .Example: aggregates
-[source,vql]
+[source,vcl]
 ----
 SELECT COUNT(*), AVG(DOCUMENT.severity), MAX(DOCUMENT.severity)
 FROM FEDERATION /scans/*
@@ -788,7 +788,7 @@ source_spec = octad_source | federation_source | store_source ;
 
 Query a specific octad by UUID:
 
-[source,vql]
+[source,vcl]
 ----
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 ----
@@ -799,7 +799,7 @@ Type: stem:[\text{Octad}(\text{UUID})]
 
 Query across multiple VeriSimDB instances matching a pattern:
 
-[source,vql]
+[source,vcl]
 ----
 FROM FEDERATION /universities/*                    -- glob pattern
 FROM FEDERATION /universities/* WITH DRIFT STRICT  -- with drift policy
@@ -829,7 +829,7 @@ Drift policies control how inter-node inconsistency is handled:
 |===
 
 .Example: federation with drift policies
-[source,vql]
+[source,vcl]
 ----
 -- Strict: fail on any drift
 SELECT *
@@ -861,7 +861,7 @@ LIMIT 10
 
 Query a specific modality store directly, bypassing federation:
 
-[source,vql]
+[source,vcl]
 ----
 FROM STORE milvus-us-east-1      -- direct store access
 FROM STORE oxigraph-node-1       -- specific graph store
@@ -914,7 +914,7 @@ Path quantifiers control traversal depth:
 * `{m,n}` — Between _m_ and _n_ hops
 
 .Examples: graph conditions
-[source,vql]
+[source,vcl]
 ----
 -- Direct citation
 WHERE (h)-[:CITES]->(target)
@@ -951,7 +951,7 @@ metric_type = 'USING' , ('COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT') ;
 ----
 
 .Examples: vector conditions
-[source,vql]
+[source,vcl]
 ----
 -- Approximate nearest neighbor with threshold
 WHERE h.embedding SIMILAR TO [0.12, 0.45, 0.78, ...] WITHIN 0.8
@@ -986,7 +986,7 @@ tensor_op = '==' | '>' | '<' | '>=' | '<=' | 'SHAPE' | 'RANK' ;
 ----
 
 .Examples: tensor conditions
-[source,vql]
+[source,vcl]
 ----
 -- Shape filtering
 WHERE tensor.data SHAPE == [256, 256, 3]
@@ -1013,7 +1013,7 @@ param_list = identifier , '=' , literal , { ',' , identifier , '=' , literal } ;
 ----
 
 .Examples: semantic conditions
-[source,vql]
+[source,vcl]
 ----
 -- Contract satisfaction
 WHERE SATISFIES AccessControlContract(role=researcher, institution=MIT)
@@ -1044,7 +1044,7 @@ document_condition = 'FULLTEXT' , 'CONTAINS' , string_literal
 ----
 
 .Examples: document conditions
-[source,vql]
+[source,vcl]
 ----
 -- Full-text search
 WHERE FULLTEXT CONTAINS "quantum computing"
@@ -1077,7 +1077,7 @@ temporal_condition = 'AS' , 'OF' , timestamp
 ----
 
 .Examples: temporal conditions
-[source,vql]
+[source,vcl]
 ----
 -- Point-in-time query
 WHERE AS OF 2024-06-15T10:30:00Z
@@ -1116,7 +1116,7 @@ Compare field values from different modalities on the same octad:
 cross_modal_field_compare = field_ref , comparison_op , field_ref ;
 ----
 
-[source,vql]
+[source,vcl]
 ----
 WHERE DOCUMENT.severity > GRAPH.centrality
 ----
@@ -1137,7 +1137,7 @@ Measure representation drift between two modalities:
 drift_condition = 'DRIFT' , '(' , modality , ',' , modality , ')' , comparison_op , float ;
 ----
 
-[source,vql]
+[source,vcl]
 ----
 WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
 ----
@@ -1156,7 +1156,7 @@ consistency_condition = 'CONSISTENT' , '(' , modality , ',' , modality , ')' ,
 metric_name = 'COSINE' | 'EUCLIDEAN' | 'DOT_PRODUCT' | 'JACCARD' ;
 ----
 
-[source,vql]
+[source,vcl]
 ----
 WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE
 ----
@@ -1172,7 +1172,7 @@ exists_condition = modality_name , 'EXISTS' ;
 not_exists_condition = modality_name , 'NOT' , 'EXISTS' ;
 ----
 
-[source,vql]
+[source,vcl]
 ----
 -- Octads with vectors but without tensors
 WHERE VECTOR EXISTS
@@ -1180,7 +1180,7 @@ WHERE VECTOR EXISTS
 ----
 
 .Combined example: cross-modal with standard conditions
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR, DOCUMENT
 FROM FEDERATION /research-db/* WITH DRIFT REPAIR
@@ -1210,7 +1210,7 @@ proof_params = 'WITH' , param_list ;
 Multiple proofs are composed with `AND` — all must pass before results are returned.
 
 .Examples: proof clause
-[source,vql]
+[source,vcl]
 ----
 -- Single proof
 PROOF EXISTENCE(ExistenceContract)
@@ -1250,7 +1250,7 @@ having_clause = 'HAVING' , condition ;
 `HAVING` requires `GROUP BY` — using HAVING without GROUP BY produces `HavingWithoutGroupBy` error.
 
 .Example: grouping with aggregate filter
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, COUNT(*), AVG(DOCUMENT.severity)
 FROM FEDERATION /universities/*
@@ -1276,7 +1276,7 @@ sort_direction = 'ASC' | 'DESC' ;
 Default sort direction is `ASC` when omitted.
 
 .Example: multi-field sort
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity
 FROM FEDERATION /archives/*
@@ -1299,7 +1299,7 @@ offset_clause = 'OFFSET' , integer ;
 ----
 
 .Example: pagination
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM FEDERATION /archives/*
@@ -1362,7 +1362,7 @@ Each modality data type has its own syntax:
 |===
 
 .Examples: INSERT
-[source,vql]
+[source,vcl]
 ----
 -- Basic insert with document and vector
 INSERT HEXAD WITH
@@ -1399,7 +1399,7 @@ set_assignment = field_ref , '=' , literal ;
 ----
 
 .Examples: UPDATE
-[source,vql]
+[source,vcl]
 ----
 -- Simple field update
 UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -1427,7 +1427,7 @@ delete_mutation = 'DELETE' , 'HEXAD' , uuid , [proof_clause] ;
 ----
 
 .Examples: DELETE
-[source,vql]
+[source,vcl]
 ----
 -- Simple deletion
 DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -1557,7 +1557,7 @@ The proof system is the core differentiator between VCL and traditional query la
 
 Multiple proofs are composed with `AND`. Composition is **conjunctive** — all proofs must hold simultaneously:
 
-[source,vql]
+[source,vcl]
 ----
 PROOF ACCESS(InstitutionalAccessContract)
   AND PROVENANCE(ClinicalTrialContract)
@@ -1629,7 +1629,7 @@ The execution pipeline flows through three layers:
 .Execution pipeline
 ----
 VCL String
-  → Parser (ReScript VQLParser.res / Elixir vql_bridge.ex fallback)
+  → Parser (ReScript VQLParser.res / Elixir vcl_bridge.ex fallback)
   → AST
   → Type Checker (VQLBidir.res)
   → Query Plan Generator (VQLExplain.res)
@@ -1657,7 +1657,7 @@ The executor separates conditions into two categories:
 
 VCL does not have explicit JOIN syntax. Instead, cross-modal querying is implicit — every octad is already the join of all its modalities. When you write:
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR, DOCUMENT
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -1678,7 +1678,7 @@ The executor:
 
 Prefix a query with `EXPLAIN` to see the execution plan without executing:
 
-[source,vql]
+[source,vcl]
 ----
 EXPLAIN SELECT GRAPH, VECTOR, DOCUMENT
 FROM FEDERATION /research-db/*
@@ -1749,23 +1749,23 @@ VCL provides structured error responses with error codes, messages, and recovery
 | Category | Error Code Pattern | Recoverable?
 
 | Parse errors
-| `VQL_PARSE_ERROR`
+| `VCL_PARSE_ERROR`
 | No
 
 | Type errors
-| `VQL_TYPE_ERROR`
+| `VCL_TYPE_ERROR`
 | No
 
 | Runtime errors
-| `VQL_STORE_UNAVAILABLE`, `VQL_QUERY_TIMEOUT`, `VQL_DRIFT_DETECTED`, `VQL_PERMISSION_DENIED`, `VQL_RESOURCE_EXHAUSTED`, `VQL_RUNTIME_ERROR`
+| `VCL_STORE_UNAVAILABLE`, `VCL_QUERY_TIMEOUT`, `VCL_DRIFT_DETECTED`, `VCL_PERMISSION_DENIED`, `VCL_RESOURCE_EXHAUSTED`, `VCL_RUNTIME_ERROR`
 | Varies
 
 | Modality errors
-| `VQL_GRAPH_ERROR`, `VQL_VECTOR_ERROR`, `VQL_TENSOR_ERROR`, `VQL_SEMANTIC_ERROR`, `VQL_DOCUMENT_ERROR`, `VQL_TEMPORAL_ERROR`
+| `VCL_GRAPH_ERROR`, `VCL_VECTOR_ERROR`, `VCL_TENSOR_ERROR`, `VCL_SEMANTIC_ERROR`, `VCL_DOCUMENT_ERROR`, `VCL_TEMPORAL_ERROR`
 | No
 
 | Federation errors
-| `VQL_FEDERATION_ERROR`
+| `VCL_FEDERATION_ERROR`
 | `PartialResults` and `RemoteStoreUnreachable` are recoverable
 |===
 
@@ -1774,7 +1774,7 @@ VCL provides structured error responses with error codes, messages, and recovery
 [source,json]
 ----
 {
-  "error_code": "VQL_PARSE_ERROR",
+  "error_code": "VCL_PARSE_ERROR",
   "message": "Parse Error at 3:27-3:27: Expected ']->',  found end of input",
   "recoverable": false
 }
@@ -1865,7 +1865,7 @@ This section provides an honest assessment of what is implemented, partially imp
 
 | VCL Parser (Elixir fallback)
 | 2.0
-| Built into `vql_bridge.ex` (672 lines). No external Deno/Node dependency needed.
+| Built into `vcl_bridge.ex` (672 lines). No external Deno/Node dependency needed.
 
 | Bidirectional Type Checker
 | 2.0
@@ -1885,7 +1885,7 @@ This section provides an honest assessment of what is implemented, partially imp
 
 | Query Executor
 | 2.0
-| `vql_executor.ex` (1162 lines). Full pipeline: parse, type check, plan, route, aggregate.
+| `vcl_executor.ex` (1162 lines). Full pipeline: parse, type check, plan, route, aggregate.
 
 | Query Router
 | 2.0
@@ -2354,52 +2354,52 @@ Complete alphabetical list of all 70 reserved keywords. Keywords are case-insens
 |===
 | Code | Description
 
-| `VQL_PARSE_ERROR`
+| `VCL_PARSE_ERROR`
 | Syntax error during parsing
 
-| `VQL_TYPE_ERROR`
+| `VCL_TYPE_ERROR`
 | Type system violation
 
-| `VQL_STORE_UNAVAILABLE`
+| `VCL_STORE_UNAVAILABLE`
 | A modality store is unreachable
 
-| `VQL_QUERY_TIMEOUT`
+| `VCL_QUERY_TIMEOUT`
 | Query exceeded time limit
 
-| `VQL_DRIFT_DETECTED`
+| `VCL_DRIFT_DETECTED`
 | Cross-node inconsistency with STRICT policy
 
-| `VQL_PERMISSION_DENIED`
+| `VCL_PERMISSION_DENIED`
 | Insufficient access rights
 
-| `VQL_RESOURCE_EXHAUSTED`
+| `VCL_RESOURCE_EXHAUSTED`
 | System resource limit reached
 
-| `VQL_RUNTIME_ERROR`
+| `VCL_RUNTIME_ERROR`
 | General runtime error
 
-| `VQL_GRAPH_ERROR`
+| `VCL_GRAPH_ERROR`
 | Graph-specific error (Oxigraph)
 
-| `VQL_VECTOR_ERROR`
+| `VCL_VECTOR_ERROR`
 | Vector-specific error (HNSW)
 
-| `VQL_TENSOR_ERROR`
+| `VCL_TENSOR_ERROR`
 | Tensor-specific error (Burn/ndarray)
 
-| `VQL_SEMANTIC_ERROR`
+| `VCL_SEMANTIC_ERROR`
 | Semantic-specific error (ZKP/CBOR)
 
-| `VQL_DOCUMENT_ERROR`
+| `VCL_DOCUMENT_ERROR`
 | Document-specific error (Tantivy)
 
-| `VQL_TEMPORAL_ERROR`
+| `VCL_TEMPORAL_ERROR`
 | Temporal-specific error (Merkle trees)
 
-| `VQL_FEDERATION_ERROR`
+| `VCL_FEDERATION_ERROR`
 | Federation-specific error
 
-| `VQL_MULTIPLE_ERRORS`
+| `VCL_MULTIPLE_ERRORS`
 | Multiple errors occurred
 |===
 
@@ -2769,10 +2769,10 @@ This specification is the authoritative reference for VCL language behaviour. Th
 | `elixir-orchestration/lib/verisim/query/query_router.ex`
 | Elixir query router GenServer (187 lines). Routes by modality.
 
-| `elixir-orchestration/lib/verisim/query/vql_bridge.ex`
+| `elixir-orchestration/lib/verisim/query/vcl_bridge.ex`
 | Elixir ↔ ReScript bridge (672 lines). Built-in fallback parser.
 
-| `elixir-orchestration/lib/verisim/query/vql_executor.ex`
+| `elixir-orchestration/lib/verisim/query/vcl_executor.ex`
 | Full VCL executor (1162 lines). Parse → type check → plan → route → aggregate.
 |===
 
@@ -2797,7 +2797,7 @@ This specification resolves all three inconsistencies in favour of the implement
 
 VCL-dt++ extends VCL v3.0 with six optional clauses that provide maximal type-theoretic strictness. These extensions are consumed by the **Typell verification kernel** (the formal verification substrate for PanLL) and are specified normatively in the grammar delta file:
 
-* link:../../typeql-experimental/docs/vql-dtpp-grammar.ebnf[`vql-dtpp-grammar.ebnf`] — EBNF grammar delta (199 lines)
+* link:../../typeql-experimental/docs/vcl-dtpp-grammar.ebnf[`vcl-dtpp-grammar.ebnf`] — EBNF grammar delta (199 lines)
 
 All six clauses are optional and composable in any combination. They append after the standard query structure with no keyword conflicts against VCL v3.0's 60+ reserved keywords.
 
@@ -3003,7 +3003,7 @@ VCL-dt++ queries are verified by the Typell kernel via JSON-RPC:
 
 [source]
 ----
-typell.check(query, "vql-dt++") → TypeResult
+typell.check(query, "vcl-dt++") → TypeResult
 ----
 
 The kernel returns: types, proof obligations, linear tracking, session protocol compliance, effect analysis, modal scope verification, and proof certificates. See the link:../../typell/docs/design/DESIGN-2026-03-01-typell-vision.md[Typell Vision Document] for the full verification protocol specification.

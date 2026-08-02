@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! VeriSim Tensor Modality
 //!
-//! Multi-dimensional array operations via ndarray and Burn.
+//! Multi-dimensional array operations via ndarray.
 //! Implements Marr's Computational Level: "What transformations apply?"
 
 #![forbid(unsafe_code)]

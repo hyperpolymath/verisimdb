@@ -3,41 +3,58 @@
 //!
 //! VeriSimDB NIF Bridge — Erlang/Elixir native interface for direct in-process calls.
 //!
-//! This crate exposes core VeriSimDB operations as Rustler NIFs, bypassing HTTP
-//! for same-node deployments. When used alongside the Elixir orchestration layer,
-//! NIF transport provides 10-100x lower latency than HTTP for octad CRUD operations.
+//! ## Status: SCAFFOLD — no operation is implemented yet
 //!
-//! ## Supported Operations (MVP)
+//! This crate exposes the *shape* of the in-process transport (a Rustler NIF
+//! surface parallel to the HTTP API) but **no operation is wired to the
+//! store**. Every function returns `{:error, :not_implemented}`.
 //!
-//! - `create_octad/1` — Create a new octad entity from JSON input
-//! - `get_octad/1` — Retrieve a octad by ID (all 8 modalities)
-//! - `delete_octad/1` — Delete a octad entity
-//! - `search_text/2` — Full-text search across document modality
-//! - `search_vector/2` — Vector similarity search
-//! - `list_octads/2` — Paginated entity listing
-//! - `get_drift_score/1` — Get drift scores for an entity
-//! - `trigger_normalise/1` — Trigger normalisation for a drifted entity
+//! This is deliberate and load-bearing: an earlier version returned canned
+//! success JSON (e.g. `delete_octad` replied `{"status":"deleted"}` having
+//! deleted nothing). With `VERISIM_TRANSPORT=nif` or `auto` selecting the NIF,
+//! that turned a write into *silent data loss reported as success*. An
+//! unimplemented operation MUST fail loudly, never fake success — so the
+//! honest stub is the correct behaviour until the store is actually wired in.
 //!
-//! ## Transport Selection
+//! When an operation is implemented, replace its `not_implemented` body with a
+//! real call through the shared `runtime`/store; the Elixir transport then
+//! observes a real result instead of an error and begins routing to the NIF.
 //!
-//! The Elixir `VeriSim.RustClient` module selects transport via:
-//! ```
+//! ## Transport selection (Elixir side)
+//!
+//! ```text
 //! VERISIM_TRANSPORT=http   # Default: HTTP to verisim-api server
-//! VERISIM_TRANSPORT=nif    # Direct NIF calls (same-node only)
-//! VERISIM_TRANSPORT=auto   # NIF if available, HTTP fallback
+//! VERISIM_TRANSPORT=nif    # Demand NIF: surfaces {:error, :not_implemented} loudly
+//! VERISIM_TRANSPORT=auto   # NIF only if OPERATIONAL, else HTTP — today always HTTP
 //! ```
 
 #![forbid(unsafe_code)]
-use rustler::{Error, NifResult};
-use serde_json::Value;
+use rustler::Atom;
 use std::sync::OnceLock;
 use tokio::runtime::Runtime;
 
+mod atoms {
+    rustler::atoms! {
+        error,
+        not_implemented,
+    }
+}
+
+/// The honest verdict every operation returns until it is wired to the store:
+/// the Elixir term `{:error, :not_implemented}`. Identical in shape to the
+/// pure-Elixir fallback stub's `{:error, :nif_not_loaded}`, so a loaded-but-
+/// unimplemented NIF and an absent NIF are indistinguishable to callers — both
+/// non-operational, neither ever fabricating success.
+#[inline]
+fn not_implemented() -> (Atom, Atom) {
+    (atoms::error(), atoms::not_implemented())
+}
+
 /// Shared Tokio runtime for executing async store operations from synchronous
-/// NIF entry points. Initialised on first NIF call.
+/// NIF entry points. Initialised on first use.
 ///
-/// Currently unused — will be activated when store operations are wired into
-/// the NIF functions (replacing the placeholder responses).
+/// Unused until the first operation is wired to the store (it will drive the
+/// store's async API from these synchronous NIF bodies).
 #[allow(dead_code)]
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
@@ -54,147 +71,61 @@ fn runtime() -> &'static Runtime {
 }
 
 // ---------------------------------------------------------------------------
-// NIF functions
+// NIF functions — all not-yet-implemented; each fails loudly, never fakes.
 // ---------------------------------------------------------------------------
 
-/// Create a new octad entity from a JSON string.
+/// Create a new octad entity from a JSON string. NOT IMPLEMENTED.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn create_octad(_json_input: String) -> (Atom, Atom) {
+    not_implemented()
+}
+
+/// Retrieve a octad by ID. NOT IMPLEMENTED.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn get_octad(_octad_id: String) -> (Atom, Atom) {
+    not_implemented()
+}
+
+/// Delete a octad entity by ID. NOT IMPLEMENTED.
 ///
-/// Accepts a JSON string matching the `OctadInput` schema (same as the HTTP
-/// POST /api/v1/octads body). Returns `{:ok, json_string}` on success or
-/// `{:error, reason}` on failure.
+/// Previously returned `{"status":"deleted"}` without deleting anything — the
+/// silent-data-loss bug this stub exists to prevent.
 #[rustler::nif(schedule = "DirtyCpu")]
-fn create_octad(json_input: String) -> NifResult<String> {
-    let input: Value = serde_json::from_str(&json_input)
-        .map_err(|e| Error::Term(Box::new(format!("invalid JSON: {e}"))))?;
-
-    // Placeholder: in full integration, this calls InMemoryOctadStore::create()
-    // via the shared store instance. For now, return the parsed input as
-    // confirmation that the NIF bridge is functional.
-    let result = serde_json::json!({
-        "status": "created",
-        "input_keys": input.as_object().map(|o| o.keys().collect::<Vec<_>>()).unwrap_or_default(),
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
+fn delete_octad(_octad_id: String) -> (Atom, Atom) {
+    not_implemented()
 }
 
-/// Retrieve a octad by ID.
+/// Full-text search across the document modality. NOT IMPLEMENTED.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn search_text(_query: String, _limit: usize) -> (Atom, Atom) {
+    not_implemented()
+}
+
+/// Vector similarity search. NOT IMPLEMENTED.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn search_vector(_embedding_json: String, _k: usize) -> (Atom, Atom) {
+    not_implemented()
+}
+
+/// Paginated listing of octad entities. NOT IMPLEMENTED.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn list_octads(_limit: usize, _offset: usize) -> (Atom, Atom) {
+    not_implemented()
+}
+
+/// Get drift detection scores for a specific entity. NOT IMPLEMENTED.
 ///
-/// Returns the full octad JSON (all 8 octad modalities) or an error if not found.
+/// Previously returned all-zero scores, indistinguishable from a real
+/// "no drift" measurement — a false negative for the engine's core claim.
 #[rustler::nif(schedule = "DirtyCpu")]
-fn get_octad(octad_id: String) -> NifResult<String> {
-    // Placeholder: will call store.get(&octad_id) via the shared runtime
-    let result = serde_json::json!({
-        "id": octad_id,
-        "status": "nif_placeholder",
-        "transport": "nif",
-        "message": "NIF bridge operational — store integration pending"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
+fn get_drift_score(_octad_id: String) -> (Atom, Atom) {
+    not_implemented()
 }
 
-/// Delete a octad entity by ID.
+/// Trigger normalisation (self-repair) for a drifted entity. NOT IMPLEMENTED.
 #[rustler::nif(schedule = "DirtyCpu")]
-fn delete_octad(octad_id: String) -> NifResult<String> {
-    let result = serde_json::json!({
-        "id": octad_id,
-        "status": "deleted",
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
-}
-
-/// Full-text search across the document modality.
-///
-/// Accepts a query string and result limit. Returns a JSON array of matching octads.
-#[rustler::nif(schedule = "DirtyCpu")]
-fn search_text(query: String, limit: usize) -> NifResult<String> {
-    let result = serde_json::json!({
-        "query": query,
-        "limit": limit,
-        "results": [],
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
-}
-
-/// Vector similarity search.
-///
-/// Accepts a JSON-encoded embedding vector and a `k` parameter for top-K results.
-#[rustler::nif(schedule = "DirtyCpu")]
-fn search_vector(embedding_json: String, k: usize) -> NifResult<String> {
-    let _embedding: Vec<f32> = serde_json::from_str(&embedding_json)
-        .map_err(|e| Error::Term(Box::new(format!("invalid embedding JSON: {e}"))))?;
-
-    let result = serde_json::json!({
-        "k": k,
-        "results": [],
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
-}
-
-/// Paginated listing of octad entities.
-#[rustler::nif(schedule = "DirtyCpu")]
-fn list_octads(limit: usize, offset: usize) -> NifResult<String> {
-    let result = serde_json::json!({
-        "limit": limit,
-        "offset": offset,
-        "octads": [],
-        "total": 0,
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
-}
-
-/// Get drift detection scores for a specific entity.
-///
-/// Returns drift scores across all 8 octad modalities (0.0 = no drift, 1.0 = max).
-#[rustler::nif(schedule = "DirtyCpu")]
-fn get_drift_score(octad_id: String) -> NifResult<String> {
-    let result = serde_json::json!({
-        "entity_id": octad_id,
-        "graph": 0.0,
-        "vector": 0.0,
-        "tensor": 0.0,
-        "semantic": 0.0,
-        "document": 0.0,
-        "temporal": 0.0,
-        "provenance": 0.0,
-        "spatial": 0.0,
-        "overall": 0.0,
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
-}
-
-/// Trigger normalisation (self-repair) for a drifted entity.
-///
-/// Returns the normalisation result status.
-#[rustler::nif(schedule = "DirtyCpu")]
-fn trigger_normalise(octad_id: String) -> NifResult<String> {
-    let result = serde_json::json!({
-        "entity_id": octad_id,
-        "status": "normalisation_triggered",
-        "transport": "nif"
-    });
-
-    serde_json::to_string(&result)
-        .map_err(|e| Error::Term(Box::new(format!("serialization error: {e}"))))
+fn trigger_normalise(_octad_id: String) -> (Atom, Atom) {
+    not_implemented()
 }
 
 // ---------------------------------------------------------------------------

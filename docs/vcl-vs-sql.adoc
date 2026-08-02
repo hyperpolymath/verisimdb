@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 = VCL vs SQL: A Comparative Guide
@@ -10,7 +10,7 @@
 
 VCL (VeriSim Consonance Language) is the query language for VeriSimDB, a 6-core multimodal database. While VCL borrows familiar keywords from SQL (`SELECT`, `FROM`, `WHERE`, `LIMIT`, `OFFSET`), it serves a fundamentally different purpose.
 
-VCL is **read-only**. It does not support `INSERT`, `UPDATE`, or `DELETE` statements. All mutations go through the Octad API (Rust core or Elixir orchestration layer). This is a deliberate design choice: VeriSimDB treats writes as coordinated multi-modal operations that must maintain consistency across all six modality stores (Graph, Vector, Tensor, Semantic, Document, Temporal). A simple `INSERT` statement cannot express the cross-modal invariants that a Octad write requires.
+VCL is **read-only**. It does not support `INSERT`, `UPDATE`, or `DELETE` statements. All mutations go through the Octad API (Rust core or Elixir orchestration layer). This is a deliberate design choice: VeriSimDB treats writes as coordinated multi-modal operations that must maintain consistency across all eight modality stores (Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, Spatial). A simple `INSERT` statement cannot express the cross-modal invariants that a Octad write requires.
 
 VCL is **multimodal**. Where SQL selects columns from relational tables, VCL selects _modalities_ from _octad stores_ or _federations_. A single VCL query can retrieve graph edges, vector embeddings, tensor slices, semantic annotations, document text, and temporal versions in one pass.
 
@@ -23,7 +23,7 @@ VCL is **federation-aware**. Queries can target a local `STORE`, a specific `HEX
 |Concept |VCL |SQL
 
 |**Column/Field Selection**
-|`SELECT` with _modalities_: `GRAPH`, `VECTOR`, `TENSOR`, `SEMANTIC`, `DOCUMENT`, `TEMPORAL`, or `*` (all six). Modalities can be combined: `SELECT GRAPH, VECTOR, SEMANTIC`.
+|`SELECT` with _modalities_: `GRAPH`, `VECTOR`, `TENSOR`, `SEMANTIC`, `DOCUMENT`, `TEMPORAL`, `PROVENANCE`, `SPATIAL`, or `*` (all eight). Modalities can be combined: `SELECT GRAPH, VECTOR, SEMANTIC`.
 |`SELECT` with _column names_ or `*` for all columns.
 
 |**Data Source**
@@ -134,13 +134,13 @@ WHERE id = '550e8400-e29b-41d4-a716-446655440000';
 ----
 
 **VCL (Slipstream):**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 ----
 
-The VCL version returns all six modalities for that octad. The SQL version returns only the columns in the `entities` table.
+The VCL version returns all eight modalities for that octad. The SQL version returns only the columns in the `entities` table.
 
 === Finding Related Entities
 
@@ -156,7 +156,7 @@ WHERE e1.id = '550e8400-e29b-41d4-a716-446655440000'
 ----
 
 **VCL (graph traversal):**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -176,7 +176,7 @@ WHERE to_tsvector('english', content) @@ to_tsquery('quantum & computing');
 ----
 
 **VCL:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM STORE research_papers
@@ -196,7 +196,7 @@ LIMIT 10;
 ----
 
 **VCL:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR
 FROM STORE research_papers
@@ -207,7 +207,7 @@ LIMIT 10
 === Verified Query (No SQL Equivalent)
 
 **VCL-DT (dependent type path):**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000

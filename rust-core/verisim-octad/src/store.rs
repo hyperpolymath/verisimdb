@@ -20,6 +20,7 @@ use crate::{
     ProvenanceEventType, ProvenanceStore, SemanticAnnotation, SemanticStore, SemanticValue,
     SpatialData, SpatialStore, TemporalStore, Tensor, TensorStore, VectorStore,
 };
+use verisim_tensor::DType;
 use verisim_wal::{SyncMode, WalEntry, WalModality, WalOperation, WalWriter};
 
 /// Snapshot of a Octad for versioning
@@ -1385,6 +1386,19 @@ where
     }
 
     async fn search_similar(&self, embedding: &[f32], k: usize) -> Result<Vec<Octad>, OctadError> {
+        Ok(self
+            .search_similar_scored(embedding, k)
+            .await?
+            .into_iter()
+            .map(|(octad, _score)| octad)
+            .collect())
+    }
+
+    async fn search_similar_scored(
+        &self,
+        embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<(Octad, f32)>, OctadError> {
         let results =
             self.vector
                 .search(embedding, k)
@@ -1394,10 +1408,12 @@ where
                     message: e.to_string(),
                 })?;
 
+        // Preserve the vector store's relevance order and carry each score
+        // through to the caller (the API surfaces it; no fabricated ranking).
         let mut octads = Vec::new();
         for result in results {
             if let Some(octad) = self.load_octad(&OctadId::new(&result.id)).await? {
-                octads.push(octad);
+                octads.push((octad, result.score));
             }
         }
 
@@ -1405,6 +1421,19 @@ where
     }
 
     async fn search_text(&self, query: &str, limit: usize) -> Result<Vec<Octad>, OctadError> {
+        Ok(self
+            .search_text_scored(query, limit)
+            .await?
+            .into_iter()
+            .map(|(octad, _score)| octad)
+            .collect())
+    }
+
+    async fn search_text_scored(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(Octad, f32)>, OctadError> {
         let results =
             self.document
                 .search(query, limit)
@@ -1417,7 +1446,7 @@ where
         let mut octads = Vec::new();
         for result in results {
             if let Some(octad) = self.load_octad(&OctadId::new(&result.id)).await? {
-                octads.push(octad);
+                octads.push((octad, result.score));
             }
         }
 
@@ -1485,20 +1514,122 @@ where
                 message: e.to_string(),
             })?;
 
-        match version {
-            Some(v) => {
-                // Reconstruct octad from snapshot
-                // For now, we just return current state with version info
-                // A full implementation would restore from snapshot
-                let mut octad = self.load_octad(id).await?;
-                if let Some(ref mut h) = octad {
-                    h.status.version = v.version;
-                    h.status.modified_at = v.timestamp;
+        let Some(v) = version else {
+            return Ok(None);
+        };
+
+        let snap = &v.data;
+        let ms = &snap.modality_status;
+
+        // Graph node is a pure function of the entity IRI — no store lookup needed.
+        let graph_node = ms
+            .graph
+            .then(|| GraphNode::new(id.to_iri(&self.config.base_iri)));
+
+        // Reconstruct each modality from the snapshot input captured at write time.
+        // If a modality was active but its input is absent (written in an earlier
+        // update not captured here), the field is None — honest partial data.
+        let embedding = if ms.vector {
+            snap.input.vector.as_ref().map(|vi| Embedding {
+                id: id.as_str().to_string(),
+                vector: vi.embedding.clone(),
+                metadata: HashMap::new(),
+            })
+        } else {
+            None
+        };
+
+        let document = if ms.document {
+            snap.input.document.as_ref().map(|di| Document {
+                id: id.as_str().to_string(),
+                title: di.title.clone(),
+                body: di.body.clone(),
+                fields: di.fields.clone(),
+                metadata: HashMap::new(),
+            })
+        } else {
+            None
+        };
+
+        let tensor = if ms.tensor {
+            snap.input.tensor.as_ref().map(|ti| Tensor {
+                id: id.as_str().to_string(),
+                shape: ti.shape.clone(),
+                dtype: DType::Float64,
+                data: ti.data.clone(),
+                metadata: HashMap::new(),
+            })
+        } else {
+            None
+        };
+
+        let semantic = if ms.semantic {
+            snap.input.semantic.as_ref().map(|si| {
+                let mut properties = HashMap::new();
+                for (k, val) in &si.properties {
+                    properties.insert(
+                        k.clone(),
+                        SemanticValue::TypedLiteral {
+                            value: val.clone(),
+                            datatype: "https://www.w3.org/2001/XMLSchema#string".to_string(),
+                        },
+                    );
                 }
-                Ok(octad)
-            }
-            None => Ok(None),
-        }
+                SemanticAnnotation {
+                    entity_id: id.as_str().to_string(),
+                    types: si.types.clone(),
+                    properties,
+                    provenance: Provenance::default(),
+                }
+            })
+        } else {
+            None
+        };
+
+        let spatial_data = if ms.spatial {
+            snap.input.spatial.as_ref().map(|si| {
+                let geometry_type = si
+                    .geometry_type
+                    .as_deref()
+                    .map(|s| match s {
+                        "LineString" => GeometryType::LineString,
+                        "Polygon" => GeometryType::Polygon,
+                        "MultiPoint" => GeometryType::MultiPoint,
+                        "MultiPolygon" => GeometryType::MultiPolygon,
+                        _ => GeometryType::Point,
+                    })
+                    .unwrap_or(GeometryType::Point);
+                SpatialData {
+                    coordinates: Coordinates::new_unchecked(si.latitude, si.longitude, si.altitude),
+                    geometry_type,
+                    srid: si.srid.unwrap_or(4326),
+                    properties: si.properties.clone(),
+                }
+            })
+        } else {
+            None
+        };
+
+        let status = OctadStatus {
+            id: id.clone(),
+            created_at: snap.timestamp,
+            modified_at: snap.timestamp,
+            version: v.version,
+            modality_status: snap.modality_status.clone(),
+        };
+
+        Ok(Some(Octad {
+            id: id.clone(),
+            status,
+            graph_node,
+            embedding,
+            tensor,
+            semantic,
+            document,
+            version_count: v.version,
+            provenance_chain_length: 0,
+            spatial_data,
+        }))
     }
 }
 
@@ -1631,5 +1762,39 @@ mod tests {
         let updated = store.update(&octad.id, update_input).await.unwrap();
         assert_eq!(updated.status.version, 2);
         assert!(updated.document.as_ref().unwrap().title.contains("Updated"));
+    }
+
+    #[tokio::test]
+    async fn test_at_time_returns_historical_not_current() {
+        // A1 regression: at_time must reconstruct from the snapshot, not return
+        // current state with patched version info.
+        let store = create_test_store();
+
+        let input_v1 = OctadBuilder::new()
+            .with_document("Version One", "Body at version 1")
+            .with_embedding(vec![0.1, 0.2, 0.3])
+            .build();
+
+        let octad = store.create(input_v1).await.unwrap();
+        let after_v1 = Utc::now();
+
+        // Brief pause so the v2 snapshot timestamp is strictly after after_v1.
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+
+        let input_v2 = OctadBuilder::new()
+            .with_document("Version Two", "Body at version 2")
+            .build();
+        let _updated = store.update(&octad.id, input_v2).await.unwrap();
+
+        // Querying at after_v1 must return v1 data, NOT the current v2 title.
+        let historical = store.at_time(&octad.id, after_v1).await.unwrap();
+        assert!(historical.is_some(), "expected a historical snapshot");
+        let h = historical.unwrap();
+        assert_eq!(h.status.version, 1);
+        let title = h.document.as_ref().map(|d| d.title.as_str()).unwrap_or("");
+        assert_eq!(
+            title, "Version One",
+            "at_time returned current state instead of historical snapshot"
+        );
     }
 }

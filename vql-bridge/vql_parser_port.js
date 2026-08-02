@@ -1,54 +1,54 @@
 #!/usr/bin/env -S deno run --allow-read
 // SPDX-License-Identifier: MPL-2.0
-// VQL Parser Port — stdin/stdout JSON bridge for Elixir
+// VCL Parser Port — stdin/stdout JSON bridge for Elixir
 //
-// Reads JSON messages (one per line) from stdin, parses VQL queries
-// using the compiled ReScript VQLParser, and writes JSON results to stdout.
+// Reads JSON messages (one per line) from stdin, parses VCL queries
+// using the compiled ReScript VCLParser, and writes JSON results to stdout.
 //
 // Protocol: newline-delimited JSON
 //   Request:  {"id": 1, "action": "parse", "query": "SELECT ..."}
 //   Response: {"id": 1, "ok": {...ast...}} or {"id": 1, "error": "..."}
 
-// Import compiled ReScript VQL parser and type checker.
-// The compiled JS output will be at ../src/vql/*.res.mjs (ReScript compiler output).
-let VQLParser;
-let VQLTypeChecker;
-let VQLBidir;
+// Import compiled ReScript VCL parser and type checker.
+// The compiled JS output will be at ../src/vcl/*.res.mjs (ReScript compiler output).
+let VCLParser;
+let VCLTypeChecker;
+let VCLBidir;
 
 try {
-  VQLParser = await import("../src/vql/VQLParser.res.mjs");
+  VCLParser = await import("../src/vcl/VCLParser.res.mjs");
 } catch (_e) {
   try {
     // Legacy .bs.js suffix (older ReScript versions)
-    VQLParser = await import("../src/vql/VQLParser.bs.js");
+    VCLParser = await import("../src/vcl/VCLParser.bs.js");
   } catch (_e2) {
-    VQLParser = null;
+    VCLParser = null;
   }
 }
 
 try {
-  VQLTypeChecker = await import("../src/vql/VQLTypeChecker.res.mjs");
+  VCLTypeChecker = await import("../src/vcl/VCLTypeChecker.res.mjs");
 } catch (_e) {
   try {
-    VQLTypeChecker = await import("../src/vql/VQLTypeChecker.bs.js");
+    VCLTypeChecker = await import("../src/vcl/VCLTypeChecker.bs.js");
   } catch (_e2) {
-    VQLTypeChecker = null;
+    VCLTypeChecker = null;
   }
 }
 
 try {
-  VQLBidir = await import("../src/vql/VQLBidir.res.mjs");
+  VCLBidir = await import("../src/vcl/VCLBidir.res.mjs");
 } catch (_e) {
   try {
-    VQLBidir = await import("../src/vql/VQLBidir.bs.js");
+    VCLBidir = await import("../src/vcl/VCLBidir.bs.js");
   } catch (_e2) {
-    VQLBidir = null;
+    VCLBidir = null;
   }
 }
 
 /**
- * Minimal VQL parser fallback (when compiled ReScript is unavailable).
- * Produces AST compatible with VQLParser.res types.
+ * Minimal VCL parser fallback (when compiled ReScript is unavailable).
+ * Produces AST compatible with VCLParser.res types.
  */
 function fallbackParse(query) {
   const tokens = query.trim().split(/\s+/);
@@ -260,8 +260,8 @@ function fallbackParse(query) {
 }
 
 /**
- * Minimal VQL mutation parser fallback (INSERT / UPDATE / DELETE).
- * Produces AST compatible with VQLParser.res mutation types.
+ * Minimal VCL mutation parser fallback (INSERT / UPDATE / DELETE).
+ * Produces AST compatible with VCLParser.res mutation types.
  */
 function fallbackParseMutation(input) {
   const tokens = input.trim().split(/\s+/);
@@ -375,7 +375,7 @@ function fallbackParseMutation(input) {
 }
 
 /**
- * Parse a VQL statement (query or mutation) using fallback parser.
+ * Parse a VCL statement (query or mutation) using fallback parser.
  */
 function fallbackParseStatement(input) {
   const trimmed = input.trim();
@@ -389,26 +389,26 @@ function fallbackParseStatement(input) {
 }
 
 /**
- * Parse a VQL query using the ReScript parser or fallback.
+ * Parse a VCL query using the ReScript parser or fallback.
  */
 function parseQuery(query, action) {
-  if (VQLParser) {
+  if (VCLParser) {
     let result;
     switch (action) {
       case "parse_slipstream":
-        result = VQLParser.parseSlipstream(query);
+        result = VCLParser.parseSlipstream(query);
         break;
       case "parse_dependent":
-        result = VQLParser.parseDependentType(query);
+        result = VCLParser.parseDependentType(query);
         break;
       case "parse_mutation":
-        result = VQLParser.parseMutation(query);
+        result = VCLParser.parseMutation(query);
         break;
       case "parse_statement":
-        result = VQLParser.parseStatement(query);
+        result = VCLParser.parseStatement(query);
         break;
       default:
-        result = VQLParser.parse(query);
+        result = VCLParser.parse(query);
     }
     // ReScript Result type: { TAG: "Ok", _0: value } or { TAG: "Error", _0: error }
     if (result.TAG === "Ok") return { ok: result._0 };
@@ -427,36 +427,36 @@ function parseQuery(query, action) {
 }
 
 // ---------------------------------------------------------------------------
-// Type checking: invoke ReScript VQLBidir or extract obligations from AST
+// Type checking: invoke ReScript VCLBidir or extract obligations from AST
 // ---------------------------------------------------------------------------
 
 /**
- * Type-check a parsed VQL-DT AST.
+ * Type-check a parsed VCL-DT AST.
  *
- * If compiled ReScript is available, delegates to VQLBidir.synthesizeQuery
+ * If compiled ReScript is available, delegates to VCLBidir.synthesizeQuery
  * for full bidirectional type inference. Otherwise, extracts proof obligations
  * directly from the AST's proof clause — a sound but less precise fallback.
  *
- * @param {object} ast - Parsed VQL query AST
+ * @param {object} ast - Parsed VCL query AST
  * @returns {{ ok: object } | { error: string }} - Type info or error
  */
 function typecheckAST(ast) {
   // Try the full ReScript type checker first
-  if (VQLBidir) {
+  if (VCLBidir) {
     try {
-      const result = VQLBidir.synthesizeQuery(ast);
+      const result = VCLBidir.synthesizeQuery(ast);
       if (result.TAG === "Ok") {
         return { ok: result._0 };
       }
       return { error: result._0?.message || JSON.stringify(result._0) };
     } catch (e) {
-      // If VQLBidir crashes, fall through to the lightweight fallback
+      // If VCLBidir crashes, fall through to the lightweight fallback
     }
   }
 
-  if (VQLTypeChecker) {
+  if (VCLTypeChecker) {
     try {
-      const result = VQLTypeChecker.checkQuery(ast);
+      const result = VCLTypeChecker.checkQuery(ast);
       if (result.TAG === "Ok") {
         return { ok: result._0 };
       }
@@ -475,7 +475,7 @@ function typecheckAST(ast) {
 /**
  * Fallback type checking: extract proof obligations from an AST's proof clause.
  *
- * Returns a structure matching what VQLBidir.synthesizeQuery would produce:
+ * Returns a structure matching what VCLBidir.synthesizeQuery would produce:
  * { proof_obligations, composition_strategy, inferred_types }
  */
 function fallbackTypecheck(ast) {

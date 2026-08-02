@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 
 = VeriSimDB
 image:https://img.shields.io/badge/OpenSSF-Best_Practices-green?logo=openssourcesecurity[OpenSSF Best Practices,link="https://www.bestpractices.dev/en/projects/new?repo_url=https://github.com/hyperpolymath/verisimdb"]
@@ -277,7 +277,7 @@ Each entity in VeriSimDB can have representations across eight modalities. Drift
 
 |**Spatial**
 |Geospatial coordinates and geometries
-|R-tree index
+|Haversine brute-force (R-tree planned)
 |===
 
 == Drift Types
@@ -475,6 +475,8 @@ cargo run -p verisim-api
 cd elixir-orchestration
 iex -S mix
 ----
+
+WARNING: The HTTP API has **no built-in authentication**. In development this is intentional; in any deployment reachable by untrusted clients you must place a gateway (svalinn, nginx, etc.) in front of it. See link:KNOWN-ISSUES.adoc#_29_http_api_has_no_authentication_open[Known Issue #29].
 
 === Test
 

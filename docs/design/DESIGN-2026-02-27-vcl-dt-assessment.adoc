@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 = VCL-DT (Dependent Type Path) Wiring Assessment
 :author: Jonathan D.A. Jewell (hyperpolymath)
@@ -104,12 +104,12 @@ end-to-end pipeline does not).
   nodes. Hardcoded cost estimates per modality (reasonable heuristics).
 
 | `VQLTypeChecker.res` (355 lines)
-| *FULLY IMPLEMENTED.* Thin facade over VQLBidir. Backward-compatible API.
+| *FULLY IMPLEMENTED.* Thin facade over VCLBidir. Backward-compatible API.
 |===
 
 ==== What Is Stubbed/Incomplete
 
-1. **VQLSubtyping Rule 6** — Refinement subsumption needs an SMT solver
+1. **VCLSubtyping Rule 6** — Refinement subsumption needs an SMT solver
    (e.g., Z3 or CVC5). This is required for proving that a refined type
    (with proof) is a subtype of another refined type.
 
@@ -126,8 +126,8 @@ end-to-end pipeline does not).
 
 1. **No integration with Elixir executor.** The ReScript type checker runs
    entirely client-side (in the browser or via Deno/Node). The Elixir VCL
-   executor comment says "Type-check if PROOF clause present (VQLTypeChecker
-   -> VQLBidir)" but this invocation never happens. The Elixir executor
+   executor comment says "Type-check if PROOF clause present (VCLTypeChecker
+   -> VCLBidir)" but this invocation never happens. The Elixir executor
    parses VCL independently using its own built-in parser.
 
 2. **No proof generation triggered from type checker.** The type checker
@@ -238,14 +238,14 @@ endpoint would fail or be silently ignored.
 |===
 | File | Status
 
-| `vql_bridge.ex` (672 lines)
+| `vcl_bridge.ex` (672 lines)
 | *IMPLEMENTED with degraded fallback.* GenServer managing a Deno/Node
   subprocess that runs compiled ReScript VCL parser. Falls back to built-in
   Elixir parser when subprocess unavailable. `parse_dependent/2` exists but
   the fallback parser only collects PROOF tokens as raw strings, not
   structured proof specs.
 
-| `vql_executor.ex` (~1000 lines)
+| `vcl_executor.ex` (~1000 lines)
 | *PARTIALLY IMPLEMENTED.* Full SELECT/INSERT/UPDATE/DELETE execution,
   cross-modal condition evaluation (DRIFT, CONSISTENT, EXISTS/NOT EXISTS
   between modalities), pagination, ORDER BY, GROUP BY, aggregates. BUT: proof
@@ -258,7 +258,7 @@ endpoint would fail or be silently ignored.
 
 ==== The Critical Proof Verification Gap
 
-The `verify_single_proof/1` function in `vql_executor.ex` (lines 514-592)
+The `verify_single_proof/1` function in `vcl_executor.ex` (lines 514-592)
 reveals the core disconnect:
 
 [source,elixir]
@@ -392,14 +392,14 @@ Client sends VCL with PROOF clause
 The ReScript type checker is the most complete component but is entirely
 disconnected. Wire it:
 
-1. Ensure `vql_bridge.ex` reliably spawns the ReScript parser process (or
+1. Ensure `vcl_bridge.ex` reliably spawns the ReScript parser process (or
    compile ReScript to a standalone binary via Deno).
-2. Add a `typecheck/2` function to `vql_bridge.ex` that sends the parsed AST
+2. Add a `typecheck/2` function to `vcl_bridge.ex` that sends the parsed AST
    to the ReScript type checker and receives back:
    - Inferred types
    - Proof obligations (from `VQLProofObligation.res`)
    - Composition strategy
-3. In `vql_executor.ex`, after parsing a query with PROOF clause, call the
+3. In `vcl_executor.ex`, after parsing a query with PROOF clause, call the
    type checker before executing.
 4. Use the returned proof obligations to drive actual proof generation
    (Priority 2).
@@ -429,7 +429,7 @@ Replace the stubbed `verify_single_proof/1` with real proof generation:
    rather than generating new hash commitments.
 4. For `:sanctify` type, call the sanctify bridge's contract validation.
 
-=== Priority 4: VQLSubtyping Rule 6 — Refinement Subsumption (MEDIUM)
+=== Priority 4: VCLSubtyping Rule 6 — Refinement Subsumption (MEDIUM)
 
 **Effort: 3-5 days (significant)**
 
@@ -483,7 +483,7 @@ checker is sufficient for practical use.
 | 95%
 | 0%
 
-| ReScript Type Checker (VQLBidir)
+| ReScript Type Checker (VCLBidir)
 | 85%
 | 85%
 | 0%

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 = VCL Execution Modes & Safety Architecture
@@ -86,7 +86,7 @@ Use for:
 * **Performance-sensitive workloads** -- No proof generation cost
 
 Example:
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT
 FROM STORE research_papers
@@ -108,7 +108,7 @@ Use for:
 * **Cross-instance federation** -- When trust is not assumed
 
 Example:
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -126,7 +126,7 @@ Every `PROOF` clause takes the form `PROOF <TYPE>(<Contract>)`:
 
 Verifies the requested octad entity exists and has data in the requested modalities.
 
-[source,vql]
+[source,vcl]
 ----
 PROOF EXISTENCE(ExistenceContract)
 ----
@@ -135,7 +135,7 @@ PROOF EXISTENCE(ExistenceContract)
 
 Verifies returned data matches stored data exactly (Merkle root / hash chain).
 
-[source,vql]
+[source,vcl]
 ----
 PROOF INTEGRITY(DataIntegrityContract)
 ----
@@ -144,7 +144,7 @@ PROOF INTEGRITY(DataIntegrityContract)
 
 Verifies all modalities of the octad are mutually consistent (no drift).
 
-[source,vql]
+[source,vcl]
 ----
 PROOF CONSISTENCY(CrossModalConsistencyContract)
 ----
@@ -153,7 +153,7 @@ PROOF CONSISTENCY(CrossModalConsistencyContract)
 
 Traces the chain of custody — creation, updates, drift repairs, normalizations.
 
-[source,vql]
+[source,vcl]
 ----
 PROOF PROVENANCE(DataLineageContract)
 ----
@@ -162,7 +162,7 @@ PROOF PROVENANCE(DataLineageContract)
 
 Verifies data is no older than a specified time bound.
 
-[source,vql]
+[source,vcl]
 ----
 PROOF FRESHNESS(FreshnessContract)
 ----
@@ -171,7 +171,7 @@ PROOF FRESHNESS(FreshnessContract)
 
 Verifies the requesting entity has appropriate permissions.
 
-[source,vql]
+[source,vcl]
 ----
 PROOF AUTHORIZATION(AccessControlContract)
 ----

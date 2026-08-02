@@ -122,7 +122,7 @@ fi
 
 # 4. Execute a VQL query — test the query engine
 echo "4. VQL query"
-VQL_RESP=$(curl -sf -X POST "${API_URL}/vql/execute" \
+VQL_RESP=$(curl -sf -X POST "${API_URL}/vcl/execute" \
   -H "Content-Type: application/json" \
   -d '{"query":"SELECT * FROM hexads LIMIT 5"}' 2>/dev/null || echo "FAILED")
 

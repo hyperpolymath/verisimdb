@@ -12,7 +12,7 @@ cargo-fuzz = true
 # directory per project (it walks up from the cwd to the nearest `fuzz/`, which
 # is always this one), so EVERY target ClusterFuzzLite builds must live here —
 # a target in rust-core/fuzz is unreachable via `cargo fuzz` and silently
-# resolves back to this manifest. fuzz_vql_parser therefore lives here too.
+# resolves back to this manifest. fuzz_vcl_parser therefore lives here too.
 # rust-core/fuzz is retained only for the native `cargo check` matrix leg in
 # rust-ci.yml; the canonical fuzz harnesses are these.
 [dependencies]
@@ -33,8 +33,8 @@ test = false
 doc = false
 
 [[bin]]
-name = "fuzz_vql_parser"
-path = "fuzz_targets/fuzz_vql_parser.rs"
+name = "fuzz_vcl_parser"
+path = "fuzz_targets/fuzz_vcl_parser.rs"
 test = false
 doc = false
 

@@ -187,11 +187,17 @@ pub enum VerifiableProofData {
 }
 
 /// Verify a verifiable proof against its claim.
+///
+/// A bare `Commitment` proof is NOT verifiable on its own — verification
+/// requires the corresponding `Reveal` (the secret that opens the
+/// commitment). Calling `verify_proof` on a `Commitment` therefore rejects:
+/// use `Reveal` to provide the secret and complete the proof.
 pub fn verify_proof(data: &VerifiableProofData, claim: &[u8]) -> bool {
     match data {
         VerifiableProofData::Commitment { .. } => {
-            // Commitments are valid by construction — they're verified at reveal time.
-            true
+            // A commitment alone cannot be verified without the opening secret.
+            // Callers must use VerifiableProofData::Reveal to complete proof.
+            false
         }
         VerifiableProofData::Reveal { commitment, secret } => {
             let expected = commit(claim, secret);

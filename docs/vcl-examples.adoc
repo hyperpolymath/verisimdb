@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 
 = VeriSim Consonance Language (VCL) Examples
 :toc: left
@@ -14,14 +14,14 @@ This document provides **63 comprehensive examples** of VCL queries and mutation
 === Example 1: Simple Octad Retrieval
 
 **Slipstream** (no proof):
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 ----
 
 **Dependent-Type** (with proof):
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -31,7 +31,7 @@ PROOF EXISTENCE(ExistenceContract)
 === Example 2: Modality-Specific Selection
 
 **Graph Only:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -39,7 +39,7 @@ WHERE (h)-[:CITES]->(target)
 ----
 
 **Vector Only:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -47,7 +47,7 @@ WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3, 0.4]
 ----
 
 **Multiple Modalities:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR, SEMANTIC
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -59,7 +59,7 @@ PROOF INTEGRITY(DataIntegrityContract)
 === Example 3: Citation Chain Traversal
 
 **Slipstream:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM FEDERATION /universities/*
@@ -69,7 +69,7 @@ LIMIT 100
 ----
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM FEDERATION /universities/* WITH DRIFT STRICT
@@ -82,7 +82,7 @@ LIMIT 100
 
 === Example 4: Bidirectional Graph Traversal
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM HEXAD abc12345-0000-0000-0000-000000000000
@@ -93,7 +93,7 @@ WHERE (h)-[:CO_AUTHOR]-(colleague)
 
 === Example 5: Property Graph Query
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM STORE oxigraph-node-1
@@ -108,7 +108,7 @@ PROOF ACCESS(ReadAccessContract)
 === Example 6: Similarity Search (ANN)
 
 **Slipstream:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR
 FROM FEDERATION /embeddings/*
@@ -117,7 +117,7 @@ LIMIT 10
 ----
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR
 FROM FEDERATION /embeddings/* WITH DRIFT REPAIR
@@ -131,7 +131,7 @@ LIMIT 20
 
 === Example 7: K-Nearest Neighbors
 
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR
 FROM HEXAD query-embedding-uuid
@@ -141,7 +141,7 @@ WHERE h.embedding NEAREST 15 USING DOT_PRODUCT
 
 === Example 8: Filtered Vector Search
 
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR, DOCUMENT
 FROM FEDERATION /research-papers/*
@@ -156,7 +156,7 @@ LIMIT 50
 === Example 9: ZKP-Verified Access
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT SEMANTIC, DOCUMENT
 FROM HEXAD confidential-data-uuid
@@ -168,7 +168,7 @@ PROOF ACCESS(InstitutionalAccessContract) WITH verifier=ethics-board
 === Example 10: Provenance Verification
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT SEMANTIC, TEMPORAL
 FROM FEDERATION /clinical-trials/*
@@ -181,7 +181,7 @@ PROOF PROVENANCE(ClinicalTrialContract)
 === Example 11: Multi-Contract Validation
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD research-dataset-uuid
@@ -196,7 +196,7 @@ PROOF CUSTOM(ComplianceContract) WITH auditor=legal-team
 === Example 12: Full-Text Search
 
 **Slipstream:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM FEDERATION /archives/*
@@ -205,7 +205,7 @@ LIMIT 1000
 ----
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM FEDERATION /archives/* WITH DRIFT TOLERATE
@@ -217,7 +217,7 @@ LIMIT 100
 
 === Example 13: Regex Pattern Matching
 
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM STORE tantivy-node-3
@@ -228,7 +228,7 @@ WHERE FULLTEXT MATCHES /\b(AI|ML|DL)\b.*ethics/
 
 === Example 14: Structured Field Queries
 
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT, SEMANTIC
 FROM FEDERATION /journals/*
@@ -241,7 +241,7 @@ WHERE FIELD doi LIKE "10.1234/%"
 
 === Example 15: Tensor Shape Filtering
 
-[source,vql]
+[source,vcl]
 ----
 SELECT TENSOR
 FROM HEXAD tensor-data-uuid
@@ -251,7 +251,7 @@ WHERE tensor.data SHAPE == [256, 256, 3]
 
 === Example 16: Tensor Operations
 
-[source,vql]
+[source,vcl]
 ----
 SELECT TENSOR
 FROM STORE burn-node-2
@@ -265,7 +265,7 @@ WHERE tensor.data RANK == 3
 === Example 17: Point-in-Time Query
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT TEMPORAL, DOCUMENT
 FROM HEXAD legal-document-uuid
@@ -275,7 +275,7 @@ PROOF PROVENANCE(TemporalContract)
 
 === Example 18: Version Range Query
 
-[source,vql]
+[source,vcl]
 ----
 SELECT TEMPORAL, GRAPH
 FROM FEDERATION /contracts/*
@@ -286,7 +286,7 @@ WHERE BETWEEN 2024-01-01T00:00:00Z AND 2024-12-31T23:59:59Z
 === Example 19: Specific Version
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD retracted-paper-uuid
@@ -300,7 +300,7 @@ PROOF PROVENANCE(RetractionContract)
 === Example 20: Neurosymbolic AI Query
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 -- Find papers similar to embedding that cite a specific work
 SELECT GRAPH, VECTOR, DOCUMENT
@@ -317,7 +317,7 @@ LIMIT 50
 === Example 21: Cross-Modal Consistency Check
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 -- Verify document content matches vector embedding
 SELECT DOCUMENT, VECTOR, SEMANTIC
@@ -332,7 +332,7 @@ PROOF INTEGRITY(CrossModalContract)
 === Example 22: Federated Provenance Audit
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 -- Audit trail across multiple institutions
 SELECT TEMPORAL, SEMANTIC, GRAPH
@@ -350,7 +350,7 @@ PROOF PROVENANCE(MultiInstitutionalContract) WITH auditor=nsf
 === Example 23: Strict Drift (Fail on Inconsistency)
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM FEDERATION /legal-records/* WITH DRIFT STRICT
@@ -363,7 +363,7 @@ PROOF INTEGRITY(LegalContract)
 === Example 24: Auto-Repair Drift
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT
 FROM FEDERATION /collaborative-wiki/* WITH DRIFT REPAIR
@@ -377,7 +377,7 @@ PROOF EXISTENCE(WikiContract)
 === Example 25: Tolerate Drift (Return Inconsistent Data)
 
 **Slipstream:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM FEDERATION /mirrors/* WITH DRIFT TOLERATE
@@ -390,7 +390,7 @@ LIMIT 1000
 === Example 26: Latest Version (Ignore Drift)
 
 **Slipstream:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM FEDERATION /news-feeds/* WITH DRIFT LATEST
@@ -404,7 +404,7 @@ LIMIT 10
 
 === Example 27: Pagination for Large Result Sets
 
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM FEDERATION /archives/*
@@ -415,7 +415,7 @@ OFFSET 500
 
 === Example 28: Store-Specific Query (Bypass Federation)
 
-[source,vql]
+[source,vcl]
 ----
 -- Query specific store for lowest latency
 SELECT VECTOR
@@ -425,7 +425,7 @@ WHERE h.embedding NEAREST 20 USING COSINE
 
 === Example 29: Minimal Modality Selection
 
-[source,vql]
+[source,vcl]
 ----
 -- Only request needed modalities to reduce data transfer
 SELECT GRAPH(nodes, edges)
@@ -438,7 +438,7 @@ WHERE (h)-[:CITES]->(target)
 === Example 30: Proof Verification Failure
 
 **Query:**
-[source,vql]
+[source,vcl]
 ----
 SELECT SEMANTIC
 FROM HEXAD protected-data-uuid
@@ -462,7 +462,7 @@ PROOF ACCESS(GuestAccessContract)
 === Example 31: Drift Detection Failure
 
 **Query:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM FEDERATION /distributed-ledger/* WITH DRIFT STRICT
@@ -486,7 +486,7 @@ WHERE AS OF 2024-01-01T00:00:00Z
 === Example 32: Malformed Query
 
 **Query:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH
 FROM HEXAD not-a-valid-uuid
@@ -512,7 +512,7 @@ WHERE (h)-[:INVALID_SYNTAX
 === Example 33: Recursive Citation Network
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 -- Find all papers in transitive citation closure
 SELECT GRAPH
@@ -528,7 +528,7 @@ LIMIT 1000
 === Example 34: Multi-Institutional Data Aggregation
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 -- Aggregate COVID-19 data from multiple hospitals
 SELECT SEMANTIC, TEMPORAL, DOCUMENT
@@ -544,7 +544,7 @@ PROOF PROVENANCE(MultiInstitutionalHealthContract)
 === Example 35: Real-Time Embeddings Query
 
 **Slipstream:**
-[source,vql]
+[source,vcl]
 ----
 -- Fast similarity search for recommendation system
 SELECT VECTOR
@@ -560,7 +560,7 @@ LIMIT 20
 === Same Query, Two Paths
 
 **Slipstream (Fast, Unverified):**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR
 FROM FEDERATION /papers/*
@@ -570,7 +570,7 @@ LIMIT 100
 ----
 
 **Dependent-Type (Slow, Verified):**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR
 FROM FEDERATION /papers/* WITH DRIFT STRICT
@@ -637,7 +637,7 @@ Use slipstream path for:
 === Example 36: Version Pinning
 
 **Query with explicit VCL version:**
-[source,vql]
+[source,vcl]
 ----
 VERSION 1.0;
 
@@ -648,7 +648,7 @@ LIMIT 10;
 ----
 
 **Query using deprecated syntax (with warning):**
-[source,vql]
+[source,vcl]
 ----
 VERSION 0.9;  -- Deprecated syntax accepted
 
@@ -661,7 +661,7 @@ LIMIT 10;
 === Example 37: Federation Version Negotiation
 
 **Query with version compatibility check:**
-[source,vql]
+[source,vcl]
 ----
 VERSION 1.0;
 
@@ -677,7 +677,7 @@ LIMIT 100;
 === Example 38: Drift Detection
 
 **Detect cross-modal drift:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DRIFT
 FROM verisim:all_modalities
@@ -693,7 +693,7 @@ WHERE octad.id = @octad_id;
 === Example 39: Drift Repair - Latest Wins
 
 **Repair using most recent version:**
-[source,vql]
+[source,vcl]
 ----
 DRIFT REPAIR
 FROM verisim:graph
@@ -704,7 +704,7 @@ USING STRATEGY latest_wins;
 === Example 40: Drift Repair - Quorum
 
 **Repair using majority voting:**
-[source,vql]
+[source,vcl]
 ----
 DRIFT REPAIR
 FROM verisim:federation /universities/*
@@ -715,7 +715,7 @@ USING STRATEGY quorum;
 === Example 41: Drift-Aware Query
 
 **Query with drift tolerance:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT
 FROM FEDERATION /universities/*
@@ -727,7 +727,7 @@ LIMIT 100;
 === Example 42: Byzantine-Resistant Query
 
 **Query with drift repair:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT
 FROM FEDERATION /universities/*
@@ -741,14 +741,14 @@ LIMIT 100;
 === Example 43: Column Selection within Modality
 
 **Select specific fields from a modality (slipstream):**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
 ----
 
 **Mixed modalities and column projections:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT.name, DOCUMENT.severity
 FROM FEDERATION /universities/*
@@ -758,7 +758,7 @@ LIMIT 50
 === Example 44: ORDER BY — Sort Results
 
 **Sort by severity descending:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT
 FROM STORE archive-1
@@ -768,7 +768,7 @@ LIMIT 50
 ----
 
 **Multi-field sort:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity
 FROM FEDERATION /archives/*
@@ -779,7 +779,7 @@ LIMIT 100
 === Example 45: COUNT(*), SUM, AVG — Aggregate Functions
 
 **Count all matching octads:**
-[source,vql]
+[source,vcl]
 ----
 SELECT COUNT(*)
 FROM FEDERATION /archives/*
@@ -787,14 +787,14 @@ WHERE FULLTEXT CONTAINS "vulnerability"
 ----
 
 **Aggregate with field reference:**
-[source,vql]
+[source,vcl]
 ----
 SELECT AVG(DOCUMENT.severity), MIN(DOCUMENT.severity), MAX(DOCUMENT.severity)
 FROM FEDERATION /scans/*
 ----
 
 **Sum and count together:**
-[source,vql]
+[source,vcl]
 ----
 SELECT COUNT(*), SUM(DOCUMENT.severity)
 FROM STORE tantivy-node-1
@@ -804,7 +804,7 @@ WHERE FIELD severity > 3
 === Example 46: GROUP BY / HAVING — Grouping with Filters
 
 **Group results by field:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, COUNT(*), AVG(DOCUMENT.severity)
 FROM FEDERATION /universities/*
@@ -813,7 +813,7 @@ LIMIT 100
 ----
 
 **GROUP BY with HAVING filter:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, COUNT(*)
 FROM FEDERATION /archives/*
@@ -826,7 +826,7 @@ LIMIT 50
 === Example 47: Full SQL-Compatible Query
 
 **Combining all SQL-compatible features with VCL's model:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity, COUNT(*), SUM(DOCUMENT.severity), AVG(DOCUMENT.severity)
 FROM FEDERATION /universities/* WITH DRIFT REPAIR
@@ -841,7 +841,7 @@ OFFSET 20
 === Example 48: SQL-Compatible with Dependent-Type Verification
 
 **Combining aggregates with formal verification (VCL-dt path):**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT.name, COUNT(*)
 FROM FEDERATION /universities/* WITH DRIFT STRICT
@@ -859,7 +859,7 @@ guarantee — the ZKP witnesses include the aggregate computation, ensuring veri
 === Example 49: Dual Proof — Existence and Integrity
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -872,7 +872,7 @@ are generated independently and composed into a single proof bundle.
 === Example 50: Triple Proof — Access, Provenance, and Integrity
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT SEMANTIC, TEMPORAL, DOCUMENT
 FROM FEDERATION /hospitals/* WITH DRIFT STRICT
@@ -888,7 +888,7 @@ must hold simultaneously.
 === Example 51: Citation and Custom Proof
 
 **Dependent-Type:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, DOCUMENT
 FROM FEDERATION /journals/* WITH DRIFT REPAIR
@@ -903,7 +903,7 @@ LIMIT 50
 === Example 52: Cross-Modal Field Compare
 
 **Compare fields across modalities:**
-[source,vql]
+[source,vcl]
 ----
 SELECT DOCUMENT, GRAPH
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -916,7 +916,7 @@ field against the graph centrality field on the same octad.
 === Example 53: Drift Between Modalities
 
 **Detect embedding drift:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR, DOCUMENT
 FROM FEDERATION /research-papers/*
@@ -930,7 +930,7 @@ document representation. Useful for identifying stale embeddings.
 === Example 54: Consistency Check
 
 **Verify cross-modal consistency:**
-[source,vql]
+[source,vcl]
 ----
 SELECT VECTOR, SEMANTIC
 FROM HEXAD suspicious-entry-uuid
@@ -944,7 +944,7 @@ using cosine similarity as the metric.
 === Example 55: Modality Existence Check
 
 **Filter by available modalities:**
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM FEDERATION /archives/*
@@ -959,7 +959,7 @@ identifying octads that need tensor representations generated.
 === Example 56: Combined Cross-Modal and Standard Conditions
 
 **Mix cross-modal with single-modality conditions:**
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH, VECTOR, DOCUMENT
 FROM FEDERATION /research-db/* WITH DRIFT REPAIR
@@ -980,7 +980,7 @@ on full octad data.
 === Example 57: Insert a New Octad
 
 **Insert with document and vector data:**
-[source,vql]
+[source,vcl]
 ----
 INSERT HEXAD WITH
   DOCUMENT(title = "New Research Paper", author = "Jane Doe", severity = 3),
@@ -993,7 +993,7 @@ The octad ID is auto-generated and returned in the result.
 === Example 58: Insert with Graph Relationship
 
 **Insert with cross-modal data:**
-[source,vql]
+[source,vcl]
 ----
 INSERT HEXAD WITH
   DOCUMENT(title = "Follow-Up Study", year = 2026),
@@ -1007,7 +1007,7 @@ Creates a octad with document content, embedding, and a graph edge
 === Example 59: Verified Insert with Proof
 
 **Insert with integrity verification:**
-[source,vql]
+[source,vcl]
 ----
 INSERT HEXAD WITH
   DOCUMENT(title = "Clinical Trial Result", status = "verified"),
@@ -1022,7 +1022,7 @@ insert is verified and auditable.
 === Example 60: Update Octad Fields
 
 **Update specific fields:**
-[source,vql]
+[source,vcl]
 ----
 UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
 SET DOCUMENT.title = "Corrected Title", DOCUMENT.severity = 5
@@ -1034,7 +1034,7 @@ Drift detection will fire if the change creates cross-modal inconsistency.
 === Example 61: Verified Update with Proof
 
 **Update with access proof:**
-[source,vql]
+[source,vcl]
 ----
 UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
 SET DOCUMENT.status = "retracted", DOCUMENT.retraction_reason = "Data fabrication"
@@ -1047,7 +1047,7 @@ of the retraction in the audit trail.
 === Example 62: Delete a Octad
 
 **Simple deletion:**
-[source,vql]
+[source,vcl]
 ----
 DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
 ----
@@ -1058,7 +1058,7 @@ in verisim-temporal for auditability.
 === Example 63: Verified Delete with Proof
 
 **Delete with access and provenance proof:**
-[source,vql]
+[source,vcl]
 ----
 DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
 PROOF ACCESS(AdminAccessContract) AND PROVENANCE(DeletionAuditContract)

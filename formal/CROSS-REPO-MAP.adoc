@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VeriSimDB formal/ ↔ Echo-Types cross-repo mapping
 :toc:
@@ -74,7 +74,7 @@ Concretely:
 | `EchoSearchExample.agda` (existing) — "find the witness" pattern + `EchoTruncation.agda`
 | The `winner` function is a SEARCH for the authoritative modality — exactly `EchoSearchExample`'s pattern. The `winner_stable_off_drifted` axiom is the "search result depends only on non-drifted modalities" — direct lift of `EchoTruncation`'s decoupling lemma. N2 idempotence is then "search is idempotent on its own result" — a *truncated echo* fixed point.
 
-| V2 `vql_preservation` + `vql_progress`
+| V2 `vcl_preservation` + `vcl_progress`
 | `formal/VCL.v`
 | `EchoGradedComonadInterface.agda` (existing) — graded comonad for "well-typed at type τ"
 | Type-preservation under reduction is the comonad ε ∘ δ = id property in the graded comonad of "well-typed terms at type τ". Reduction is the comonad action. The V2 mechanisation here is the MINIMUM-VIABLE core (booleans + opaque proof terms + conditional), closing #92 blockers 1 (big-step → small-step) and 2 (proof terms as values, no β-reduction). Full VCL extends mechanically per added expression form. Progress bundled as the type-soundness companion.

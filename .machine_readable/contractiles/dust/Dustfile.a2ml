@@ -60,7 +60,7 @@ nothing is deleted without --apply and per-item approval. Audit trail preserved.
 
 ### no-tracked-rescript-mjs
 - description: No compiled ReScript .res.mjs output tracked in git
-- target: src/vql
+- target: src/vcl
 - reason: Compiled output regenerated from .res sources
 - probe: test -z "$(git ls-files '*.res.mjs' 2>/dev/null)"
 - status: declared

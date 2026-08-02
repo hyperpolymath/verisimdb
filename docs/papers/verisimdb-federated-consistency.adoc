@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 = VeriSimDB: Cross-Modal Drift Detection and Self-Normalisation in Heterogeneous Database Federations
@@ -166,7 +166,7 @@ Earlier versions of VeriSimDB used a octad (six modalities), but operational exp
 
 | Spatial
 | Geospatial coordinates, geometries
-| R-tree index
+| Haversine brute-force (R-tree planned)
 | Radius, bounding box, nearest-neighbour
 |===
 
@@ -369,17 +369,17 @@ Normalisation results are recorded as telemetry events including the entity ID, 
 
 
 // ============================================================================
-// 6. VQL AND VCL-DT
+// 6. VCL AND VCL-DT
 // ============================================================================
 
-== VQL and VCL-DT
+== VCL and VCL-DT
 
-=== VQL Syntax and Semantics
+=== VCL Syntax and Semantics
 
 The VeriSim Consonance Language (VCL) is the native query interface for VeriSimDB.
 Its grammar is specified in ISO/IEC 14977 EBNF notation <<iso14977>> and supports `SELECT`, `INSERT`, `UPDATE`, and `DELETE` operations across octad entities.
 
-A VQL query comprises:
+A VCL query comprises:
 
 [source,ebnf]
 ----
@@ -391,7 +391,7 @@ query = select_clause, from_clause, [where_clause],
 
 The `SELECT` clause specifies which modalities to retrieve, with optional per-modality projections:
 
-[source,vql]
+[source,vcl]
 ----
 SELECT GRAPH((?s)-[:CITES]->(?target)), DOCUMENT(title, abstract)
 FROM STORE research_papers
@@ -401,12 +401,12 @@ LIMIT 50
 
 The `FROM` clause supports three source types: `HEXAD <uuid>` for direct entity access, `STORE <name>` for collection queries, and `FEDERATION <name>` for cross-instance queries.
 
-VQL is not SQL.
+VCL is not SQL.
 Key differences include: no table schemas (entities are schema-flexible with type annotations in the Semantic modality), modality-scoped projections rather than column selections, graph pattern matching in `WHERE` clauses, and cross-modal conditions such as `DRIFT_SCORE(semantic, vector) > 0.5`.
 
 === The PROOF Clause and 11 Proof Types
 
-VCL-DT (VQL with Dependent Types) is activated by the presence of a `PROOF` clause.
+VCL-DT (VCL with Dependent Types) is activated by the presence of a `PROOF` clause.
 When a query includes `PROOF`, the query router directs it through the formal verification pipeline rather than the standard (slipstream) execution path.
 
 The `PROOF` clause takes the form `PROOF <TYPE>(<Contract>)` and supports 11 proof types:
@@ -452,7 +452,7 @@ The `PROOF` clause takes the form `PROOF <TYPE>(<Contract>)` and supports 11 pro
 
 Multiple proofs can be composed in a single query:
 
-[source,vql]
+[source,vcl]
 ----
 SELECT *
 FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
@@ -495,11 +495,11 @@ VCL-DT supports three composition strategies for multi-proof queries:
 === Adapter-Based Federation Architecture
 
 VeriSimDB federation enables cross-instance queries over heterogeneous databases.
-The federation layer is adapter-based: each external database type implements a `FederationAdapter` trait that translates VQL queries into the native query language of the target system and maps results back into octad entities.
+The federation layer is adapter-based: each external database type implements a `FederationAdapter` trait that translates VCL queries into the native query language of the target system and maps results back into octad entities.
 
 Four adapters are currently defined:
 
-1. **VeriSimDB-native** -- Peer VeriSimDB instances communicating via the HTTP API. This is the primary federation mode, supporting all VQL features including drift policies and proof clauses.
+1. **VeriSimDB-native** -- Peer VeriSimDB instances communicating via the HTTP API. This is the primary federation mode, supporting all VCL features including drift policies and proof clauses.
 
 2. **PostgreSQL** -- Queries relational tables via SQL, mapping rows to Document and Semantic modalities. Graph modalities require explicit relationship tables.
 
@@ -547,7 +547,7 @@ Key crates include:
 - **verisim-drift**: The `DriftCalculator` struct implementing all drift scoring functions (cosine similarity, Jaccard coefficients, Frobenius norms).
 - **verisim-normalizer**: The self-normalisation engine with five strategies, authority ranking, conflict resolution, and audit logging.
 - **verisim-provenance**: Hash-chain-based lineage tracking with actor search and integrity verification.
-- **verisim-spatial**: R-tree index for geospatial queries (radius, bounding box, k-nearest).
+- **verisim-spatial**: Haversine brute-force geospatial queries (radius, bounding box, k-nearest); R-tree index planned.
 - **verisim-octad**: The octad entity abstraction, builder pattern, and cross-modal linking logic.
 - **verisim-api**: Actix-web HTTP server exposing RESTful endpoints for all operations plus federation peer management.
 - **verisim-wal**: Write-ahead log for crash recovery and atomic multi-modality commits.
@@ -558,16 +558,16 @@ The Elixir layer coordinates distributed operations using OTP's battle-tested su
 
 - **VeriSim.EntityServer**: A GenServer per entity, managing the entity's lifecycle and serialising concurrent updates. Entity servers are distributed across the cluster using Horde (a distributed DynamicSupervisor).
 - **VeriSim.DriftMonitor**: A GenServer that sweeps entities on a configurable interval, dispatching drift computation to the Rust core and queuing normalisation tasks.
-- **VeriSim.QueryRouter**: Routes VQL queries to the appropriate execution pipeline (slipstream vs VCL-DT) and handles federation decomposition.
+- **VeriSim.QueryRouter**: Routes VCL queries to the appropriate execution pipeline (slipstream vs VCL-DT) and handles federation decomposition.
 - **VeriSim.SchemaRegistry**: Manages entity type schemas and proof contracts, coordinating with the Semantic modality store.
 - **VeriSim.Consensus**: A KRaft-inspired (Kafka Raft) consensus implementation for metadata replication in clustered deployments.
 
 === ReScript Components
 
-The VQL parser is implemented in ReScript, compiling to JavaScript and running under Deno.
+The VCL parser is implemented in ReScript, compiling to JavaScript and running under Deno.
 This layer handles:
 
-- VQL tokenisation and parsing to AST.
+- VCL tokenisation and parsing to AST.
 - Federation registry management (mapping peer names to endpoints and capabilities).
 - PanLL database module protocol integration (registering VeriSimDB as a panel-capable database in the broader ecosystem).
 
@@ -576,7 +576,7 @@ This layer handles:
 The test suite comprises 510 Rust tests and 152 Elixir tests, totalling 662 tests with 0 failures.
 Test categories include:
 
-- **Unit tests**: Per-crate tests for each modality store, drift calculator, normaliser strategy, and VQL parser.
+- **Unit tests**: Per-crate tests for each modality store, drift calculator, normaliser strategy, and VCL parser.
 - **Integration tests**: Cross-crate tests verifying drift detection triggers normalisation, federation queries span peers, and proof certificates verify correctly.
 - **Property tests**: Proptest-based generative testing for the drift calculator, verifying that drift scores are always in [0, 1] and that normalisation reduces drift scores.
 
@@ -810,7 +810,7 @@ The 11 proof types cover a range of assurance levels from basic existence checki
 
 Federation extends these guarantees across organisational boundaries, enabling multi-institutional data sharing with configurable drift policies that balance consistency against latency and autonomy.
 
-VeriSimDB is open source under the Mozilla Public License 2.0 (MPL-2.0), with the Rust core, Elixir orchestration layer, and VQL parser available at https://github.com/hyperpolymath/verisimdb.
+VeriSimDB is open source under the Mozilla Public License 2.0 (MPL-2.0), with the Rust core, Elixir orchestration layer, and VCL parser available at https://github.com/hyperpolymath/verisimdb.
 
 
 // ============================================================================

@@ -50,16 +50,30 @@
 
 Require Import Coq.Lists.List.
 Require Import Coq.Sorting.Permutation.
+Require Import Planner.
+
+(* Keep Print Assumptions output on one line per axiom: the CI and Justfile
+   guards match /^name :/ with awk, and Coq's default ~78-column wrap would
+   split a longer axiom type across lines and silently escape the check. *)
+Set Printing Width 400.
+
 Import ListNotations.
 
-(** ** Domain (reusing Planner.v abstractions) *)
+(** ** Domain
 
-Parameter modality : Type.
-Parameter condition : Type.
+    This module said "reusing Planner.v abstractions" while in fact
+    re-declaring its own [modality], [condition], [node], [optimize] and a
+    second copy of [optimize_is_permutation]. The two files agreed only by
+    coincidence, and the duplicated axiom meant discharging it in Planner.v
+    would have left an identical assumption standing here.
+
+    It now genuinely imports Planner.v, so [modality] (an [Inductive]),
+    [node], [optimize] (a [Definition]) and the discharged
+    [optimize_is_permutation] [Theorem] all come from one place. *)
+
 Parameter octad : Type.
 
-Definition node : Type := (modality * list condition)%type.
-Definition plan : Type := list node.
+Definition plan : Type := logical_plan.
 Definition state : Type := list octad.
 
 (** ** Per-node execution semantics
@@ -87,12 +101,12 @@ Fixpoint exec_plan (p : plan) (s : state) : state :=
   | n :: rest => exec_plan rest (exec_node n s)
   end.
 
-(** ** Optimizer (axiomatised from Planner.v) *)
+(** ** Optimizer
 
-Parameter optimize : plan -> plan.
-
-Axiom optimize_is_permutation :
-  forall p, Permutation p (optimize p).
+    Imported from Planner.v, where [optimize] is [Mergesort]'s [sort] under a
+    decidable total order and [optimize_is_permutation] is a [Theorem]
+    discharged from [Permuted_sort]. Previously both were re-declared here as
+    a [Parameter] and an [Axiom]. *)
 
 (** ** Helper: exec_plan is invariant under permutation of nodes *)
 Theorem exec_plan_perm_invariant :

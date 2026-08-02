@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 = VeriSimDB External Adoption Strategy
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :toc: left
@@ -387,8 +387,8 @@ Any external adopter should know:
 | VCL-DT proofs incomplete | PROOF clauses parse but don't generate verifiable
   certificates yet. Lean type checker integration planned Q2 2026.
 
-| No SQL dialect | VQL is intentionally not SQL. Users wanting familiar syntax
-  need to learn VQL (comprehensive docs provided).
+| No SQL dialect | VCL is intentionally not SQL. Users wanting familiar syntax
+  need to learn VCL (comprehensive docs provided).
 
 | Query planner is basic | Queries using all 8 modalities may not be optimally
   planned. Single-modality queries perform well.

@@ -157,7 +157,7 @@ for vql_file in "${VQL_DIR}"/*.vql; do
   # Escape double quotes in the query for JSON payload
   ESCAPED_QUERY=$(echo "$QUERY" | sed 's/"/\\"/g')
 
-  RESULT=$(curl -sf -X POST "${API_URL}/vql/execute" \
+  RESULT=$(curl -sf -X POST "${API_URL}/vcl/execute" \
     -H "Content-Type: application/json" \
     -d "{\"query\": \"${ESCAPED_QUERY}\"}" 2>/dev/null || echo '{"error": "query execution failed or server unreachable"}')
 
