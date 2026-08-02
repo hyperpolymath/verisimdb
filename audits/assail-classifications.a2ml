@@ -1,0 +1,73 @@
+;; SPDX-License-Identifier: MPL-2.0
+;; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+;; assail-classifications.a2ml — audited panic-attack findings for verisimdb.
+;;
+;; Read by panic-attack >= 2.5.5 (load_user_classifications): findings
+;; matching (file, category) flip to suppressed = true after the kanren
+;; structural pass. Entries are AUDITED-SOUND residuals with rationale;
+;; the registry lives apart from the source so a code edit cannot
+;; self-suppress (panic-attack CLAUDE.md, User-Classification Registry).
+;;
+;; Audit trail: 2026-06-11 estate-loop session — fresh panic-attack
+;; 2.5.5 scan; every entry inspected at source.
+
+(assail-classifications
+  ;; ── Documentation examples misread as credentials ────────────────
+  (classification
+    (file "elixir-orchestration/lib/verisim/federation/adapters/object_storage.ex")
+    (category "HardcodedSecret")
+    (audit "object_storage.ex:25-50 @moduledoc — MinIO/S3 configuration examples")
+    (rationale "doc examples; \"minioadmin\" is MinIO's published default (matches test-infra), \"AKIA...\" is a literal ellipsis placeholder"))
+  (classification
+    (file "connectors/clients/elixir/lib/verisim_client/federation.ex")
+    (category "HardcodedSecret")
+    (audit "federation.ex:21 @moduledoc usage example — api_key: \"example-peer-key-123\"")
+    (rationale "doc example with example- prefixed placeholder; no credential present"))
+
+  ;; ── stringify→parseExn round-trips inside try blocks ─────────────
+  ;; `params->Obj.magic->JSON.stringify->JSON.parseExn` cannot fail
+  ;; (stringify output is always valid JSON) and every call site is
+  ;; inside `try { } catch` returning result<_, VeriSimError.t>. The
+  ;; graceful degradation the finding asks for is already present.
+  (classification
+    (file "connectors/clients/rescript/src/VeriSimVcl.res")
+    (category "UnsafeDeserialization")
+    (audit "try-wrapped stringify→parseExn round-trips")
+    (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+  (classification
+    (file "connectors/clients/rescript/src/VeriSimFederation.res")
+    (category "UnsafeDeserialization")
+    (audit "try-wrapped stringify→parseExn round-trips")
+    (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+  (classification
+    (file "connectors/clients/rescript/src/VeriSimProvenance.res")
+    (category "UnsafeDeserialization")
+    (audit "try-wrapped stringify→parseExn round-trips")
+    (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+  (classification
+    (file "connectors/clients/rescript/src/VeriSimDrift.res")
+    (category "UnsafeDeserialization")
+    (audit "VeriSimDrift.res:77 — JSON.parseExn(\"{}\") constant, inside try")
+    (rationale "parse of a constant literal inside try; cannot throw"))
+  (classification
+    (file "connectors/clients/rescript/src/VeriSimHexad.res")
+    (category "UnsafeDeserialization")
+    (audit "try-wrapped stringify→parseExn round-trips")
+    (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+  (classification
+    (file "connectors/clients/rescript/src/VeriSimSearch.res")
+    (category "UnsafeDeserialization")
+    (audit "VeriSimSearch.res:80-200 — six try-wrapped stringify→parseExn round-trips")
+    (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+
+  ;; ── Allocation bounded by an explicit guard the scanner cannot see ──
+  ;; assail flags the growth pattern (String::new + push_str in a loop)
+  ;; syntactically; it does not prove bounds, so the guard added below does
+  ;; not clear the finding. Re-verified 2026-07-21: still reported after the
+  ;; fix, hence this entry rather than a code change alone.
+  (classification
+    (file "rust-core/verisim-repl/src/main.rs")
+    (category "UnboundedAllocation")
+    (audit "main.rs — REPL backslash-continuation buffer `query_buf`; guarded by MAX_QUERY_BUF_BYTES (1 MiB) since 2026-07-21")
+    (rationale "growth is bounded: the continuation branch checks query_buf.len() + line + 1 against MAX_QUERY_BUF_BYTES and clears the buffer on overflow, so the allocation cannot exceed 1 MiB regardless of input length"))
+)

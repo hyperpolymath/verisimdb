@@ -112,7 +112,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> TemporalSt
                 .map_err(|_| TemporalError::LockPoisoned)?;
             let versions = store.entry(entity_id.to_string()).or_default();
 
-            let next_version = versions.keys().last().map(|v| v + 1).unwrap_or(1);
+            // O(log n) via the BTreeMap's ordered end, not an O(n) full walk.
+            let next_version = versions.keys().next_back().map(|v| v + 1).unwrap_or(1);
             let mut version = Version::new(next_version, data, author);
             if let Some(msg) = message {
                 version = version.with_message(msg);
@@ -134,7 +135,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> TemporalSt
             .map_err(|_| TemporalError::LockPoisoned)?;
         Ok(store
             .get(entity_id)
-            .and_then(|versions| versions.values().last().cloned()))
+            .and_then(|versions| versions.values().next_back().cloned()))
     }
 
     async fn at_version(
@@ -160,13 +161,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> TemporalSt
             .versions
             .read()
             .map_err(|_| TemporalError::LockPoisoned)?;
-        Ok(store.get(entity_id).and_then(|versions| {
-            versions
-                .values()
-                .filter(|v| v.timestamp <= time)
-                .last()
-                .cloned()
-        }))
+        Ok(store
+            .get(entity_id)
+            .and_then(|versions| versions.values().rfind(|v| v.timestamp <= time).cloned()))
     }
 
     async fn in_range(

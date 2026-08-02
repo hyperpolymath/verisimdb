@@ -5,16 +5,39 @@ name: Security Scan
 on:
   push:
     branches: [main]
+  # No `pull_request:` trigger by design -- this scan pushes a report to
+  # verisimdb-data, which should happen for main, not for every PR. That does
+  # mean a change to THIS file cannot be verified pre-merge; a temporary
+  # `pull_request:` trigger was added on this branch to prove the fix below,
+  # then removed. Verifying run: 29831433656 (commit 4cd3f20) -- the workflow
+  # loaded, the scan executed, and only the dispatch step failed (HTTP 401,
+  # expired VERISIMDB_PAT). Re-add the trigger the same way if you touch this.
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   scan:
-    uses: hyperpolymath/panic-attacker/.github/workflows/scan-and-report.yml@ea88be7da68e07249ae7df8b948ecb8ecfb9664c # main 2026-05-20
-    timeout-minutes: 15
+    # `hyperpolymath/panic-attacker` NO LONGER EXISTS: the repo was renamed to
+    # `hyperpolymath/panic-attack`. The REST API transparently follows repo
+    # renames, so every API probe of the old name appears to succeed — but
+    # GitHub Actions does NOT follow renames when resolving a reusable
+    # workflow's `uses:`. The call therefore failed at workflow-LOAD time,
+    # which is why every run since at least 2026-07-14 reported
+    # `conclusion: failure` with zero jobs, no retrievable log, and this
+    # workflow's registry entry stuck showing the file path instead of
+    # "Security Scan" (GitHub never parsed the file).
+    #
+    # Pin refreshed at the same time: the previous pin (2dc1393c, 2026-05-20)
+    # predates the upstream fix that skips the cross-repo dispatch when
+    # VERISIMDB_PAT is absent and that chunks oversized payloads.
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@774dceb6373d798ad4d96a9e40c3993942c2836e # main 2026-07-19
     secrets:
       VERISIMDB_PAT: ${{ secrets.VERISIMDB_PAT }}

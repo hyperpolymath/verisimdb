@@ -1,0 +1,263 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= VeriSimDB Deep Review & July-1 Plan (2026-06-11)
+:toc: left
+:toclevels: 2
+:sectnums:
+
+== Purpose and verdict
+
+A full fresh review of VeriSimDB (Rust core, Elixir orchestration, VCL/VCL
+surface, docs, CI), conducted 2026-06-11, with a targeted three-week plan to
+make the project genuinely plausible and respectable by 2026-07-01. The plan
+optimises for *truth and demonstrability*, not feature count: close the gap
+between what the README claims and what the code does, make the first hour
+flawless for a visitor, and connect VCL-total to the engine for real.
+
+*Verdict in one paragraph.* VeriSimDB is a real, working, well-tested
+multi-modal CRUD engine — ~41.6k LOC Rust (295 tests, all green, verified
+this session), ~15.5k LOC Elixir (615 test cases), near-zero TODO debt,
+REUSE-clean, 19 CI workflows. The octad coordinator, WAL, persistence layer,
+planner, three protocol surfaces (REST/GraphQL/gRPC), REPL, provenance
+hash-chain, and federation adapters are genuine engineering. The two
+*differentiating* claims, however — drift detection and self-normalisation —
+are currently disconnected at the integration layer: real drift mathematics
+exists but has zero callers, and normalisation derives repairs without ever
+writing them back. Both ends of every broken seam already exist; the July-1
+work is wiring, not invention.
+
+== What is verified real (build + test ground truth)
+
+* `cargo check --workspace --all-targets`: clean, 78 s (this session).
+* `cargo test --workspace`: *295 passed, 0 failed* across 15 suites
+  (this session).
+* Test culture is substantive: dedicated atomicity suite for the octad
+  store, proptests on the WAL, insta snapshot tests on the planner,
+  criterion benches, a libfuzzer target for the VCL tokenizer.
+* Zero `todo!`/`unimplemented!`/`FIXME` in the Rust tree; several crates
+  carry `#![forbid(unsafe_code)]`.
+
+Per-crate reality (abridged):
+
+[cols="1,1,3"]
+|===
+|Crate |Verdict |Notes
+
+|verisim-octad (4.8k LOC, 57 tests)
+|REAL — strongest crate
+|WAL intent -> per-modality locks -> writes -> COMMITTED marker -> replay
+recovery. Rollback covers vector/document/tensor; graph/semantic rollback
+gap acknowledged at `store.rs:624`.
+
+|verisim-wal (2.0k, 39 tests)
+|REAL
+|CRC32-framed segmented log, fsync modes, corrupted-tail handling,
+proptests. Production-grade shape.
+
+|verisim-storage (1.9k, 41 tests)
+|REAL
+|redb abstraction consumed by six persistent backends (feature-gated;
+load-all-into-RAM on open, honestly documented).
+
+|verisim-graph / -document / -temporal / -provenance
+|REAL
+|Indexed triples (oxigraph behind off-by-default flag); Tantivy; versioning;
+SHA-256 hash chain with `verify_chain`.
+
+|verisim-vector (1.2k, 12 tests)
+|REAL, mis-deployed
+|Default + persistent paths are brute-force. A hand-rolled, *correct*
+HNSW (660 LOC, same `VectorStore` trait) sits orphaned.
+
+|verisim-spatial (1.3k, 39 tests)
+|REAL but brute-force
+|Haversine scan; no R-tree despite docs claim (`lib.rs:17,269` admits it).
+
+|verisim-tensor (0.5k)
+|PARTIAL
+|Storage only, zero tensor ops; `burn` declared and entirely unused
+(pure compile-time weight).
+
+|verisim-semantic (3.3k, 54 tests)
+|REAL code, oversold branding
+|"ZKP" = SHA-256 commitment-reveal + Merkle inclusion + R1CS constraint
+checking. Sound, tested (52/52), *not zero-knowledge*. One verify arm
+returns `true` unconditionally for bare commitments
+(`zkp.rs:190-206`); nonce is deterministic (`zkp_bridge.rs:339`);
+`verification_key` is never read (`circuit_registry.rs:268`).
+`zkp_bridge.rs:10`: "Full ZK-SNARK via sanctify is designed but not yet
+compiled in."
+
+|verisim-drift (1.2k, 11 tests)
+|Real maths, ORPHANED
+|`DriftCalculator` has zero callers in the workspace.
+`DriftDetector::record` is never invoked by API, octad, or normalizer.
+
+|verisim-normalizer (3.9k, 59 tests)
+|SKELETON at the seam
+|Decision + derivation logic real; strategies return descriptions with
+`success: true` without mutating stores; sole `ModalityRegenerator` impl
+returns drift 0.0 "to signal a successful conceptual repair"
+(`regeneration.rs:535-543`). KNOWN-ISSUES marks the 2026-02-12 fix
+RESOLVED — true for derivation, not yet for write-back or API wiring.
+
+|verisim-planner (7.0k, 121 tests)
+|REAL, advisory-only
+|Cost model, optimizer, prepared statements, slow-query log,
+EXPLAIN/EXPLAIN ANALYZE; wired into `/query/plan` + `/query/explain`.
+No executor consumes `PhysicalPlan` yet — honest framing needed.
+
+|verisim-api (9.0k, 53 tests)
+|REAL CRUD/search/VCL; theatre at drift/normalize endpoints
+|REST + GraphQL + gRPC genuinely served. `/drift/status` returns
+initialized-to-zero metrics forever; `/drift/entity/{id}` returns global
+zeros labelled per-entity (`lib.rs:1189-1233`); `POST
+/normalizer/normalize/{id}` checks existence, returns 202, does nothing
+(`lib.rs:1262`); `/transactions/*` drive a manager no write path
+participates in; search scores are fabricated from rank
+(`lib.rs:1088,1124`: `1.0 - 0.1*i`).
+
+|verisim-repl (2.6k, 67 tests)
+|REAL
+|rustyline REPL -> HTTP `/vql/execute`; linter, formatter, highlighter,
+completion, table output.
+
+|verisim-nif (204 LOC, 0 tests)
+|100% STUB — dangerous
+|Every NIF returns canned success JSON ("store integration pending").
+If `VERISIM_TRANSPORT=nif|auto` selects it, writes silently vanish.
+|===
+
+Elixir layer (static review; Elixir not installed in this container):
+real OTP application — supervision tree boots Telemetry, EntityRegistry +
+DynamicSupervisor, DriftMonitor, QueryRouter, SchemaRegistry, KRaft
+consensus node (single-node bootstrap), Federation Resolver. Transport
+defaults to HTTP. 14 federation adapters (237–650 LOC each) with real
+modality->capability mapping and optional native wire drivers (postgrex,
+redix, exqlite, bolt_sips). VCL surface exists three times over: ReScript
+(`src/vql`, incl. bidirectional type checker + proof obligations), Elixir
+(`query/vcl_*`), and the Rust planner bridge consuming the ReScript AST
+JSON. Coq models for Octad/Drift/Normalizer/Planner under `formal/` with a
+CI build.
+
+== Where the claims outrun the code
+
+. *Drift is never measured on real data.* The flagship sentence of the
+  README describes a loop that does not run.
+. *Normalisation never repairs.* Derivation without write-back; the API
+  endpoint is a 202 no-op.
+. *Per-entity drift endpoint misreports* global zeros as entity-specific.
+. *Time-travel (`at_time`) returns current state* with a version number
+  attached (`verisim-octad/src/store.rs:1481-1486`) — the stored
+  `OctadSnapshot` contains everything needed to do it honestly.
+. *NIF fakes success.*
+. *Search scores are rank-derived constants*, though Tantivy BM25 and
+  cosine scores are available.
+. *"ZKP" naming* oversells commitment/Merkle/R1CS machinery.
+. *"HNSW similarity search" / "R-tree spatial"* in docs vs brute-force in
+  both default paths (HNSW exists, unused; R-tree absent).
+. *VCL-total integration is prose-only.* No code path in this repo invokes
+  vcl-ut; `vql-bridge/` is a single JS parser port. The README's central
+  triad (engine / VCL / VCL-total) has no executable seam.
+. *Doc duplication/staleness:* CHANGELOG.adoc and CHANGELOG.md both exist;
+  KNOWN-ISSUES item 1 is over-resolved; CLAUDE.md still says `.scm`
+  machine-readable artefacts while the tree has migrated to A2ML.
+
+== The July-1 plan (three weeks, targeted)
+
+Theme: *make the flagship claims true, make the first hour flawless,
+connect the two repos.* Every item below has both ends already built;
+the work is wiring and honesty, not research. Effort: S = half-day,
+M = 1–2 days.
+
+=== Week 1 (Jun 12–18) — make the consonance loop real
+
+. *Wire drift-on-write (M, highest leverage).* After octad commit, compute
+  embedding-free drift components per entity — temporal consistency
+  (timestamps already stored), schema drift (modality presence),
+  provenance drift (`verify_chain` exists), tensor staleness — and call
+  `DriftDetector::record`. `/drift/status` becomes live immediately.
+. *Honest per-entity drift (S).* `/drift/entity/{id}` computes on demand
+  from that entity's modalities; delete the global-zeros shim.
+. *One real regenerator (M).* In verisim-api (which owns concrete
+  stores): regenerate vector from document via deterministic
+  hash-embedding, tensor from vector reshape; wire through
+  `RegenerationEngine::with_regenerator`; write back via the octad store.
+. *Connect `POST /normalizer/normalize/{id}` (M).* Measured drift ->
+  regenerate -> write -> re-measure -> respond with before/after scores.
+  This closes detect->repair end-to-end.
+. *Scripted demo I: `just demo-consonance` (M).* Create entity -> mutate
+  document only -> drift detected (real numbers) -> normalize -> drift
+  falls -> provenance chain verifies. Transcript captured into README.
+  This is the artefact to show on July 1.
+
+=== Week 2 (Jun 19–25) — truth sweep + cheap wins
+
+[start=6]
+. *Swap default vector store to the existing HNSW (S).* Same trait;
+  turns an orphaned 660-LOC asset into a true headline.
+. *Plumb real search scores (S).* BM25 + cosine through
+  `SearchResultResponse`.
+. *NIF: fail loudly (S).* Every stub returns `{:error,
+  :not_implemented}`; `auto` must not prefer a fake transport. (Full NIF
+  wiring is a non-goal for July.)
+. *Honest `at_time` (S/M).* Reconstruct from the stored `OctadSnapshot`,
+  or return 501 until done.
+. *Transactions endpoints (S).* Bridge to the octad store's real
+  `TransactionManager` or return 501; no fake 200s.
+. *Rename the ZKP surface (S).* "Integrity commitments + Merkle
+  membership + R1CS constraint checking; ZK-SNARK planned via sanctify."
+  Fix the unconditional-true verify arm; KNOWN-ISSUES entry for the
+  deterministic nonce.
+. *Docs truth pass (M).* README/CLAUDE.md claims aligned with code
+  (spatial = brute-force for now; HNSW true after item 6; drop unused
+  `burn`; planner framed as advisory); KNOWN-ISSUES normalizer entry
+  re-scoped to "derivation real, write-back landed <date>"; delete
+  duplicate CHANGELOG.md; refresh `.machine_readable/` and CLAUDE.md
+  (`.scm` -> A2ML).
+. *Auth reachability decision (S).* Either add a key-registration path or
+  state plainly that authn ships disabled in 0.x.
+
+=== Week 3 (Jun 26 – Jul 1) — connect VCL-total + release
+
+[start=15]
+. *Minimal real admissibility gate (M, cross-repo).* vcl-ut's
+  `vcltotal-parse` already builds standalone (verified: 19/19 tests) and
+  has a wire format + decider. Ship a tiny `vclt-gate` binary there
+  (stdin: statement, stdout: verdict JSON with level-tagged reasons,
+  static levels L1–L4). VeriSimDB's VCL execute path invokes it when
+  present (env/feature-gated). The README triad becomes executable.
+. *Scripted demo II: admissibility (S).* Well-formed DECLARE/ASSERT
+  admitted; malformed/unsafe statement rejected with reasons. Transcript
+  into README.
+. *Release hygiene (M).* CI green on both repos; CHANGELOG entries; tag
+  `v0.2.0`; demo transcripts linked from READMEs; KNOWN-ISSUES refreshed
+  as of 2026-07-01.
+
+=== Explicit non-goals for July 1
+
+Real ZK-SNARKs; live federation certification against external DBs;
+R-tree spatial; full NIF data path; multi-node KRaft; physical-plan
+executor; LSP/DAP completion; fleet dispatch. Each stays on the roadmap,
+honestly labelled.
+
+== Definition of "respectable" (acceptance criteria)
+
+. Fresh clone builds and tests green with zero sibling checkouts —
+  both repos.
+. One-command demo shows detect -> repair with real, changing numbers.
+. The admissibility gate connects VCL-total to the engine in code, not
+  prose, for at least the static levels.
+. Every README claim is either true today or explicitly labelled
+  *planned*.
+. Tagged release with an honest CHANGELOG and a refreshed KNOWN-ISSUES.
+
+== Strengths worth showcasing (unchanged by this review)
+
+The octad atomicity machinery, the WAL, provenance verification, the
+planner's EXPLAIN surface, three live protocol surfaces from one process,
+the polished REPL, 14-adapter federation design, the Coq models, and the
+repo's hygiene (REUSE, fuzzing, benches, zero TODO debt). The honest
+KNOWN-ISSUES culture is itself a differentiator — this plan extends it
+rather than replacing it.

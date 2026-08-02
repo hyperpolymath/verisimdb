@@ -8,7 +8,7 @@
     <void:Dataset rdf:about="https://verisimdb.dev/dataset">
         <dcterms:title>verisimdb Dataset</dcterms:title>
         <dcterms:description>Linked data from verisimdb project</dcterms:description>
-        <dcterms:license rdf:resource="https://palimpsest.spdx.dev"/>
+        <dcterms:license rdf:resource="https://spdx.org/licenses/MPL-2.0.html"/>
         <void:sparqlEndpoint rdf:resource="https://verisimdb.dev/sparql"/>
         <void:dataDump rdf:resource="https://verisimdb.dev/dataset.ttl"/>
     </void:Dataset>

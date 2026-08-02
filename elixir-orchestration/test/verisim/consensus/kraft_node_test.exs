@@ -36,6 +36,20 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
     :exit, _ -> :ok
   end
 
+  defp wait_for_leader(node_id, attempts \\ 50) do
+    case KRaftNode.diagnostics(node_id) do
+      %{role: :leader} ->
+        :ok
+
+      _ when attempts > 0 ->
+        Process.sleep(20)
+        wait_for_leader(node_id, attempts - 1)
+
+      _ ->
+        flunk("node #{node_id} did not become leader")
+    end
+  end
+
   describe "single-node leader election" do
     test "node with 0 peers becomes leader within 500ms" do
       node_id = "solo-#{System.unique_integer([:positive])}"
@@ -155,40 +169,55 @@ defmodule VeriSim.Consensus.KRaftNodeTest do
 
   describe "dynamic membership — add_server" do
     test "leader accepts add_server and new peer appears in registry members" do
-      node_id = "add-#{System.unique_integer([:positive])}"
+      suffix = System.unique_integer([:positive])
+      node_id = "add-#{suffix}"
+      peer_id = "add-peer-#{suffix}"
+
       pid = start_kraft(node_id)
+      wait_for_leader(node_id)
 
-      Process.sleep(500)
+      # The peer must be a real, responding process: under the
+      # latest-config-in-log rule the add entry itself commits against the
+      # NEW configuration {leader, peer}, so the peer has to acknowledge
+      # replication. (You cannot add a server that never responds.)
+      peer_pid = start_kraft(peer_id, [node_id])
 
-      assert {:ok, _index} = KRaftNode.add_server(node_id, "new-peer-1", [])
+      assert {:ok, _index} = KRaftNode.add_server(node_id, peer_id, [node_id])
 
       Process.sleep(100)
 
       registry = KRaftNode.registry(node_id)
       members = get_in(registry, [:config, :members]) || []
-      assert "new-peer-1" in members
+      assert peer_id in members
 
+      stop_kraft(peer_pid)
       stop_kraft(pid)
     end
   end
 
   describe "dynamic membership — remove_server" do
     test "leader accepts remove_server and peer is removed from registry members" do
-      node_id = "rm-#{System.unique_integer([:positive])}"
+      suffix = System.unique_integer([:positive])
+      node_id = "rm-#{suffix}"
+      peer_id = "rm-peer-#{suffix}"
+
       pid = start_kraft(node_id)
+      wait_for_leader(node_id)
+      peer_pid = start_kraft(peer_id, [node_id])
 
-      Process.sleep(500)
-
-      # Add then remove
-      {:ok, _} = KRaftNode.add_server(node_id, "ephemeral-peer", [])
+      # Add a real peer, then remove it. The removal commits against the
+      # post-removal configuration {leader} (latest-config-in-log rule), so
+      # it cannot deadlock on the departing peer's acknowledgement.
+      {:ok, _} = KRaftNode.add_server(node_id, peer_id, [node_id])
       Process.sleep(100)
-      {:ok, _} = KRaftNode.remove_server(node_id, "ephemeral-peer")
+      {:ok, _} = KRaftNode.remove_server(node_id, peer_id)
       Process.sleep(100)
 
       registry = KRaftNode.registry(node_id)
       members = get_in(registry, [:config, :members]) || []
-      refute "ephemeral-peer" in members
+      refute peer_id in members
 
+      stop_kraft(peer_pid)
       stop_kraft(pid)
     end
   end

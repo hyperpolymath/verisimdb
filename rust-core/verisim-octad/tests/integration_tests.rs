@@ -3,7 +3,11 @@
 //! Integration tests for VeriSimDB
 //!
 //! Tests cross-modal consistency and end-to-end workflows.
-//! Persistence tests are gated behind `#[ignore]` until store serialization is implemented.
+//!
+//! There are no `#[ignore]`d tests here. Disk persistence is not a property of
+//! the in-memory stores this file exercises; it lives in the sibling
+//! `Persistent*` variants (`verisim-{vector,tensor,semantic,temporal}/src/persistent.rs`)
+//! and is covered by unit tests there. See the note above `test_modality_isolation`.
 
 use std::sync::Arc;
 use verisim_document::TantivyDocumentStore;

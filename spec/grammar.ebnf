@@ -1,7 +1,7 @@
 (* @taxonomy: spec/grammar *)
 (* SPDX-License-Identifier: MPL-2.0 *)
 (* Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> *)
-(* VeriSim Query Language (VQL) Grammar *)
+(* VeriSim Consonance Language (VCL) Grammar *)
 (* Format: Extended Backus-Naur Form (EBNF) *)
 (* Version: 3.0 — Octad (8 modalities), provenance conditions, spatial conditions *)
 (* Date: 2026-02-27 *)

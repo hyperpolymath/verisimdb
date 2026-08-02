@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VeriSimDB Zig Client SDK
 :author: Jonathan D.A. Jewell
@@ -27,7 +27,7 @@ rather than via a maintained per-language SDK.
 | `src/drift.zig`       | Drift: `score / status / normalize`.
 | `src/provenance.zig`  | Provenance: `chain / record / verify`.
 | `src/search.zig`      | Multi-modal search: text / vector / spatial / nearest / related.
-| `src/vql.zig`         | VQL: `execute / explain`.
+| `src/vcl.zig`         | VCL: `execute / explain`.
 | `src/federation.zig`  | Federation: `registerPeer / listPeers / query`.
 |===
 

@@ -29,10 +29,10 @@ jobs:
   build:
     name: Compile Coq proofs + assumptions guard
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Coq
         run: |
@@ -91,6 +91,12 @@ jobs:
           set -euo pipefail
           coqc -q PlannerSemantic.v | tee PlannerSemantic.out
 
+      - name: Compile Octad.v
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Octad.v | tee Octad.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -148,10 +154,18 @@ jobs:
         working-directory: formal
         run: |
           set -euo pipefail
-          # Whitelist: modality, condition, optimize, optimize_is_permutation
+          # Whitelist: condition, node_cost.
+          #
+          # Tightened 2026-07-28. Was: modality, condition, optimize,
+          # optimize_is_permutation. `optimize_is_permutation` is now a Theorem
+          # discharged from Coq.Sorting.Mergesort's Permuted_sort, and both
+          # `modality` and `optimize` are concrete definitions, so all three
+          # must NOT reappear here. Re-adding any of them would let the axiom
+          # come back silently -- this list is the acceptance test for that
+          # work, not bookkeeping.
           UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Planner.out \
             | sort -u \
-            | grep -vE '^(modality|condition|optimize|optimize_is_permutation)$' || true)
+            | grep -vE '^(condition|node_cost)$' || true)
           if [ -n "$UNEXPECTED" ]; then
             echo "ERROR(Planner): unexpected axiom(s) in Print Assumptions:"
             echo "$UNEXPECTED"
@@ -159,7 +173,7 @@ jobs:
             cat Planner.out
             exit 1
           fi
-          echo "OK(Planner): Q1-lite 3 theorems x 4 axioms whitelisted"
+          echo "OK(Planner): Q1-lite 3 theorems x 2 parameters whitelisted (0 propositional axioms)"
 
       - name: Verify WAL assumptions whitelist
         working-directory: formal
@@ -213,7 +227,7 @@ jobs:
           set -euo pipefail
           UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' PlannerSemantic.out \
             | sort -u \
-            | grep -vE '^(modality|condition|octad|exec_node|exec_node_comm|optimize|optimize_is_permutation)$' || true)
+            | grep -vE '^(condition|node_cost|octad|exec_node|exec_node_comm)$' || true)
           if [ -n "$UNEXPECTED" ]; then
             echo "ERROR(PlannerSemantic): unexpected axiom(s):"
             echo "$UNEXPECTED"
@@ -221,3 +235,22 @@ jobs:
             exit 1
           fi
           echo "OK(PlannerSemantic): Q1-full semantic equivalence + membership"
+
+      - name: Verify Octad assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Whitelist: 2 Parameters (mval, ident) + functional_extensionality_dep
+          # (Coq stdlib). modality is inductive; resolve is an operation
+          # argument — neither is an axiom.
+          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Octad.out \
+            | sort -u \
+            | grep -vE '^(mval|ident|functional_extensionality_dep)$' || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Octad): unexpected axiom(s) in Print Assumptions:"
+            echo "$UNEXPECTED"
+            echo "---"
+            cat Octad.out
+            exit 1
+          fi
+          echo "OK(Octad): O-series + R1-R3 modality algebra whitelisted"

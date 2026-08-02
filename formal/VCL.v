@@ -6,7 +6,7 @@
     Mechanises the foundation-pack theorem V2 (vql_preservation) for
     VCL (the VeriSim Consonance Language; renamed from VQL on
     2026-04-05). The original semantics in
-    [docs/vql-formal-semantics.adoc] use BIG-STEP evaluation
+    [docs/vcl-formal-semantics.adoc] use BIG-STEP evaluation
     [e ⇓ v], which does not compose with preservation as classically
     stated. This module closes #92 by introducing a minimal
     SMALL-STEP calculus and proving preservation against it.
@@ -42,6 +42,12 @@
 *)
 
 Require Import Coq.Init.Logic.
+
+(* Keep Print Assumptions output on one line per axiom: the CI and Justfile
+   guards match /^name :/ with awk, and Coq's default ~78-column wrap would
+   split a longer axiom type across lines and silently escape the check. *)
+Set Printing Width 400.
+
 
 (** ** Syntax *)
 

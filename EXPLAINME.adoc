@@ -1,310 +1,130 @@
-// SPDX-License-Identifier: MPL-2.0
-// SPDX-FileCopyrightText: 2025-2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= VeriSimDB — Show Me The Receipts
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= EXPLAINME — VeriSimDB Orientation
 :toc:
-:icons: font
+:toc-placement!:
 
-The `README.adoc` makes claims. This file shows where to look for the
-evidence: source files, runnable commands, canonical-count docs. It is
-deliberately count-free at the prose level — every number lives in
-exactly one place and is referenced from here.
+[.lead]
+**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-total validates whether proposed identity transitions are admissible.**
 
-== How to read this file
+This is the human-readable orientation. For the feature/benefit framing see
+link:README.adoc[README.adoc]; for the normative VCL grammar see
+link:docs/VCL-SPEC.adoc[the VCL specification] (file still historically named
+`VCL-SPEC.adoc`).
 
-Each section quotes a claim from `README.adoc`, then names the file or
-command that backs it up. If you want a specific number, run the
-command; if you want the canonical version of a tier or count, follow
-the link.
+toc::[]
 
-== Octad: one entity, eight representations
+== The one idea to hold onto
 
-[quote, README section "What VeriSimDB Does"]
-____
-Each entity exists simultaneously across up to 8 representations (the
-octad) with automatic drift detection and self-normalisation.
-____
+If you take away a single thing: a VeriSimDB "entity" is **not a row**. It is a
+**consonance subject** — an identity under continuous maintenance across up to
+eight *modal witnesses* (the octad: graph, vector, tensor, semantic, document,
+temporal, provenance, spatial). The system's job is not storage; it is deciding,
+continuously, whether those witnesses still cohere as one identity — and what to
+do when they do not.
 
-*Evidence — eight modality crates:*
+So the verbs are not CRUD. They are **lifecycle transitions** on identity claims:
+declare, assert, inspect, verify, transform, retract, merge, split, normalise,
+tombstone.
 
-* `rust-core/verisim-graph/` — RDF + property graph storage (pure-Rust redb default, Oxigraph optional)
-* `rust-core/verisim-vector/` — HNSW-based similarity search
-* `rust-core/verisim-tensor/` — multi-dimensional array operations via Burn
-* `rust-core/verisim-semantic/` — ontology + CBOR-proof type annotations
-* `rust-core/verisim-document/` — full-text search via Tantivy
-* `rust-core/verisim-temporal/` — versioning + time-series
-* `rust-core/verisim-provenance/` — origin tracking, lineage chain, actor trail
-* `rust-core/verisim-spatial/` — geospatial coordinates + R-tree proximity queries
+== Why "consonance", not "consistency"
 
-*Evidence — unified entity abstraction:*
+Classic databases enforce *consistency* up front (transactions, locks) and treat
+divergence as an error to prevent. VeriSimDB instead expects modal witnesses to
+drift — a document is edited before its embedding is recomputed; a spatial
+coordinate is refined independently of the text — and treats that drift as a
+**first-class, typed condition** to be measured, classified, and repaired. The
+maintained property is *consonance*: the witnesses still refer to the same
+identity, within policy.
 
-* `rust-core/verisim-octad/` — the one-ID-eight-stores layer that binds the
-  modalities into a single `Octad` entity type.
+A modality failure is therefore **not** automatically an identity failure. These
+are distinct states with distinct proof obligations and repair paths:
 
-*Reproduce:*
-
-[source, sh]
-----
-$ find rust-core -name "Cargo.toml" -not -path "*/fuzz/*" | wc -l    # crate count
-$ ls rust-core/verisim-{graph,vector,tensor,semantic,document,temporal,provenance,spatial}/Cargo.toml
-----
-
-== Drift detection
-
-[quote, README section "What VeriSimDB Does"]
-____
-When VeriSimDB detects that an entity's vector embedding has diverged
-from its document content, or that a provenance chain's hash integrity
-is broken, or that spatial coordinates no longer match location
-references in the text — it identifies the drift type, scores the
-severity, and triggers repair automatically.
-____
-
-*Evidence — implementation:*
-
-* `rust-core/verisim-drift/` — drift detector crate; cross-modal
-  consistency monitoring with configurable severity thresholds.
-
-*Evidence — formal model:*
-
-* `formal/Drift.v` — Coq mechanisation of drift detection semantics +
-  drift-type taxonomy.
-
-The drift-type list (`semantic_vector_drift`, `graph_document_drift`,
-`temporal_consistency_drift`, `tensor_drift`, `schema_drift`,
-`quality_drift`) is documented in `.claude/CLAUDE.md` under "Drift
-Detection".
-
-== Self-normalisation
-
-[quote, README section "What VeriSimDB Does"]
-____
-… and triggers repair automatically.
-____
-
-*Evidence — implementation:*
-
-* `rust-core/verisim-normalizer/` — the repair engine. Identifies the
-  most authoritative modality, regenerates drifted modalities from it,
-  validates consistency, and updates all modalities atomically.
-
-*Evidence — formal model:*
-
-* `formal/Normalizer.v` — Coq mechanisation of the normalisation
-  procedure + atomicity invariants.
-
-== Provenance integrity
-
-[quote, README section "What VeriSimDB Does"]
-____
-… or that a provenance chain's hash integrity is broken …
-____
-
-*Evidence — implementation:*
-
-* `rust-core/verisim-provenance/` — provenance modality crate; hash-chain
-  integrity, actor-search, lineage walk.
-
-*Evidence — formal model:*
-
-* `formal/Provenance.v` — Coq proofs P2 + P3 (append-preserves-verified,
-  build-chain-all-verified) closing the foundation-pack provenance
-  obligations. Landed via PR #87, extended via PR #103.
-
-== Query language (VCL)
-
-[quote, README + .claude/CLAUDE.md]
-____
-VCL — VeriSim Query Language (native query interface, NOT SQL)
-____
-
-*Evidence — implementation:*
-
-* `vql-bridge/` — VCL parser bridge (legacy name `VQL`, renamed
-  2026-04-05; rename incomplete across the tree per
-  `[[project_verisimdb_subject_of_everything]]`).
-* `rust-core/verisim-planner/` — cost-based query planner with formally
-  verified semantic equivalence (`formal/PlannerSemantic.v`,
-  `formal/Planner.v`).
-* `rust-core/verisim-repl/` — interactive VCL REPL.
-
-*Evidence — formal model:*
-
-* `formal/PlannerSemantic.v` — planner semantic-equivalence theorem
-  (Q1-full, the foundation-pack query obligation).
-* `formal/VCL.v` — VCL normalisation theorems (N2: normalise-idempotent;
-  V2: vql-preservation).
-
-== Write-ahead log + transactions
-
-[quote, .claude/CLAUDE.md]
-____
-WAL: Write-ahead log for VeriSimDB crash recovery
-____
-
-*Evidence — implementation:*
-
-* `rust-core/verisim-wal/` — WAL crate; pluggable storage backend
-  recovery semantics.
-* `rust-core/verisim-storage/` — pluggable storage-backend abstraction.
-
-*Evidence — formal model:*
-
-* `formal/WAL.v` — WAL replay idempotency proof (C7-Option-A: WAL replay
-  idempotent on observable state; closes the WAL portion of the
-  foundation-pack consistency obligations).
-* `formal/Transaction.v` — transaction state machine (C2:
-  txn_state_machine; asserts 0 axioms per the build oracle).
-
-== Elixir orchestration layer
-
-[quote, README + .claude/CLAUDE.md]
-____
-Elixir Orchestration Layer
-____
-
-*Evidence:*
-
-* `elixir-orchestration/lib/verisim/` — OTP supervision tree:
-** `entity_server.ex` — GenServer per entity
-** `drift_monitor.ex` — drift detection coordinator
-** `query_router.ex` — query distribution
-** `schema_registry.ex` — type system coordinator
-
-*Evidence — Hypatia integration (3 modules, 37 tests live):*
-
-* `elixir-orchestration/lib/verisim/hypatia/scan_ingester.ex`
-* `elixir-orchestration/lib/verisim/hypatia/pattern_query.ex`
-* `elixir-orchestration/lib/verisim/hypatia/dispatch_bridge.ex`
-
-== Testing
-
-[quote, README implicit]
-____
-Cross-modal consistency that catches drift before it causes damage —
-verified empirically and formally.
-____
-
-*Evidence — Rust integration tests:*
-
-[source, sh]
-----
-$ find rust-core -name "*.rs" -path "*/tests/*" | wc -l
-----
-
-*Evidence — Elixir tests (incl. 105 federation-adapter integration tests):*
-
-[source, sh]
-----
-$ find elixir-orchestration -name "*_test.exs" | wc -l
-$ cd elixir-orchestration && mix test --include integration
-----
-
-*Evidence — formal proofs:*
-
-[source, sh]
-----
-$ ls formal/*.v
-----
-
-Coq modules (8): `Drift`, `Normalizer`, `Planner`, `PlannerSemantic`,
-`Provenance`, `Transaction`, `VCL`, `WAL`. Built via
-`.github/workflows/coq-build.yml`; foundation-pack status tracked in
-`ROADMAP.md`.
-
-== Federation adapters
-
-[quote, .claude/CLAUDE.md "Test Infrastructure"]
-____
-105 tests across 7 adapter test files (MongoDB, Redis, Neo4j,
-ClickHouse, SurrealDB, InfluxDB, MinIO).
-____
-
-*Evidence:*
-
-* `connectors/test-infra/` — selur-compose stack: 7 databases on
-  `cgr.dev/chainguard/wolfi-base:latest`.
-* `elixir-orchestration/test/integration/` — adapter tests.
-
-== Client SDKs
-
-[quote, .claude/CLAUDE.md "Repository Structure"]
-____
-6 SDKs: Rust, Zig, Elixir, ReScript, Julia, Gleam
-____
-
-*Evidence:*
-
-* `connectors/clients/rust/Cargo.toml` — Rust SDK
-* `connectors/clients/elixir/mix.exs` — Elixir SDK
-* `connectors/clients/{zig,rescript,julia}/` — language-specific clients
-* (Gleam SDK was removed 2026-06-01 per commit ee3e902 "drop Gleam SDK".)
-
-== Container deployment
-
-[quote, README implicit + .claude/CLAUDE.md]
-____
-Podman > Docker; selur-compose for the full stack; ct-build.sh signs
-.ctp bundles via the stapeln ecosystem.
-____
-
-*Evidence:*
-
-* `container/Containerfile` — primary build (in-memory default; `--build-arg
-  FEATURES=persistent` for redb + Tantivy + WAL persistence)
-* `container/compose.toml` — selur-compose stack (rust-core + elixir +
-  svalinn gateway)
-* `container/.gatekeeper.yaml` — svalinn edge gateway policy
-* `container/manifest.toml` — cerro-torre `.ctp` bundle manifest
-* `container/ct-build.sh` — build/sign/verify pipeline
-* `selur-compose.yml` — top-level compose
-
-== Licence
-
-[quote, README "Licence" implied; canonical declaration]
-____
-MPL-2.0 (primary).
-____
-
-*Evidence:*
-
-* `LICENSE` — Mozilla Public License Version 2.0 (full text)
-* `Cargo.toml:32` — `license = "MPL-2.0"` (workspace.package)
-* All 18 workspace crates inherit `license.workspace = true`
-* `deny.toml` allow-list includes `MPL-2.0`
-* `cargo deny check` is GREEN on `main` since #101 (2026-06-02)
-
-*Estate context:* MPL-2.0 is the owner's-sole-repos default per the
-estate license-policy umbrella (see
-`[[feedback_estate_license_policy_umbrella]]`). Not AGPL. Not MIT.
-Not Apache.
-
-== ROADMAP — foundation-pack proof obligations
-
-The eight foundation-pack obligations tracked in `ROADMAP.md`:
-
-[cols="1,3,1"]
+[cols="1,1"]
 |===
-| Tag | Theorem | Status
+|Observation |State
 
-| P2 | `append_preserves_verified` (provenance hash-chain integrity) | MERGED #87
-| P3 | `build_chain_all_verified` (chain reconstruction) | MERGED #87
-| D1 | `drift_unit_interval` (drift score bounds) | MERGED #90
-| C2 | `txn_state_machine` (transaction states) | MERGED #90
-| C7 | `wal_replay_idempotent` (observable-state idempotency) | MERGED #94
-| N2 | `normalize_idempotent` (normaliser fixed-point) | MERGED #95
-| V2 | `vcl_preservation` (planner preserves VCL semantics) | MERGED #96
-| Q1 | `planner_semantic_equivalence` (Q1-lite + Q1-full) | MERGED #93 + landed
+|document changed, vector stale |modal drift (repairable by normalisation)
+|hash chain broken |provenance / integrity failure
+|remote node asserts an incompatible type |federation conflict (needs arbitration)
+|all live witnesses retracted |inactive / tombstoned identity
 |===
 
-All eight closed by 2026-06-02. Print-Assumptions guards in
-`.github/workflows/coq-build.yml`.
+== The identity lifecycle
 
-== Where the canonical numbers live
+----
+Candidate
+  -> Declared
+  -> Asserted
+  -> Consonant
+  -> Drifting
+  -> Normalised
+  -> Merged / Split
+  -> Retracted
+  -> Tombstoned
+  -> Expunged  (only under explicit policy)
+----
 
-* Crate count: `find rust-core -name "Cargo.toml" -not -path "*/fuzz/*"`
-* Test counts: `cargo test 2>&1 | grep "test result"` and `mix test`
-* Proof count: `ls formal/*.v`
-* Modality list: `rust-core/verisim-{graph,vector,tensor,semantic,document,temporal,provenance,spatial}/`
-* Architecture diagram: `README.adoc` (the ASCII figure)
-* Drift type catalogue: `.claude/CLAUDE.md` section "Drift Detection"
-* Foundation-pack status: `ROADMAP.md`
+**Retraction is not deletion.** A retracted claim usually stays visible to
+provenance, audit, federation, and proof systems — it is no longer *live*.
+Tombstoning durably retires an identity or claim without pretending it never
+existed. Expungement is a separate, policy-governed operation.
+
+== Core terms
+
+[cols="1,2"]
+|===
+|Term |Meaning
+
+|Consonance Subject |The lifecycle-managed identity under consideration.
+|Identity Claim |A claim that some subject exists, has a property, has a relation, or survives a transition.
+|Modality Witness |One modal presentation of a subject: graph, vector, tensor, semantic, document, temporal, provenance, or spatial.
+|Drift Report |Evidence that one or more modal witnesses no longer cohere.
+|Transition |A proposed identity event: declare, assert, retract, normalise, merge, split, federate, tombstone.
+|Proof Obligation |What must be shown before a transition is admissible.
+|Federation Attestation |A remote or local authority claim about identity, provenance, validity, or trust.
+|Tombstone |A durable marker that an identity claim is no longer live, without pretending it never existed.
+|===
+
+== VCL, VCL-total, and VeriSimDB
+
+[cols="1,3"]
+|===
+|Layer |Role
+
+|**VeriSimDB** |The federated consonance engine. Stores and maintains identity consonance across the octad of modal witnesses; detects drift; repairs under policy.
+|**VCL** |The production consonance language. Statements are *propositions* (`DECLARE`, `ASSERT`, `RETRACT`) or *epistemic requests* (`INSPECT`, `VERIFY`), plus `MERGE` / `SPLIT` / `NORMALISE` — directed at the engine, not queries against a passive store.
+|**VCL-total** |The proof-bearing safety substrate behind VCL (repo: https://github.com/hyperpolymath/vcl-ut[vcl-ut]). It decides whether a proposed identity transition is *admissible* under schema, modality, provenance, authority, freshness, resource, effect, federation, and proof constraints.
+|===
+
+The proof goal is deliberately narrow and useful — **not** "prove the whole
+database correct", but:
+
+----
+prove that THIS identity transition is admissible,
+traceable, authorised, and consonant enough to affect live state.
+----
+
+== What is implemented vs design intent (honest)
+
+* **Implemented today:** the octad stores (graph, vector, tensor, semantic,
+  document, temporal, provenance hash-chain, spatial R-tree); cross-modal drift
+  detection + self-normalisation; the federation coordinator; and a VCL surface
+  whose *current* in-repo grammar (`spec/grammar.ebnf` v3.0) is a read-style,
+  SQL-shaped convenience (`SELECT … FROM HEXAD …`, with `HEXAD` the legacy
+  keyword for the octad source) plus `PROOF`-carrying statements.
+* **The model / direction:** the lifecycle/consonance verbs (`DECLARE` …
+  `NORMALISE`) and full proof-bearing admissibility are the semantic target,
+  carried by **VCL-total** (vcl-ut). Read the SQL-ish read-path as *epistemic
+  inspection of consonance state*, not row retrieval.
+* **Formal core:** invariants are mechanised in Coq under `formal/` (octad
+  modality algebra, provenance hash-chain, drift bounds, planner equivalence,
+  WAL/normaliser idempotence, VCL preservation) — see
+  link:formal/CROSS-REPO-MAP.adoc[the cross-repo map] and
+  link:docs/proof-debt.md[the trusted-base ledger].
+
+== Where to go next
+
+* link:README.adoc[README.adoc] — capabilities, comparisons, quick start.
+* link:docs/VCL-SPEC.adoc[VCL specification] — normative grammar (historically `VCL-SPEC.adoc`).
+* https://github.com/hyperpolymath/vcl-ut[vcl-ut] — VCL-total, the proof-bearing substrate.
+* link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc] — honest-gaps audit.

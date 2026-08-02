@@ -326,19 +326,25 @@ defmodule VeriSim.Consensus.KRaftNode do
       last_log_term: last_log_term
     }
 
-    for peer <- state.peers do
+    peers = effective_peers(state)
+
+    for peer <- peers do
       Task.start(fn ->
         try do
           response = GenServer.call(via(peer), {:request_vote, request}, 1_000)
           send(self_pid(state.node_id), {:vote_response, peer, response})
         rescue
           _ -> :timeout
+        catch
+          # Unreachable peer (not registered / stopped): a failed RPC, not a
+          # crash — the election timer drives the retry.
+          :exit, _ -> :unreachable
         end
       end)
     end
 
     # Check if we already have quorum (e.g., single-node cluster with 0 peers)
-    quorum = div(length(state.peers) + 1, 2) + 1
+    quorum = div(length(peers) + 1, 2) + 1
 
     if MapSet.size(state.votes_received) >= quorum do
       become_leader(state)
@@ -387,7 +393,7 @@ defmodule VeriSim.Consensus.KRaftNode do
 
       state.role == :candidate and response.vote_granted ->
         votes = MapSet.put(state.votes_received, from_peer)
-        quorum = div(length(state.peers) + 1, 2) + 1
+        quorum = div(length(effective_peers(state)) + 1, 2) + 1
 
         if MapSet.size(votes) >= quorum do
           become_leader(%{state | votes_received: votes})
@@ -450,7 +456,7 @@ defmodule VeriSim.Consensus.KRaftNode do
   # ---------------------------------------------------------------------------
 
   defp send_append_entries(state) do
-    for peer <- state.peers do
+    for peer <- effective_peers(state) do
       next_idx = Map.get(state.next_index, peer, 1)
       prev_log_index = next_idx - 1
 
@@ -483,6 +489,10 @@ defmodule VeriSim.Consensus.KRaftNode do
           send(self_pid(node_id), {:append_entries_response, peer, response})
         rescue
           _ -> :timeout
+        catch
+          # Unreachable peer (not registered / stopped): a failed RPC, not a
+          # crash — the next heartbeat drives the retry.
+          :exit, _ -> :unreachable
         end
       end)
     end
@@ -577,12 +587,16 @@ defmodule VeriSim.Consensus.KRaftNode do
   # ---------------------------------------------------------------------------
 
   defp maybe_advance_commit(state) do
-    # Find highest N where majority of matchIndex[i] >= N
+    # Find highest N where a majority of matchIndex[i] >= N. Membership is
+    # the latest configuration in the log (effective_peers/1), and only
+    # members of that configuration count toward the quorum.
+    peers = effective_peers(state)
+
     all_match =
-      (Map.values(state.match_index) ++ [length(state.log)])
+      (Enum.map(peers, &Map.get(state.match_index, &1, 0)) ++ [length(state.log)])
       |> Enum.sort(:desc)
 
-    quorum_idx = div(length(state.peers) + 1, 2)
+    quorum_idx = div(length(peers) + 1, 2)
     new_commit = Enum.at(all_match, quorum_idx, state.commit_index)
 
     # Only commit entries from current term (Raft safety property)
@@ -679,6 +693,19 @@ defmodule VeriSim.Consensus.KRaftNode do
   end
 
   defp apply_membership_change(peers, _self_id, _command), do: peers
+
+  # Raft single-server membership rule (Ongaro, "Consensus" §4.1): a server
+  # uses the LATEST configuration present in its log — committed or not —
+  # for quorum counting and replication targets. `state.peers` is the
+  # configuration as of `last_applied`; replay any unapplied config deltas
+  # in the log suffix on top of it.
+  defp effective_peers(state) do
+    state.log
+    |> Enum.drop(state.last_applied)
+    |> Enum.reduce(state.peers, fn entry, peers ->
+      apply_membership_change(peers, state.node_id, entry.command)
+    end)
+  end
 
   defp maybe_trigger_snapshot(state) do
     if state.wal_path != nil and state.last_applied > 0 and

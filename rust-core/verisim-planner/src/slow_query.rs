@@ -54,7 +54,7 @@ pub struct SlowQueryEntry {
     /// When the query was recorded.
     pub timestamp: DateTime<Utc>,
 
-    /// The VQL query text (if available).
+    /// The VCL query text (if available).
     pub query_text: Option<String>,
 
     /// Actual execution time in milliseconds.
@@ -321,6 +321,8 @@ mod tests {
                     },
                     optimization_hint: None,
                     pushed_predicates: vec![],
+                    projections: vec![],
+                    early_limit: None,
                 })
                 .collect(),
             strategy: if steps.len() >= 2 {

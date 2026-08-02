@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 
 = Challenges: Hybrid Deployment Mode
 
@@ -717,7 +717,7 @@ Result: Query denied at Layer 2 despite passing Layer 1
 **Problem:** Hybrid mode requires **more operational expertise** than standalone.
 
 **Skills Required:**
-- **Standalone:** Understand 6 modality stores + Elixir orchestrator (7 components)
+- **Standalone:** Understand 8 modality stores + Elixir orchestrator (9 components)
 - **Hybrid:** All above + Network troubleshooting + Remote store APIs + Policy coordination (10+ components)
 
 **Hiring Impact:** May need to hire **DevOps specialist** for hybrid management (+$150k/year salary)

@@ -1,0 +1,86 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+# Proof Debt — Trusted Base of the VeriSimDB Formal Development
+
+This document is the authoritative catalogue of **soundness-relevant escape
+hatches** in VeriSimDB's machine-checked proofs, per the estate
+[Trusted-Base Reduction Policy](https://github.com/hyperpolymath/standards/blob/main/docs/TRUSTED-BASE-REDUCTION-POLICY.adoc).
+Every Coq `Axiom` (and any `Admitted` / `admit.`, of which there are currently
+**none**) is enumerated here by `file:line`, with its justification.
+
+The Coq corpus lives in [`formal/`](../formal/). Each module is compiled by
+`coqc` and its `Print Assumptions` output is grepped against a per-module
+whitelist in [`formal/Justfile`](../formal/Justfile) and
+[`.github/workflows/coq-build.yml`](../.github/workflows/coq-build.yml), so an
+axiom that is **not** in this ledger cannot silently enter a theorem's trusted
+base — CI fails on any unlisted assumption ("axiom slippage").
+
+## Summary
+
+| Count | Kind | Status |
+|------:|------|--------|
+| 13 | Coq `Axiom` | Documented below; whitelisted; non-`Admitted` |
+| 0 | `Admitted` / `admit.` | None — every theorem closes with `Qed` |
+| 0 | Rust `unsafePerformIO` / `unsafeCoerce` | N/A (Rust core uses neither) |
+
+`formal/Octad.v` (the octad modality algebra) contributes **zero** axioms: it
+closes on two `Parameter`s (`mval`, `ident`) plus the Coq stdlib
+`functional_extensionality_dep`. `Parameter`s are interface points (opaque
+carriers), not soundness escape hatches, and are tracked by the same
+`Print Assumptions` guard.
+
+## Catalogue
+
+### `formal/Drift.v` — drift-score order laws (6 axioms)
+
+Minimal axiomatisation of the abstract `score` order (the Rust source is
+`f64`). These are standard total-order / clamp laws, not domain assumptions.
+
+- `formal/Drift.v:46` — `le_refl` — reflexivity of the score order (`x <= x`).
+- `formal/Drift.v:47` — `clamp_lower` — `clamp lo hi x` is `>= lo`. Mirrors `f64::clamp`.
+- `formal/Drift.v:48` — `clamp_upper` — `clamp lo hi x` is `<= hi`. Mirrors `f64::clamp`.
+- `formal/Drift.v:157` — `le_or_gt` — totality of the order (`s <= t` or `s > t`); faithful to the `f64` total order modulo NaN, which the clamp rules out.
+- `formal/Drift.v:161` — `le_gt_exclusive` — `<=` and `>` are mutually exclusive.
+- `formal/Drift.v:167` — `detector_iff_threshold` — the detector signals iff `score > threshold` (the `if score > threshold` guard at `verisim-drift/src/lib.rs`).
+
+### `formal/Provenance.v` — cryptographic assumption (1 axiom)
+
+- `formal/Provenance.v:59` — `sha256_collision_resistant` — injectivity of SHA-256 on `(content, parent_hash)`. Standard cryptographic assumption; **declared but unused** by the current P2/P3/P4 theorems (reserved for later uniqueness work). `Print Assumptions` confirms it is not in their trusted base.
+
+### `formal/WAL.v` — decidable equality (1 axiom)
+
+- `formal/WAL.v:57` — `eq_entity_dec` — decidable equality on `entity_id`. True for `String` in the Rust source (`store.rs`); axiomatised because the carrier is opaque.
+
+### `formal/Normalizer.v` — normalize spec contract (2 axioms)
+
+Encode the remediated N2 spec (see issue #91): the authoritative source is
+never a drifted modality, and winner selection ignores drifted data.
+
+- `formal/Normalizer.v:73` — `winner_excludes_drifted` — the normalize winner is never a drifted modality ("never copy FROM corrupt sources").
+- `formal/Normalizer.v:80` — `winner_stable_off_drifted` — winner selection depends only on non-drifted modalities ("frozen rank, not `Utc::now()`").
+
+### `formal/Planner.v` / `formal/PlannerSemantic.v` — optimizer contract (3 axioms)
+
+Structural contracts on `Planner::optimize` (a `stable_sort_by`): it permutes
+plan nodes, and per-node filters commute at the set level.
+
+- `formal/Planner.v:63` — `optimize_is_permutation` — the optimizer reorders nodes without adding or dropping any (Q1-lite).
+- `formal/PlannerSemantic.v:94` — `optimize_is_permutation` — same contract, restated for the Q1-full semantic-equivalence development.
+- `formal/PlannerSemantic.v:78` — `exec_node_comm` — per-node set-restrictions commute (filter intersection is order-independent across operator types).
+
+## Discharge paths (future work)
+
+These are deliberate, mathematically-standard assumptions, not gaps in
+reasoning. Where the estate wishes to shrink the trusted base further:
+
+- The `Drift.v` order laws and `WAL.v` `eq_entity_dec` discharge automatically
+  if the abstract carriers are instantiated to concrete Coq types
+  (`R`/`Q`/`bool`-decidable strings) — they exist only because the carriers are
+  kept opaque to mirror the Rust generics.
+- `sha256_collision_resistant` is a genuine cryptographic axiom; it can be
+  re-homed to a CryptHOL/Isabelle development per the issue #77 tool-selection
+  table, but stays an assumption in any first-order model.
+- `optimize_is_permutation` / `exec_node_comm` are checkable by a Rust property
+  test over `Planner::optimize`; that test is the intended runtime corroboration.
+
+See `formal/CROSS-REPO-MAP.adoc` for the echo-types correspondence of each
+theorem these axioms support.

@@ -22,16 +22,20 @@ jobs:
   a2ml-validate:
     name: Validate A2ML manifests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check for A2ML files
         id: detect
         run: |
-          COUNT=$(find . -name '*.a2ml' -not -path './.git/*' | wc -l)
+          # audits/assail-classifications.a2ml is panic-attack's user-classification
+          # registry — an S-expression dialect by that tool's spec (see panic-attack
+          # CLAUDE.md), not the TOML-like manifest A2ML this gate validates. Exclude
+          # it rather than feeding it to a validator for a different dialect.
+          COUNT=$(find . -name '*.a2ml' -not -path './.git/*' -not -name 'assail-classifications.a2ml' | wc -l)
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           if [ "$COUNT" -eq 0 ]; then
             echo "::warning::No .a2ml manifest files found. Every RSR repo should have 0-AI-MANIFEST.a2ml"
@@ -39,11 +43,17 @@ jobs:
 
       - name: Validate A2ML manifests
         if: steps.detect.outputs.count > 0
-        uses: hyperpolymath/a2ml-validate-action@6bff6ec134fc977e86d25166a5c522ddea5c1e78
-        with:
-          path: '.'
-          strict: 'false'
-
+        env:
+          INPUT_PATHS_IGNORE: |
+            vendor/
+            vendored/
+            verified-container-spec/
+            .audittraining/
+            integration/fixtures/
+            test/fixtures/
+            tests/fixtures/
+            assail-classifications.a2ml
+        run: bash .githooks/validate-a2ml.sh
       - name: Write summary
         run: |
           A2ML_COUNT="${{ steps.detect.outputs.count }}"

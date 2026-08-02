@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: MPL-2.0
+# Bustfile — Error-handling / failure-recovery contract for VeriSimDB
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Declared failure modes and their recovery paths. Hard gate on any failure
+# mode without a working, exercised recovery.
+# Pairs with: bust.ncl (same directory)
+# Run with: contractile bust check   (list failure modes + recovery status)
+#           contractile bust drill   (inject declared failures, verify recovery)
+
+@abstract:
+Failure modes for VeriSimDB and the recovery paths that must hold. The octad
+keeps eight synchronised stores plus a WAL; drift detection + self-normalisation
+are the in-band recovery mechanisms. Each failure mode below names a recovery
+probe; the drill harness injects the failure and verifies recovery. Injection
+is scoped to the system-under-test only.
+@end
+
+## Persistence & Crash Recovery
+
+### wal-replay-after-crash
+- description: WAL replay restores observable state after an unclean shutdown
+- class: crash
+- run: test -d rust-core/verisim-wal
+- severity: critical
+- recovery: WAL replay is idempotent on observable state (Coq: formal/WAL.v, C7 wal_replay_idempotent, PR #94)
+- notes: Recovery proof mechanised; drill exercises replay against a repo-local store.
+
+### redb-backend-available
+- description: Pure-Rust redb backend present as fallback when Oxigraph feature is off
+- class: disk_full
+- run: test -d rust-core/verisim-storage
+- severity: high
+- recovery: redb backend is feature-flagged; no oxrocksdb-sys C++ dependency (resolved, see CLAUDE.md known-issues)
+
+## Cross-Modal Consistency Drift
+
+### drift-detector-bounds
+- description: Drift detector keeps scores in the unit interval and triggers normalisation
+- class: concurrency
+- run: test -d rust-core/verisim-drift
+- severity: high
+- recovery: Self-normalizer regenerates drifted modalities from the most authoritative one (formal/Drift.v D1 unit-interval, formal/Normalizer.v N2 normalize_idempotent, PRs #90/#95)
+
+### normalizer-idempotent
+- description: Re-running normalisation on a consistent octad is a no-op
+- class: partial_write
+- run: test -d rust-core/verisim-normalizer
+- severity: high
+- recovery: normalize_idempotent mechanised (formal/Normalizer.v, closes #91)
+
+## Transaction State Machine
+
+### txn-state-machine-recovery
+- description: Aborted/partial transactions return the store to a valid prior state
+- class: rollback
+- run: test -f formal/Transaction.v
+- severity: high
+- recovery: Transaction state machine mechanised (formal/Transaction.v C2, PR #90)
+
+## Federation / NIF Bridge
+
+### rust-core-unavailable-fallback
+- description: Elixir layer degrades to ETS fallback when the Rust core/NIF is unavailable
+- class: network
+- run: test -f elixir-orchestration/lib/verisim/nif_bridge.ex
+- severity: medium
+- recovery: ScanIngester + Hypatia modules fall back to ETS (:hypatia_scans) when Rust core is down (CLAUDE.md Hypatia Integration)
+- notes: Degraded-mode path, not a hard outage; OTP supervision restarts the bridge.
+
+## Rollback Ladder
+
+### git-revert-is-floor
+- description: First-line recovery for a bad change is git revert (reversible, low blast radius)
+- class: rollback
+- run: git rev-parse --is-inside-work-tree
+- severity: low
+- recovery: revert the offending commit; force-push to main is PROHIBITED without explicit human confirmation (branch protection)

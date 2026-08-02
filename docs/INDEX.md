@@ -1,5 +1,5 @@
 <!--
-SPDX-License-Identifier: MPL-2.0
+SPDX-License-Identifier: CC-BY-SA-4.0
 Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 -->
 # VeriSimDB Documentation Index
@@ -79,20 +79,20 @@ The repo root holds only documents that need maximum visibility for new readers,
 
 - [docs/design/DESIGN-2026-02-27-level-data-model.md](design/DESIGN-2026-02-27-level-data-model.md)
 - [docs/design/DESIGN-2026-02-27-strategic-improvements.adoc](design/DESIGN-2026-02-27-strategic-improvements.adoc)
-- [docs/design/DESIGN-2026-02-27-vql-dt-assessment.adoc](design/DESIGN-2026-02-27-vql-dt-assessment.adoc)
+- [docs/design/DESIGN-2026-02-27-vcl-dt-assessment.adoc](design/DESIGN-2026-02-27-vcl-dt-assessment.adoc)
 - [docs/design/DESIGN-2026-02-28-panll-interop-telemetry.md](design/DESIGN-2026-02-28-panll-interop-telemetry.md)
 
-### VQL language
+### VCL language
 
-- [docs/getting-started.adoc](getting-started.adoc) — VQL getting started
-- [docs/VQL-SPEC.adoc](VQL-SPEC.adoc) — Full VQL specification
-- [docs/vql-grammar.ebnf](vql-grammar.ebnf) — ISO/IEC 14977 EBNF grammar
-- [docs/vql-architecture.adoc](vql-architecture.adoc) — Parser / executor architecture
-- [docs/vql-type-system.adoc](vql-type-system.adoc) — VQL-DT dependent type system
-- [docs/vql-formal-semantics.adoc](vql-formal-semantics.adoc) — Formal semantics
-- [docs/vql-examples.adoc](vql-examples.adoc) — Worked examples
-- [docs/vql-vs-vql-dt.adoc](vql-vs-vql-dt.adoc) — VQL vs VQL-DT comparison
-- [docs/vql-vs-sql.adoc](vql-vs-sql.adoc) — VQL vs SQL comparison
+- [docs/getting-started.adoc](getting-started.adoc) — VCL getting started
+- [docs/VCL-SPEC.adoc](VCL-SPEC.adoc) — Full VCL specification
+- [docs/vcl-grammar.ebnf](vcl-grammar.ebnf) — ISO/IEC 14977 EBNF grammar
+- [docs/vcl-architecture.adoc](vcl-architecture.adoc) — Parser / executor architecture
+- [docs/vcl-type-system.adoc](vcl-type-system.adoc) — VCL-DT dependent type system
+- [docs/vcl-formal-semantics.adoc](vcl-formal-semantics.adoc) — Formal semantics
+- [docs/vcl-examples.adoc](vcl-examples.adoc) — Worked examples
+- [docs/vcl-vs-vcl-dt.adoc](vcl-vs-vcl-dt.adoc) — VCL vs VCL-DT comparison
+- [docs/vcl-vs-sql.adoc](vcl-vs-sql.adoc) — VCL vs SQL comparison
 - [docs/rescript-registry-types.adoc](rescript-registry-types.adoc) — ReScript registry types
 
 ### Operational concerns
@@ -156,16 +156,16 @@ Under [`.github/workflows/`](../.github/workflows/):
 | Path | Language | Purpose |
 |---|---|---|
 | `rust-core/` | Rust | Core database engine (8 modality stores + octad + drift + normalizer + api + planner) |
-| `elixir-orchestration/` | Elixir | OTP orchestration layer (DriftMonitor, EntityServer, VQLExecutor, VQLBridge, SchemaRegistry, federation adapters) |
-| `src/` | ReScript | VQL parser, type checker, federation registry |
-| `playground/` | ReScript + HTML | VQL Playground web UI |
+| `elixir-orchestration/` | Elixir | OTP orchestration layer (DriftMonitor, EntityServer, VCLExecutor, VCLBridge, SchemaRegistry, federation adapters) |
+| `src/` | ReScript | VCL parser, type checker, federation registry |
+| `playground/` | ReScript + HTML | VCL Playground web UI |
 | `connectors/` | Multi | Federation adapters, client SDKs (Rust, Elixir, ReScript, Julia, Zig), test infrastructure. Other BEAM languages (Gleam, Erlang) access via the SNIFs WASM bridge — see `hyperpolymath/snifs`. |
 | `debugger/` | Idris2 + Rust | ABI/FFI debugger |
 | `ffi/zig/` | Zig | Zig FFI |
 | `v-api-gateway/` | V | V-language API gateway |
 | `fuzz/`, `rust-core/fuzz/` | Rust | Fuzz harnesses (libFuzzer via cargo-fuzz) |
 | `benches/` | Rust | Criterion benchmarks (all 8 modalities + cross-modal + octad + drift) |
-| `elixir-orchestration/bench/` | Elixir | Benchee benchmark scripts (DriftMonitor, QueryRouter, VQLExecutor, VQLBridge, SchemaRegistry) |
+| `elixir-orchestration/bench/` | Elixir | Benchee benchmark scripts (DriftMonitor, QueryRouter, VCLExecutor, VCLBridge, SchemaRegistry) |
 
 ## Container & deployment
 

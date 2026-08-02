@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MPL-2.0
+# Intentfile — North-star contract for VeriSimDB
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Committed next-actions ([[intents]]) and horizon aspirations ([[wishes]]).
+# Non-gating: reports progress, never blocks.
+# Pairs with: intend.ncl (same directory)
+# Run with: contractile intend run        (status table)
+#           contractile intend progress   (declared vs observed)
+#           contractile intend horizon     (wishes grouped by near/mid/far)
+
+@abstract:
+Declared intent and north-star for VeriSimDB — a cross-system entity
+consistency engine maintaining eight synchronised modalities (the octad) with
+drift detection, self-normalisation, and proof-bearing VQL queries. Standalone
+database OR heterogeneous federation coordinator.
+@end
+
+## Purpose
+
+VeriSimDB keeps one entity consistent across Graph, Vector, Tensor, Semantic,
+Document, Temporal, Provenance and Spatial representations, detecting and
+repairing drift before it degrades data quality, and answering VQL queries that
+carry formal proof obligations.
+
+## Anti-Purpose
+
+This project is NOT:
+- A SQL database (VQL is the native query interface, not SQL)
+- A single-modality store (the octad is the floor — eight modalities per entity)
+- A Python/Go codebase (Rust core + Elixir/OTP orchestration + ReScript VQL only)
+
+## If In Doubt
+
+Sensitive areas: the formal/ Coq proofs (drift/normalizer/WAL/transaction/
+provenance/planner), the VQL type checker (Elixir + ReScript + Rust ZKP bridge),
+license headers, and the NIF bridge between Elixir and the Rust core. Ask before
+changing proof statements or proof-bearing query semantics.
+
+## Intents
+
+### fleet-dispatch-live
+- description: Move Hypatia fleet dispatch from JSONL-logged to live GraphQL mutations
+- status: declared
+- notes: Requires a GitHub PAT with repo scope; see verisimdb-data/INTEGRATION.md. DispatchBridge already logs JSONL manifests + outcomes.
+
+### elixir-coverage-ramp
+- description: Raise Elixir test coverage from ~42.6% to the phase-1 floor of 50%
+- status: in_progress
+- target_date: 2026-07-15
+- notes: Floor currently 40; ramp doc elixir-orchestration/coveralls-coverage-targets.md (phase 2 → 60% by 2026-09-01).
+
+### github-ci-flatfile-store
+- description: Stand up the git-backed verisimdb-data flat-file store + ingest workflow
+- status: declared
+- notes: repository_dispatch ingest.yml + reusable scan-and-report.yml; pilot on echidna / panic-attacker / ambientops.
+
+### main-branch-green
+- description: Keep main CI fully green (last residual was license, closed via #82/#101)
+- status: in_progress
+- notes: 5-of-7 reds cleared in PR #99; license normalised in #101. Watch for regression.
+
+### foundation-pack-followups
+- description: Continue mechanising the formal foundation pack beyond the 8/8 landed lemmas
+- status: declared
+- notes: D1/D2/C2/C7/N2/P2/P3/P4/Q1/V2 landed (PRs #87–#103). Next: wire echo-types cross-doc obligations.
+
+## Wishes
+
+### persistent-server-fly
+- description: Deploy verisim-api to a persistent host (Fly.io free tier) beyond flat files
+- horizon: mid
+- why: GitHub Actions could call a live endpoint instead of repository_dispatch; keep verisimdb-data as mirror
+- status: declared
+
+### model-router-tool
+- description: Build the Haiku-classifier model-router CLI (route tasks Haiku/Sonnet/Opus)
+- horizon: mid
+- why: Auto-select Claude model by task complexity using per-repo CLAUDE.md signals
+- status: declared
+
+### tensor-modality-applications
+- description: Land novel applications of the Tensor modality (active research)
+- horizon: far
+- why: Tensor is the least-developed octad facet; details forthcoming
+- status: declared
+
+### federation-adapters-ga
+- description: Promote the 7 federation adapters (Mongo/Redis/Neo4j/ClickHouse/SurrealDB/Influx/MinIO) to GA-grade
+- horizon: mid
+- why: 105 integration tests exist behind the test-infra stack; harden for production federation
+- status: declared
