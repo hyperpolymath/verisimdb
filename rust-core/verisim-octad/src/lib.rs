@@ -38,6 +38,7 @@ pub use store::{InMemoryOctadStore, OctadSnapshot};
 
 // Homoiconicity: queries as octads
 pub mod query_octad;
+pub mod ram_promotion;
 pub use query_octad::{QueryExecution, QueryOctadBuilder};
 
 // ACID transaction manager for cross-modality atomicity
