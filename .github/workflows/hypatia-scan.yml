@@ -14,9 +14,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
   # Must be `write`, not `read`: hypatia-scan-reusable.yml declares
   # `security-events: write` as of standards 45108f95e404, and GitHub refuses
+  actions: read
+  contents: read
+  security-events: write
   # to start a reusable-workflow call whose caller grants less than the
   # reusable declares (the failure mode is `startup_failure`, with no log).
   security-events: write
