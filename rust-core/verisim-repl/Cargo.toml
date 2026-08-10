@@ -26,7 +26,7 @@ rustyline-derive = "0.12"
 clap = { version = "4", features = ["derive"] }
 
 # Output formatting
-comfy-table = "7"
+comfy-table = "8"
 colored = "3"
 
 # Home directory resolution (history file, .vclrc)
