@@ -64,7 +64,7 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.20.4
+        uses: erlef/setup-beam@v1.24.1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
@@ -117,7 +117,7 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.20.4
+        uses: erlef/setup-beam@v1.24.1
         with:
           elixir-version: "1.17"
           otp-version: "27"
@@ -168,7 +168,7 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.20.4
+        uses: erlef/setup-beam@v1.24.1
         with:
           elixir-version: "1.17"
           otp-version: "27"
@@ -217,7 +217,7 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.20.4
+        uses: erlef/setup-beam@v1.24.1
         with:
           elixir-version: "1.17"
           otp-version: "27"
