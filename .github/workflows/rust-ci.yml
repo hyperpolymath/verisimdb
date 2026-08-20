@@ -111,7 +111,7 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: swatinem/rust-cache@v2.9.2
-      - uses: taiki-e/install-action@v2.86.1
+      - uses: taiki-e/install-action@v2.86.2
       - name: Generate lcov report
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
       - uses: codecov/codecov-action@v7.0.0
@@ -136,7 +136,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2.9.2
-      - uses: taiki-e/install-action@v2.86.1
+      - uses: taiki-e/install-action@v2.86.2
         with:
           tool: cargo-mutants
       - name: Run mutation tests on core invariant crates
