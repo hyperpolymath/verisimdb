@@ -30,35 +30,52 @@
   ;; inside `try { } catch` returning result<_, VeriSimError.t>. The
   ;; graceful degradation the finding asks for is already present.
   (classification
-    (file "connectors/clients/rescript/src/VeriSimVcl.res")
+    (file "connectors/clients/rescript/src/VeriSimVcl.affine")
     (category "UnsafeDeserialization")
     (audit "try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
   (classification
-    (file "connectors/clients/rescript/src/VeriSimFederation.res")
+    (file "connectors/clients/rescript/src/VeriSimFederation.affine")
     (category "UnsafeDeserialization")
     (audit "try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
   (classification
-    (file "connectors/clients/rescript/src/VeriSimProvenance.res")
+    (file "connectors/clients/rescript/src/VeriSimProvenance.affine")
     (category "UnsafeDeserialization")
     (audit "try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
   (classification
-    (file "connectors/clients/rescript/src/VeriSimDrift.res")
+    (file "connectors/clients/rescript/src/VeriSimDrift.affine")
     (category "UnsafeDeserialization")
-    (audit "VeriSimDrift.res:77 — JSON.parseExn(\"{}\") constant, inside try")
+    (audit "VeriSimDrift.affine:77 — JSON.parseExn(\"{}\") constant, inside try")
     (rationale "parse of a constant literal inside try; cannot throw"))
   (classification
-    (file "connectors/clients/rescript/src/VeriSimHexad.res")
+    (file "connectors/clients/rescript/src/VeriSimHexad.affine")
     (category "UnsafeDeserialization")
     (audit "try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
   (classification
-    (file "connectors/clients/rescript/src/VeriSimSearch.res")
+    (file "connectors/clients/rescript/src/VeriSimSearch.affine")
     (category "UnsafeDeserialization")
-    (audit "VeriSimSearch.res:80-200 — six try-wrapped stringify→parseExn round-trips")
+    (audit "VeriSimSearch.affine:80-200 — six try-wrapped stringify→parseExn round-trips")
     (rationale "parse of self-stringified JSON inside try; cannot throw on external input"))
+
+  ;; ── Audited process and module dispatch boundaries ───────────────
+  (classification
+    (file "elixir-orchestration/lib/verisim/query/vcl_bridge.ex")
+    (category "CommandInjection")
+    (audit "start_port/1 uses Port.open({:spawn_executable, runtime}, args: [script])")
+    (rationale "runtime and script are resolved locally and passed as an executable plus argv vector; no shell parses query text or either path"))
+  (classification
+    (file "elixir-orchestration/lib/verisim/query/vclt_gate.ex")
+    (category "CommandInjection")
+    (audit "invoke_gate/2 passes only shell-quoted operator path and random private payload path to sh; statement and schema remain file content")
+    (rationale "both shell words use single-quote escaping, the binary path is operator-controlled, and no request value reaches shell syntax"))
+  (classification
+    (file "elixir-orchestration/lib/verisim/federation/adapters/postgresql.ex")
+    (category "DynamicCodeExecution")
+    (audit "execute_postgrex/3 dispatches only Postgrex.start_link/1 and Postgrex.query/3")
+    (rationale "module and function atoms are compile-time constants used to preserve an optional dependency; federation config supplies data arguments only"))
 
   ;; ── Allocation bounded by an explicit guard the scanner cannot see ──
   ;; assail flags the growth pattern (String::new + push_str in a loop)

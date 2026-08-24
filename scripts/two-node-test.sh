@@ -16,6 +16,9 @@ PRIMARY_GRPC=18051
 REPLICA_PORT=18090
 REPLICA_GRPC=18052
 PIDS=()
+WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/verisimdb-two-node.XXXXXX")
+PRIMARY_DATA_DIR="$WORK_DIR/node-a"
+REPLICA_DATA_DIR="$WORK_DIR/node-b"
 
 echo "=== VeriSimDB Two-Node Federation Test ==="
 
@@ -28,7 +31,8 @@ cleanup() {
             wait "$pid" 2>/dev/null || true
         fi
     done
-    rm -rf /tmp/verisimdb-node-{a,b} 2>/dev/null || true
+    # WORK_DIR is created by mktemp and is the only tree this script owns.
+    rm -rf -- "$WORK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -39,11 +43,11 @@ BINARY="target/release/verisim-api"
 
 # Start Node A (primary)
 echo "[2/7] Starting Node A (primary) on port $PRIMARY_PORT..."
-mkdir -p /tmp/verisimdb-node-a
+mkdir -p "$PRIMARY_DATA_DIR"
 VERISIM_HOST=127.0.0.1 VERISIM_PORT=$PRIMARY_PORT VERISIM_GRPC_PORT=$PRIMARY_GRPC \
-    VERISIM_PERSISTENCE_DIR=/tmp/verisimdb-node-a \
-    $BINARY &
-PIDS+=($!)
+    VERISIM_PERSISTENCE_DIR="$PRIMARY_DATA_DIR" \
+    "$BINARY" &
+PIDS+=("$!")
 sleep 2
 
 if ! kill -0 "${PIDS[0]}" 2>/dev/null; then
@@ -54,11 +58,11 @@ echo "  Node A running (PID: ${PIDS[0]})"
 
 # Start Node B (replica)
 echo "[3/7] Starting Node B (replica) on port $REPLICA_PORT..."
-mkdir -p /tmp/verisimdb-node-b
+mkdir -p "$REPLICA_DATA_DIR"
 VERISIM_HOST=127.0.0.1 VERISIM_PORT=$REPLICA_PORT VERISIM_GRPC_PORT=$REPLICA_GRPC \
-    VERISIM_PERSISTENCE_DIR=/tmp/verisimdb-node-b \
-    $BINARY &
-PIDS+=($!)
+    VERISIM_PERSISTENCE_DIR="$REPLICA_DATA_DIR" \
+    "$BINARY" &
+PIDS+=("$!")
 sleep 2
 
 if ! kill -0 "${PIDS[1]}" 2>/dev/null; then
