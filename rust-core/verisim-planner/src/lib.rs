@@ -35,7 +35,7 @@ pub use profiler::{ExplainAnalyzeOutput, ProfileStep, Profiler, QueryProfile};
 pub use slow_query::{SlowQueryConfig, SlowQueryEntry, SlowQueryLog, SlowQuerySummary};
 pub use stats::{AdaptiveTuner, StatisticsCollector, StoreStatistics};
 
-/// The six modalities of VeriSimDB.
+/// The eight modalities of a VeriSimDB octad.
 ///
 /// Each modality represents a different representation/store for octad entities.
 /// The planner defines its own canonical enum to avoid coupling with verisim-octad
@@ -49,24 +49,29 @@ pub enum Modality {
     Semantic,
     Document,
     Temporal,
+    Provenance,
+    Spatial,
 }
 
 impl Modality {
-    /// All six modalities in canonical order.
-    pub const ALL: [Modality; 6] = [
+    /// All eight modalities in canonical octad order.
+    pub const ALL: [Modality; 8] = [
         Modality::Graph,
         Modality::Vector,
         Modality::Tensor,
         Modality::Semantic,
         Modality::Document,
         Modality::Temporal,
+        Modality::Provenance,
+        Modality::Spatial,
     ];
 
     /// Execution priority — lower value means execute earlier.
     ///
     /// Matches the Elixir bidirectional planner ordering:
     /// - Temporal first (often cached)
-    /// - Vector/Document next (selective indexes)
+    /// - Vector/Spatial/Document next (selective indexes)
+    /// - Provenance after indexed lookups (sequential chain walk)
     /// - Graph middle
     /// - Tensor moderate
     /// - Semantic last (ZKP expensive)
@@ -74,7 +79,9 @@ impl Modality {
         match self {
             Modality::Temporal => 10,
             Modality::Vector => 20,
+            Modality::Spatial => 25,
             Modality::Document => 30,
+            Modality::Provenance => 35,
             Modality::Graph => 40,
             Modality::Tensor => 50,
             Modality::Semantic => 90,
@@ -91,6 +98,8 @@ impl fmt::Display for Modality {
             Modality::Semantic => write!(f, "semantic"),
             Modality::Document => write!(f, "document"),
             Modality::Temporal => write!(f, "temporal"),
+            Modality::Provenance => write!(f, "provenance"),
+            Modality::Spatial => write!(f, "spatial"),
         }
     }
 }
@@ -106,6 +115,8 @@ impl FromStr for Modality {
             "semantic" => Ok(Modality::Semantic),
             "document" => Ok(Modality::Document),
             "temporal" => Ok(Modality::Temporal),
+            "provenance" => Ok(Modality::Provenance),
+            "spatial" => Ok(Modality::Spatial),
             _ => Err(PlannerError::UnknownModality(s.to_string())),
         }
     }
@@ -149,6 +160,12 @@ mod tests {
     fn test_execution_priority_ordering() {
         assert!(Modality::Temporal.execution_priority() < Modality::Vector.execution_priority());
         assert!(Modality::Vector.execution_priority() < Modality::Document.execution_priority());
+        assert!(Modality::Vector.execution_priority() < Modality::Spatial.execution_priority());
+        assert!(Modality::Spatial.execution_priority() < Modality::Document.execution_priority());
+        assert!(
+            Modality::Document.execution_priority() < Modality::Provenance.execution_priority()
+        );
+        assert!(Modality::Provenance.execution_priority() < Modality::Graph.execution_priority());
         assert!(Modality::Document.execution_priority() < Modality::Graph.execution_priority());
         assert!(Modality::Graph.execution_priority() < Modality::Tensor.execution_priority());
         assert!(Modality::Tensor.execution_priority() < Modality::Semantic.execution_priority());

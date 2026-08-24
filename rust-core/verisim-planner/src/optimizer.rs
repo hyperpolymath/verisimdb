@@ -107,6 +107,8 @@ impl Planner {
                     crate::Modality::Semantic => "Semantic verification",
                     crate::Modality::Document => "Document fulltext search",
                     crate::Modality::Temporal => "Temporal version lookup",
+                    crate::Modality::Provenance => "Provenance chain traversal",
+                    crate::Modality::Spatial => "Spatial index lookup",
                 },
                 if node.conditions.is_empty() {
                     "(scan)".to_string()

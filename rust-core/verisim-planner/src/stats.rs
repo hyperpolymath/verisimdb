@@ -46,7 +46,7 @@ pub struct StatisticsCollector {
 }
 
 impl StatisticsCollector {
-    /// Create a new collector with empty statistics for all 6 modalities.
+    /// Create a new collector with empty statistics for all eight modalities.
     pub fn new() -> Self {
         let mut stats = HashMap::new();
         for m in Modality::ALL {
@@ -226,7 +226,7 @@ mod tests {
             assert_eq!(stats.query_count, 0);
             assert_eq!(stats.total_rows, 0);
         }
-        assert_eq!(collector.snapshot().len(), 6);
+        assert_eq!(collector.snapshot().len(), Modality::ALL.len());
     }
 
     #[test]
@@ -268,7 +268,7 @@ mod tests {
     fn test_snapshot_returns_all() {
         let collector = StatisticsCollector::new();
         let snap = collector.snapshot();
-        assert_eq!(snap.len(), 6);
+        assert_eq!(snap.len(), Modality::ALL.len());
     }
 
     // ====================================================================
