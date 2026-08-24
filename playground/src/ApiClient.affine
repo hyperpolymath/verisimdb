@@ -1,7 +1,284 @@
 // SPDX-License-Identifier: MPL-2.0
-// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
-// Ported via Harvard Engine bulk-processor
+// Ported via Harvard Engine (Semantic pass)
 
 module ApiClient;
 
-// TODO: Complete semantic implementation
+// SPDX-License-Identifier: MPL-2.0
+// VCL Playground API client — connects to a real verisim-api backend.
+// Falls back gracefully to demo mode when the backend is unreachable.
+
+/// Response shape from POST /api/v1/vcl/execute.
+struct vclResponse { {
+  success: bool,
+  statement_struct: string,
+  row_count: int,
+  data: JSON.t,
+  message: option<string>,
+}
+
+/// Connection state for the backend.
+struct connectionState {
+  | Disconnected
+  | Connecting
+  | Connected(string)
+  | Failed(string)
+
+// === Fetch API bindings (no external package needed) ===
+
+struct response
+
+@val external fetch: (string, {..}) => promise<response> = "fetch"
+@val external fetchGet: string => promise<response> = "fetch"
+@send external responseJson: response => promise<JSON.t> = "json"
+@get external responseOk: response => bool = "ok"
+@get external responseStatus: response => int = "status"
+
+/// Backend URL — defaults to localhost:8080 (verisim-api default port).
+/// Override by setting window.__VERISIM_API_URL__ before the script loads.
+@val @scope("window") external apiUrlOverride: Nullable.t<string> = "__VERISIM_API_URL__"
+
+fn getBaseUrl = (): string => {
+  switch Nullable.toOption(apiUrlOverride) {
+  | Some(url) => url
+  | None => "http://localhost:8080"
+  }
+}
+
+/// Check backend health by hitting GET /api/v1/health.
+fn checkHealth = async (): result<string, string> => {
+  fn url = getBaseUrl() ++ "/api/v1/health"
+  try {
+    fn response = await fetchGet(url)
+    if responseOk(response) {
+      Ok(getBaseUrl())
+    } else {
+      Error("Backend returned " ++ Int.toString(responseStatus(response)))
+    }
+  } catch {
+  | _ => Error("Backend unreachable at " ++ url)
+  }
+}
+
+/// Execute a VCL query against the real backend.
+/// Returns Ok(vclResponse) on success, Error(string) on failure.
+fn executeQuery = async (query: string): result<vclResponse, string> => {
+  fn url = getBaseUrl() ++ "/api/v1/vcl/execute"
+  fn bodyDict = Dict.make()
+  Dict.set(bodyDict, "query", JSON.Encode.string(query))
+  fn body = JSON.Encode.object(bodyDict)
+
+  try {
+    fn response = await fetch(
+      url,
+      {
+        "method": "POST",
+        "headers": {"Content-Type": "application/json"},
+        "body": JSON.stringify(body),
+      },
+    )
+
+    fn json = await responseJson(response)
+
+    if responseOk(response) {
+      // Parse the response fields.
+      switch JSON.Classify.classify(json) {
+      | JSON.Classify.Object(obj) => {
+          fn success = switch Dict.get(obj, "success") {
+          | Some(v) =>
+            switch JSON.Classify.classify(v) {
+            | JSON.Classify.Bool(b) => b
+            | _ => false
+            }
+          | None => false
+          }
+          fn statementType = switch Dict.get(obj, "statement_struct") {
+          | Some(v) =>
+            switch JSON.Classify.classify(v) {
+            | JSON.Classify.String(s) => s
+            | _ => "UNKNOWN"
+            }
+          | None => "UNKNOWN"
+          }
+          fn rowCount = switch Dict.get(obj, "row_count") {
+          | Some(v) =>
+            switch JSON.Classify.classify(v) {
+            | JSON.Classify.Number(n) => Float.toInt(n)
+            | _ => 0
+            }
+          | None => 0
+          }
+          fn data = switch Dict.get(obj, "data") {
+          | Some(v) => v
+          | None => JSON.Encode.null
+          }
+          fn message = switch Dict.get(obj, "message") {
+          | Some(v) =>
+            switch JSON.Classify.classify(v) {
+            | JSON.Classify.String(s) => Some(s)
+            | _ => None
+            }
+          | None => None
+          }
+
+          Ok({
+            success,
+            statement_struct: statementType,
+            row_count: rowCount,
+            data,
+            message,
+          })
+        }
+      | _ => Error("Unexpected response format")
+      }
+    } else {
+      // Parse error message from response body.
+      switch JSON.Classify.classify(json) {
+      | JSON.Classify.Object(obj) =>
+        switch Dict.get(obj, "error") {
+        | Some(v) =>
+          switch JSON.Classify.classify(v) {
+          | JSON.Classify.String(s) => Error(s)
+          | _ =>
+            Error("Backend error (status " ++ Int.toString(responseStatus(response)) ++ ")")
+          }
+        | None =>
+          Error("Backend error (status " ++ Int.toString(responseStatus(response)) ++ ")")
+        }
+      | _ => Error("Backend error (status " ++ Int.toString(responseStatus(response)) ++ ")")
+      }
+    }
+  } catch {
+  | exn =>
+    fn msg = switch exn {
+    | Exn.Error(e) =>
+      switch Exn.message(e) {
+      | Some(m) => m
+      | None => "Network error"
+      }
+    | _ => "Network error"
+    }
+    Error(msg)
+  }
+}
+
+// === Response conversion helpers (defined before toExecuteResult) ===
+
+/// Convert a JSON value to a display string for table cells.
+fn jsonToString = (value: JSON.t): string => {
+  switch JSON.Classify.classify(value) {
+  | JSON.Classify.String(s) => s
+  | JSON.Classify.Number(n) =>
+    if Float.mod(n, 1.0) == 0.0 {
+      Int.toString(Float.toInt(n))
+    } else {
+      Float.toFixed(n, ~digits=3)
+    }
+  | JSON.Classify.Bool(b) => if b { "true" } else { "false" }
+  | JSON.Classify.Null => "null"
+  | _ => JSON.stringify(value)
+  }
+}
+
+/// Format an EXPLAIN response into readable text.
+fn formatExplainResponse = (data: JSON.t): string => {
+  fn text = ref("=== EXPLAIN OUTPUT (from backend) ===\n\n")
+  switch JSON.Classify.classify(data) {
+  | JSON.Classify.Object(obj) => {
+      switch Dict.get(obj, "query") {
+      | Some(q) =>
+        switch JSON.Classify.classify(q) {
+        | JSON.Classify.String(s) => text := text.contents ++ "Query: " ++ s ++ "\n\n"
+        | _ => ()
+        }
+      | None => ()
+      }
+      switch Dict.get(obj, "plan") {
+      | Some(plan) => text := text.contents ++ "Plan:\n" ++ JSON.stringify(plan, ~space=2) ++ "\n"
+      | None => ()
+      }
+    }
+  | _ => text := text.contents ++ JSON.stringify(data, ~space=2) ++ "\n"
+  }
+  text.contents
+}
+
+/// Convert a VCL response with a JSON data array into a table result.
+fn formatAsTable = (response: vclResponse): DemoExecutor.executeResult => {
+  switch JSON.Classify.classify(response.data) {
+  | JSON.Classify.Array(items) =>
+    if Array.length(items) == 0 {
+      DemoExecutor.Success({
+        columns: ["result"],
+        rows: [],
+        timing_ms: 0.0,
+        row_count: 0,
+      })
+    } else {
+      // Extract columns from the first item's keys.
+      fn firstItem = items[0]
+      fn columns = switch firstItem {
+      | Some(item) =>
+        switch JSON.Classify.classify(item) {
+        | JSON.Classify.Object(obj) => Dict.keysToArray(obj)
+        | _ => ["value"]
+        }
+      | None => ["value"]
+      }
+
+      // Extract rows.
+      fn rows = items->Array.map(item =>
+        columns->Array.map(col =>
+          switch JSON.Classify.classify(item) {
+          | JSON.Classify.Object(obj) =>
+            switch Dict.get(obj, col) {
+            | Some(v) => jsonToString(v)
+            | None => "null"
+            }
+          | _ => jsonToString(item)
+          }
+        )
+      )
+
+      DemoExecutor.Success({
+        columns,
+        rows,
+        timing_ms: 0.0,
+        row_count: response.row_count,
+      })
+    }
+  | JSON.Classify.Object(_) =>
+    // Single object result (e.g., COUNT, SHOW STATUS) — render as key-value pairs.
+    fn text = JSON.stringify(response.data, ~space=2)
+    switch response.message {
+    | Some(msg) => DemoExecutor.ExplainResult(msg ++ "\n\n" ++ text)
+    | None =>
+      DemoExecutor.ExplainResult(response.statement_struct ++ " result:\n\n" ++ text)
+    }
+  | JSON.Classify.Null =>
+    switch response.message {
+    | Some(msg) => DemoExecutor.ExplainResult(msg)
+    | None => DemoExecutor.ExplainResult(response.statement_struct ++ " completed successfully.")
+    }
+  | _ => DemoExecutor.ExplainResult(JSON.stringify(response.data, ~space=2))
+  }
+}
+
+/// Convert a VCL API response into a DemoExecutor-compatible result.
+/// This bridges the real backend response format to the existing rendering code.
+fn toExecuteResult = (response: vclResponse): DemoExecutor.executeResult => {
+  if !response.success {
+    DemoExecutor.Error(
+      switch response.message {
+      | Some(msg) => msg
+      | None => "Query failed"
+      },
+    )
+  } else if response.statement_struct == "EXPLAIN" {
+    // EXPLAIN returns structured JSON — format it as readable text.
+    DemoExecutor.ExplainResult(formatExplainResponse(response.data))
+  } else {
+    // Convert JSON data array to columns + rows table format.
+    formatAsTable(response)
+  }
+}
+

@@ -1,7 +1,530 @@
 // SPDX-License-Identifier: MPL-2.0
-// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
-// Ported via Harvard Engine bulk-processor
+// Ported via Harvard Engine (Semantic pass)
 
 module KRaftSerializer;
 
-// TODO: Complete semantic implementation
+// SPDX-License-Identifier: MPL-2.0
+// KRaft Serializer — JSON persistence for Raft log and cluster state.
+//
+// Provides encode/decode functions for all Raft structs so the log
+// can be persisted to disk (or transmitted over the wire for RPC).
+
+// ============================================================================
+// Command Serialization
+// ============================================================================
+
+fn commandToJson = (cmd: MetadataLog.command): Js.Json.t => {
+  open Js.Json
+
+  switch cmd {
+  | RegisterStore({storeId, endpoint, modalities}) =>
+    Dict.fromArray([
+      ("struct", string("RegisterStore")),
+      ("storeId", string(storeId)),
+      ("endpoint", string(endpoint)),
+      (
+        "modalities",
+        array(modalities->Belt.Array.map(m => string(m))),
+      ),
+    ])->object_
+
+  | UnregisterStore({storeId}) =>
+    Dict.fromArray([
+      ("struct", string("UnregisterStore")),
+      ("storeId", string(storeId)),
+    ])->object_
+
+  | MapHexad({hexadId, locations}) =>
+    Dict.fromArray([
+      ("struct", string("MapHexad")),
+      ("hexadId", string(hexadId)),
+      ("locations", locations->object_),
+    ])->object_
+
+  | UnmapHexad({hexadId}) =>
+    Dict.fromArray([
+      ("struct", string("UnmapHexad")),
+      ("hexadId", string(hexadId)),
+    ])->object_
+
+  | UpdateTrust({storeId, newTrust}) =>
+    Dict.fromArray([
+      ("struct", string("UpdateTrust")),
+      ("storeId", string(storeId)),
+      ("newTrust", number(newTrust)),
+    ])->object_
+
+  | NoOp =>
+    Dict.fromArray([("struct", string("NoOp"))])->object_
+  }
+}
+
+fn commandFromJson = (json: Js.Json.t): option<MetadataLog.command> => {
+  open Belt.Option
+
+  fn dict = Js.Json.decodeObject(json)
+
+  dict->flatMap(d => {
+    fn cmdType =
+      Dict.get(d, "struct")
+      ->flatMap(Js.Json.decodeString)
+
+    switch cmdType {
+    | Some("RegisterStore") => {
+        fn storeId = Dict.get(d, "storeId")->flatMap(Js.Json.decodeString)
+        fn endpoint = Dict.get(d, "endpoint")->flatMap(Js.Json.decodeString)
+        fn modalities =
+          Dict.get(d, "modalities")
+          ->flatMap(Js.Json.decodeArray)
+          ->map(arr => arr->Belt.Array.keepMap(Js.Json.decodeString))
+
+        switch (storeId, endpoint, modalities) {
+        | (Some(s), Some(e), Some(m)) =>
+          Some(MetadataLog.RegisterStore({storeId: s, endpoint: e, modalities: m}))
+        | _ => None
+        }
+      }
+
+    | Some("UnregisterStore") => {
+        fn storeId = Dict.get(d, "storeId")->flatMap(Js.Json.decodeString)
+        storeId->map(s => MetadataLog.UnregisterStore({storeId: s}))
+      }
+
+    | Some("MapHexad") => {
+        fn hexadId = Dict.get(d, "hexadId")->flatMap(Js.Json.decodeString)
+        fn locations =
+          Dict.get(d, "locations")
+          ->flatMap(Js.Json.decodeObject)
+
+        switch (hexadId, locations) {
+        | (Some(h), Some(l)) =>
+          Some(MetadataLog.MapHexad({hexadId: h, locations: l}))
+        | _ => None
+        }
+      }
+
+    | Some("UnmapHexad") => {
+        fn hexadId = Dict.get(d, "hexadId")->flatMap(Js.Json.decodeString)
+        hexadId->map(h => MetadataLog.UnmapHexad({hexadId: h}))
+      }
+
+    | Some("UpdateTrust") => {
+        fn storeId = Dict.get(d, "storeId")->flatMap(Js.Json.decodeString)
+        fn newTrust = Dict.get(d, "newTrust")->flatMap(Js.Json.decodeNumber)
+
+        switch (storeId, newTrust) {
+        | (Some(s), Some(t)) =>
+          Some(MetadataLog.UpdateTrust({storeId: s, newTrust: t}))
+        | _ => None
+        }
+      }
+
+    | Some("NoOp") => Some(MetadataLog.NoOp)
+    | _ => None
+    }
+  })
+}
+
+// ============================================================================
+// Log Entry Serialization
+// ============================================================================
+
+fn logEntryToJson = (entry: MetadataLog.logEntry): Js.Json.t => {
+  Dict.fromArray([
+    ("term", Js.Json.number(Belt.Int.toFloat(entry.term))),
+    ("index", Js.Json.number(Belt.Int.toFloat(entry.index))),
+    ("command", commandToJson(entry.command)),
+    ("timestamp", Js.Json.number(entry.timestamp)),
+  ])->Js.Json.object_
+}
+
+fn logEntryFromJson = (json: Js.Json.t): option<MetadataLog.logEntry> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn term =
+      Dict.get(d, "term")
+      ->flatMap(Js.Json.decodeNumber)
+      ->map(Belt.Float.toInt)
+
+    fn index =
+      Dict.get(d, "index")
+      ->flatMap(Js.Json.decodeNumber)
+      ->map(Belt.Float.toInt)
+
+    fn command =
+      Dict.get(d, "command")
+      ->flatMap(commandFromJson)
+
+    fn timestamp =
+      Dict.get(d, "timestamp")
+      ->flatMap(Js.Json.decodeNumber)
+
+    switch (term, index, command, timestamp) {
+    | (Some(t), Some(i), Some(c), Some(ts)) =>
+      Some({
+        term: t,
+        index: i,
+        command: c,
+        timestamp: ts,
+      }: MetadataLog.logEntry)
+    | _ => None
+    }
+  })
+}
+
+// ============================================================================
+// Node State Serialization
+// ============================================================================
+
+fn roleToString = (role: MetadataLog.nodeRole): string => {
+  switch role {
+  | Leader => "leader"
+  | Follower => "follower"
+  | Candidate => "candidate"
+  }
+}
+
+fn roleFromString = (s: string): option<MetadataLog.nodeRole> => {
+  switch s {
+  | "leader" => Some(MetadataLog.Leader)
+  | "follower" => Some(MetadataLog.Follower)
+  | "candidate" => Some(MetadataLog.Candidate)
+  | _ => None
+  }
+}
+
+fn dictToJsonNumbers = (d: Dict.t<MetadataLog.index>): Js.Json.t => {
+  fn entries = Dict.entries(d)->Belt.Array.map(((k, v)) => {
+    (k, Js.Json.number(Belt.Int.toFloat(v)))
+  })
+  Dict.fromArray(entries)->Js.Json.object_
+}
+
+fn jsonToDictNumbers = (json: Js.Json.t): Dict.t<MetadataLog.index> => {
+  switch Js.Json.decodeObject(json) {
+  | None => Dict.empty()
+  | Some(d) => {
+      fn entries = Dict.entries(d)->Belt.Array.keepMap(((k, v)) => {
+        Js.Json.decodeNumber(v)->Belt.Option.map(n => (k, Belt.Float.toInt(n)))
+      })
+      Dict.fromArray(entries)
+    }
+  }
+}
+
+fn nodeStateToJson = (state: MetadataLog.nodeState): Js.Json.t => {
+  Dict.fromArray([
+    ("role", Js.Json.string(roleToString(state.role))),
+    ("currentTerm", Js.Json.number(Belt.Int.toFloat(state.currentTerm))),
+    (
+      "votedFor",
+      switch state.votedFor {
+      | Some(id) => Js.Json.string(id)
+      | None => Js.Json.null
+      },
+    ),
+    ("log", Js.Json.array(state.log->Belt.Array.map(logEntryToJson))),
+    ("commitIndex", Js.Json.number(Belt.Int.toFloat(state.commitIndex))),
+    ("lastApplied", Js.Json.number(Belt.Int.toFloat(state.lastApplied))),
+    ("nextIndex", dictToJsonNumbers(state.nextIndex)),
+    ("matchIndex", dictToJsonNumbers(state.matchIndex)),
+  ])->Js.Json.object_
+}
+
+fn nodeStateFromJson = (json: Js.Json.t): option<MetadataLog.nodeState> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn role =
+      Dict.get(d, "role")
+      ->flatMap(Js.Json.decodeString)
+      ->flatMap(roleFromString)
+
+    fn currentTerm =
+      Dict.get(d, "currentTerm")
+      ->flatMap(Js.Json.decodeNumber)
+      ->map(Belt.Float.toInt)
+
+    fn votedFor =
+      Dict.get(d, "votedFor")
+      ->flatMap(v =>
+        if v == Js.Json.null {
+          Some(None)
+        } else {
+          Js.Json.decodeString(v)->map(s => Some(s))
+        }
+      )
+
+    fn log =
+      Dict.get(d, "log")
+      ->flatMap(Js.Json.decodeArray)
+      ->map(arr => arr->Belt.Array.keepMap(logEntryFromJson))
+
+    fn commitIndex =
+      Dict.get(d, "commitIndex")
+      ->flatMap(Js.Json.decodeNumber)
+      ->map(Belt.Float.toInt)
+
+    fn lastApplied =
+      Dict.get(d, "lastApplied")
+      ->flatMap(Js.Json.decodeNumber)
+      ->map(Belt.Float.toInt)
+
+    fn nextIndex =
+      Dict.get(d, "nextIndex")
+      ->map(jsonToDictNumbers)
+      ->getWithDefault(Dict.empty())
+
+    fn matchIndex =
+      Dict.get(d, "matchIndex")
+      ->map(jsonToDictNumbers)
+      ->getWithDefault(Dict.empty())
+
+    switch (role, currentTerm, votedFor, log, commitIndex, lastApplied) {
+    | (Some(r), Some(ct), Some(vf), Some(l), Some(ci), Some(la)) =>
+      Some({
+        role: r,
+        currentTerm: ct,
+        votedFor: vf,
+        log: l,
+        commitIndex: ci,
+        lastApplied: la,
+        nextIndex: nextIndex,
+        matchIndex: matchIndex,
+      }: MetadataLog.nodeState)
+    | _ => None
+    }
+  })
+}
+
+// ============================================================================
+// Vote Request/Response Serialization
+// ============================================================================
+
+fn voteRequestToJson = (req: MetadataLog.voteRequest): Js.Json.t => {
+  Dict.fromArray([
+    ("term", Js.Json.number(Belt.Int.toFloat(req.term))),
+    ("candidateId", Js.Json.string(req.candidateId)),
+    ("lastLogIndex", Js.Json.number(Belt.Int.toFloat(req.lastLogIndex))),
+    ("lastLogTerm", Js.Json.number(Belt.Int.toFloat(req.lastLogTerm))),
+  ])->Js.Json.object_
+}
+
+fn voteRequestFromJson = (json: Js.Json.t): option<MetadataLog.voteRequest> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn term = Dict.get(d, "term")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn candidateId = Dict.get(d, "candidateId")->flatMap(Js.Json.decodeString)
+    fn lastLogIndex = Dict.get(d, "lastLogIndex")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn lastLogTerm = Dict.get(d, "lastLogTerm")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+
+    switch (term, candidateId, lastLogIndex, lastLogTerm) {
+    | (Some(t), Some(c), Some(li), Some(lt)) =>
+      Some({term: t, candidateId: c, lastLogIndex: li, lastLogTerm: lt}: MetadataLog.voteRequest)
+    | _ => None
+    }
+  })
+}
+
+fn voteResponseToJson = (res: MetadataLog.voteResponse): Js.Json.t => {
+  Dict.fromArray([
+    ("term", Js.Json.number(Belt.Int.toFloat(res.term))),
+    ("voteGranted", Js.Json.boolean(res.voteGranted)),
+  ])->Js.Json.object_
+}
+
+fn voteResponseFromJson = (json: Js.Json.t): option<MetadataLog.voteResponse> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn term = Dict.get(d, "term")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn voteGranted = Dict.get(d, "voteGranted")->flatMap(Js.Json.decodeBoolean)
+
+    switch (term, voteGranted) {
+    | (Some(t), Some(v)) =>
+      Some({term: t, voteGranted: v}: MetadataLog.voteResponse)
+    | _ => None
+    }
+  })
+}
+
+// ============================================================================
+// AppendEntries Request/Response Serialization
+// ============================================================================
+
+fn appendEntriesRequestToJson = (req: MetadataLog.appendEntriesRequest): Js.Json.t => {
+  Dict.fromArray([
+    ("term", Js.Json.number(Belt.Int.toFloat(req.term))),
+    ("leaderId", Js.Json.string(req.leaderId)),
+    ("prevLogIndex", Js.Json.number(Belt.Int.toFloat(req.prevLogIndex))),
+    ("prevLogTerm", Js.Json.number(Belt.Int.toFloat(req.prevLogTerm))),
+    ("entries", Js.Json.array(req.entries->Belt.Array.map(logEntryToJson))),
+    ("leaderCommit", Js.Json.number(Belt.Int.toFloat(req.leaderCommit))),
+  ])->Js.Json.object_
+}
+
+fn appendEntriesRequestFromJson = (json: Js.Json.t): option<MetadataLog.appendEntriesRequest> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn term = Dict.get(d, "term")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn leaderId = Dict.get(d, "leaderId")->flatMap(Js.Json.decodeString)
+    fn prevLogIndex = Dict.get(d, "prevLogIndex")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn prevLogTerm = Dict.get(d, "prevLogTerm")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn entries =
+      Dict.get(d, "entries")
+      ->flatMap(Js.Json.decodeArray)
+      ->map(arr => arr->Belt.Array.keepMap(logEntryFromJson))
+    fn leaderCommit = Dict.get(d, "leaderCommit")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+
+    switch (term, leaderId, prevLogIndex, prevLogTerm, entries, leaderCommit) {
+    | (Some(t), Some(l), Some(pi), Some(pt), Some(e), Some(lc)) =>
+      Some({
+        term: t,
+        leaderId: l,
+        prevLogIndex: pi,
+        prevLogTerm: pt,
+        entries: e,
+        leaderCommit: lc,
+      }: MetadataLog.appendEntriesRequest)
+    | _ => None
+    }
+  })
+}
+
+fn appendEntriesResponseToJson = (res: MetadataLog.appendEntriesResponse): Js.Json.t => {
+  Dict.fromArray([
+    ("term", Js.Json.number(Belt.Int.toFloat(res.term))),
+    ("success", Js.Json.boolean(res.success)),
+    ("matchIndex", Js.Json.number(Belt.Int.toFloat(res.matchIndex))),
+  ])->Js.Json.object_
+}
+
+fn appendEntriesResponseFromJson = (json: Js.Json.t): option<MetadataLog.appendEntriesResponse> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn term = Dict.get(d, "term")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+    fn success = Dict.get(d, "success")->flatMap(Js.Json.decodeBoolean)
+    fn matchIndex = Dict.get(d, "matchIndex")->flatMap(Js.Json.decodeNumber)->map(Belt.Float.toInt)
+
+    switch (term, success, matchIndex) {
+    | (Some(t), Some(s), Some(mi)) =>
+      Some({term: t, success: s, matchIndex: mi}: MetadataLog.appendEntriesResponse)
+    | _ => None
+    }
+  })
+}
+
+// ============================================================================
+// Full Snapshot Serialization (for persistence)
+// ============================================================================
+
+struct persistedSnapshot { {
+  version: int,
+  nodeState: Js.Json.t,
+  snapshotTimestamp: float,
+}
+
+fn snapshotToJson = (state: MetadataLog.nodeState): Js.Json.t => {
+  Dict.fromArray([
+    ("version", Js.Json.number(1.0)),
+    ("nodeState", nodeStateToJson(state)),
+    ("snapshotTimestamp", Js.Json.number(Js.Date.now())),
+  ])->Js.Json.object_
+}
+
+fn snapshotFromJson = (json: Js.Json.t): option<MetadataLog.nodeState> => {
+  open Belt.Option
+
+  Js.Json.decodeObject(json)->flatMap(d => {
+    fn version =
+      Dict.get(d, "version")
+      ->flatMap(Js.Json.decodeNumber)
+      ->map(Belt.Float.toInt)
+
+    switch version {
+    | Some(1) =>
+      Dict.get(d, "nodeState")->flatMap(nodeStateFromJson)
+    | _ => None // Unknown version
+    }
+  })
+}
+
+// ============================================================================
+// Write-Ahead Log (WAL) Entry Format
+// ============================================================================
+
+/// Encode a single log entry as a line for append-only WAL file.
+fn walEncode = (entry: MetadataLog.logEntry): string => {
+  Js.Json.stringify(logEntryToJson(entry))
+}
+
+/// Decode a WAL line back to a log entry.
+fn walDecode = (line: string): option<MetadataLog.logEntry> => {
+  try {
+    fn json = Js.Json.parseExn(line)
+    logEntryFromJson(json)
+  } catch {
+  | _ => None
+  }
+}
+
+/// Encode multiple WAL entries (newline-delimited JSON).
+fn walEncodeAll = (entries: array<MetadataLog.logEntry>): string => {
+  entries
+  ->Belt.Array.map(walEncode)
+  ->Belt.Array.joinWith("\n", s => s)
+}
+
+/// Decode all entries from a WAL string.
+fn walDecodeAll = (data: string): array<MetadataLog.logEntry> => {
+  String.split(data, "\n")
+  ->Belt.Array.keepMap(line => {
+    fn trimmed = String.trim(line)
+    if String.length(trimmed) > 0 {
+      walDecode(trimmed)
+    } else {
+      None
+    }
+  })
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+// Commands
+fn encodeCommand = commandToJson
+fn decodeCommand = commandFromJson
+
+// Log entries
+fn encodeEntry = logEntryToJson
+fn decodeEntry = logEntryFromJson
+
+// Node state
+fn encodeState = nodeStateToJson
+fn decodeState = nodeStateFromJson
+
+// RPC messages
+fn encodeVoteReq = voteRequestToJson
+fn decodeVoteReq = voteRequestFromJson
+fn encodeVoteRes = voteResponseToJson
+fn decodeVoteRes = voteResponseFromJson
+fn encodeAppendReq = appendEntriesRequestToJson
+fn decodeAppendReq = appendEntriesRequestFromJson
+fn encodeAppendRes = appendEntriesResponseToJson
+fn decodeAppendRes = appendEntriesResponseFromJson
+
+// Snapshots
+fn snapshot = snapshotToJson
+fn restore = snapshotFromJson
+
+// WAL
+fn wal = walEncode
+fn unwal = walDecode
+fn walAll = walEncodeAll
+fn unwalAll = walDecodeAll
+

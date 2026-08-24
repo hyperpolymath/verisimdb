@@ -1,7 +1,1201 @@
 // SPDX-License-Identifier: MPL-2.0
-// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
-// Ported via Harvard Engine bulk-processor
+// Ported via Harvard Engine (Semantic pass)
 
 module VCLParser;
 
-// TODO: Complete semantic implementation
+// SPDX-License-Identifier: MPL-2.0
+// VCL Slipstream Parser - Unstructd AST
+// Phase 1: Simple parser for slipstream queries (no dependent structs)
+
+// ============================================================================
+// AST Types
+// ============================================================================
+
+module AST = {
+  struct modality {
+    | Graph
+    | Vector
+    | Tensor
+    | Semantic
+    | Document
+    | Temporal
+    | Provenance
+    | Spatial
+    | All
+
+  struct source {
+    | Hexad(string)  // UUID
+    | Federation(string, option<driftPolicy>)  // pattern, drift policy
+    | Store(string)  // store ID
+    | Reflect  // Meta-circular: query the query store itself
+
+  and driftPolicy =
+    | Strict
+    | Repair
+    | Tolerate
+    | Latest
+
+  struct operator {
+    | Eq
+    | Neq
+    | Gt
+    | Lt
+    | Gte
+    | Lte
+    | Like
+    | Contains
+    | Matches
+
+  struct condition {
+    | Simple(simpleCondition)
+    | And(condition, condition)
+    | Or(condition, condition)
+    | Not(condition)
+
+  and simpleCondition =
+    | FulltextContains(string)
+    | FulltextMatches(string)
+    | FieldCondition(string, operator, literal)
+    | VectorSimilar(array<float>, option<float>)  // embedding, threshold
+    | GraphPattern(string)  // SPARQL-like pattern (simplified)
+    // Phase 2: Cross-modal conditions
+    | CrossModalFieldCompare(modality, string, operator, modality, string)
+      // e.g., WHERE DOCUMENT.severity > GRAPH.centrality
+    | ModalityDrift(modality, modality, float)
+      // e.g., WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
+    | ModalityExists(modality)
+      // e.g., WHERE VECTOR EXISTS
+    | ModalityNotExists(modality)
+      // e.g., WHERE TENSOR NOT EXISTS
+    | ModalityConsistency(modality, modality, string)
+      // e.g., WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE
+
+  and literal =
+    | String(string)
+    | Int(int)
+    | Float(float)
+    | Bool(bool)
+    | Array(array<literal>)
+
+  // Field reference: DOCUMENT.name, GRAPH.predicate, etc.
+  struct fieldRef { {
+    modality: modality,
+    field: string,
+  }
+
+  // Aggregate functions (SQL-compatible)
+  struct aggregateFunc {
+    | Count
+    | Sum
+    | Avg
+    | Min
+    | Max
+
+  // Aggregate expression in SELECT
+  struct aggregateExpr {
+    | CountAll                              // COUNT(*)
+    | AggregateField(aggregateFunc, fieldRef) // AVG(DOCUMENT.severity)
+
+  // Sort direction for ORDER BY
+  struct sortDirection {
+    | Asc
+    | Desc
+
+  // ORDER BY item
+  struct orderByItem { {
+    field: fieldRef,
+    direction: sortDirection,
+  }
+
+  struct query { {
+    modalities: array<modality>,
+    projections: option<array<fieldRef>>,       // Column selection: DOCUMENT.name, DOCUMENT.severity
+    aggregates: option<array<aggregateExpr>>,   // COUNT(*), SUM(DOCUMENT.severity)
+    source: source,
+    where: option<condition>,
+    groupBy: option<array<fieldRef>>,           // GROUP BY DOCUMENT.name
+    having: option<condition>,                  // HAVING COUNT(*) > 5
+    proof: option<array<proofSpec>>,
+    orderBy: option<array<orderByItem>>,        // ORDER BY DOCUMENT.severity DESC
+    limit: option<int>,
+    offset: option<int>,
+  }
+
+  and proofSpec = {
+    proofType: proofType,
+    contractName: string,
+    customParams: option<array<(string, string)>>,  // WITH (key=value, ...) for Custom proofs
+  }
+
+  and proofType =
+    | Existence
+    | Citation
+    | Access
+    | Integrity
+    | Provenance
+    | Custom
+
+  // Phase 3: Mutation structs (INSERT / UPDATE / DELETE)
+  struct modalityData {
+    | DocumentData(array<(string, literal)>) // field-value pairs
+    | VectorData(array<float>) // embedding
+    | GraphData(string, string) // edge_struct, target_hexad_id
+    | TensorData(array<literal>) // tensor values
+    | SemanticData(string) // contract name
+    | TemporalData(string) // timestamp
+    | ProvenanceData(array<(string, literal)>) // event_struct, actor, description, source
+    | SpatialData(array<(string, literal)>) // latitude, longitude, altitude, geometry_struct
+
+  struct mutation {
+    | Insert({
+        modalities: array<modalityData>,
+        proof: option<array<proofSpec>>,
+      })
+    | Update({
+        hexadId: string,
+        sets: array<(fieldRef, literal)>,
+        proof: option<array<proofSpec>>,
+      })
+    | Delete({
+        hexadId: string,
+        proof: option<array<proofSpec>>,
+      })
+
+  struct statement {
+    | Query(query)
+    | Mutation(mutation)
+}
+
+// ============================================================================
+// Parser Combinators
+// ============================================================================
+
+module Parser = {
+  struct parseError { {
+    message: string,
+    position: int,
+  }
+
+  struct parseResult<'a> = Result<('a, int), parseError>
+
+  struct parser<'a> = string => parseResult<'a>
+
+  // Basic combinators
+  fn pure = (value: 'a): parser<'a> => {
+    input => Ok((value, 0))
+  }
+
+  fn fail = (message: string): parser<'a> => {
+    _input => Error({message, position: 0})
+  }
+
+  fn map = (p: parser<'a>, f: 'a => 'b): parser<'b> => {
+    input => {
+      switch p(input) {
+      | Ok((value, consumed)) => Ok((f(value), consumed))
+      | Error(e) => Error(e)
+      }
+    }
+  }
+
+  fn bind = (p: parser<'a>, f: 'a => parser<'b>): parser<'b> => {
+    input => {
+      switch p(input) {
+      | Ok((value, consumed)) => {
+          fn remaining = Js.String2.sliceToEnd(input, ~from=consumed)
+          switch f(value)(remaining) {
+          | Ok((value2, consumed2)) => Ok((value2, consumed + consumed2))
+          | Error(e) => Error({...e, position: e.position + consumed})
+          }
+        }
+      | Error(e) => Error(e)
+      }
+    }
+  }
+
+  fn (<|>) = (p1: parser<'a>, p2: parser<'a>): parser<'a> => {
+    input => {
+      switch p1(input) {
+      | Ok(result) => Ok(result)
+      | Error(_) => p2(input)
+      }
+    }
+  }
+
+  // Whitespace handling
+  fn ws: parser<unit> = input => {
+    fn trimmed = Js.String2.trimStart(input)
+    fn consumed = Js.String2.length(input) - Js.String2.length(trimmed)
+    Ok(((), consumed))
+  }
+
+  fn lexeme = (p: parser<'a>): parser<'a> => {
+    bind(p, value => map(ws, _ => value))
+  }
+
+  // String matching
+  fn string = (s: string): parser<string> => {
+    input => {
+      if Js.String2.startsWith(input, s) {
+        Ok((s, Js.String2.length(s)))
+      } else {
+        Error({message: `Expected "${s}"`, position: 0})
+      }
+    }
+  }
+
+  fn keyword = (k: string): parser<string> => {
+    lexeme(string(k))
+  }
+
+  // Regex-based parsers
+  fn regex = (pattern: string): parser<string> => {
+    input => {
+      fn re = Js.Re.fromStringWithFlags(pattern, ~flags="i")
+      switch Js.Re.exec_(re, input) {
+      | Some(result) => {
+          fn matched = Js.Re.captures(result)[0]
+          switch Js.Nullable.toOption(matched) {
+          | Some(str) => Ok((str, Js.String2.length(str)))
+          | None => Error({message: `Regex ${pattern} failed`, position: 0})
+          }
+        }
+      | None => Error({message: `Regex ${pattern} failed`, position: 0})
+      }
+    }
+  }
+
+  fn identifier: parser<string> = lexeme(regex("^[a-zA-Z_][a-zA-Z0-9_]*"))
+
+  fn uuid: parser<string> = lexeme(
+    regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+  )
+
+  fn integer: parser<int> = {
+    input => {
+      fn intStr = lexeme(regex("^[0-9]+"))
+      switch intStr(input) {
+      | Ok((str, consumed)) => {
+          switch Belt.Int.fromString(str) {
+          | Some(n) => Ok((n, consumed))
+          | None => Error({message: "Invalid integer", position: 0})
+          }
+        }
+      | Error(e) => Error(e)
+      }
+    }
+  }
+
+  fn float: parser<float> = {
+    input => {
+      fn floatStr = lexeme(regex("^[0-9]+\\.[0-9]+"))
+      switch floatStr(input) {
+      | Ok((str, consumed)) => {
+          switch Belt.Float.fromString(str) {
+          | Some(f) => Ok((f, consumed))
+          | None => Error({message: "Invalid float", position: 0})
+          }
+        }
+      | Error(e) => Error(e)
+      }
+    }
+  }
+
+  fn stringLiteral: parser<string> = {
+    input => {
+      fn quoted = lexeme(regex("^\"([^\"\\\\]|\\\\.)*\""))
+      switch quoted(input) {
+      | Ok((str, consumed)) => {
+          // Remove quotes
+          fn unquoted = Js.String2.slice(str, ~from=1, ~to_=Js.String2.length(str) - 1)
+          Ok((unquoted, consumed))
+        }
+      | Error(e) => Error(e)
+      }
+    }
+  }
+
+  // Many combinator
+  fn rec many = (p: parser<'a>): parser<array<'a>> => {
+    input => {
+      switch p(input) {
+      | Ok((value, consumed)) => {
+          fn remaining = Js.String2.sliceToEnd(input, ~from=consumed)
+          switch many(p)(remaining) {
+          | Ok((values, consumed2)) => Ok(([value]->Js.Array2.concat(values), consumed + consumed2))
+          | Error(_) => Ok(([value], consumed))
+          }
+        }
+      | Error(_) => Ok(([], 0))
+      }
+    }
+  }
+
+  fn sepBy = (p: parser<'a>, sep: parser<'b>): parser<array<'a>> => {
+    input => {
+      switch p(input) {
+      | Ok((first, consumed1)) => {
+          fn remaining = Js.String2.sliceToEnd(input, ~from=consumed1)
+          fn parseRest = bind(sep, _ => p)
+          switch many(parseRest)(remaining) {
+          | Ok((rest, consumed2)) => Ok(([first]->Js.Array2.concat(rest), consumed1 + consumed2))
+          | Error(_) => Ok(([first], consumed1))
+          }
+        }
+      | Error(e) => Error(e)
+      }
+    }
+  }
+
+  fn optional = (p: parser<'a>): parser<option<'a>> => {
+    input => {
+      switch p(input) {
+      | Ok((value, consumed)) => Ok((Some(value), consumed))
+      | Error(_) => Ok((None, 0))
+      }
+    }
+  }
+}
+
+// ============================================================================
+// VCL Grammar Parsers
+// ============================================================================
+
+module Grammar = {
+  open Parser
+  open AST
+
+  // Modality parser (octad: 8 modalities + All)
+  fn modality: parser<modality> = {
+    fn graph = map(keyword("GRAPH"), _ => Graph)
+    fn vector = map(keyword("VECTOR"), _ => Vector)
+    fn tensor = map(keyword("TENSOR"), _ => Tensor)
+    fn semantic = map(keyword("SEMANTIC"), _ => Semantic)
+    fn document = map(keyword("DOCUMENT"), _ => Document)
+    fn temporal = map(keyword("TEMPORAL"), _ => Temporal)
+    fn provenance = map(keyword("PROVENANCE"), _ => Provenance)
+    fn spatial = map(keyword("SPATIAL"), _ => Spatial)
+    fn all = map(keyword("*"), _ => All)
+
+    graph <|> vector <|> tensor <|> semantic <|> document <|> temporal <|> provenance <|> spatial <|> all
+  }
+
+  fn modalityList: parser<array<modality>> = sepBy(modality, keyword(","))
+
+  // Field reference parser: DOCUMENT.name, GRAPH.predicate, etc.
+  fn fieldRef: parser<AST.fieldRef> = {
+    bind(modality, mod =>
+      bind(keyword("."), _ =>
+        map(identifier, field => {
+          AST.modality: mod,
+          field: field,
+        })
+      )
+    )
+  }
+
+  // Aggregate function name parser
+  fn aggregateFunc: parser<AST.aggregateFunc> = {
+    fn count = map(keyword("COUNT"), _ => AST.Count)
+    fn sum = map(keyword("SUM"), _ => AST.Sum)
+    fn avg = map(keyword("AVG"), _ => AST.Avg)
+    fn min_ = map(keyword("MIN"), _ => AST.Min)
+    fn max_ = map(keyword("MAX"), _ => AST.Max)
+
+    count <|> sum <|> avg <|> min_ <|> max_
+  }
+
+  // Aggregate expression parser: COUNT(*) or AVG(DOCUMENT.severity)
+  fn aggregateExpr: parser<AST.aggregateExpr> = {
+    fn countAll = {
+      bind(keyword("COUNT"), _ =>
+        bind(keyword("("), _ =>
+          bind(keyword("*"), _ =>
+            map(keyword(")"), _ => AST.CountAll)
+          )
+        )
+      )
+    }
+
+    fn aggregateField = {
+      bind(aggregateFunc, func =>
+        bind(keyword("("), _ =>
+          bind(fieldRef, ref =>
+            map(keyword(")"), _ => AST.AggregateField(func, ref))
+          )
+        )
+      )
+    }
+
+    countAll <|> aggregateField
+  }
+
+  // Extended select item: aggregate | field projection | bare modality
+  struct selectItem {
+    | SelectAggregate(AST.aggregateExpr)
+    | SelectField(AST.fieldRef)
+    | SelectModality(AST.modality)
+
+  fn selectItem: parser<selectItem> = {
+    fn agg = map(aggregateExpr, a => SelectAggregate(a))
+    fn field = map(fieldRef, f => SelectField(f))
+    fn mod = map(modality, m => SelectModality(m))
+
+    agg <|> field <|> mod
+  }
+
+  fn selectItemList: parser<array<selectItem>> = sepBy(selectItem, keyword(","))
+
+  // Classify select items into modalities, projections, and aggregates
+  struct classifiedSelect { {
+    modalities: array<AST.modality>,
+    projections: option<array<AST.fieldRef>>,
+    aggregates: option<array<AST.aggregateExpr>>,
+  }
+
+  fn classifySelect = (items: array<selectItem>): classifiedSelect => {
+    fn mods = []
+    fn projs = []
+    fn aggs = []
+
+    items->Js.Array2.forEach(item => {
+      switch item {
+      | SelectModality(m) => mods->Js.Array2.push(m)->ignore
+      | SelectField(f) => {
+          projs->Js.Array2.push(f)->ignore
+          // Also add the modality if not already present
+          if !(mods->Js.Array2.some(m => m == f.modality)) {
+            mods->Js.Array2.push(f.modality)->ignore
+          }
+        }
+      | SelectAggregate(a) => {
+          aggs->Js.Array2.push(a)->ignore
+          // Add modality from aggregate field ref if present
+          switch a {
+          | AggregateField(_, ref) =>
+            if !(mods->Js.Array2.some(m => m == ref.modality)) {
+              mods->Js.Array2.push(ref.modality)->ignore
+            }
+          | CountAll => ()
+          }
+        }
+      }
+    })
+
+    {
+      modalities: mods,
+      projections: if Js.Array2.length(projs) > 0 { Some(projs) } else { None },
+      aggregates: if Js.Array2.length(aggs) > 0 { Some(aggs) } else { None },
+    }
+  }
+
+  // SELECT clause (extended to support projections and aggregates)
+  fn selectClause: parser<classifiedSelect> = {
+    map(bind(keyword("SELECT"), _ => selectItemList), items => classifySelect(items))
+  }
+
+  // Drift policy
+  fn driftPolicy: parser<driftPolicy> = {
+    fn strict = map(keyword("STRICT"), _ => Strict)
+    fn repair = map(keyword("REPAIR"), _ => Repair)
+    fn tolerate = map(keyword("TOLERATE"), _ => Tolerate)
+    fn latest = map(keyword("LATEST"), _ => Latest)
+
+    bind(keyword("WITH"), _ =>
+      bind(keyword("DRIFT"), _ =>
+        strict <|> repair <|> tolerate <|> latest
+      )
+    )
+  }
+
+  // Source parser
+  fn source: parser<source> = {
+    fn hexadSource = {
+      bind(keyword("HEXAD"), _ =>
+        map(uuid, id => Hexad(id))
+      )
+    }
+
+    fn federationSource = {
+      bind(keyword("FEDERATION"), _ =>
+        bind(identifier, pattern =>
+          map(optional(driftPolicy), drift =>
+            Federation(pattern, drift)
+          )
+        )
+      )
+    }
+
+    fn storeSource = {
+      bind(keyword("STORE"), _ =>
+        map(identifier, id => Store(id))
+      )
+    }
+
+    hexadSource <|> federationSource <|> storeSource
+  }
+
+  // FROM clause
+  fn fromClause: parser<source> = {
+    bind(keyword("FROM"), _ => source)
+  }
+
+  // Operators
+  fn operator: parser<operator> = {
+    fn eq = map(keyword("=="), _ => Eq)
+    fn neq = map(keyword("!="), _ => Neq)
+    fn gte = map(keyword(">="), _ => Gte)
+    fn lte = map(keyword("<="), _ => Lte)
+    fn gt = map(keyword(">"), _ => Gt)
+    fn lt = map(keyword("<"), _ => Lt)
+    fn like = map(keyword("LIKE"), _ => Like)
+    fn contains = map(keyword("CONTAINS"), _ => Contains)
+    fn matches = map(keyword("MATCHES"), _ => Matches)
+
+    eq <|> neq <|> gte <|> lte <|> gt <|> lt <|> like <|> contains <|> matches
+  }
+
+  // Literals
+  fn rec literal: parser<literal> = {
+    input => {
+      fn stringLit = map(stringLiteral, s => String(s))
+      fn intLit = map(integer, i => Int(i))
+      fn floatLit = map(float, f => Float(f))
+      fn boolLit = {
+        fn t = map(keyword("true"), _ => Bool(true))
+        fn f = map(keyword("false"), _ => Bool(false))
+        t <|> f
+      }
+
+      fn arrayLit = {
+        bind(keyword("["), _ =>
+          bind(sepBy(literal, keyword(",")), values =>
+            map(keyword("]"), _ => Array(values))
+          )
+        )
+      }
+
+      fn p = arrayLit <|> floatLit <|> intLit <|> stringLit <|> boolLit
+      p(input)
+    }
+  }
+
+  // Simple conditions
+  fn simpleCondition: parser<simpleCondition> = {
+    fn fulltextContains = {
+      bind(keyword("FULLTEXT"), _ =>
+        bind(keyword("CONTAINS"), _ =>
+          map(stringLiteral, text => FulltextContains(text))
+        )
+      )
+    }
+
+    fn fulltextMatches = {
+      bind(keyword("FULLTEXT"), _ =>
+        bind(keyword("MATCHES"), _ =>
+          map(stringLiteral, pattern => FulltextMatches(pattern))
+        )
+      )
+    }
+
+    fn fieldCondition = {
+      bind(keyword("FIELD"), _ =>
+        bind(identifier, field =>
+          bind(operator, op =>
+            map(literal, value => FieldCondition(field, op, value))
+          )
+        )
+      )
+    }
+
+    fn vectorSimilar = {
+      bind(identifier, _field =>
+        bind(keyword("SIMILAR"), _ =>
+          bind(keyword("TO"), _ =>
+            bind(literal, embedding =>
+              map(optional(bind(keyword("WITHIN"), _ => float)), threshold => {
+                // Extract floats from array literal
+                fn floats = switch embedding {
+                | Array(arr) => arr->Js.Array2.map(lit =>
+                    switch lit {
+                    | Float(f) => f
+                    | Int(i) => Belt.Int.toFloat(i)
+                    | _ => 0.0
+                    }
+                  )
+                | _ => []
+                }
+                VectorSimilar(floats, threshold)
+              })
+            )
+          )
+        )
+      )
+    }
+
+    fn graphPattern = {
+      // Simplified: just capture the pattern as string for now
+      map(stringLiteral, pattern => GraphPattern(pattern))
+    }
+
+    // Phase 2: Cross-modal conditions
+    fn driftCondition = {
+      bind(keyword("DRIFT"), _ =>
+        bind(keyword("("), _ =>
+          bind(modality, mod1 =>
+            bind(keyword(","), _ =>
+              bind(modality, mod2 =>
+                bind(keyword(")"), _ =>
+                  bind(operator, _op =>
+                    map(float, threshold =>
+                      ModalityDrift(mod1, mod2, threshold)
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
+    fn consistencyCondition = {
+      bind(keyword("CONSISTENT"), _ =>
+        bind(keyword("("), _ =>
+          bind(modality, mod1 =>
+            bind(keyword(","), _ =>
+              bind(modality, mod2 =>
+                bind(keyword(")"), _ =>
+                  bind(keyword("USING"), _ =>
+                    map(identifier, metric =>
+                      ModalityConsistency(mod1, mod2, metric)
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
+    fn existsCondition = {
+      bind(modality, mod =>
+        map(keyword("EXISTS"), _ =>
+          ModalityExists(mod)
+        )
+      )
+    }
+
+    fn notExistsCondition = {
+      bind(modality, mod =>
+        bind(keyword("NOT"), _ =>
+          map(keyword("EXISTS"), _ =>
+            ModalityNotExists(mod)
+          )
+        )
+      )
+    }
+
+    // Cross-modal field compare: MODALITY1.field op MODALITY2.field
+    fn crossModalFieldCompare = {
+      bind(modality, mod1 =>
+        bind(keyword("."), _ =>
+          bind(identifier, field1 =>
+            bind(operator, op =>
+              bind(modality, mod2 =>
+                bind(keyword("."), _ =>
+                  map(identifier, field2 =>
+                    CrossModalFieldCompare(mod1, field1, op, mod2, field2)
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+
+    driftCondition <|> consistencyCondition <|> notExistsCondition <|> existsCondition <|> crossModalFieldCompare <|> fulltextContains <|> fulltextMatches <|> fieldCondition <|> vectorSimilar <|> graphPattern
+  }
+
+  // Compound conditions
+  fn rec condition: parser<condition> = {
+    input => {
+      fn simple = map(simpleCondition, c => Simple(c))
+
+      fn andCond = {
+        bind(condition, left =>
+          bind(keyword("AND"), _ =>
+            map(condition, right => And(left, right))
+          )
+        )
+      }
+
+      fn orCond = {
+        bind(condition, left =>
+          bind(keyword("OR"), _ =>
+            map(condition, right => Or(left, right))
+          )
+        )
+      }
+
+      fn notCond = {
+        bind(keyword("NOT"), _ =>
+          map(condition, c => Not(c))
+        )
+      }
+
+      fn p = andCond <|> orCond <|> notCond <|> simple
+      p(input)
+    }
+  }
+
+  // WHERE clause
+  fn whereClause: parser<condition> = {
+    bind(keyword("WHERE"), _ => condition)
+  }
+
+  // PROOF clause
+  fn proofType: parser<proofType> = {
+    fn existence = map(keyword("EXISTENCE"), _ => Existence)
+    fn citation = map(keyword("CITATION"), _ => Citation)
+    fn access = map(keyword("ACCESS"), _ => Access)
+    fn integrity = map(keyword("INTEGRITY"), _ => Integrity)
+    fn provenance = map(keyword("PROVENANCE"), _ => Provenance)
+    fn custom = map(keyword("CUSTOM"), _ => Custom)
+
+    existence <|> citation <|> access <|> integrity <|> provenance <|> custom
+  }
+
+  fn proofSpec: parser<proofSpec> = {
+    bind(proofType, pType =>
+      bind(keyword("("), _ =>
+        bind(identifier, contract =>
+          map(keyword(")"), _ => {
+            proofType: pType,
+            contractName: contract,
+          })
+        )
+      )
+    )
+  }
+
+  // Multi-proof: PROOF spec1 AND spec2 AND spec3
+  fn proofClause: parser<array<proofSpec>> = {
+    bind(keyword("PROOF"), _ =>
+      sepBy(proofSpec, keyword("AND"))
+    )
+  }
+
+  // LIMIT clause
+  fn limitClause: parser<int> = {
+    bind(keyword("LIMIT"), _ => integer)
+  }
+
+  // OFFSET clause
+  fn offsetClause: parser<int> = {
+    bind(keyword("OFFSET"), _ => integer)
+  }
+
+  // GROUP BY clause
+  fn groupByClause: parser<array<AST.fieldRef>> = {
+    bind(keyword("GROUP"), _ =>
+      bind(keyword("BY"), _ =>
+        sepBy(fieldRef, keyword(","))
+      )
+    )
+  }
+
+  // HAVING clause (reuses condition parser — conditions on aggregates)
+  fn havingClause: parser<AST.condition> = {
+    bind(keyword("HAVING"), _ => condition)
+  }
+
+  // Sort direction parser
+  fn sortDirection: parser<AST.sortDirection> = {
+    fn asc = map(keyword("ASC"), _ => AST.Asc)
+    fn desc = map(keyword("DESC"), _ => AST.Desc)
+
+    asc <|> desc
+  }
+
+  // ORDER BY item: DOCUMENT.severity DESC | DOCUMENT.name (defaults to ASC)
+  fn orderByItem: parser<AST.orderByItem> = {
+    bind(fieldRef, ref =>
+      map(optional(sortDirection), dir => {
+        AST.field: ref,
+        direction: switch dir {
+        | Some(d) => d
+        | None => Asc
+        },
+      })
+    )
+  }
+
+  // ORDER BY clause
+  fn orderByClause: parser<array<AST.orderByItem>> = {
+    bind(keyword("ORDER"), _ =>
+      bind(keyword("BY"), _ =>
+        sepBy(orderByItem, keyword(","))
+      )
+    )
+  }
+
+  // Full query parser
+  fn query: parser<query> = {
+    input => {
+      // Parse in sequence:
+      // SELECT ... FROM ... [WHERE ...] [GROUP BY ...] [HAVING ...]
+      // [PROOF ...] [ORDER BY ...] [LIMIT ...] [OFFSET ...]
+      fn parseQuery = {
+        bind(ws, _ =>
+          bind(selectClause, classified =>
+            bind(fromClause, src =>
+              bind(optional(whereClause), whereCond =>
+                bind(optional(groupByClause), groupBy =>
+                  bind(optional(havingClause), having =>
+                    bind(optional(proofClause), proof =>
+                      bind(optional(orderByClause), orderBy =>
+                        bind(optional(limitClause), lim =>
+                          map(optional(offsetClause), off => {
+                            modalities: classified.modalities,
+                            projections: classified.projections,
+                            aggregates: classified.aggregates,
+                            source: src,
+                            where: whereCond,
+                            groupBy: groupBy,
+                            having: having,
+                            proof: proof,
+                            orderBy: orderBy,
+                            limit: lim,
+                            offset: off,
+                          })
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      }
+
+      parseQuery(input)
+    }
+  }
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+struct parseError { Parser.parseError
+struct query { AST.query
+
+fn parse = (input: string): Result<query, parseError> => {
+  switch Grammar.query(input) {
+  | Ok((query, _consumed)) => Ok(query)
+  | Error(e) => Error(e)
+  }
+}
+
+fn parseSlipstream = (input: string): Result<query, parseError> => {
+  // Slipstream path: no proof clause allowed
+  switch parse(input) {
+  | Ok(query) => {
+      switch query.proof {
+      | Some(proofs) if Js.Array2.length(proofs) > 0 =>
+        Error({message: "Slipstream queries cannot have PROOF clause", position: 0})
+      | _ => Ok(query)
+      }
+    }
+  | Error(e) => Error(e)
+  }
+}
+
+fn parseDependentType = (input: string): Result<query, parseError> => {
+  // Dependent-struct path: proof clause required
+  switch parse(input) {
+  | Ok(query) => {
+      if query.proof->Belt.Option.isNone {
+        Error({message: "Dependent-struct queries require PROOF clause", position: 0})
+      } else {
+        Ok(query)
+      }
+    }
+  | Error(e) => Error(e)
+  }
+}
+
+// ============================================================================
+// Phase 3: Mutation Parsers
+// ============================================================================
+
+struct mutation { AST.mutation
+struct modalityData { AST.modalityData
+struct statement { AST.statement
+
+module MutationParser = {
+  open Parser
+  open AST
+
+  // Parse a single modality data entry
+  fn documentData: parser<modalityData> = {
+    bind(keyword("DOCUMENT"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(
+          bind(Grammar.identifier, field =>
+            bind(keyword("="), _ =>
+              map(Grammar.literal, value => (field, value))
+            )
+          ),
+          keyword(","),
+        ), fields =>
+          map(keyword(")"), _ => DocumentData(fields))
+        )
+      )
+    )
+  }
+
+  fn vectorData: parser<modalityData> = {
+    bind(keyword("VECTOR"), _ =>
+      bind(keyword("("), _ =>
+        bind(keyword("["), _ =>
+          bind(sepBy(Grammar.float, keyword(",")), values =>
+            bind(keyword("]"), _ =>
+              map(keyword(")"), _ => VectorData(values))
+            )
+          )
+        )
+      )
+    )
+  }
+
+  fn graphData: parser<modalityData> = {
+    bind(keyword("GRAPH"), _ =>
+      bind(keyword("("), _ =>
+        bind(Grammar.identifier, edgeType =>
+          bind(keyword(","), _ =>
+            bind(Grammar.identifier, targetId =>
+              map(keyword(")"), _ => GraphData(edgeType, targetId))
+            )
+          )
+        )
+      )
+    )
+  }
+
+  fn tensorData: parser<modalityData> = {
+    bind(keyword("TENSOR"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(Grammar.literal, keyword(",")), values =>
+          map(keyword(")"), _ => TensorData(values))
+        )
+      )
+    )
+  }
+
+  fn semanticData: parser<modalityData> = {
+    bind(keyword("SEMANTIC"), _ =>
+      bind(keyword("("), _ =>
+        bind(Grammar.identifier, contractName =>
+          map(keyword(")"), _ => SemanticData(contractName))
+        )
+      )
+    )
+  }
+
+  fn temporalData: parser<modalityData> = {
+    bind(keyword("TEMPORAL"), _ =>
+      bind(keyword("("), _ =>
+        bind(Grammar.stringLiteral, timestamp =>
+          map(keyword(")"), _ => TemporalData(timestamp))
+        )
+      )
+    )
+  }
+
+  // PROVENANCE(field=value, ...)
+  fn provenanceData: parser<modalityData> = {
+    bind(keyword("PROVENANCE"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(
+          bind(Grammar.identifier, key =>
+            bind(keyword("="), _ =>
+              map(Grammar.literal, value => (key, value))
+            )
+          ),
+          keyword(",")
+        ), fields =>
+          map(keyword(")"), _ => ProvenanceData(fields))
+        )
+      )
+    )
+  }
+
+  // SPATIAL(field=value, ...)
+  fn spatialData: parser<modalityData> = {
+    bind(keyword("SPATIAL"), _ =>
+      bind(keyword("("), _ =>
+        bind(sepBy(
+          bind(Grammar.identifier, key =>
+            bind(keyword("="), _ =>
+              map(Grammar.literal, value => (key, value))
+            )
+          ),
+          keyword(",")
+        ), fields =>
+          map(keyword(")"), _ => SpatialData(fields))
+        )
+      )
+    )
+  }
+
+  fn modalityData: parser<modalityData> = {
+    documentData <|> vectorData <|> graphData <|> tensorData <|> semanticData <|> temporalData <|> provenanceData <|> spatialData
+  }
+
+  // INSERT HEXAD WITH modalityData [, modalityData]* [PROOF ...]
+  fn insertMutation: parser<mutation> = {
+    bind(keyword("INSERT"), _ =>
+      bind(keyword("HEXAD"), _ =>
+        bind(keyword("WITH"), _ =>
+          bind(sepBy(modalityData, keyword(",")), data =>
+            map(optional(Grammar.proofClause), proof =>
+              Insert({
+                modalities: data,
+                proof: proof,
+              })
+            )
+          )
+        )
+      )
+    )
+  }
+
+  // UPDATE HEXAD uuid SET field = value [, field = value]* [PROOF ...]
+  fn updateMutation: parser<mutation> = {
+    bind(keyword("UPDATE"), _ =>
+      bind(keyword("HEXAD"), _ =>
+        bind(uuid, id =>
+          bind(keyword("SET"), _ =>
+            bind(sepBy(
+              bind(Grammar.fieldRef, field =>
+                bind(keyword("="), _ =>
+                  map(Grammar.literal, value => (field, value))
+                )
+              ),
+              keyword(","),
+            ), sets =>
+              map(optional(Grammar.proofClause), proof =>
+                Update({
+                  hexadId: id,
+                  sets: sets,
+                  proof: proof,
+                })
+              )
+            )
+          )
+        )
+      )
+    )
+  }
+
+  // DELETE HEXAD uuid [PROOF ...]
+  fn deleteMutation: parser<mutation> = {
+    bind(keyword("DELETE"), _ =>
+      bind(keyword("HEXAD"), _ =>
+        bind(uuid, id =>
+          map(optional(Grammar.proofClause), proof =>
+            Delete({
+              hexadId: id,
+              proof: proof,
+            })
+          )
+        )
+      )
+    )
+  }
+
+  fn mutation: parser<mutation> = {
+    insertMutation <|> updateMutation <|> deleteMutation
+  }
+
+  // Top-level statement: query or mutation
+  fn statement: parser<statement> = {
+    input => {
+      fn queryP = map(Grammar.query, q => Query(q))
+      fn mutationP = map(mutation, m => Mutation(m))
+
+      fn p = bind(ws, _ => mutationP <|> queryP)
+      p(input)
+    }
+  }
+}
+
+fn parseMutation = (input: string): Result<AST.mutation, parseError> => {
+  switch MutationParser.mutation(input) {
+  | Ok((m, _consumed)) => Ok(m)
+  | Error(e) => Error(e)
+  }
+}
+
+fn parseStatement = (input: string): Result<AST.statement, parseError> => {
+  switch MutationParser.statement(input) {
+  | Ok((s, _consumed)) => Ok(s)
+  | Error(e) => Error(e)
+  }
+}
+
+// ============================================================================
+// Example Usage
+// ============================================================================
+
+/*
+// Slipstream query
+fn slipstreamQuery = `
+  SELECT GRAPH, VECTOR
+  FROM FEDERATION /universities/*
+  WHERE FULLTEXT CONTAINS "machine learning"
+  LIMIT 100
+`
+
+switch parseSlipstream(slipstreamQuery) {
+| Ok(query) => Js.Console.log(query)
+| Error(e) => Js.Console.error(e.message)
+}
+
+// Dependent-struct query
+fn dependentQuery = `
+  SELECT GRAPH, VECTOR
+  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3] WITHIN 0.9
+    AND FULLTEXT CONTAINS "climate change"
+  PROOF CITATION(CitationContract)
+  LIMIT 50
+`
+
+switch parseDependentType(dependentQuery) {
+| Ok(query) => Js.Console.log(query)
+| Error(e) => Js.Console.error(e.message)
+}
+
+// SQL-compatible query with column projections, aggregates, ORDER BY, GROUP BY
+fn sqlCompatQuery = `
+  SELECT DOCUMENT.name, DOCUMENT.severity, COUNT(*), AVG(DOCUMENT.severity)
+  FROM FEDERATION /universities/*
+  WHERE FIELD severity > 5
+  GROUP BY DOCUMENT.name, DOCUMENT.severity
+  HAVING FIELD count > 3
+  ORDER BY DOCUMENT.severity DESC
+  LIMIT 50
+`
+
+switch parseSlipstream(sqlCompatQuery) {
+| Ok(query) => Js.Console.log(query)
+| Error(e) => Js.Console.error(e.message)
+}
+*/
+

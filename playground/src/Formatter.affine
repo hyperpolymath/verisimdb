@@ -1,7 +1,73 @@
 // SPDX-License-Identifier: MPL-2.0
-// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
-// Ported via Harvard Engine bulk-processor
+// Ported via Harvard Engine (Semantic pass)
 
 module Formatter;
 
-// TODO: Complete semantic implementation
+// SPDX-License-Identifier: MPL-2.0
+// VCL formatter — canonical formatting for queries.
+
+/// Clause-starting keywords that get their own line.
+fn clauseStarters = [
+  "SELECT", "FROM", "WHERE", "ORDER", "GROUP", "HAVING", "LIMIT",
+  "OFFSET", "JOIN", "ON", "WITH", "SET", "INTO", "VALUES",
+  "TRAVERSE", "PROOF", "EXPLAIN",
+]
+
+fn formatVcl = (query: string): string => {
+  fn upper = String.toUpperCase
+  fn tokens =
+    String.splitByRe(query, %re("/(\s+|'[^']*'|\"[^\"]*\")/"))
+    ->Array.filterMap(t => t)
+    ->Array.filter(t => String.trim(t) !== "")
+
+  fn result = ref("")
+  fn isFirst = ref(true)
+
+  tokens->Array.forEach(token => {
+    fn trimmed = String.trim(token)
+    if trimmed === "" {
+      // Whitespace — will be normalized
+      if !(String.endsWith(result.contents, " ") || String.endsWith(result.contents, "\n")) {
+        result := result.contents ++ " "
+      }
+    } else if String.startsWith(trimmed, "'") || String.startsWith(trimmed, "\"") {
+      // String literal — preserve as-is
+      result := result.contents ++ trimmed
+    } else {
+      fn word = upper(trimmed)
+      fn formatted = if VclKeywords.isKeyword(word) || VclKeywords.isModality(word) {
+        word
+      } else {
+        trimmed
+      }
+
+      if clauseStarters->Array.includes(word) && !isFirst.contents {
+        // Remove trailing space
+        if String.endsWith(result.contents, " ") {
+          result := String.slice(result.contents, ~start=0, ~end=String.length(result.contents) - 1)
+        }
+        // Check EXPLAIN + SELECT same line
+        if word === "SELECT" && String.endsWith(String.trim(result.contents), "EXPLAIN") {
+          result := result.contents ++ " " ++ formatted
+        } else {
+          result := result.contents ++ "\n" ++ formatted
+        }
+      } else if word === "AND" || word === "OR" {
+        if String.endsWith(result.contents, " ") {
+          result := String.slice(result.contents, ~start=0, ~end=String.length(result.contents) - 1)
+        }
+        result := result.contents ++ "\n  " ++ formatted
+      } else {
+        if !(String.endsWith(result.contents, " ") || String.endsWith(result.contents, "\n") || result.contents === "") {
+          result := result.contents ++ " "
+        }
+        result := result.contents ++ formatted
+      }
+
+      isFirst := false
+    }
+  })
+
+  String.trim(result.contents)
+}
+
