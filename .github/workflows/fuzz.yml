@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # Fuzz testing for VeriSimDB query engine and FFI layers
 # Addresses OpenSSF Scorecard "Fuzzing" check
 name: Fuzz Testing
@@ -30,7 +29,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2.9.2
       - name: Run core fuzz compile check
         run: |
           cd rust-core/fuzz
@@ -46,7 +44,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2.9.2
       - name: Run debugger fuzz compile check
         run: |
           cd debugger/fuzz

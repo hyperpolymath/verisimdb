@@ -8,15 +8,14 @@ workflows:
     '.github/workflows/build-validation.yml':
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@stable'
-        - 'erlef/setup-beam@v1.24.0'
-        - 'swatinem/rust-cache@v2.9.1'
+        - 'erlef/setup-beam@v1.24.1'
     '.github/workflows/cflite_batch.yml':
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/cflite_pr.yml':
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
-        - 'github/codeql-action@v4.37.3'
+        - 'github/codeql-action@v4.37.7'
     '.github/workflows/coq-build.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/doc-consonance.yml':
@@ -27,13 +26,12 @@ workflows:
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'codecov/codecov-action@v7.0.0'
-        - 'erlef/setup-beam@v1.20.4'
+        - 'erlef/setup-beam@v1.24.1'
     '.github/workflows/fuzz.yml':
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@stable'
-        - 'swatinem/rust-cache@v2.9.1'
     '.github/workflows/ghcr-publish.yml':
-        - 'actions/attest-build-provenance@v4.1.1'
+        - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
     '.github/workflows/governance.yml': []
     '.github/workflows/hypatia-scan.yml': []
@@ -51,26 +49,23 @@ workflows:
         - 'actions/upload-artifact@v7.0.1'
         - 'codecov/codecov-action@v7.0.0'
         - 'dtolnay/rust-toolchain@stable'
-        - 'embarkstudios/cargo-deny-action@v2.1.1'
         - 'rustsec/audit-check@v2.0.0'
-        - 'swatinem/rust-cache@v2.9.1'
-        - 'taiki-e/install-action@v2.81.3'
-        - 'taiki-e/install-action@v2.85.7'
+        - 'taiki-e/install-action@v2.86.2'
     '.github/workflows/scorecard.yml': []
     '.github/workflows/secret-scanner.yml': []
     '.github/workflows/security-scan.yml': []
     '.github/workflows/spark-theatre-gate.yml': []
 dependencies:
-    'actions/attest-build-provenance@v4.1.1':
-        ref: 'v4.1.1'
-        commit: 'sha1-0f67c3f4856b2e3261c31976d6725780e5e4c373'
+    'actions/attest-build-provenance@v4.2.2':
+        ref: 'v4.2.2'
+        commit: 'sha1-4d101475d8b20a2381f78447822ac1eab6504dd8'
         owner_id: 44036562
         repo_id: 760702757
-        uses:
-            - 'actions/attest@a1948c3f048ba23858d222213b7c278aabede763'
-    'actions/attest@a1948c3f048ba23858d222213b7c278aabede763':
-        ref: 'v4.1.1'
-        commit: 'sha1-a1948c3f048ba23858d222213b7c278aabede763'
+        'uses':
+            - 'actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d'
+    'actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d':
+        ref: 'v4.2.1'
+        commit: 'sha1-508db95dd578ae2727ebd6217d5ba78e4fbda05d'
         owner_id: 44036562
         repo_id: 760701061
     'actions/cache@v6.1.0':
@@ -108,38 +103,28 @@ dependencies:
         commit: 'sha1-fc324d3547104276b827a68afc52ff2a11cc49c9'
         owner_id: 44036562
         repo_id: 496012378
-        uses:
+        'uses':
             - 'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
     'codecov/codecov-action@v7.0.0':
         ref: 'v7.0.0'
         commit: 'sha1-fb8b3582c8e4def4969c97caa2f19720cb33a72f'
         owner_id: 8226205
         repo_id: 200299178
-        uses:
+        'uses':
             - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
         commit: 'sha1-4cda84d5c5c54efe2404f9d843567869ab1699d4'
         owner_id: 1940490
         repo_id: 260749683
-    'embarkstudios/cargo-deny-action@v2.1.1':
-        ref: 'v2.1.1'
-        commit: 'sha1-3c6349835b2b7b196a839186cb8b78e02f7b5f25'
-        owner_id: 44887257
-        repo_id: 228054692
-    'erlef/setup-beam@v1.20.4':
-        ref: 'v1.20.4'
-        commit: 'sha1-e6d7c94229049569db56a7ad5a540c051a010af9'
+    'erlef/setup-beam@v1.24.1':
+        ref: 'v1.24.1'
+        commit: 'sha1-54075bcc5e249e4758d363f27d099f55d843f124'
         owner_id: 47606891
         repo_id: 331103973
-    'erlef/setup-beam@v1.24.0':
-        ref: 'v1.24.0'
-        commit: 'sha1-fc68ffb90438ef2936bbb3251622353b3dcb2f93'
-        owner_id: 47606891
-        repo_id: 331103973
-    'github/codeql-action@v4.37.3':
-        ref: 'v4.37.3'
-        commit: 'sha1-e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81'
+    'github/codeql-action@v4.37.7':
+        ref: 'v4.37.7'
+        commit: 'sha1-ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd'
         owner_id: 9919
         repo_id: 259445878
     'google/clusterfuzzlite@v1':
@@ -157,18 +142,8 @@ dependencies:
         commit: 'sha1-69366f33c96575abad1ee0dba8212993eecbe998'
         owner_id: 25397242
         repo_id: 523199201
-    'swatinem/rust-cache@v2.9.1':
-        ref: 'v2.9.1'
-        commit: 'sha1-e18b497796c12c097a38f9edb9d0641fb99eee32'
-        owner_id: 580492
-        repo_id: 298565987
-    'taiki-e/install-action@v2.81.3':
-        ref: 'v2.81.3'
-        commit: 'sha1-25435dc8dd3baed7417e0c96d3fe89013a5b2e09'
-        owner_id: 43724913
-        repo_id: 442947557
-    'taiki-e/install-action@v2.85.7':
-        ref: 'v2.85.7'
-        commit: 'sha1-67729d5c413db75907f0ad1e39bb04b9c868ff60'
+    'taiki-e/install-action@v2.86.2':
+        ref: 'v2.86.2'
+        commit: 'sha1-b6b84cf49ebfe0176417bdce007c624f0db37f20'
         owner_id: 43724913
         repo_id: 442947557

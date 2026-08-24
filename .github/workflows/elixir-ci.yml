@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # Elixir CI for the orchestration layer: compile, format check, test, audit.
 name: elixir-ci
 
@@ -64,12 +63,12 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.24.1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
       - if: steps.detect.outputs.relevant == 'true'
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             elixir-orchestration/deps
@@ -117,12 +116,12 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.24.1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.17"
           otp-version: "27"
       - if: steps.detect.outputs.relevant == 'true'
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             elixir-orchestration/deps
@@ -133,7 +132,7 @@ jobs:
       - if: steps.detect.outputs.relevant == 'true'
         run: mix coveralls.json
       - if: steps.detect.outputs.relevant == 'true'
-        uses: codecov/codecov-action@v7.0.0
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: elixir-orchestration/cover/excoveralls.json
           flags: elixir
@@ -168,12 +167,12 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.24.1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.17"
           otp-version: "27"
       - if: steps.detect.outputs.relevant == 'true'
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             elixir-orchestration/deps
@@ -217,7 +216,7 @@ jobs:
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.detect.outputs.relevant == 'true'
-        uses: erlef/setup-beam@v1.24.1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.17"
           otp-version: "27"
