@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 name: Build Validation
 
 on:
@@ -20,7 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2.9.2
       - run: cargo check --workspace
 
   validate-elixir:
