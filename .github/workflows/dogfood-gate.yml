@@ -55,6 +55,8 @@ jobs:
             tests/fixtures/
             assail-classifications.a2ml
         run: bash .githooks/validate-a2ml.sh
+      - name: Validate panic-attack classification keys
+        run: bash tests/assail-classifications-gate.sh
       - name: Write summary
         run: |
           A2ML_COUNT="${{ steps.detect.outputs.count }}"

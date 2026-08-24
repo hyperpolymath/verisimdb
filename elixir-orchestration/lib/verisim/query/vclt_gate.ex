@@ -96,32 +96,54 @@ defmodule VeriSim.Query.VCLTGate do
   end
 
   defp invoke_gate(path, payload) do
-    # Write the JSON payload to a temp file and redirect it to the gate's stdin
-    # via the shell.  The path comes from an operator-controlled env var, so
-    # quoting it is sufficient.
-    tmp =
-      Path.join(
-        System.tmp_dir!(),
-        "vcltgate_#{:erlang.unique_integer([:positive])}.json"
-      )
-
     try do
-      File.write!(tmp, payload)
+      tmp = write_secure_payload!(payload)
 
-      # Quote path and tmp — no user-supplied values reach the shell here.
-      quoted_path = shell_quote(path)
-      quoted_tmp = shell_quote(tmp)
+      try do
+        # Quote path and tmp — no statement or schema value reaches the shell.
+        quoted_path = shell_quote(path)
+        quoted_tmp = shell_quote(tmp)
 
-      {output, exit_code} =
-        System.cmd("sh", ["-c", "#{quoted_path} < #{quoted_tmp}"], stderr_to_stdout: false)
+        {output, exit_code} =
+          System.cmd("sh", ["-c", "#{quoted_path} < #{quoted_tmp}"], stderr_to_stdout: false)
 
-      handle_gate_result(IO.iodata_to_binary(output), exit_code)
+        handle_gate_result(IO.iodata_to_binary(output), exit_code)
+      after
+        File.rm(tmp)
+      end
     rescue
       e ->
         Logger.warning("vclt-gate: invocation error: #{Exception.message(e)} — failing closed")
         {:error, :gate_failed}
-    after
-      File.rm(tmp)
+    end
+  end
+
+  defp write_secure_payload!(payload, attempts \\ 8)
+
+  defp write_secure_payload!(_payload, 0),
+    do: raise("could not allocate an exclusive vclt-gate payload file")
+
+  defp write_secure_payload!(payload, attempts) do
+    token = 18 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+    path = Path.join(System.tmp_dir!(), "vcltgate_#{token}.json")
+
+    case File.open(path, [:write, :binary, :exclusive]) do
+      {:ok, io} ->
+        try do
+          # Restrict access before any payload bytes are written. Exclusive
+          # creation prevents a pre-planted symlink from being followed.
+          File.chmod!(path, 0o600)
+          IO.binwrite(io, payload)
+          path
+        after
+          File.close(io)
+        end
+
+      {:error, :eexist} ->
+        write_secure_payload!(payload, attempts - 1)
+
+      {:error, reason} ->
+        raise File.Error, reason: reason, action: "create secure payload", path: path
     end
   end
 
