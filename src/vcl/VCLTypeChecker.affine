@@ -55,14 +55,26 @@ struct structContext { {
 
 struct structCheckResult { Result<unit, Error.structError>
 
+fn allModalities: array<AST.modality> = [
+  Graph,
+  Vector,
+  Tensor,
+  Semantic,
+  Document,
+  Temporal,
+  Provenance,
+  Spatial,
+]
+
 fn makeTypeContext = (
   ~contracts: Js.Dict.t<contractInfo>=Js.Dict.empty(),
+  ~availableModalities=allModalities,
   ~strictMode=true,
   (),
 ): structContext => {
   {
     contracts: contracts,
-    availableModalities: [Graph, Vector, Tensor, Semantic, Document, Temporal],
+    availableModalities: availableModalities,
     strictMode: strictMode,
   }
 }
@@ -109,25 +121,30 @@ fn toBidirContext = (ctx: structContext): Ctx.context => {
 // ============================================================================
 
 fn checkQuery = (query: AST.query, context: structContext): structCheckResult => {
-  // First: SQL-compat validation (HAVING requires GROUP BY, etc.)
-  switch checkSqlCompat(query) {
+  // First: reject modalities this execution context cannot provide.
+  switch validateAvailableModalities(query, context) {
   | Error(e) => Error(e)
   | Ok() =>
-    // Delegate to bidirectional struct checker
-    fn bidirCtx = toBidirContext(context)
-    switch Bidir.synthesizeQuery(bidirCtx, query) {
-    | Ok(_struct) => Ok()
-    | Error(structErr) =>
-      // Convert Bidir.structError to VCLError.structError
-      Error({
-        kind: Error.TypeMismatch({
-          expected: "well-structd query",
-          found: Bidir.formatTypeError(structErr),
-        }),
-        hexad_id: None,
-        modality: None,
-        context: Bidir.formatTypeError(structErr),
-      })
+    // Then: SQL-compat validation (HAVING requires GROUP BY, etc.)
+    switch checkSqlCompat(query) {
+    | Error(e) => Error(e)
+    | Ok() =>
+      // Delegate to bidirectional struct checker
+      fn bidirCtx = toBidirContext(context)
+      switch Bidir.synthesizeQuery(bidirCtx, query) {
+      | Ok(_struct) => Ok()
+      | Error(structErr) =>
+        // Convert Bidir.structError to VCLError.structError
+        Error({
+          kind: Error.TypeMismatch({
+            expected: "well-structd query",
+            found: Bidir.formatTypeError(structErr),
+          }),
+          hexad_id: None,
+          modality: None,
+          context: Bidir.formatTypeError(structErr),
+        })
+      }
     }
   }
 }
@@ -224,6 +241,35 @@ fn validateAggregates = (query: AST.query): structCheckResult => {
   }
 }
 
+fn validateAvailableModalities = (
+  query: AST.query,
+  context: structContext,
+): structCheckResult => {
+  fn requested = if query.modalities->Belt.Array.some(m => m == All) {
+    allModalities
+  } else {
+    query.modalities
+  }
+
+  switch requested->Belt.Array.getBy(requestedModality => {
+    !(context.availableModalities->Belt.Array.some(available => available == requestedModality))
+  }) {
+  | None => Ok()
+  | Some(unavailable) => {
+      fn modStr = modalityToString(unavailable)
+      Error({
+        kind: Error.ContractViolation({
+          contract: "modality-availability",
+          reason: `Query requires unavailable modality ${modStr}`,
+        }),
+        hexad_id: None,
+        modality: Some(modStr),
+        context: `Configure a ${modStr} store or remove it from the query`,
+      })
+    }
+  }
+}
+
 fn validateOrderByModalities = (query: AST.query): structCheckResult => {
   switch query.orderBy {
   | None => Ok()
@@ -310,6 +356,8 @@ fn modalityToString = (m: AST.modality): string => {
   | Semantic => "SEMANTIC"
   | Document => "DOCUMENT"
   | Temporal => "TEMPORAL"
+  | Provenance => "PROVENANCE"
+  | Spatial => "SPATIAL"
   | All => "*"
   }
 }
@@ -357,4 +405,3 @@ fn testCreateConstraint = (
   | _ => None
   }
 }
-

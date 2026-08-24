@@ -32,6 +32,8 @@ impl BaseCost {
     /// - Semantic: 300ms, 0.8 selectivity
     /// - Document: 80ms, 0.05 selectivity
     /// - Temporal: 30ms, 0.1 selectivity
+    /// - Provenance: 60ms, 0.3 selectivity
+    /// - Spatial: 70ms, 0.1 selectivity
     pub fn for_modality(modality: Modality) -> Self {
         match modality {
             Modality::Graph => BaseCost {
@@ -63,6 +65,16 @@ impl BaseCost {
                 time_ms: 30.0,
                 selectivity: 0.1,
                 hint: "Version tree lookup — cached",
+            },
+            Modality::Provenance => BaseCost {
+                time_ms: 60.0,
+                selectivity: 0.3,
+                hint: "Hash-chain traversal — O(n) chain length",
+            },
+            Modality::Spatial => BaseCost {
+                time_ms: 70.0,
+                selectivity: 0.1,
+                hint: "R-tree spatial index lookup",
             },
         }
     }
@@ -498,6 +510,8 @@ mod tests {
         assert_eq!(BaseCost::for_modality(Modality::Semantic).time_ms, 300.0);
         assert_eq!(BaseCost::for_modality(Modality::Document).time_ms, 80.0);
         assert_eq!(BaseCost::for_modality(Modality::Temporal).time_ms, 30.0);
+        assert_eq!(BaseCost::for_modality(Modality::Provenance).time_ms, 60.0);
+        assert_eq!(BaseCost::for_modality(Modality::Spatial).time_ms, 70.0);
     }
 
     #[test]

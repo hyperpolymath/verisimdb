@@ -29,7 +29,7 @@
     The discharge replaces the parameter with a definition, which is what
     makes the statement provable at all:
 
-      - [modality] becomes an [Inductive] mirroring [crate::Modality]'s six
+      - [modality] becomes an [Inductive] mirroring [crate::Modality]'s eight
         constructors, with [execution_priority] transcribing the Rust match
         arms exactly (verisim-planner/src/lib.rs).
       - [optimize] becomes [Mergesort]'s [sort] over a decidable total order
@@ -84,27 +84,29 @@ Import ListNotations.
 
 (** [modality] mirrors [crate::Modality] (verisim-planner/src/lib.rs).
 
-    Six constructors, not the octad's eight: the planner declares its own
-    canonical enum and does not cover Provenance or Spatial, even though both
-    are full crates. That gap is real and tracked separately; this module
-    mirrors the Rust as it is rather than as it should be, because a model
-    that covered eight would no longer describe the code it validates. *)
+    All eight octad constructors are represented so the proof model and Rust
+    planner share the same scheduling domain. *)
 Inductive modality : Type :=
   | Graph
   | Vector
   | Tensor
   | Semantic
   | Document
-  | Temporal.
+  | Temporal
+  | Provenance
+  | Spatial.
 
 (** Transcribes [Modality::execution_priority] arm for arm. Lower runs
-    earlier: Temporal first (often cached), Vector/Document next (selective
-    indexes), Graph middle, Tensor moderate, Semantic last (ZKP expensive). *)
+    earlier: Temporal first (often cached), Vector/Spatial/Document next (selective
+    indexes), Provenance chain walks after indexed lookups, Graph middle,
+    Tensor moderate, Semantic last (ZKP expensive). *)
 Definition execution_priority (m : modality) : nat :=
   match m with
   | Temporal => 10
   | Vector   => 20
+  | Spatial  => 25
   | Document => 30
+  | Provenance => 35
   | Graph    => 40
   | Tensor   => 50
   | Semantic => 90

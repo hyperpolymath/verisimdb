@@ -46,6 +46,8 @@ fn modality_strategy() -> impl Strategy<Value = Modality> {
         Just(Modality::Semantic),
         Just(Modality::Document),
         Just(Modality::Temporal),
+        Just(Modality::Provenance),
+        Just(Modality::Spatial),
     ]
 }
 
