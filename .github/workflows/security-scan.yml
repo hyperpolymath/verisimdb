@@ -36,9 +36,8 @@ jobs:
     # workflow's registry entry stuck showing the file path instead of
     # "Security Scan" (GitHub never parsed the file).
     #
-    # Pin refreshed at the same time: the previous pin (2dc1393c, 2026-05-20)
-    # predates the upstream fix that skips the cross-repo dispatch when
-    # VERISIMDB_PAT is absent and that chunks oversized payloads.
-    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@887ca863ab0837be4d0002d33389862be8c7bee5 # main 2026-07-19
+    # Pin includes canonical .affine language detection and preserves
+    # JSON.parseExn coverage after the ReScript-to-AffineScript migration.
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@01920ee9d48ae5ba7aa1fab68458bb6c40c57150 # main 2026-08-24
     secrets:
       VERISIMDB_PAT: ${{ secrets.VERISIMDB_PAT }}
