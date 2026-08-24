@@ -131,7 +131,7 @@ pub struct VclQuery {
 /// A VCL modality tag.
 ///
 /// The ReScript parser emits modalities as `{"TAG": "Graph"}` etc.
-/// `All` is a special sentinel meaning "expand to all 6 modalities".
+/// `All` is a special sentinel meaning "expand to all 8 modalities".
 #[derive(Debug, Clone)]
 pub enum VclModality {
     Graph,
@@ -140,6 +140,8 @@ pub enum VclModality {
     Semantic,
     Document,
     Temporal,
+    Provenance,
+    Spatial,
     All,
 }
 
@@ -177,11 +179,21 @@ impl<'de> Deserialize<'de> for VclModality {
                     Some("Semantic") => Ok(VclModality::Semantic),
                     Some("Document") => Ok(VclModality::Document),
                     Some("Temporal") => Ok(VclModality::Temporal),
+                    Some("Provenance") => Ok(VclModality::Provenance),
+                    Some("Spatial") => Ok(VclModality::Spatial),
                     Some("All") => Ok(VclModality::All),
                     Some(other) => Err(de::Error::unknown_variant(
                         other,
                         &[
-                            "Graph", "Vector", "Tensor", "Semantic", "Document", "Temporal", "All",
+                            "Graph",
+                            "Vector",
+                            "Tensor",
+                            "Semantic",
+                            "Document",
+                            "Temporal",
+                            "Provenance",
+                            "Spatial",
+                            "All",
                         ],
                     )),
                     None => Err(de::Error::missing_field("TAG")),
@@ -793,7 +805,7 @@ fn resolve_modalities(vcl_mods: &[VclModality]) -> Result<Vec<Modality>, Planner
     for vm in vcl_mods {
         match vm {
             VclModality::All => {
-                // Expand to all six modalities.
+                // Expand to all eight octad modalities.
                 result.extend_from_slice(&Modality::ALL);
             }
             other => {
@@ -816,6 +828,8 @@ fn vcl_modality_to_planner(vm: &VclModality) -> Result<Modality, PlannerError> {
         VclModality::Semantic => Ok(Modality::Semantic),
         VclModality::Document => Ok(Modality::Document),
         VclModality::Temporal => Ok(Modality::Temporal),
+        VclModality::Provenance => Ok(Modality::Provenance),
+        VclModality::Spatial => Ok(Modality::Spatial),
         VclModality::All => {
             // Should have been expanded already.
             Err(PlannerError::InvalidConfig(
@@ -1321,8 +1335,8 @@ mod tests {
 
         let plan = parse_and_plan(json).expect("should parse All modality query");
 
-        // All 6 modalities should be present.
-        assert_eq!(plan.nodes.len(), 6);
+        // All 8 modalities should be present.
+        assert_eq!(plan.nodes.len(), 8);
         let modalities: Vec<Modality> = plan.nodes.iter().map(|n| n.modality).collect();
         for m in &Modality::ALL {
             assert!(
@@ -1333,7 +1347,32 @@ mod tests {
 
         // Nodes should be sorted by execution priority.
         assert_eq!(plan.nodes[0].modality, Modality::Temporal);
-        assert_eq!(plan.nodes[5].modality, Modality::Semantic);
+        assert_eq!(plan.nodes[7].modality, Modality::Semantic);
+    }
+
+    #[test]
+    fn test_provenance_and_spatial_modalities() {
+        let json = r#"{
+            "TAG": "Query",
+            "_0": {
+                "modalities": [{"TAG": "Provenance"}, {"TAG": "Spatial"}],
+                "source": {"TAG": "Octad", "_0": null},
+                "where": null,
+                "projections": null,
+                "aggregates": null,
+                "groupBy": null,
+                "having": null,
+                "proof": null,
+                "orderBy": null,
+                "limit": null,
+                "offset": null
+            }
+        }"#;
+
+        let plan = parse_and_plan(json).expect("should plan both added octad modalities");
+        assert_eq!(plan.nodes.len(), 2);
+        assert_eq!(plan.nodes[0].modality, Modality::Spatial);
+        assert_eq!(plan.nodes[1].modality, Modality::Provenance);
     }
 
     #[test]
@@ -1755,7 +1794,7 @@ mod tests {
         }"#;
 
         let plan = parse_and_plan(json).expect("should deduplicate modalities");
-        // Should still have exactly 6 unique modalities.
-        assert_eq!(plan.nodes.len(), 6);
+        // Should still have exactly the eight unique octad modalities.
+        assert_eq!(plan.nodes.len(), Modality::ALL.len());
     }
 }
