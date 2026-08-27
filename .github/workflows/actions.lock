@@ -61,7 +61,7 @@ dependencies:
         commit: 'sha1-4d101475d8b20a2381f78447822ac1eab6504dd8'
         owner_id: 44036562
         repo_id: 760702757
-        'uses':
+        uses:
             - 'actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d'
     'actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d':
         ref: 'v4.2.1'
@@ -103,14 +103,14 @@ dependencies:
         commit: 'sha1-fc324d3547104276b827a68afc52ff2a11cc49c9'
         owner_id: 44036562
         repo_id: 496012378
-        'uses':
+        uses:
             - 'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
     'codecov/codecov-action@v7.0.0':
         ref: 'v7.0.0'
         commit: 'sha1-fb8b3582c8e4def4969c97caa2f19720cb33a72f'
         owner_id: 8226205
         repo_id: 200299178
-        'uses':
+        uses:
             - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
