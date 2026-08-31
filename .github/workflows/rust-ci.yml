@@ -108,14 +108,10 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@v2.86.7
+        with:
+          tool: cargo-llvm-cov
       - name: Generate lcov report
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
-      - uses: codecov/codecov-action@v7.0.0
-        with:
-          files: lcov.info
-          flags: rust
-          fail_ci_if_error: false
-        continue-on-error: true
       - name: Enforce minimum coverage
         run: cargo llvm-cov --workspace --summary-only --fail-under-lines 60
 
