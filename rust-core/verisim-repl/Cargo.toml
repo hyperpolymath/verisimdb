@@ -30,4 +30,4 @@ comfy-table = "7"
 colored = "3"
 
 # Home directory resolution (history file, .vclrc)
-dirs = "6"
+dirs = "7"
