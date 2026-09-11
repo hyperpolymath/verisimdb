@@ -499,7 +499,7 @@ groups:
   - name: verisimdb
     interval: 30s
     rules:
-      - alert: HighDriftScore
+      - alert: HighDrifore
         expr: verisim_drift_score > 0.8
         for: 5m
         labels:

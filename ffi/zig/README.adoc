@@ -84,7 +84,7 @@ Targets recent Zig (0.14+).
 type Query {
   octad(id: ID!): Octad
   octads(limit: Int, offset: Int): [Octad!]!
-  driftScore(entityId: ID!): DriftScore
+  drifore(entityId: ID!): Drifore
   telemetry: TelemetryReport
   health: HealthStatus
 }
@@ -96,7 +96,7 @@ type Mutation {
 
 Variables expected:
 
-* `driftScore`  — `variables.entityId` (string)
+* `drifore`  — `variables.entityId` (string)
 * `executeVcl` — `variables.query` (string)
 
 == Configuration (env vars)

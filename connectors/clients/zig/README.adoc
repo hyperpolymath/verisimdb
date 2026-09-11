@@ -21,7 +21,7 @@ rather than via a maintained per-language SDK.
 
 | `src/root.zig`        | Public module entrypoint — `@import("verisimdb_client")`.
 | `src/client.zig`      | `Client` struct, `Auth` union, HTTP transport.
-| `src/types.zig`       | Wire types: `Octad`, `OctadInput`, `DriftScore`, etc.
+| `src/types.zig`       | Wire types: `Octad`, `OctadInput`, `Drifore`, etc.
 | `src/error.zig`       | `VeriSimError`, `VeriSimErrorCode`, server-envelope parser.
 | `src/octad.zig`       | Octad CRUD: `create / get / update / delete / list`.
 | `src/drift.zig`       | Drift: `score / status / normalize`.
