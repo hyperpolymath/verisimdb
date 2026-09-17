@@ -133,7 +133,7 @@ jobs:
       - if: steps.detect.outputs.relevant == 'true'
         run: mix coveralls.json
       - if: steps.detect.outputs.relevant == 'true'
-        uses: codecov/codecov-action@v7.0.0
+        uses: codecov/codecov-action@v7.1.0
         with:
           files: elixir-orchestration/cover/excoveralls.json
           flags: elixir
