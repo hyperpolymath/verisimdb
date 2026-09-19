@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Query.VCLTGateTest do
-  use ExUnit.Case, async: true
+  # These tests mutate a process-global environment variable.
+  use ExUnit.Case, async: false
 
   alias VeriSim.Query.VCLTGate
 
@@ -49,6 +50,33 @@ defmodule VeriSim.Query.VCLTGateTest do
     end
 
     @tag :tmp_dir
+    test "uses a private unpredictable payload file and removes it", %{tmp_dir: tmp} do
+      stub = Path.join(tmp, "gate-inspect-input")
+      observation = Path.join(tmp, "input-observation")
+
+      File.write!(stub, """
+      #!/bin/sh
+      input_path=$(readlink /proc/$$/fd/0)
+      input_mode=$(stat -c '%a' "$input_path")
+      printf '%s\n%s\n' "$input_path" "$input_mode" > #{shell_quote(observation)}
+      echo '{"certified_level":6,"levels":[]}'
+      exit 0
+      """)
+
+      File.chmod!(stub, 0o755)
+      System.put_env("VERISIM_VCLT_GATE", stub)
+
+      assert :admit == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc LIMIT 1")
+      [input_path, input_mode] = observation |> File.read!() |> String.split("\n", trim: true)
+
+      assert input_mode == "600"
+      assert Path.basename(input_path) =~ ~r/^vcltgate_[A-Za-z0-9_-]{24}\.json$/
+      refute File.exists?(input_path)
+    after
+      System.delete_env("VERISIM_VCLT_GATE")
+    end
+
+    @tag :tmp_dir
     test "returns {:reject, reasons} when stub exits 1 with level JSON", %{tmp_dir: tmp} do
       stub = Path.join(tmp, "gate-reject")
 
@@ -87,4 +115,6 @@ defmodule VeriSim.Query.VCLTGateTest do
       System.delete_env("VERISIM_VCLT_GATE")
     end
   end
+
+  defp shell_quote(str), do: "'" <> String.replace(str, "'", "'\\''") <> "'"
 end

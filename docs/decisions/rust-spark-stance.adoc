@@ -102,7 +102,7 @@ without redesign, which is exactly what §Terminology requires of a
   type-level statements of the deeper octad-consistency or
   drift-threshold invariants enforced (only) in the Rust workspace;
   those are owed, not proven.
-* `ffi/zig/src/main.zig` still contains unfilled `{{PROJECT}}` RSR
+* `ffi/zig/src/main.zig` still contains unfilled `VERISIMDB` RSR
   template placeholders — the Zig implementation layer is scaffolding,
   not a finished faithful implementation of the `Foreign.idr` contract.
   This is a real gap on the FFI side, not merely a missing proof.

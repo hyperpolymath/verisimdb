@@ -93,7 +93,7 @@ jobs:
       #     --repo ${{ github.repository }}
       - name: Attest container provenance
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v4.1.1
+        uses: actions/attest-build-provenance@v4.2.2
         with:
           subject-name: ghcr.io/hyperpolymath/verisimdb-api
           subject-digest: ${{ steps.push.outputs.digest }}
