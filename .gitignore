@@ -9,24 +9,20 @@ Thumbs.db
 *~
 .idea/
 .vscode/
-
 # Build
 /target/
 /_build/
 /build/
 /dist/
 /out/
-
 # Dependencies
 /node_modules/
 /vendor/
 /deps/
 /.elixir_ls/
-
 # Rust
 **/*.rs.bk
 # Cargo.lock  # Keep for binaries
-
 # Elixir
 /cover/
 /doc/
@@ -38,41 +34,33 @@ Thumbs.db
 *.ez
 *.beam
 erl_crash.dump
-
 # Julia
 *.jl.cov
 *.jl.mem
 /Manifest.toml
-
 # ReScript
 /lib/bs/
 /.bsb.lock
 *.res.mjs
-
 # Playground build artifacts
 /playground/node_modules/
 /playground/lib/
 /playground/public/app.js
 /playground/public/app.js.map
 /playground/deno.lock
-
 # Python (SaltStack only)
 __pycache__/
 *.py[cod]
 .venv/
-
 # Ada/SPARK
 *.ali
 /obj/
 /bin/
-
 # Haskell
 /.stack-work/
 /dist-newstyle/
-
 # Chapel
 *.chpl.tmp.*
-
 # Secrets & Environment
 .env
 .env.*
@@ -81,52 +69,68 @@ __pycache__/
 *.pem
 *.key
 secrets/
-
 # Test/Coverage
 /coverage/
 htmlcov/
-
 # Logs
 *.log
 /logs/
 logs/
-
 # Temp
 /tmp/
 tmp/
 temp/
 *.tmp
 *.bak
-
 # Data directories (for local dev)
 /data/
 /storage/
-
 # verisimdb-data is its own repo — do not track here
 /verisimdb-data/
-
 # Container build artifacts
 *.tar
-
 # Crash recovery artifacts
 ai-cli-crash-capture/
-
 # Fuzz harness build artifacts
 fuzz/target/
 rust-core/fuzz/target/
-
 # Local database files
 *.db
 *.db-journal
 *.db-shm
 *.db-wal
-
 # Local caches and agent worktrees
 .cache/
 .claude/
-
 # Local export and build outputs
 /exports/*.json
 /exports/*.lgt
 composer/*.beam
 composer/build/
+# RSR-compliant .gitignore
+# Build (unanchored to match nested monorepo paths)
+target/
+_build/
+zig-out/
+zig-cache/
+.zig-cache/
+# Secrets
+# Machine-readable locks
+.machine_readable/.locks/
+# ReScript/OCaml compiler artifacts
+*.cmt
+*.cmti
+*.cmi
+# asdf version manager
+.tool-versions
+# Rust build artefacts (innervation tools)
+inline-annotations/extractor/target/
+k9-coordination-protocol/tools/k9-init/target/
+hooks/playbook-to-recipe/target/
+inline-annotations/extractor/Cargo.lock
+k9-coordination-protocol/tools/k9-init/Cargo.lock
+hooks/playbook-to-recipe/Cargo.lock
+.verisimdb/ecosystem-ingest/target/
+.verisimdb/ecosystem-ingest/Cargo.lock
+# Backup/scratch files (never commit)
+*.backup
