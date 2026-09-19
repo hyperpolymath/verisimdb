@@ -1,3 +1,4 @@
+# This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
 # This workflow is managed by gh actions-lock.
@@ -38,7 +39,7 @@ jobs:
       id-token: write       # mint the OIDC token the attestation is signed with
       attestations: write   # write the build-provenance attestation (the "claim")
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/checkout@v7.0.1
 
       - name: Build image (Podman)
         run: |
@@ -93,7 +94,7 @@ jobs:
       #     --repo ${{ github.repository }}
       - name: Attest container provenance
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        uses: actions/attest-build-provenance@v4.2.2
         with:
           subject-name: ghcr.io/hyperpolymath/verisimdb-api
           subject-digest: ${{ steps.push.outputs.digest }}

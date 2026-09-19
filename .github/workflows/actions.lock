@@ -25,7 +25,7 @@ workflows:
     '.github/workflows/elixir-ci.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'codecov/codecov-action@v7.0.0'
+        - 'codecov/codecov-action@v7.1.0'
         - 'erlef/setup-beam@v1.24.1'
     '.github/workflows/fuzz.yml':
         - 'actions/checkout@v7.0.1'
@@ -49,10 +49,10 @@ workflows:
     '.github/workflows/rust-ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.1'
-        - 'codecov/codecov-action@v7.0.0'
+        - 'codecov/codecov-action@v7.1.0'
         - 'dtolnay/rust-toolchain@stable'
         - 'rustsec/audit-check@v2.0.0'
-        - 'taiki-e/install-action@v2.87.3'
+        - 'taiki-e/install-action@v2.87.13'
     '.github/workflows/scorecard.yml': []
     '.github/workflows/secret-scanner.yml': []
     '.github/workflows/security-scan.yml': []
@@ -107,9 +107,9 @@ dependencies:
         repo_id: 496012378
         uses:
             - 'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
-    'codecov/codecov-action@v7.0.0':
-        ref: 'v7.0.0'
-        commit: 'sha1-fb8b3582c8e4def4969c97caa2f19720cb33a72f'
+    'codecov/codecov-action@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-0b35c9ecc4f0529d0eb674914510c22f85b196b4'
         owner_id: 8226205
         repo_id: 200299178
         uses:
@@ -144,8 +144,8 @@ dependencies:
         commit: 'sha1-69366f33c96575abad1ee0dba8212993eecbe998'
         owner_id: 25397242
         repo_id: 523199201
-    'taiki-e/install-action@v2.87.3':
-        ref: 'v2.87.3'
-        commit: 'sha1-0758d235715de2f3551eacc980d9ae8fce9342c3'
+    'taiki-e/install-action@v2.87.13':
+        ref: 'v2.87.13'
+        commit: 'sha1-26e9283f268b880168bdbd2c545dfcd60ec2c6ab'
         owner_id: 43724913
         repo_id: 442947557
