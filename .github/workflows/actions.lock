@@ -25,7 +25,6 @@ workflows:
     '.github/workflows/elixir-ci.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'codecov/codecov-action@v7.1.0'
         - 'erlef/setup-beam@v1.24.1'
     '.github/workflows/fuzz.yml':
         - 'actions/checkout@v7.0.1'
@@ -49,7 +48,6 @@ workflows:
     '.github/workflows/rust-ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.1'
-        - 'codecov/codecov-action@v7.1.0'
         - 'dtolnay/rust-toolchain@stable'
         - 'rustsec/audit-check@v2.0.0'
         - 'taiki-e/install-action@v2.87.13'
@@ -107,13 +105,6 @@ dependencies:
         repo_id: 496012378
         uses:
             - 'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
-    'codecov/codecov-action@v7.1.0':
-        ref: 'v7.1.0'
-        commit: 'sha1-0b35c9ecc4f0529d0eb674914510c22f85b196b4'
-        owner_id: 8226205
-        repo_id: 200299178
-        uses:
-            - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
         commit: 'sha1-6bed0761d98439e5a578e2877258200ad565ba87'

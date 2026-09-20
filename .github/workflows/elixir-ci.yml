@@ -91,7 +91,6 @@ jobs:
     # Unit-test coverage only: the federation adapters are exercised by the
     # :integration suite (live databases; excluded in CI) and are skipped in
     # coveralls.json, so they don't dilute the unit-coverage denominator.
-    name: ExCoveralls (unit, gate in coveralls.json)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
@@ -133,13 +132,6 @@ jobs:
         run: mix deps.get
       - if: steps.detect.outputs.relevant == 'true'
         run: mix coveralls.json
-      - if: steps.detect.outputs.relevant == 'true'
-        uses: codecov/codecov-action@v7.1.0
-        with:
-          files: elixir-orchestration/cover/excoveralls.json
-          flags: elixir
-          fail_ci_if_error: false
-        continue-on-error: true
 
   bench-compile:
     name: benchee scripts compile
