@@ -15,7 +15,7 @@ workflows:
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
-        - 'github/codeql-action@v4.37.9'
+        - 'github/codeql-action@b96794f015dfd88f77b49b1c93e0fa7110f94c63'
     '.github/workflows/coq-build.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/doc-consonance.yml':
@@ -32,13 +32,16 @@ workflows:
     '.github/workflows/ghcr-publish.yml':
         - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
-    '.github/workflows/governance.yml': []
-    '.github/workflows/hypatia-scan.yml': []
+    '.github/workflows/governance.yml':
+        - 'hyperpolymath/standards@8f31a5a4ba591d544b65f91f6d78b136e07756f0'
+    '.github/workflows/hypatia-scan.yml':
+        - 'hyperpolymath/standards@cc58c0cb23f73fc2019ce85a56a468e5248a93b3'
     '.github/workflows/instant-sync.yml':
         - 'peter-evans/repository-dispatch@v4.0.1'
     '.github/workflows/label-triage.yml': []
     '.github/workflows/labels.yml': []
-    '.github/workflows/mirror.yml': []
+    '.github/workflows/mirror.yml':
+        - 'hyperpolymath/standards@fcb8669169b4e9f5d9848608df880ae5fae812b4'
     '.github/workflows/pages.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/deploy-pages@v5.0.1'
@@ -50,12 +53,21 @@ workflows:
         - 'actions/upload-artifact@v7.0.1'
         - 'dtolnay/rust-toolchain@stable'
         - 'rustsec/audit-check@v2.0.0'
-        - 'taiki-e/install-action@v2.87.13'
-    '.github/workflows/scorecard.yml': []
-    '.github/workflows/secret-scanner.yml': []
-    '.github/workflows/security-scan.yml': []
-    '.github/workflows/spark-theatre-gate.yml': []
+        - 'taiki-e/install-action@v2.87.15'
+    '.github/workflows/scorecard.yml':
+        - 'hyperpolymath/standards@8750b94ac1bbe8c51ad13fe106669b13478f0b62'
+    '.github/workflows/secret-scanner.yml':
+        - 'hyperpolymath/standards@84355587cb2a1f86e6882de83514a32db2646e7a'
+    '.github/workflows/security-scan.yml':
+        - 'hyperpolymath/panic-attack@27b3d93b11fbfc03cee695e791904d741ce2b24b'
+    '.github/workflows/spark-theatre-gate.yml':
+        - 'hyperpolymath/standards@fcb8669169b4e9f5d9848608df880ae5fae812b4'
 dependencies:
+    'Swatinem/rust-cache@v2.8.2':
+        ref: 'v2.8.2'
+        commit: 'sha1-779680da715d629ac1d338a641029a2f4372abb5'
+        owner_id: 580492
+        repo_id: 298565987
     'actions/attest-build-provenance@v4.2.2':
         ref: 'v4.2.2'
         commit: 'sha1-4d101475d8b20a2381f78447822ac1eab6504dd8'
@@ -73,6 +85,16 @@ dependencies:
         commit: 'sha1-55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
         owner_id: 44036562
         repo_id: 215566462
+    'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1':
+        ref: '3d3c42e5aac5ba805825da76410c181273ba90b1'
+        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
+        owner_id: 44036562
+        repo_id: 197814629
+    'actions/checkout@v4.3.1':
+        ref: 'v4.3.1'
+        commit: 'sha1-34e114876b0b11c390a56381ad16ebd13914f8d5'
+        owner_id: 44036562
+        repo_id: 197814629
     'actions/checkout@v7.0.1':
         ref: 'v7.0.1'
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
@@ -100,9 +122,19 @@ dependencies:
         repo_id: 496012378
         uses:
             - 'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
+    'dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c':
+        ref: '2c7215f132e9ebf062739d9130488b56d53c060c'
+        commit: 'sha1-2c7215f132e9ebf062739d9130488b56d53c060c'
+        owner_id: 1940490
+        repo_id: 260749683
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
         commit: 'sha1-6bed0761d98439e5a578e2877258200ad565ba87'
+        owner_id: 1940490
+        repo_id: 260749683
+    'dtolnay/rust-toolchain@v1':
+        ref: 'v1'
+        commit: 'sha1-02cb101ec7c40f2c49e1d9714d64511d8e1b74de'
         owner_id: 1940490
         repo_id: 260749683
     'erlef/setup-beam@v1.24.1':
@@ -110,9 +142,9 @@ dependencies:
         commit: 'sha1-54075bcc5e249e4758d363f27d099f55d843f124'
         owner_id: 47606891
         repo_id: 331103973
-    'github/codeql-action@v4.37.9':
-        ref: 'v4.37.9'
-        commit: 'sha1-cdf488f595d80d6e07e03d4674febd5ab45fa938'
+    'github/codeql-action@b96794f015dfd88f77b49b1c93e0fa7110f94c63':
+        ref: 'v4.38.0'
+        commit: 'sha1-b96794f015dfd88f77b49b1c93e0fa7110f94c63'
         owner_id: 9919
         repo_id: 259445878
     'google/clusterfuzzlite@v1':
@@ -120,6 +152,46 @@ dependencies:
         commit: 'sha1-884713a6c30a92e5e8544c39945cd7cb630abcd1'
         owner_id: 1342004
         repo_id: 400046858
+    'hyperpolymath/panic-attack@27b3d93b11fbfc03cee695e791904d741ce2b24b':
+        ref: '27b3d93b11fbfc03cee695e791904d741ce2b24b'
+        commit: 'sha1-27b3d93b11fbfc03cee695e791904d741ce2b24b'
+        owner_id: 6759885
+        repo_id: 1152434997
+        uses:
+            - 'actions/checkout@v4.3.1'
+            - 'dtolnay/rust-toolchain@v1'
+            - 'Swatinem/rust-cache@v2.8.2'
+    'hyperpolymath/standards@84355587cb2a1f86e6882de83514a32db2646e7a':
+        ref: '84355587cb2a1f86e6882de83514a32db2646e7a'
+        commit: 'sha1-84355587cb2a1f86e6882de83514a32db2646e7a'
+        owner_id: 6759885
+        repo_id: 1116521501
+        uses:
+            - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+    'hyperpolymath/standards@8750b94ac1bbe8c51ad13fe106669b13478f0b62':
+        ref: '8750b94ac1bbe8c51ad13fe106669b13478f0b62'
+        commit: 'sha1-8750b94ac1bbe8c51ad13fe106669b13478f0b62'
+        owner_id: 6759885
+        repo_id: 1116521501
+    'hyperpolymath/standards@8f31a5a4ba591d544b65f91f6d78b136e07756f0':
+        ref: '8f31a5a4ba591d544b65f91f6d78b136e07756f0'
+        commit: 'sha1-8f31a5a4ba591d544b65f91f6d78b136e07756f0'
+        owner_id: 6759885
+        repo_id: 1116521501
+    'hyperpolymath/standards@cc58c0cb23f73fc2019ce85a56a468e5248a93b3':
+        ref: 'cc58c0cb23f73fc2019ce85a56a468e5248a93b3'
+        commit: 'sha1-cc58c0cb23f73fc2019ce85a56a468e5248a93b3'
+        owner_id: 6759885
+        repo_id: 1116521501
+    'hyperpolymath/standards@fcb8669169b4e9f5d9848608df880ae5fae812b4':
+        ref: 'fcb8669169b4e9f5d9848608df880ae5fae812b4'
+        commit: 'sha1-fcb8669169b4e9f5d9848608df880ae5fae812b4'
+        owner_id: 6759885
+        repo_id: 1116521501
+        uses:
+            - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+            - 'dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c'
+            - 'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555'
     'peter-evans/repository-dispatch@v4.0.1':
         ref: 'v4.0.1'
         commit: 'sha1-28959ce8df70de7be546dd1250a005dd32156697'
@@ -130,23 +202,13 @@ dependencies:
         commit: 'sha1-69366f33c96575abad1ee0dba8212993eecbe998'
         owner_id: 25397242
         repo_id: 523199201
-    'taiki-e/install-action@v2.87.13':
-        ref: 'v2.87.13'
-        commit: 'sha1-26e9283f268b880168bdbd2c545dfcd60ec2c6ab'
+    'taiki-e/install-action@v2.87.15':
+        ref: 'v2.87.15'
+        commit: 'sha1-4076c08d76dba979c11a7285295b0716c1d67908'
         owner_id: 43724913
         repo_id: 442947557
-    'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1':
-        ref: 'v7.0.1'
-        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
-        owner_id: 44036562
-        repo_id: 197814629
-    'dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c':
-        ref: 'stable'
-        commit: 'sha1-2c7215f132e9ebf062739d9130488b56d53c060c'
-        owner_id: 1940490
-        repo_id: 260749683
     'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555':
-        ref: 'v0.10.0'
+        ref: 'e83874834305fe9a4a2997156cb26c5de65a8555'
         commit: 'sha1-e83874834305fe9a4a2997156cb26c5de65a8555'
         owner_id: 135788
         repo_id: 208510314
