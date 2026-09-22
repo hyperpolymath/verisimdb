@@ -1,3 +1,4 @@
+# This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
 # This workflow is managed by gh actions-lock.
@@ -39,6 +40,6 @@ jobs:
     #
     # Pin includes canonical .affine language detection and preserves
     # JSON.parseExn coverage after the ReScript-to-AffineScript migration.
-    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@b70d6da34c8c64b0ad41e0aa3e9184921b307156 # main 2026-08-24
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@27b3d93b11fbfc03cee695e791904d741ce2b24b # main 2026-08-24
     secrets:
       VERISIMDB_PAT: ${{ secrets.VERISIMDB_PAT }}
