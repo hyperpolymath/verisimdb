@@ -70,11 +70,12 @@ if [ ! -f "$LOCK" ]; then
 fi
 
 shopt -s nullglob
-mapfile -t WORKFLOWS < <(printf '%s\n' "$WF_DIR"/*.yml "$WF_DIR"/*.yaml | sort -u)
+WORKFLOWS=("$WF_DIR"/*.yml "$WF_DIR"/*.yaml)
 if [ "${#WORKFLOWS[@]}" -eq 0 ]; then
   echo "check-lock-sync: FATAL: no workflow files under $WF_DIR" >&2
   exit 1
 fi
+mapfile -t WORKFLOWS < <(printf '%s\n' "${WORKFLOWS[@]}" | sort -u)
 
 read -r -d '' PROG <<'AWK' || true
 # Return the owner/repository pin for an external action or reusable workflow,
