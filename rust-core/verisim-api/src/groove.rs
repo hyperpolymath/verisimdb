@@ -501,8 +501,12 @@ fn probe_mesh_peers(mesh: &MeshState) {
         match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(500)) {
             Ok(mut stream) => {
                 use std::io::{Read, Write};
-                stream.set_read_timeout(Some(std::time::Duration::from_millis(500))).ok();
-                stream.set_write_timeout(Some(std::time::Duration::from_millis(500))).ok();
+                stream
+                    .set_read_timeout(Some(std::time::Duration::from_millis(500)))
+                    .ok();
+                stream
+                    .set_write_timeout(Some(std::time::Duration::from_millis(500)))
+                    .ok();
 
                 let request = format!(
                     "GET /.well-known/groove/status HTTP/1.0\r\nHost: {}\r\nConnection: close\r\n\r\n",
@@ -649,10 +653,18 @@ pub struct FeedbackRequest {
     pub source_service: String,
 }
 
-fn default_feedback_type() -> String { "feedback".to_string() }
-fn default_verisimdb() -> String { "verisimdb".to_string() }
-fn default_other() -> String { "other".to_string() }
-fn default_unknown() -> String { "unknown".to_string() }
+fn default_feedback_type() -> String {
+    "feedback".to_string()
+}
+fn default_verisimdb() -> String {
+    "verisimdb".to_string()
+}
+fn default_other() -> String {
+    "other".to_string()
+}
+fn default_unknown() -> String {
+    "unknown".to_string()
+}
 
 /// POST /.well-known/groove/feedback — Receive feedback from the Groove mesh.
 async fn groove_feedback_handler(
@@ -704,10 +716,12 @@ async fn groove_feedback_handler(
 }
 
 /// GET /.well-known/groove/feedback — List stored feedback entries.
-async fn groove_feedback_list_handler(
-    State(store): State<FeedbackStore>,
-) -> impl IntoResponse {
-    let entries = store.entries.lock().unwrap_or_else(|e| e.into_inner()).clone();
+async fn groove_feedback_list_handler(State(store): State<FeedbackStore>) -> impl IntoResponse {
+    let entries = store
+        .entries
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     Json(serde_json::json!({
         "count": entries.len(),
         "entries": entries,
@@ -731,14 +745,8 @@ pub fn groove_router() -> Router {
 
     // Connection lifecycle sub-router (uses GrooveState).
     let connection_router = Router::new()
-        .route(
-            "/.well-known/groove",
-            get(groove_manifest_handler),
-        )
-        .route(
-            "/.well-known/groove/connect",
-            post(groove_connect_handler),
-        )
+        .route("/.well-known/groove", get(groove_manifest_handler))
+        .route("/.well-known/groove/connect", post(groove_connect_handler))
         .route(
             "/.well-known/groove/disconnect",
             post(groove_disconnect_handler),
@@ -747,18 +755,12 @@ pub fn groove_router() -> Router {
             "/.well-known/groove/heartbeat",
             get(groove_heartbeat_handler),
         )
-        .route(
-            "/.well-known/groove/status",
-            get(groove_status_handler),
-        )
+        .route("/.well-known/groove/status", get(groove_status_handler))
         .with_state(groove_state);
 
     // Health mesh sub-router (uses MeshState).
     let mesh_router = Router::new()
-        .route(
-            "/.well-known/groove/mesh",
-            get(groove_mesh_handler),
-        )
+        .route("/.well-known/groove/mesh", get(groove_mesh_handler))
         .with_state(mesh_state);
 
     // Feedback sub-router (uses FeedbackStore).
@@ -769,9 +771,7 @@ pub fn groove_router() -> Router {
         )
         .with_state(feedback_store);
 
-    connection_router
-        .merge(mesh_router)
-        .merge(feedback_router)
+    connection_router.merge(mesh_router).merge(feedback_router)
 }
 
 // --- Helpers ---
@@ -874,10 +874,7 @@ mod tests {
 
     #[test]
     fn test_capability_matching() {
-        let peer_consumes = vec![
-            "octad-storage".to_string(),
-            "unknown-cap".to_string(),
-        ];
+        let peer_consumes = vec!["octad-storage".to_string(), "unknown-cap".to_string()];
 
         let matched: Vec<String> = peer_consumes
             .iter()
