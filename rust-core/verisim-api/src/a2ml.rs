@@ -37,12 +37,7 @@ pub const A2ML_CONTENT_TYPE: &str = "text/a2ml; charset=utf-8";
 /// Wrap an A2ML body string in an Axum [`Response`] with the correct
 /// `Content-Type`.
 pub fn a2ml_response(status: StatusCode, body: String) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, A2ML_CONTENT_TYPE)],
-        body,
-    )
-        .into_response()
+    (status, [(header::CONTENT_TYPE, A2ML_CONTENT_TYPE)], body).into_response()
 }
 
 /// Convenience alias so callers can `use crate::a2ml::String` implicitly.
@@ -126,20 +121,36 @@ pub fn proof_attempts_to_a2ml(rows: &[serde_json::Value]) -> String {
     let mut out = String::new();
     out.push_str("@proof-attempts():\n");
     for v in rows {
-        let Some(attempt_id)       = v["attempt_id"].as_str()       else { continue };
-        let Some(obligation_id)    = v["obligation_id"].as_str()     else { continue };
-        let Some(repo)             = v["repo"].as_str()              else { continue };
-        let Some(file)             = v["file"].as_str()              else { continue };
-        let Some(claim)            = v["claim"].as_str()             else { continue };
-        let Some(obligation_class) = v["obligation_class"].as_str()  else { continue };
-        let Some(prover_used)      = v["prover_used"].as_str()       else { continue };
-        let Some(outcome)          = v["outcome"].as_str()           else { continue };
-        let duration_ms            = v["duration_ms"].as_u64().unwrap_or(0);
-        let confidence             = v["confidence"].as_f64().unwrap_or(0.0);
-        let parent_attempt_id      = v["parent_attempt_id"].as_str();
-        let strategy_tag           = v["strategy_tag"].as_str().unwrap_or("");
-        let started_at             = v["started_at"].as_str().unwrap_or("");
-        let completed_at           = v["completed_at"].as_str().unwrap_or("");
+        let Some(attempt_id) = v["attempt_id"].as_str() else {
+            continue;
+        };
+        let Some(obligation_id) = v["obligation_id"].as_str() else {
+            continue;
+        };
+        let Some(repo) = v["repo"].as_str() else {
+            continue;
+        };
+        let Some(file) = v["file"].as_str() else {
+            continue;
+        };
+        let Some(claim) = v["claim"].as_str() else {
+            continue;
+        };
+        let Some(obligation_class) = v["obligation_class"].as_str() else {
+            continue;
+        };
+        let Some(prover_used) = v["prover_used"].as_str() else {
+            continue;
+        };
+        let Some(outcome) = v["outcome"].as_str() else {
+            continue;
+        };
+        let duration_ms = v["duration_ms"].as_u64().unwrap_or(0);
+        let confidence = v["confidence"].as_f64().unwrap_or(0.0);
+        let parent_attempt_id = v["parent_attempt_id"].as_str();
+        let strategy_tag = v["strategy_tag"].as_str().unwrap_or("");
+        let started_at = v["started_at"].as_str().unwrap_or("");
+        let completed_at = v["completed_at"].as_str().unwrap_or("");
 
         let row = ProofAttemptRowA2ml {
             attempt_id,
@@ -210,10 +221,10 @@ pub fn parse_recommendations(text: &str) -> Vec<RecommendationA2ml> {
         .filter_map(|line| {
             let v: serde_json::Value = serde_json::from_str(line).ok()?;
             Some(RecommendationA2ml {
-                prover:          v["prover_used"].as_str()?.to_string(),
-                success_rate:    v["success_rate"].as_f64().unwrap_or(0.0),
+                prover: v["prover_used"].as_str()?.to_string(),
+                success_rate: v["success_rate"].as_f64().unwrap_or(0.0),
                 avg_duration_ms: v["avg_duration_ms"].as_f64().unwrap_or(0.0),
-                total_attempts:  v["total_attempts"].as_u64().unwrap_or(0),
+                total_attempts: v["total_attempts"].as_u64().unwrap_or(0),
             })
         })
         .collect()
@@ -257,9 +268,9 @@ pub fn parse_certs(text: &str) -> Vec<CertRowA2ml> {
         .filter_map(|line| {
             let v: serde_json::Value = serde_json::from_str(line).ok()?;
             Some(CertRowA2ml {
-                prover_used:    v["prover_used"].as_str()?.to_string(),
-                status:         v["status"].as_str().unwrap_or("pending").to_string(),
-                success_rate:   v["success_rate"].as_f64().unwrap_or(0.0),
+                prover_used: v["prover_used"].as_str()?.to_string(),
+                status: v["status"].as_str().unwrap_or("pending").to_string(),
+                success_rate: v["success_rate"].as_f64().unwrap_or(0.0),
                 total_attempts: v["total_attempts"].as_u64().unwrap_or(0),
             })
         })
@@ -310,14 +321,12 @@ mod tests {
 
     #[test]
     fn strategy_to_a2ml_format() {
-        let recs = vec![
-            RecommendationA2ml {
-                prover: "echidna".to_string(),
-                success_rate: 0.95,
-                avg_duration_ms: 120.5,
-                total_attempts: 100,
-            },
-        ];
+        let recs = vec![RecommendationA2ml {
+            prover: "echidna".to_string(),
+            success_rate: 0.95,
+            avg_duration_ms: 120.5,
+            total_attempts: 100,
+        }];
         let s = strategy_to_a2ml(&recs);
         assert!(s.starts_with("@strategy-recommendations():\n"));
         assert!(s.contains("prover=\"echidna\""));

@@ -38,9 +38,9 @@
 //   - RAM promotion: tmpfs overlay for reads, writes go to WAL first
 //   - On crash: WAL replays, RAM overlay is gone, no data loss
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
-use serde::{Serialize, Deserialize};
 
 /// Hard limit: maximum octads promoted to RAM simultaneously.
 /// Conservative limit (2 not 3) for crash safety — fewer in-flight
@@ -70,9 +70,14 @@ pub enum Modality {
 impl Modality {
     pub fn all() -> Vec<Modality> {
         vec![
-            Modality::Graph, Modality::Vector, Modality::Tensor,
-            Modality::Semantic, Modality::Document, Modality::Temporal,
-            Modality::Provenance, Modality::Spatial,
+            Modality::Graph,
+            Modality::Vector,
+            Modality::Tensor,
+            Modality::Semantic,
+            Modality::Document,
+            Modality::Temporal,
+            Modality::Provenance,
+            Modality::Spatial,
         ]
     }
 
@@ -103,7 +108,10 @@ struct PromotedState {
 #[derive(Debug, Clone)]
 pub enum PromotionDecision {
     /// Promote — significant benefit expected.
-    Promote { modalities: Vec<Modality>, estimated_speedup: f64 },
+    Promote {
+        modalities: Vec<Modality>,
+        estimated_speedup: f64,
+    },
     /// Skip — benefit too small to justify RAM usage.
     Skip { reason: String },
     /// Blocked — already at MAX_PROMOTED limit.
@@ -202,7 +210,8 @@ impl PromotionManager {
         }
 
         // Check 3-octad limit.
-        let new_count = modalities.iter()
+        let new_count = modalities
+            .iter()
             .filter(|m| !self.promoted.contains_key(m))
             .count();
         if self.promoted.len() + new_count > MAX_PROMOTED {
@@ -256,7 +265,8 @@ impl PromotionManager {
         if self.promoted.len() >= MAX_PROMOTED {
             return Err(format!(
                 "Cannot promote: already at limit ({}/{})",
-                self.promoted.len(), MAX_PROMOTED
+                self.promoted.len(),
+                MAX_PROMOTED
             ));
         }
 
@@ -271,12 +281,15 @@ impl PromotionManager {
             ));
         }
 
-        self.promoted.insert(modality.clone(), PromotedState {
-            modality: modality.clone(),
-            promoted_at: Instant::now(),
-            estimated_size_bytes: estimated_size,
-            operation_count: 0,
-        });
+        self.promoted.insert(
+            modality.clone(),
+            PromotedState {
+                modality: modality.clone(),
+                promoted_at: Instant::now(),
+                estimated_size_bytes: estimated_size,
+                operation_count: 0,
+            },
+        );
         self.ram_used += estimated_size;
 
         self.history.push(PromotionEvent {
@@ -316,7 +329,9 @@ impl PromotionManager {
 
     /// Check for expired promotions and force-demote them.
     pub fn enforce_timeouts(&mut self) {
-        let expired: Vec<Modality> = self.promoted.iter()
+        let expired: Vec<Modality> = self
+            .promoted
+            .iter()
             .filter(|(_, state)| state.promoted_at.elapsed() > MAX_PROMOTION_DURATION)
             .map(|(m, _)| m.clone())
             .collect();
@@ -345,7 +360,9 @@ impl PromotionManager {
 }
 
 impl Default for PromotionManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn epoch_ms() -> u64 {
@@ -393,8 +410,10 @@ mod tests {
         let mut pm = PromotionManager::new();
         pm.enable(10_000_000);
 
-        pm.promote(&Modality::Graph, 1000).expect("TODO: handle error");
-        pm.promote(&Modality::Vector, 1000).expect("TODO: handle error");
+        pm.promote(&Modality::Graph, 1000)
+            .expect("TODO: handle error");
+        pm.promote(&Modality::Vector, 1000)
+            .expect("TODO: handle error");
 
         pm.demote(&Modality::Graph);
         assert_eq!(pm.promoted_count(), 1);
@@ -437,8 +456,10 @@ mod tests {
         let mut pm = PromotionManager::new();
         pm.enable(10_000_000);
 
-        pm.promote(&Modality::Graph, 1000).expect("TODO: handle error");
-        pm.promote(&Modality::Vector, 1000).expect("TODO: handle error");
+        pm.promote(&Modality::Graph, 1000)
+            .expect("TODO: handle error");
+        pm.promote(&Modality::Vector, 1000)
+            .expect("TODO: handle error");
         pm.demote_all();
 
         assert_eq!(pm.promoted_count(), 0);
@@ -451,7 +472,8 @@ mod tests {
         let mut pm = PromotionManager::new();
         pm.enable(10_000_000);
 
-        pm.promote(&Modality::Graph, 1000).expect("TODO: handle error");
+        pm.promote(&Modality::Graph, 1000)
+            .expect("TODO: handle error");
         pm.demote(&Modality::Graph);
 
         assert_eq!(pm.history().len(), 2);
