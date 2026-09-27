@@ -97,20 +97,32 @@ defmodule VeriSim.Query.VCLTGate do
 
   defp invoke_gate(path, payload) do
     try do
-      tmp = write_secure_payload!(payload)
+      # No shell, and no temp file.
+      #
+      # This used to be `System.cmd("sh", ["-c", "'#{path}' < '#{tmp}'"])`, which
+      # needed the payload written to an exclusively-created 0o600 file because a
+      # shell redirection can only take a filename, not a stream. That pulled in
+      # `write_secure_payload!/2` (collision retries, `:crypto.strong_rand_bytes`,
+      # chmod-before-write), `shell_quote/1`, and an `after File.rm/1` — roughly
+      # 45 lines of security-sensitive machinery whose only job was to work
+      # around a shell feature we did not need.
+      #
+      # `System.cmd/3`'s `:input` option writes the payload straight to the
+      # child's stdin, so all of that goes away and with it the question of
+      # whether the quoting was correct. It was correct — `shell_quote/1` was a
+      # sound POSIX single-quote escape and neither the statement nor the schema
+      # ever reached the shell — but "correct quoting" is a property that has to
+      # be re-verified every time this function is edited, whereas "no shell" is
+      # a property that cannot regress.
+      #
+      # `path` is argv[0], never a shell word, so `VERISIM_VCLT_GATE` cannot
+      # smuggle arguments or metacharacters either. `System.cmd/3` raises
+      # `ErlangError` when the executable is missing or not runnable; the
+      # `rescue` below turns that into a fail-closed `{:error, :gate_failed}`,
+      # which is the documented behaviour for an unavailable gate.
+      {output, exit_code} = System.cmd(path, [], input: payload, stderr_to_stdout: false)
 
-      try do
-        # Quote path and tmp — no statement or schema value reaches the shell.
-        quoted_path = shell_quote(path)
-        quoted_tmp = shell_quote(tmp)
-
-        {output, exit_code} =
-          System.cmd("sh", ["-c", "#{quoted_path} < #{quoted_tmp}"], stderr_to_stdout: false)
-
-        handle_gate_result(IO.iodata_to_binary(output), exit_code)
-      after
-        File.rm(tmp)
-      end
+      handle_gate_result(IO.iodata_to_binary(output), exit_code)
     rescue
       e ->
         Logger.warning("vclt-gate: invocation error: #{Exception.message(e)} — failing closed")
@@ -118,36 +130,14 @@ defmodule VeriSim.Query.VCLTGate do
     end
   end
 
-  defp write_secure_payload!(payload, attempts \\ 8)
-
-  defp write_secure_payload!(_payload, 0),
-    do: raise("could not allocate an exclusive vclt-gate payload file")
-
-  defp write_secure_payload!(payload, attempts) do
-    token = 18 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
-    path = Path.join(System.tmp_dir!(), "vcltgate_#{token}.json")
-
-    case File.open(path, [:write, :binary, :exclusive]) do
-      {:ok, io} ->
-        try do
-          # Restrict access before any payload bytes are written. Exclusive
-          # creation prevents a pre-planted symlink from being followed.
-          File.chmod!(path, 0o600)
-          IO.binwrite(io, payload)
-          path
-        after
-          File.close(io)
-        end
-
-      {:error, :eexist} ->
-        write_secure_payload!(payload, attempts - 1)
-
-      {:error, reason} ->
-        raise File.Error, reason: reason, action: "create secure payload", path: path
-    end
-  end
-
-  defp shell_quote(str), do: "'" <> String.replace(str, "'", "'\\''") <> "'"
+  # `write_secure_payload!/2` and `shell_quote/1` were deleted here on 2026-09-27.
+  # They existed solely to feed a `sh -c` redirection a filename; with
+  # `System.cmd/3`'s `:input` the payload goes to stdin directly. Removing them is
+  # the point of the change: less security-sensitive code to keep correct.
+  # The test that asserted their observable behaviour (an unpredictable
+  # `vcltgate_*.json` file at mode 600, removed afterwards) has been replaced by
+  # one that asserts the underlying property instead — that shell metacharacters
+  # in the statement and schema arrive on stdin verbatim, unparsed.
 
   defp handle_gate_result(output, 0) do
     case Jason.decode(output) do

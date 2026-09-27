@@ -50,15 +50,15 @@ defmodule VeriSim.Query.VCLTGateTest do
     end
 
     @tag :tmp_dir
-    test "uses a private unpredictable payload file and removes it", %{tmp_dir: tmp} do
-      stub = Path.join(tmp, "gate-inspect-input")
-      observation = Path.join(tmp, "input-observation")
+    test "delivers the payload on stdin, unparsed by any shell", %{tmp_dir: tmp} do
+      stub = Path.join(tmp, "gate-stdin")
+      observation = Path.join(tmp, "stdin-observation")
 
+      # Copy stdin verbatim to a file so the test can assert on exactly what the
+      # gate process received, then emit a valid admit response.
       File.write!(stub, """
       #!/bin/sh
-      input_path=$(readlink /proc/$$/fd/0)
-      input_mode=$(stat -c '%a' "$input_path")
-      printf '%s\n%s\n' "$input_path" "$input_mode" > #{shell_quote(observation)}
+      cat > #{shell_quote(observation)}
       echo '{"certified_level":6,"levels":[]}'
       exit 0
       """)
@@ -66,12 +66,30 @@ defmodule VeriSim.Query.VCLTGateTest do
       File.chmod!(stub, 0o755)
       System.put_env("VERISIM_VCLT_GATE", stub)
 
-      assert :admit == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc LIMIT 1")
-      [input_path, input_mode] = observation |> File.read!() |> String.split("\n", trim: true)
+      # Every character here is one a shell parser would act on: single quotes
+      # (which would close an enclosing quote), `;` `|` `&` (separators), a
+      # backtick and `$(...)` (command substitution), `>` (redirection), plus a
+      # literal newline and tab in the schema value. If any part of the invocation
+      # passed through a shell, at least one of these would be consumed, expanded
+      # or split before reaching the gate.
+      #
+      # So asserting they survive byte-for-byte is a direct test of the property
+      # that matters — no shell sees the statement or schema. That is strictly
+      # stronger than what this test previously asserted (an unpredictable
+      # `vcltgate_*.json` file at mode 600, removed afterwards), which described
+      # the temp-file mechanism rather than the guarantee it existed to provide.
+      # The mechanism is gone: `System.cmd/3`'s `:input` writes to stdin directly.
+      hostile_statement =
+        "INSPECT GRAPH FROM HEXAD abc WHERE id = '1' ; rm -rf / | x & `id` $(whoami) > /tmp/pwn"
 
-      assert input_mode == "600"
-      assert Path.basename(input_path) =~ ~r/^vcltgate_[A-Za-z0-9_-]{24}\.json$/
-      refute File.exists?(input_path)
+      hostile_schema = %{"probe" => "' ; | & ` $( ) > \n tab\there"}
+
+      assert :admit == VCLTGate.check(hostile_statement, hostile_schema)
+
+      received = Jason.decode!(File.read!(observation))
+      assert received["schema_version"] == 1
+      assert received["statement"] == hostile_statement
+      assert received["schema"] == hostile_schema
     after
       System.delete_env("VERISIM_VCLT_GATE")
     end
