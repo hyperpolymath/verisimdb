@@ -1072,6 +1072,6 @@ ensures the deletion is recorded in the audit chain.
 - link:vcl-grammar.ebnf[VCL Grammar (EBNF)]
 - link:backwards-compatibility.adoc[Backwards Compatibility Strategy]
 - link:drift-handling.adoc[Drift Handling Documentation]
-- link:../WHITEPAPER.md[VeriSimDB White Paper]
+- link:../WHITEPAPER.pdf[VeriSimDB White Paper]
 - link:technical-specification-kraft-metadata-log.adoc[KRaft Metadata Log Specification]
-- link:../design-decisions.adoc[Architecture Design Decisions]
+- link:../ARCHITECTURE.adoc[Architecture Index] — the component map and the AD-001…AD-007 decision register

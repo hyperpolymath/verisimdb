@@ -1,6 +1,16 @@
-== TOPOLOGY.md — VeriSimDB
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Process Topology — VeriSimDB
+:toc: left
+:toclevels: 2
 
-=== System Architecture
+// Titled "TOPOLOGY.md" until 2026-09-27, in a file that is .adoc, as a
+// level-2 heading with level-3 sections beneath it. Both were template
+// artefacts; the title now names the document, not a filename that does not
+// exist.
+
+
+== System Architecture
 
 ....
                     ┌─────────────────────────────────────┐
@@ -53,7 +63,7 @@
     panic-attack → verisimdb-data (flat-file) → hypatia (rules) → gitbot-fleet (fixes)
 ....
 
-=== Completion Dashboard
+== Completion Dashboard
 
 [cols=",,",options="header",]
 |===
@@ -82,7 +92,7 @@
 |*Overall* |`+██████░░░░+` *65%* |
 |===
 
-=== Key Dependencies
+== Key Dependencies
 
 ....
 verisimdb

@@ -221,7 +221,7 @@ let solveQueryPlan = (queryAst: string): array<string> => {
 
 === Option C: Scheme miniKanren (via Guile)
 
-**Use existing STATE.scm infrastructure:**
+**Use existing STATE.a2ml infrastructure:**
 
 ```scheme
 ;; lib/verisim_minikanren.scm

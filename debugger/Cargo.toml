@@ -7,7 +7,12 @@ edition = "2024"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 license = "MPL-2.0"
 description = "Interactive debugger and visualization tool for VeriSimDB"
-repository = "https://github.com/hyperpolymath/verisimdb-debugger"
+# This crate lives in-tree at `debugger/` inside the verisimdb repository. The
+# previous value pointed at `hyperpolymath/verisimdb-debugger`, which does not
+# exist (HTTP 404, verified 2026-09-27) — a crate publishing with an unreachable
+# `repository` URL sends every reader somewhere that is not there.
+repository = "https://github.com/hyperpolymath/verisimdb"
+homepage = "https://github.com/hyperpolymath/verisimdb/tree/main/debugger"
 keywords = ["database", "debugger", "tui", "multimodal", "zkp"]
 categories = ["command-line-utilities", "development-tools::debugging"]
 

@@ -7,7 +7,7 @@
     (version "0.1.0")
     (schema-version "1.0")
     (created "2026-01-03")
-    (updated "2026-06-05")
+    (updated "2026-09-27")
     (project "VeriSimDB")
     (repo "github.com/hyperpolymath/verisimdb"))
 
@@ -17,14 +17,29 @@
     (tech-stack
       ("Rust"          "core engine + modality stores")
       ("Elixir/OTP"    "orchestration + supervision")
-      ("ReScript"      "VCL parser + federation registry")
+      ("AffineScript"  "VCL parser + type checker + federation registry (src/vcl, src/registry)")
       ("Coq"           "formal proofs (9 modules in formal/, Coq 8.18)")
       ("Idris2"        "VCL-DT type checker / proof bridge")
       ("HTTP + gRPC"   "API surface")
       ("Tantivy"       "document modality (full-text)")
-      ("Burn"          "tensor modality")
+      ("ndarray"       "tensor modality (Burn removed from the workspace in 0.2.0)")
       ("redb"          "graph storage (pure-Rust default)")
       ("Oxigraph"      "graph storage (optional)")))
+
+  ;; -----------------------------------------------------------------------
+  ;; Tech-stack currency, re-measured 2026-09-27 against HEAD 681d635:
+  ;;   * 0 `.res` files remain in the tree; 32 `.affine` files do. The
+  ;;     ReScript -> AffineScript migration is complete, so the parser/registry
+  ;;     entry above names AffineScript. Two directory names are still
+  ;;     historical and were deliberately NOT renamed here, because renaming a
+  ;;     client-SDK directory is a consumer-visible break: `connectors/clients/
+  ;;     rescript/` and `playground/src/`. `rescript.json` is gone, and
+  ;;     `REUSE.toml` still globs `**/*.res` and `rescript.json` harmlessly.
+  ;;   * `Burn` is no longer a dependency at all (see deny.toml and CHANGELOG
+  ;;     0.2.0), so the tensor modality is ndarray only. The stale
+  ;;     `quinn-proto` note that referenced the burn chain has been corrected in
+  ;;     Cargo.toml; its closure is recorded in SECURITY-ADVISORIES.adoc.
+  ;; -----------------------------------------------------------------------
 
   ;; -----------------------------------------------------------------------
   ;; Proof status is calibrated to a machine-checked Coq `Print Assumptions`
@@ -38,7 +53,7 @@
     (components
       (("verisim-graph"        "implemented" "redb default + Oxigraph optional"))
       (("verisim-vector"       "implemented" "HNSW similarity search"))
-      (("verisim-tensor"       "implemented" "ndarray + Burn"))
+      (("verisim-tensor"       "implemented" "ndarray (Burn removed in 0.2.0)"))
       (("verisim-semantic"     "implemented" "CBOR proofs + ZKP bridge"))
       (("verisim-document"     "implemented" "Tantivy 0.26 (PR #76)"))
       (("verisim-temporal"     "implemented" "time-series + versions"))
@@ -66,7 +81,7 @@
       ("Provenance hash-chain integrity (P2/P3 Coq-verified, modulo an abstract hash)")
       ("WAL replay (C7 idempotent on observable state, modulo decidable equality)")
       ("Federation adapters: MongoDB Redis Neo4j ClickHouse SurrealDB InfluxDB MinIO (7x, 105 integration tests)")
-      ("Client SDKs: Rust Zig Elixir ReScript Julia (Gleam SDK retired 2026-06-01)")
+      ("Client SDKs: Rust Zig Elixir Julia + the AffineScript SDK (Gleam SDK retired 2026-06-01)")
       ("Stapeln container ecosystem: compose.toml + .gatekeeper.yaml + manifest.toml + ct-build.sh")
       ("Telemetry: opt-in collector + reporter + 19 telemetry tests")))
 

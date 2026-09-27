@@ -123,8 +123,14 @@ lto = true
 codegen-units = 1
 panic = "abort"
 
-# NOTE: quinn-proto (Dependabot alert — build-time only, NOT runtime)
-# Chain: burn 0.20 → cubecl-cpu → tracel-llvm-bundler (build dep) → reqwest 0.12 → quinn → quinn-proto
-# This is a build-time dependency for LLVM artifact download, not in any production code path.
-# Waiting for burn 0.21 stable release. reqwest bumped to 0.13 for direct deps.
+# NOTE (historical, resolved): the quinn-proto Dependabot alert (GHSA-4w2j-m93h-cj5j,
+# high, remote memory exhaustion) reached this workspace via
+#   burn 0.20 → cubecl-cpu → tracel-llvm-bundler (build dep) → reqwest 0.12 → quinn → quinn-proto
+# `burn` was removed from the workspace entirely in 0.2.0, so the whole chain is
+# gone: Cargo.lock contains 0 burn crates and no quinn / quinn-proto / cubecl /
+# tracel-llvm-bundler, and reqwest resolves to 0.13.x. There is nothing to wait
+# for. An earlier revision of this note said "waiting for burn 0.21 stable", which
+# contradicted deny.toml ("the burn ML stack is no longer a dependency at all")
+# and would have sent the next maintainer to wait on a release that is no longer
+# needed. Closure is recorded in SECURITY-ADVISORIES.adoc.
 

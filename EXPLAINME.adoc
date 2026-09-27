@@ -120,7 +120,7 @@ traceable, authorised, and consonant enough to affect live state.
   modality algebra, provenance hash-chain, drift bounds, planner equivalence,
   WAL/normaliser idempotence, VCL preservation) — see
   link:formal/CROSS-REPO-MAP.adoc[the cross-repo map] and
-  link:docs/proof-debt.md[the trusted-base ledger].
+  link:docs/proof-debt.adoc[the trusted-base ledger].
 
 == Where to go next
 

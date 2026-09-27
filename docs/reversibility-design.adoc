@@ -410,7 +410,7 @@ end
 
 == References
 
-- link:../WHITEPAPER.md[VeriSimDB White Paper] - Temporal modality design
+- link:../WHITEPAPER.pdf[VeriSimDB White Paper] - Temporal modality design
 - link:technical-specification-kraft-metadata-log.adoc[KRaft Log] - Append-only log
 - link:vcl-architecture.adoc[VCL Architecture] - Query execution
 - https://martin.kleppmann.com/2015/05/27/logs-for-data-infrastructure.html[Designing Data-Intensive Applications]

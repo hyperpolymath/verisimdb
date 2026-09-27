@@ -19,7 +19,7 @@ Please use the [Question](https://github.com/hyperpolymath/verisimdb/issues/new?
 
 ### For Security Issues
 
-**Do NOT open a public issue.** Please see [SECURITY.md](../SECURITY.md) for responsible disclosure instructions.
+**Do NOT open a public issue.** Please see [SECURITY.adoc](../SECURITY.adoc) for responsible disclosure instructions.
 
 ## Response Times
 
@@ -27,4 +27,4 @@ This is a solo-maintained project. Response times vary but issues are reviewed r
 
 ## Contributing
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines.
+See [CONTRIBUTING.adoc](../CONTRIBUTING.adoc) for contribution guidelines.

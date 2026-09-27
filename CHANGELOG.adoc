@@ -9,6 +9,70 @@ All notable changes to VeriSimDB are documented here. This project uses https://
 
 == [Unreleased]
 
+=== Added — Governance, advisory triage and orientation documents (2026-09-27)
+
+Closes the documentation-presence half of issue #204. `standards`' `check-docs-presence.sh` blocks only on `README`/`LICENSE` and warns on `CONTRIBUTING`, so none of these were CI-forced; they were missing anyway, and their absence meant the repo had no written governance, no advisory log and no orientation path.
+
+- *`ARCHITECTURE.adoc`* — architecture *index*, not a duplicate of `docs/architecture/`: component map, the AD-001…AD-007 decision register transcribed from `.machine_readable/6a2/META.a2ml` (which remains canonical), and a "read this next, by question" table.
+- *`FAQ.adoc`* — short answers with pointers to the long ones, harvested from existing documents rather than re-answered, so it cannot drift into a second source of truth.
+- *`SECURITY-ADVISORIES.adoc`* — advisory triage log modelled on `standards`' `3-practice/SECURITY-ADVISORIES.adoc`: closed and deferred-with-reason sections, a per-advisory exposure table, and an explicit re-evaluate trigger on each deferral. Records the two `deny.toml` RUSTSEC suppressions and the closure of the `quinn-proto` chain.
+- *`.well-known/humans.txt`*, *`.well-known/security.txt`*, *`.well-known/ai.txt`* — RFC 9116 contact and expiry (`Expires: 2027-09-27T00:00:00Z`, GitHub private-advisory contact URL), plus an AI attribution stance modelled on `standards`' live `www/.well-known/ai.txt`. The `ai.txt` follows the MPL-2.0/CC-BY-SA-4.0 precedent rather than the `templates/` MIT+Palimpsest variant, because that template's licence does not match this repo's.
+- *`docs/architecture/snifs-bridge.adoc`* — the issue #86 scope analysis for a SNIFs WASM bridge, written against the measured upstream constraints (no WASI, no filesystem, no sockets; `wasm32-freestanding`; only `i32/i64/f32/f64` and bytes cross the boundary).
+- *`docs/CITATIONS.adoc`* and *`debugger/docs/CITATIONS.adoc`* rewritten to separate what is actually cited from what is merely adjacent.
+
+=== Added — Doc-links gate: every relative link must resolve (2026-09-27)
+
+Closes issue #204's link-integrity half.
+
+- *`scripts/check-doc-links.sh`* — resolves every relative `link:` macro target in `*.adoc`/`*.md` against the working tree. Exemptions live in `scripts/doc-links-allowlist.txt` (currently empty: nothing is exempt), so suppressing a link is a visible, reviewable edit rather than an inline comment.
+- *`tests/doc-links-gate.sh`* — positive control for the above. A gate that passes on a clean tree is indistinguishable from a gate that does nothing, so this plants a broken link in a scratch copy and asserts the gate rejects it, names the correct target and resolved path, and does not flag a resolving sibling in the same file.
+- Both wired into `.github/workflows/doc-consonance.yml` (renamed *Documentation Gates*). No new actions, so `.github/workflows/actions.lock` is unchanged.
+- Current state: *363 relative links resolve across 101 documents, 0 exempt.*
+
+=== Security — `VCLTGate` no longer shells out (2026-09-27)
+
+Addresses issue #203.
+
+- *`elixir-orchestration/lib/verisim/query/vclt_gate.ex`* invoked the gate binary through `sh -c` with a hand-rolled `shell_quote/1`, and wrote the payload to an exclusive `0o600` temp file via `write_secure_payload!/2` to keep it off the command line. That is the right instinct defending the wrong layer: the shell itself was the attack surface, and quoting is exactly the kind of code that is correct until it is not.
+- Replaced with `System.cmd(path, [], input: payload, stderr_to_stdout: false)`. The payload now travels on *stdin* and no argument list is assembled, so no shell parses it and no quoting is needed. `write_secure_payload!/2` (both clauses) and `shell_quote/1` were deleted — roughly 45 lines of security-critical code that no longer has a reason to exist.
+- The corresponding test was rewritten rather than adapted. The old test asserted temp-file naming, a property of the deleted mechanism; the new one asserts the security property that actually matters — that shell metacharacters in a statement or schema arrive *verbatim* on the child's stdin.
+- Verified statically only: no Elixir/BEAM toolchain is installable in the environment where this change was made (see "Not done" below), so `mix test` and `mix format --check-formatted` were not run locally and will first execute in CI.
+
+=== Changed — Corrected documentation that contradicted the implementation (2026-09-27)
+
+Issue #113 and the residue left by the 2026-07-07 docs-hygiene pass.
+
+- *`docs/VCL-SPEC.adoc` implementation-files table*: named `src/vql/VQL{Parser,Types,Bidir,Error,Explain}.res` — files that do not exist. Residue from two completed migrations (`vql` → `vcl`, and ReScript → AffineScript; *zero* `.res` files remain in the tree, 32 `.affine` files do). Rewritten against measured line counts, and six modules present in `src/vcl/` but never listed were added. Counts had drifted materially — `vcl_executor.ex` was documented at 1162 lines and is 2310. Nine further inline "ReScript" references that named the implementation language were corrected.
+- *`docs/vcl-vs-sql.adoc`*: described VCL as **read-only**, contradicting `statement = query | mutation ;` in the normative grammar and three implemented mutation parsers. Now states that the Octad API is the *preferred* write path while recording that `INSERT`/`UPDATE`/`DELETE` exist as retained legacy forms. Also corrected: "6-core" → eight-modality (the same paragraph already enumerated eight stores); `GROUP BY`, `ORDER BY`, aggregate functions and `HAVING` were listed as unsupported although the grammar defines all four; and the six `PROOF` types listed were not the grammar's six.
+- *`README.adoc`*: project-structure block rewritten against the actual tree (17 `rust-core/` crates, `src/vcl/`, `debugger/` in-tree, `lib/` auxiliary modules, `.machine_readable/` contents). Test counts corrected from "510+"/"160+" to the measured 694 Rust (437 `#[test]` + 257 `#[tokio::test]`) and 680 Elixir. The `KNOWN-ISSUES` summary claimed "25/25 resolved"; the file catalogues 31 items with 3 open.
+- *`AUDIT.adoc`*: claimed "all 25 catalogued issues are resolved" — an overclaim in the one document whose purpose is to be the honest audit trail. Now measured (31 catalogued, 28 resolved, 3 open, each named). Its machine-readable section named `STATE.scm`/`META.scm`/`ECOSYSTEM.scm`; those files have never existed here (the artefacts are `.a2ml`). Added pointers to `SECURITY-ADVISORIES.adoc` and the assail classification registry.
+- *`docs/INDEX.adoc`*: added the root documents that existed but were never indexed (`EXPLAINME`, `ARCHITECTURE`, `FAQ`, `GOVERNANCE`, `MAINTAINERS`, `CODEOWNERS-POLICY`, `SECURITY-ADVISORIES`, `ULTRAPLAN`), added `docs/architecture/snifs-bridge.adoc`, removed the `v-api-gateway/` row (no such directory), and corrected the same three `.scm` filenames to the real seven-file `6a2/` set.
+- *`.machine_readable/6a2/STATE.a2ml`*: tech stack named ReScript (migration complete) and Burn (removed from the workspace in 0.2.0). Corrected, with a dated note recording why two directory names — `connectors/clients/rescript/` and `playground/src/` — were deliberately *not* renamed: renaming a client-SDK directory is a consumer-visible break, not a documentation edit.
+- *`.machine_readable/6a2/0-AI-MANIFEST.a2ml`*: added the `;;` SPDX header the other six specs in the directory carry. This was the sole warning in a 32-file `.githooks/validate-a2ml.sh` scan; it passed `reuse lint` regardless, because `REUSE.toml`'s `.machine_readable/**` aggregate covers it — the two tools check different things. Scan is now 32/32 with 0 warnings.
+- *`.machine_readable/6a2/README.adoc`*: "6 core A2ML files" → 7, listed the seventh, and corrected the standards-repo URL to its real `1-formats/a2ml` path.
+- *`Cargo.toml`*: the `quinn-proto` suppression note still described an open transitive chain. Replaced with the accurate closure (burn removed in 0.2.0, chain gone; `quinn` is absent from `Cargo.lock`).
+- Eight link *labels* whose targets had been fixed but whose display text still named the old file (`link:SECURITY.adoc[SECURITY.md]`) were synced.
+- *`CONTRIBUTING.adoc`*: its repository-structure block claimed "14 workspace members" where `Cargo.toml` declares 18 (17 `rust-core/verisim-*` crates plus `benches`), and omitted `verisim-provenance`, `verisim-spatial` and `verisim-nif`. It described `verisim-tensor` as Burn-backed (Burn was removed in 0.2.0), called the octad a "6-modal entity" when it has eight, listed a root `contractiles/` directory that does not exist (they live under `.machine_readable/contractiles/`), and described `.machine_readable/` as holding "SCM checkpoint files". Its allowed-languages table listed *ReScript* while the adjacent "Not Accepted" list told contributors to use AffineScript instead — both are now correct, and ReScript is recorded as retired with the two historical directory names that were deliberately not renamed.
+
+=== Removed
+
+- *`TEST_CI_VERIFY.adoc`* — a scratch artefact left in the repo root. No inbound references anywhere in the tree.
+
+=== Known issues — flagged, not silently resolved (2026-09-27)
+
+Two divergences were found that need an owner decision rather than an edit. Both are now flagged at the point of divergence.
+
+- *Two copies of the normative VCL grammar are committed*: `spec/grammar.ebnf` and `docs/vcl-grammar.ebnf`. They were byte-identical in substance, differing only by `spec/`'s `@taxonomy` and copyright lines and a stale "VQL" wording in a comment (now corrected). `spec/grammar.ebnf` is treated as canonical — it carries the taxonomy tag and is the copy cited by `README.adoc`, `EXPLAINME.adoc`, `0-AI-MANIFEST.a2ml` and `spec/system-specs.adoc`. Maintaining two normative grammars is a drift hazard; both files now carry a notice requiring any edit to be applied to both. Consolidating them means deleting a normative artefact, which is an owner decision.
+- *`docs/vcl-vs-vcl-dt.adoc` proof types*: its "Six PROOF Types" section names `CONSISTENCY`, `FRESHNESS` and `AUTHORIZATION`, which are not grammar terminals, and omits the grammar's `CITATION`, `ACCESS` and `CUSTOM`. `VCL-SPEC.adoc` already recorded this as known inconsistency #2 and ruled that the specification follows the grammar. A `WARNING` block was added to the divergent page naming the mismatch; its six subsections were *not* rewritten, because either direction silently picks a winner between "the grammar is right and these were never implemented" and "this page describes an intended v-next proof set and the grammar is behind". Items #1 and #3 of that list are now closed in the source documents.
+
+=== Not done — toolchain unobtainable in the working environment (2026-09-27)
+
+Recorded rather than skipped silently, per issue #79's scope ruling.
+
+- No `rustc`, `cargo`, `erl`, `elixir`, `mix` or `coqc` is present, and every installation source is network-blocked (`rustup.rs`, `static.crates.io`, `index.crates.io`, `forge.rust-lang.org`, `deb.debian.org`, `apt.llvm.org`, `hex.pm`, `repo.hex.pm`, `erlang.org`, `opam.ocaml.org`; `apt-get update` is both permission-denied and unreachable). Consequently *no code change in this entry was compiled or executed locally*: the Rust and Elixir test suites, `cargo clippy`, `mix format --check-formatted` and the Coq build all first run in CI.
+- Issue #79's test-expansion work therefore stops at re-measurement. The counts above are measured from source, not from a test run. `rust-core/verisim-nif` remains the worst-density crate at 0 tests / 135 LOC — it is an honest stub returning `{:error, :not_implemented}`, and writing tests for a stub that intentionally does nothing would manufacture coverage rather than add it.
+- Only the shell-script and Python-level gates were actually executed here, and all pass: doc-consonance, doc-links (plus its positive control), assail classifications (plus its positive control), `validate-a2ml.sh` (32/32, 0 warnings) and `reuse lint` (809/809).
+
 === Changed — Docs hygiene: retire fossil specs, fix six→eight modality drift (2026-07-07)
 
 - Stale-stamped three fossil documents with prominent superseded/historical banners: `docs/status/implementation-plan.adoc` (Week 1–16 / 10%-completion plan), `docs/releases/v0.1.0-alpha.md` ("Production-Ready" / "100% Complete" claims contradicted by KNOWN-ISSUES #29/#30/#31), and `spec/system-specs.md` (pre-octad template spec with a Textual/Numeric/Categorical modality set and `verisimdb-core`/`-nif` Rustler crate layout matching neither the octad nor the real `verisim-*` crates).

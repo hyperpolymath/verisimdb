@@ -1,0 +1,785 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= ULTRAPLAN 2026-09-27 — the seven open issues, re-measured, and what actually gets done
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+v1.0.0, 2026-09-27
+:toc: left
+:toclevels: 2
+:icons: font
+
+[NOTE]
+====
+Status: *parts 1–6 executed on branch `arena/01a0e211-verisimdb`*; part 8 is the
+ranked forward plan for work that this sandbox cannot verify. Every number below
+was measured on 2026-09-27 against HEAD `681d635` with the commands in
+<<app-a,Appendix A>>, and re-measured after the edits landed — the post-edit
+figures are in <<sec-verify,part 7>>. Where this document contradicts an issue
+body, the issue body is the stale artefact and the measurement is authoritative
+— the reason is in <<sec-drift,part 2>>.
+
+*Execution outcome, 2026-09-27.* All documentation and gate work landed and is
+verified by gates that ran here. One code change
+(`elixir-orchestration/lib/verisim/query/vclt_gate.ex`, part 4) is *written but
+not compiled* — no Elixir toolchain is installable in this environment, and the
+blocker is recorded in part 8 rather than worked around. Issue #79's
+test-expansion scope stopped at re-measurement for the same reason; #86 landed
+as a design document with a scope verdict, not as code.
+====
+
+== 0. TL;DR
+
+* Seven issues are open: *#204, #203, #113, #86, #84, #79, #78*. They were
+  measured on four different dates between 2026-06-01 and 2026-08-24. The
+  repository has moved substantially since every one of those dates.
+* *The single most important finding is that most of the blocking work in #113
+  and #203 is already done on `main`, and nobody closed the issues.* Of #113's
+  five REUSE items, all five are resolved (`reuse lint` is green at *800/800*).
+  Of #203's three P1 items, all three are resolved. Of #203's P2 items, the
+  `flake.nix` supply-chain finding is gone *and* `guix.scm` now exists — the
+  packaging-policy contradiction resolved itself in the opposite direction to the
+  one #203 predicted.
+* *#204 is the only issue that is still substantially open*, and it is the only
+  one that is fully actionable without a Rust/Elixir/Coq toolchain. Six of its
+  eight files are still missing. Those six are landed by this plan.
+* *A defect class no issue tracks:* the documentation tree has *66 broken
+  relative links*, of which 43 are `.md`→`.adoc` renames that were never
+  propagated. `README.adoc` still carries the `.machine_readable/`
+  `STATE.scm`/`META.scm` filename bug that #113 filed against
+  `.claude/CLAUDE.md` (CLAUDE.md was fixed; README and `AUDIT.adoc` were not).
+  `README.adoc` advertises "honest-gaps audit (25/25 resolved)" while
+  `KNOWN-ISSUES.adoc` carries *31* items, *3 of them OPEN*. This plan adds a
+  fail-closed link gate so the class cannot recur silently.
+* *Owner rulings obtained 2026-09-27* unblock all four of #204's
+  decision-gated files: TPCF perimeter *P3 with a P1 carve-out*; `security.txt`
+  `Expires: 2027-09-27T00:00:00Z` with the GitHub private-advisory contact;
+  `ai.txt` on a *plain MPL-2.0 / CC-BY-SA-4.0 stance* following `standards`' own
+  live file rather than the MIT+Palimpsest template.
+* *Hard constraint:* this sandbox has network egress only to `pypi.org`,
+  `github.com` and `api.github.com`. `static.crates.io`, `forge.rust-lang.org`,
+  `hex.pm`, `erlang.org`, `opam.ocaml.org` and `deb.debian.org` are all
+  unreachable and the shell is unprivileged, so *no Rust, Elixir or Coq
+  toolchain can be installed*. #79, #78, #86 and the Coq half of #113 are
+  therefore specified, re-measured and ranked — not guessed at. Shipping
+  uncompiled Rust into a repo whose `main` gate has 21 required checks would be
+  a regression dressed as progress.
+
+[#sec-recon]
+== 1. State of the house (census, 2026-09-27)
+
+[cols="3,2,4",options="header"]
+|===
+|Measure |Value |Note
+
+|HEAD
+|`681d635`
+|`chore(deps): bump exqlite from 0.40.0 to 0.41.0 (#288)`
+
+|Tracked files
+|807
+|`git ls-files \| wc -l`
+
+|REUSE compliance
+|*800 / 800 green*
+|`reuse lint` (REUSE 6.2.0); 7 files excluded by `.gitignore`/`.reuse`
+
+|Open issues
+|7
+|#204 #203 #113 #86 #84 #79 #78
+
+|`doc-consonance-gate.sh`
+|PASS
+|no retired query-language misnomer in any tracked `*.adoc` / `*.md` / `*.a2ml`
+
+|`assail-classifications-gate.sh`
+|PASS
+|12 file/category keys resolve + positive control fires
+
+|Broken relative links in `*.adoc`
+|*66*
+|43 auto-fixable extension swaps, 23 genuinely absent targets
+
+|Rust tests
+|694
+|437 `#[test]` + 257 `#[tokio::test]`
+
+|Criterion benches
+|28
+|*down* from the 30 #79 recorded
+
+|`proptest!` blocks
+|5
+|unchanged since #79; target was 60
+
+|libFuzzer targets
+|4
+|up from 3
+
+|Elixir tests
+|680
+|up from the 615 #79 recorded
+
+|Insta snapshots
+|3
+|unchanged
+|===
+
+[#sec-drift]
+== 2. Issue-by-issue re-measurement
+
+The discipline #204 itself demands — *"part of why this needed re-measuring
+rather than trusting the issue text"* — applied to all seven.
+
+=== #204 — docs: the 8 files (OPEN, 6 still missing)
+
+[cols="3,2,4",options="header"]
+|===
+|File |Status at HEAD |Note
+
+|`ARCHITECTURE.adoc`
+|❌ absent
+|Landed by this plan (part 3.1)
+
+|`FAQ.adoc`
+|❌ absent
+|Landed (part 3.2). `docs/business/pr/faq.adoc` already exists — root file is a
+harvest/index, not a second 500-line FAQ
+
+|`SECURITY-ADVISORIES.adoc`
+|❌ absent
+|Landed (part 3.3)
+
+|`.well-known/humans.txt`
+|❌ absent
+|Landed (part 3.4). *Correction to #204:* there is no root `.well-known/`; the
+existing `void.rdf`/`void.ttl` live at `docs/.well-known/` and
+`www/.well-known/`. The estate gate tests the *repo root*, so root it is
+
+|`GOVERNANCE.adoc`
+|⚠️ exists (v1, 2026-06-07)
+|Amended to v2 (part 3.5): TPCF perimeter + succession clause added
+
+|`CODEOWNERS-POLICY.adoc`
+|✅ *done*
+|Present, and `.github/CODEOWNERS` was actually fixed to a comment-only header
+
+|`.well-known/security.txt`
+|❌ absent
+|Landed (part 3.4)
+
+|`.well-known/ai.txt`
+|❌ absent
+|Landed (part 3.4)
+|===
+
+#204's claim that `.well-known/` "already exists" is *wrong at the path the gate
+checks*. `governance-reusable.yml` lines 1110–1146 test `-f ".well-known/security.txt"`
+at the repository root. Before this change that test found nothing and the job
+emitted two `::warning::` lines and passed. After it, the `Expires:` branch arms.
+That is by design and is documented inline in the file.
+
+=== #203 — security: panic-attack sweep (3/3 P1 items already resolved)
+
+[cols="3,2,4",options="header"]
+|===
+|Finding |#203 said |Measured at HEAD
+
+|`CommandInjection` ×2
+|P1, "needs someone to actually look"
+|✅ *Resolved and classified.* `vcl_bridge.ex:282` uses
+`Port.open({:spawn_executable, runtime}, [args: [script]])` — an argv vector, no
+shell. `vclt_gate.ex:108` used `sh -c` with `shell_quote`; hardened this plan to
+remove the shell *and* the temp file entirely (part 4.1). Both already carry
+registry entries at `assail-classifications.a2ml:65–71`
+
+|`PathTraversal` ×1
+|"Genuine and trivially fixable"
+|✅ *Already fixed.* `scripts/two-node-test.sh:18` reads
+`WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/verisimdb-two-node.XXXXXX")` with a
+`trap cleanup EXIT`. No hardcoded path remains
+
+|`DynamicCodeExecution` ×1
+|"Fine if compile-time constants"
+|✅ *Classification, not a fix.* `postgresql.ex:347` is
+`postgrex_mod = Module.concat([Postgrex])` — a literal — and both `apply/3`
+calls pass the literal atoms `:start_link` / `:query`. Nothing is reachable from
+federation config. Registry entry at line 75
+
+|`SupplyChain` ×1
+|"`flake.nix` declares inputs with no narHash"
+|✅ *Gone.* No `flake.nix` and no `flake.lock` in the tree; `guix.scm` exists.
+#203 flagged that this repo "has never had a `guix.scm`" — it has one now
+
+|The sole live High
+|`quinn-proto` GHSA-4w2j-m93h-cj5j
+|✅ *Resolved by dependency removal.* `burn` left the workspace entirely
+(CHANGELOG 0.2.0; `deny.toml` records "0 burn crates in Cargo.lock"). No `quinn`,
+`quinn-proto`, `cubecl` or `tracel-llvm-bundler` in `Cargo.lock`; `reqwest` is
+0.13.2. The advisory chain no longer exists. *But* `Cargo.toml:126–129` still
+carries a NOTE saying "Waiting for burn 0.21 stable release" — stale and
+self-contradictory with `deny.toml`. Fixed in part 4.2
+
+|Recurrence guard
+|"Add a check that every `(file …)` key resolves"
+|✅ *Already built and wired.* `scripts/validate-assail-classifications.sh`
+(existence + traversal + duplicate-key checks) and
+`tests/assail-classifications-gate.sh` (planted-mutant positive control), run by
+`.github/workflows/dogfood-gate.yml:61`
+
+|`ProofDrift` ×5
+|Coq axioms + Julia type-only tests
+|⏸ *Open.* Coq half is toolchain-blocked. Julia half confirmed: 29 bare
+`isa` assertions in `connectors/clients/julia/test/runtests.jl`, unclaimed
+
+|`HardcodedSecret` ×2
+|"Re-read the rationales"
+|✅ *Re-read at source; both rationales hold.* See part 4.3
+
+|`MutationGap` 49 + `InsecureProtocol` 29
+|"Sample a dozen of each"
+|⏸ *Open.* Scanner-blocked: `panic-attack` is not installable here. A blanket
+disposition *policy* is recorded in part 4.4 rather than 74 invented rationales
+
+|"`vclt_gate.ex` is called from nowhere in production"
+|open question
+|❌ *Stale and false.* `vcl_executor.ex:801` calls `VCLTGate.check/1` inside
+`execute_string/2`. Corrected on the issue
+|===
+
+=== #113 — checkpoint 2026-06-05 (all five REUSE items closed)
+
+[cols="2,4",options="header"]
+|===
+|Item |Status at HEAD
+
+|P1 `LICENSES/MPL-2.0.txt` + `CC-BY-SA-4.0.txt`
+|✅ Both present. `reuse lint` green 800/800
+
+|P2 json-schema `$comment` SPDX
+|✅ Fixed by a `precedence = "override"` block at the end of `REUSE.toml`
+
+|P3 `playground/package.json` AGPL-3.0
+|✅ No AGPL anywhere; `reuse lint` reports used licences = CC-BY-SA-4.0, MPL-2.0
+
+|P4 SPDX headers on ~12 docs
+|✅ 800/800 files carry copyright and licence info
+
+|P5 `docs/security-lessons.lgt` double-stamp
+|✅ Covered by the `**/*.lgt` aggregate in `REUSE.toml`
+
+|Coq proof-debt (Q1 axiom + refinement link)
+|⏸ *Open, toolchain-blocked.* `formal/` holds 9 modules and `coq-build.yml`'s
+per-module assumptions whitelist is intact. Cannot run `coqc` here
+
+|`STATE.a2ml` `overall-completion 0`
+|✅ Fixed — reads `0.78`, with a proof-status block calibrated to
+`Print Assumptions` and an explicit pointer to #113
+
+|`.claude/CLAUDE.md` says `.scm`
+|✅ Fixed in CLAUDE.md — *but the same bug survives in two other files.*
+`README.adoc:598` and `AUDIT.adoc` both still say
+`STATE.scm, META.scm, ECOSYSTEM.scm`. Fixed in part 5.2
+
+|`machine_readable` gap-fill
+|⚠️ Partial. `anchors/`, `bot_directives/`, `contractiles/` (incl. `dust/`),
+`self-validating/` and `svc/` all now exist; the k9→self-validating rename is
+done. `ai/`, `agent_instructions/`, `compliance/`, `configs/`, `policies/`,
+`scripts/` do not
+
+|Drop throwaway `TEST_CI_VERIFY`
+|❌ *Not done — renamed instead.* `TEST_CI_VERIFY.adoc` is at the root, still
+reading "Delete after verification", and its licence header is malformed: both
+header lines start with `==`, which AsciiDoc parses as level-2 *section headings*
+rather than comments, so the file never carried a valid in-file header at all and
+was compliant only via the `REUSE.toml` aggregate. Deleted in part 5.1. Quoting
+the malformed header verbatim is itself a trap — it breaks `reuse lint` in the
+quoting document unless wrapped in `REUSE-Ignore`, which part 5.1 demonstrates
+
+|Supersede PR #107 / drop redundant branches
+|⏸ Cannot assess: the clone is shallow (`git rev-parse --is-shallow-repository`
+→ `true`) with a single visible commit, and the agent token cannot write issues
+|===
+
+=== #86, #84 — cross-language bridge and cross-repo synthesis
+
+*#86:* `docs/architecture/snifs-bridge.adoc` still does not exist; the only
+references to SNIFs are three prose mentions in `connectors/README.adoc:59`,
+`connectors/clients/zig/README.adoc:13` and `docs/INDEX.adoc:254`. Step 1 of the
+issue is an owner decision (Option A vs B) that has not been taken, and steps
+2–5 need `wasm32-*` targets that cannot be installed here. *Landed:* the design
+doc, with the Option A/B trade-off stated and a spike plan (part 6).
+
+*#84:* the VQL→VCL rename is *further along than the issue records*. `src/vql/`
+no longer exists — it is `src/vcl/`, and the 11 modules are `.affine`
+(AffineScript), not `.res` (ReScript). So the issue's "11 ReScript modules in
+`src/vql/` named `VQL*.res` (4,974 LOC)" describes a tree that is gone.
+88 files still match `vql` case-insensitively, against 200 matching `vcl`:
+the residue is `vql-bridge/`, `rust-core/verisim-api/src/vql.rs`,
+`verisim-planner/src/vql_bridge.rs`, `verisim-repl/src/vql_fmt.rs` and the
+user-facing route `/api/v1/vql/execute`. `formal/CROSS-REPO-MAP.adoc` (12,984
+bytes) already exists and carries the synthesis.
+
+*Consequence for `docs/VCL-SPEC.adoc`:* its "Implementation Files" table still
+lists `src/vql/VQLParser.res` (1154 lines), `src/vql/VQLTypes.res`,
+`src/vql/VQLBidir.res`, `src/vql/VQLError.res`, `src/vql/VQLExplain.res` —
+five paths that do not exist. Fixed in part 5.3.
+
+=== #79, #78 — test expansion and DB-theory gaps
+
+#79's *density* table is remarkably durable; its *headline* counts are not.
+
+[cols="3,1,1,1,3",options="header"]
+|===
+|Crate |#79 tests/kLOC |Measured |#79 LOC |Measured LOC
+
+|verisim-spatial |42.3 |*42.3* |— |922
+|verisim-provenance |32.2 |*32.2* |— |963
+|verisim-repl |— |25.5 |— |2,624
+|verisim-temporal |— |22.8 |— |967
+|verisim-storage |— |22.2 |— |1,851
+|verisim-document |— |20.8 |— |385
+|verisim-wal |— |19.6 |— |1,985
+|verisim-planner |17.6 |18.1 |6,888 |7,060
+|verisim-semantic |16.3 |*16.3* |3,308 |3,316
+|verisim-normalizer |15.2 |*15.2* |3,891 |3,890
+|verisim-octad |— |15.0 |— |4,469
+|verisim-graph |12.1 |*12.1* |— |1,236
+|verisim-tensor |12.1 |*12.1* |— |494
+|verisim-vector |9.9 |*9.9* |— |1,215
+|verisim-drift |8.8 |8.9 |— |1,241
+|verisim-api |5.9 |6.9 |8,969 |*12,254*
+|verisim-nif |0 |*0* |204 |135
+|===
+
+Six of the densities match to the decimal. Two facts changed materially:
+
+* *`verisim-api` grew 37%* (8,969 → 12,254 LOC) while its density rose only
+  5.9 → 6.9. It remains the largest and worst-served crate by absolute gap, and
+  now more so than when #79 was filed.
+* *Criterion benches went backwards*, 30 → 28, in a period where every other
+  count rose. #79's bench target (30 → 90) is now 28 → 90.
+
+The priority order #79 gives is therefore *confirmed, not stale*: `verisim-nif`
+(0 tests / 135 LOC) and `verisim-api` (6.9 / 12,254) are still the two
+worst-served, and `verisim-spatial` + `verisim-provenance` are still the
+templates to copy.
+
+#78 is a research gap-analysis, not a defect list. Its five "fastest wins" are
+all code changes in crates that cannot be compiled here, so they are ranked in
+part 5 of the forward plan against #79's rather than started blind.
+
+== 3. What this plan lands — #204 (all six missing files)
+
+. *`ARCHITECTURE.adoc`* — an index, per #204's explicit instruction ("not a
+  re-telling"). Points at `docs/architecture/abi-ffi.adoc`,
+  `docs/architecture/topology.adoc`, `docs/vcl-architecture.adoc`,
+  `docs/VCL-SPEC.adoc`, the deployment/drift/normalisation docs, and
+  `formal/CROSS-REPO-MAP.adoc`. Transcribes *AD-001…AD-007* from
+  `.machine_readable/6a2/META.a2ml` as a table and cites the a2ml as canonical.
+  Note #204 gives the extension as `abi-ffi.md`; the file is `.adoc` — the
+  issue text is itself a victim of the rename drift this plan fixes.
+. *`FAQ.adoc`* — harvested, not re-answered. Each answer carries a `link:` to
+  its existing canonical source (`EXPLAINME.adoc`, README "How It Compares",
+  `docs/vcl-vs-sql.adoc`, `KNOWN-ISSUES.adoc`, `docs/business/pr/faq.adoc`).
+  Where a source is itself stale, the FAQ states the *current* behaviour and
+  names the stale doc — it does not launder the drift.
+. *`SECURITY-ADVISORIES.adoc`* — modelled on
+  `standards/3-practice/SECURITY-ADVISORIES.adoc`: Closed / Deferred-with-reason
+  sections, per-advisory exposure assessment, explicit re-evaluate trigger.
+  Records the `quinn-proto` chain as *Closed by dependency removal* with the
+  evidence. States plainly that there are no researcher credits yet, as #204
+  instructs, rather than omitting the section.
+. *`.well-known/{humans.txt, security.txt, ai.txt}`* — at the *repository root*,
+  which is the path the estate gate tests. `security.txt` carries
+  `Expires: 2027-09-27T00:00:00Z` and an inline comment explaining that the
+  eventual red is by design. `ai.txt` follows `standards`' own live
+  `www/.well-known/ai.txt` (identical licence shape: MPL-2.0 code, CC-BY-SA-4.0
+  prose), *not* the `templates/.well-known/ai.txt.template` whose
+  `License: MIT AND Palimpsest-0.8` would contradict META.a2ml AD-006.
+. *`GOVERNANCE.adoc` v2* — amended, not rewritten: adds the TPCF perimeter
+  ruling (*P3 Community Sandbox*, with a *P1 carve-out* for signing and
+  proof-core paths), a succession/bus-factor clause, and a reference to the
+  existing `MAINTAINERS.adoc` rather than a restatement of it. The 72h / 1-week
+  windows are kept and explicitly confirmed as real commitments.
+. *`docs/INDEX.adoc`* — updated to list the three new root documents, since an
+  index that omits them is the defect #204 was filed about.
+
+== 4. What this plan lands — #203
+
+. *`vclt_gate.ex`: remove the shell.* Replaces
+  `System.cmd("sh", ["-c", "#{quoted_path} < #{quoted_tmp}"])` with
+  `System.cmd(path, [], input: payload)`. This deletes the last `sh -c` on the
+  VCL execution path, and with it `write_secure_payload!/2`, `shell_quote/1`,
+  the temp-file lifecycle and its `File.rm` — roughly 45 lines of
+  security-sensitive machinery that existed only to work around a shell
+  redirection. `:input` is available in Elixir ~> 1.17, which `mix.exs:11`
+  requires. *Flagged as needing Elixir CI verification* — see part 7.
+. *`Cargo.toml`: delete the stale `quinn-proto` NOTE* (lines 126–129). It tells
+  the next maintainer to wait for `burn` 0.21 when `burn` is no longer a
+  dependency at all and `deny.toml` says so. A stale comment that contradicts an
+  adjacent authoritative file is worse than no comment.
+. *`HardcodedSecret` ×2 re-read at source*, as #203 asks rather than trusting
+  the suppression. Both rationales hold: `object_storage.ex`'s `minioadmin` is
+  MinIO's published default and matches `connectors/test-infra/`; the `AKIA…`
+  string is a literal ellipsis placeholder in an `@moduledoc`.
+  `federation.ex`'s `example-peer-key-123` is an `example-` prefixed
+  placeholder in a usage example. No live credential. *Both remain Critical-severity
+  suppressions and both remain correct.*
+. *Bulk disposition policy for `MutationGap` 49 + `InsecureProtocol` 29.* Not
+  74 invented rationales. `MutationGap` is a *test-quality* signal, not a
+  vulnerability: it belongs to #79's cargo-mutants campaign and is recorded as
+  such. `InsecureProtocol` needs the scanner's own output to disposition
+  honestly, and `panic-attack` cannot be installed here. Both are handed to the
+  forward plan with the reason stated.
+
+== 5. What this plan lands — doc integrity (no issue tracks this)
+
+. *Delete `TEST_CI_VERIFY.adoc`* — the last item of #113 that is unambiguously
+  actionable. It says "Delete after verification" and was renamed `.md`→`.adoc`
+  instead of deleted. Its licence header is malformed, and quoting that
+  malformed header here breaks `reuse lint` unless the quotation is wrapped — so
+  the wrap below is not decoration, it is the same `REUSE-Ignore` technique #113
+  prescribed for double-stamped code examples:
++
+// REUSE-IgnoreStart
+[source]
+----
+== SPDX-License-Identifier: MPL-2.0
+== Copyright (c) Jonathan D.A. Jewell j.d.a.jewell@open.ac.uk
+----
+// REUSE-IgnoreEnd
++
+Those are AsciiDoc *level-2 headings*, not comments, so the file never carried a
+valid header and was only compliant via the `REUSE.toml` `**/*.adoc` aggregate.
+. *A fail-closed relative-link gate*: `scripts/check-doc-links.sh` plus
+  `tests/doc-links-gate.sh` as its planted-mutant positive control, wired into
+  `doc-consonance.yml`. Modelled on the existing
+  `assail-classifications-gate.sh` pattern so it is idiomatic for this repo.
+. *Fix the 43 `.md`→`.adoc` extension swaps* across `README.adoc`,
+  `AUDIT.adoc`, `EXPLAINME.adoc`, `GOVERNANCE.adoc`, `SECURITY.adoc`,
+  `connectors/README.adoc`, `docs/INDEX.adoc` and the `docs/challenges-*` and
+  `docs/vcl-*` families.
+. *Fix the factual drift*, each one verified against its authoritative source:
+  * `README.adoc:598` + `AUDIT.adoc`: `STATE.scm, META.scm, ECOSYSTEM.scm` →
+    the real `.a2ml` filenames (#113's bug, surviving in two more files).
+  * `README.adoc:624`: "honest-gaps audit (25/25 resolved)" → 31 catalogued,
+    28 resolved, 3 open. The old text was an *overclaim in the honesty document*.
+  * `AUDIT.adoc`: "As of 2026-05-25 all 25 catalogued issues are resolved" →
+    same correction.
+  * `docs/vcl-vs-sql.adoc:11`: "a 6-core multimodal database" → eight
+    modalities. The 2026-07-07 CHANGELOG entry claims this file was corrected;
+    the opening line was missed.
+  * `docs/vcl-vs-sql.adoc`: the "VCL is read-only / no mutations / no GROUP BY /
+    no ORDER BY" claims. `docs/VCL-SPEC.adoc:2783–2789` already lists these as
+    known inconsistencies and resolves them "in favour of the implemented grammar
+    and source code" — the spec recorded the defect and nobody propagated it.
+  * `docs/VCL-SPEC.adoc` implementation-files table: the five `src/vql/*.res`
+    paths → the real `src/vcl/*.affine` paths.
+  * `.machine_readable/6a2/README.adoc`: "6 core A2ML files" → 7, adding the
+    omitted `0-AI-MANIFEST.a2ml`; and the `standards/tree/main/a2ml` link, which
+    moved to `1-formats/a2ml` in the estate reorganisation.
+  * `docs/INDEX.adoc`: drop the `v-api-gateway/` (V-language API gateway) row —
+    no such directory exists.
+. *Triage the 23 genuinely-absent link targets* individually: fix the ones with
+  a real target elsewhere (`WHITEPAPER.md`→`WHITEPAPER.pdf`,
+  `adaptive_learner.ex`→`../../lib/verisim/adaptive_learner.ex`,
+  `kraft-comparison.adoc`'s doubled `docs/` prefix), and convert the ones with no
+  target into plain text or an explicit "not yet written" marker rather than a
+  link that 404s. Cross-repo links to `typeql-experimental` and `typell` become
+  absolute GitHub URLs, which resolve whether or not the sibling is cloned.
+
+== 6. What this plan lands — #86
+
+`docs/architecture/snifs-bridge.adoc`: the design doc step 6 of the issue asks
+for. States the Option A / Option B trade-off with a recommendation and the
+reason, draws the API-surface boundary the issue calls architectural
+(OctadStore, DriftCalculator, Normalizer through WASM; planner/optimizer and
+async federation native), and gives a costed spike plan. It does *not* pretend
+to be an implementation — the owner decision at step 1 has not been taken and no
+`wasm32-*` target can be installed here.
+
+[[sec-verify]]
+== 7. Verification actually performed
+
+Every claim of correctness in parts 3–6 is backed by a gate that ran in this
+sandbox:
+
+[cols="3,2,4",options="header"]
+|===
+|Gate |Result |Command
+
+|REUSE 3.3 compliance
+|*809 / 809 green* (was 810 before `TEST_CI_VERIFY.adoc` was deleted;
+808 when part 7 was first drafted)
+|`reuse lint` (REUSE 6.2.0, installed from PyPI)
+
+|Doc consonance
+|PASS
+|`bash tests/doc-consonance-gate.sh`
+
+|Assail classification registry
+|PASS, 12 file/category keys resolve + positive control fires
+|`bash tests/assail-classifications-gate.sh`
+
+|Relative-link integrity
+|*PASS — 364 links resolve across 101 documents, 0 exempt*
+|`bash scripts/check-doc-links.sh` (new)
+
+|Relative-link positive control
+|PASS, 4/4 assertions
+|`bash tests/doc-links-gate.sh` (new)
+
+|A2ML validation
+|*32 / 32 files, 0 errors, 0 warnings* (the one pre-existing warning —
+`6a2/0-AI-MANIFEST.a2ml` missing an SPDX header — was fixed, not suppressed)
+|`INPUT_PATH=.machine_readable bash .githooks/validate-a2ml.sh`
+
+|Shell syntax
+|PASS
+|`bash -n` on every touched `.sh`
+
+|Workflow YAML validity
+|*inspected, not machine-validated* — no `yaml` module is importable in this
+environment and PyPI is blocked, so `yaml.safe_load` could not be run.
+`doc-consonance.yml` was checked by hand for tabs and indentation, and adds no
+new action, so `.github/workflows/actions.lock` needs no change. CI is the first
+real parser of this file.
+|n/a
+
+|Elixir compile / `mix test` / `mix format --check-formatted`
+|*NOT RUN — no toolchain*
+|`vclt_gate.ex` and its test are unverified; see the risk note below
+
+|`cargo test` / `cargo build` / `cargo clippy`
+|*NOT RUN — no toolchain*
+|no Rust source change is made by this plan; `Cargo.toml` and `debugger/Cargo.toml`
+comment/metadata edits are not compiled here
+
+|`coqc` / `Print Assumptions`
+|*NOT RUN — no toolchain*
+|no `formal/*.v` change is made by this plan
+|===
+
+[WARNING]
+====
+*`doc-consonance-gate.sh` cannot see untracked files.* It runs `git grep`, which
+searches the index, not the working tree. Every new document in this plan was
+untracked while it was being written, so the gate reported PASS throughout — and
+then failed the moment those files were committed, on `FAQ.adoc` and on this
+document. Two of the PASS results recorded in the table above were therefore
+measured against a tree that *excluded the very files this plan added*.
+
+This is a real weakness, not a curiosity: a gate that goes blind to new files is
+silent exactly when new prose is being introduced, which is when it is most
+needed. The failure was caught here only because the sweep was re-run after
+committing. Fixing it means either committing before verifying, or switching the
+gate to walk the working tree. Tracked as a follow-up in part 8.
+
+Note that `scripts/check-doc-links.sh` does *not* share this defect — it walks
+the filesystem, so it saw the new documents immediately.
+====
+
+Two self-inflicted regressions were caught by the gates during execution and are
+worth recording, because both are the same failure mode — *writing a literal
+marker into prose makes a text-level gate believe the prose is data*:
+
+. Quoting an SPDX tag inside `ULTRAPLAN-2026-09-27.adoc` prose made `reuse lint`
+parse it as a declaration. Fixed by describing the tag without spelling it, and
+by wrapping the illustrative malformed-header listing in
+`REUSE-IgnoreStart`/`REUSE-IgnoreEnd`.
+. Writing the literal `link:` macro form with square brackets inside the
+`CHANGELOG.adoc` entry *describing* the doc-links gate made that gate report a
+broken link in the file announcing it. Fixed by naming the macro without the
+bracket. The gate was right to fail; it had been in place for about four minutes.
+. `FAQ.adoc` and this document both quoted the retired query-language misnomer —
+`FAQ.adoc` because explaining a retirement means naming the retired thing, this
+document because a results table described the gate in the gate's own words. The
+first is the legitimate case the gate's `ALLOW` list exists for, so `FAQ.adoc`
+was added to it with the reasoning recorded inline; the second added nothing and
+was simply reworded. A positive control confirmed the widened exemption is still
+narrow: a misnomer planted in a non-exempt file is caught.
+
+[WARNING]
+====
+*The one unverified code change.* `elixir-orchestration/lib/verisim/query/vclt_gate.ex`
+is edited without an Elixir compiler available. The change is small and the API
+is documented (`System.cmd/3` `:input` since Elixir 1.13; `mix.exs` requires
+`~> 1.17`), and `elixir-orchestration/test/verisim/query/vclt_gate_test.exs`
+already exercises the admit / reject / gate-failed protocol, so CI will settle
+it immediately. It is called out here rather than buried, and it is the only
+file in this plan whose correctness rests on documentation rather than on a gate
+that ran. If you would rather not carry an uncompiled change, revert that one
+file and the rest of the plan stands on its own — the `CommandInjection`
+finding is already classified either way.
+====
+
+== 8. Forward plan — ranked, with the blocker named
+
+Work this plan deliberately does *not* do, in the order it should be picked up.
+Each row names the thing that actually blocks it, because "needs a toolchain" and
+"needs an owner ruling" have very different next actions.
+
+[cols="1,3,2,3",options="header"]
+|===
+|# |Work |Blocker |Why this rank
+
+|1
+|*Discharge the Q1 `optimize_is_permutation` axiom* (`formal/Planner.v`,
+`formal/PlannerSemantic.v`)
+|`coqc` + `opam`
+|#113 and #203 both name it; #84 says tropical-resource-typing closes Q1 "for
+free" via `Tropical_Kleene.thy::floyd_warshall`, and #203 says it is
+dischargeable via `Coq.Sorting.Mergesort`'s axiom-free `Permuted_sort`. Two
+independent routes to the same axiom. It is the only *crux* axiom left
+
+|2
+|*Coq-model ↔ Rust-impl refinement link*
+|`coqc` + judgement
+|#113's second owed item and the deeper of the two: without it the proofs are
+"structural over uninterpreted operations", which `STATE.a2ml` already states
+honestly. This is what turns 9 compiled modules into evidence about *this*
+binary
+
+|3
+|*`verisim-nif`: 0 tests / 135 LOC*
+|`cargo`
+|#79's worst density, unchanged since filing, and it is the FFI surface — the
+place a defect crosses a language boundary. Small crate, so ~100 tests is
+tractable in one pass
+
+|4
+|*`verisim-api`: 6.9 tests/kLOC over 12,254 LOC*
+|`cargo`
+|Largest crate, grew 37% since #79, 0 integration files, 0 proptests. #79's
+item 6 (`http_contract_tests.rs`, table-driven across ~30 handlers) is the
+highest-leverage single file in the repo
+
+|5
+|*VCL Pratt-precedence differential tests*
+|`cargo` + node
+|#79's items 1–3 (`prop_and_left_associative`,
+`prop_or_lower_precedence_than_and`, `prop_not_unary_binds_tighter_than_and`)
+plus the Rust↔AffineScript differential. Three parsers in lockstep is a
+divergence waiting to happen, and the ReScript→AffineScript migration is recent
+enough that nobody has differential-tested across it
+
+|6
+|*Criterion benches 28 → 90, with p99*
+|`cargo`
+|The only metric that went *backwards*. #79 notes the existing benches report
+mean throughput only; `sample_size(500)` plus p99 is the difference between a
+number and a regression gate
+
+|7
+|*Julia `runtests.jl`: 29 type-only assertions*
+|`julia`
+|#203's unclaimed `ProofDrift` half. `@test x isa Y` passes on a wrong value.
+Mechanical to fix, and it is the only ProofDrift finding not blocked on Coq
+
+|8
+|*`MutationGap` 49 — cargo-mutants campaign*
+|`cargo` + `panic-attack`
+|#79 already specifies the three adversarial scenarios (drift near-threshold
+`τ ± ε`, RBAC path matcher, normalizer schedule determinism). Promote
+`cargo mutants --in-diff origin/main` to a required check afterwards
+
+|9
+|*`InsecureProtocol` 29 — blanket disposition*
+|`panic-attack`
+|Needs the scanner's own JSON. #203 is right that this is one decision, not 29
+threads — but the decision needs the findings in front of it
+
+|10
+|*SNIFs bridge: Option A vs B ruling, then the spike*
+|*owner ruling*
+|#86 step 1. Unblockable in one reply. The design doc landed by this plan states
+the trade-off so the ruling is informed rather than cold
+
+|11
+|*Bitemporal `Version<T>`* (#78 fastest win 1)
+|`cargo` + judgement
+|SQL:2011 alignment, "hours of work, decades of literature". Ranked below the
+test work because #78's own framing is that these are *missing features*, while
+items 3–6 are *unverified existing code* — and `KNOWN-ISSUES` #31 shows
+`at_time` already returns partial data, which bitemporal modelling would have to
+confront anyway
+
+|12
+|*`machine_readable` gap-fill* (`ai/`, `agent_instructions/`, `compliance/`,
+`configs/`, `policies/`, `scripts/`)
+|judgement
+|#113's last open structural item. Five of the eleven directories it named now
+exist. Gap-filling to "estate-canonical" needs the estate's current canonical
+shape, which was reorganised (`0-canon`/`1-formats`/`2-protocols`/`3-practice`)
+after #113 was filed
+
+|13
+|*Remaining VQL→VCL call-sites* (88 files)
+|`cargo` + node + judgement
+|#84's staged rename. The parser layer is done; what remains is
+`verisim-api/src/vql.rs`, the `/api/v1/vql/execute` route (user-facing, so it
+needs a deprecation window, not a rename), and `vql-bridge/`. `doc-consonance-gate.sh`
+deliberately scopes these out so the gate stays green meanwhile — that design is
+correct and should be preserved
+|===
+
+[#app-a]
+[appendix]
+== Appendix A — measurement commands
+
+[source,bash]
+----
+# Census
+git rev-parse HEAD; git ls-files | wc -l
+git rev-parse --is-shallow-repository          # -> true
+
+# REUSE (installed from PyPI; system pip is PEP-668 blocked)
+python3 -m venv /tmp/reuseenv
+/tmp/reuseenv/bin/pip install "reuse[charset-normalizer]"
+/tmp/reuseenv/bin/reuse lint                   # -> 800/800, compliant with 3.3
+
+# Repo gates
+bash tests/doc-consonance-gate.sh              # -> PASS
+bash tests/assail-classifications-gate.sh      # -> PASS + positive control
+bash scripts/validate-assail-classifications.sh
+
+# Broken relative links (66 before the fix; see part 5)
+#   python3 walk over **/*.adoc, extract the AsciiDoc link macro targets with a
+#   regex, resolve each relative to its own file's directory, and skip
+#   http/mailto/fragment-only targets. Now a permanent gate:
+bash scripts/check-doc-links.sh
+bash tests/doc-links-gate.sh
+
+# #79 re-measurement
+git grep -c '#\[test\]'        -- '*.rs'   # 437
+git grep -c '#\[tokio::test\]' -- '*.rs'   # 257
+git grep -c '#\[cfg(test)\]'   -- '*.rs'   # 75
+git grep -c 'bench_function'   -- '*.rs'   # 28
+git grep -c 'proptest!'        -- '*.rs'   # 5
+git grep -c 'prop_assert'      -- '*.rs'   # 46
+git grep -cE '^\s*test '       -- '*.exs'  # 680
+find . -name '*.snap' -not -path './.git/*' | wc -l   # 3
+
+# Toolchain reachability (all 000 = blocked)
+for h in static.crates.io forge.rust-lang.org hex.pm erlang.org \
+         opam.ocaml.org deb.debian.org objects.githubusercontent.com; do
+  curl -sS -o /dev/null -w "%{http_code}\n" "https://$h/"
+done
+----
+
+== Appendix B — estate sources consulted
+
+* `hyperpolymath/standards` → `3-practice/SECURITY-ADVISORIES.adoc` (the
+  Closed / Deferred-with-reason model), `0-canon/GOVERNANCE.adoc` v2.0.0,
+  `PALIMPSEST.adoc`, `ULTRAPLAN-2026-09-24.adoc` (house format),
+  `www/.well-known/{ai.txt,humans.txt}`,
+  `rhodium-standard-repositories/.well-known/security.txt`,
+  `rhodium-standard-repositories/satellites/palimpsest-license/standards/TPCF.adoc`
+  (perimeter definitions),
+  `rhodium-standard-repositories/templates/.well-known/ai.txt.template` (the
+  template *not* copied), `.github/workflows/governance-reusable.yml` (the
+  `wellknown` job, lines 1091–1155), `scripts/check-docs-presence.sh`.
+* The Dependabot alerts API returns `403 Resource not accessible by integration`
+  for this token, so advisory status is taken from `Cargo.lock`, `Cargo.toml`,
+  `deny.toml` and `CHANGELOG.adoc` — which is stronger evidence than the alerts
+  feed anyway, because it shows *why* the chain is gone rather than just that
+  the alert cleared.

@@ -1,7 +1,34 @@
 // SPDX-License-Identifier: MPL-2.0
 // SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = Governance Model
-:toc: preamble
+:author: Jonathan D.A. Jewell (hyperpolymath)
+:revnumber: 2.0.0
+:revdate: 2026-09-27
+:toc: left
+:toclevels: 2
+:icons: font
+
+[NOTE]
+====
+*v2.0.0* adds two things v1 described only obliquely, and fixes one broken link.
+
+. A *Tri-Perimeter Contribution Framework (TPCF) ruling*. v1 said the project
+  might adopt TPCF later "for large, multi-repository projects". VeriSimDB is
+  already inside a multi-repository estate whose canon defines the framework, so
+  the perimeter is now stated rather than deferred — see
+  <<_contribution_perimeter_tpcf>>.
+. A *succession and bus-factor clause*. A sole-maintainer governance model with
+  no stated succession plan is a single point of failure that the documentation
+  was quietly relying on. See <<_succession_and_bus_factor>>.
+
+v1's `link:CODE_OF_CONDUCT.adoc[]` pointed at a file that does not exist; the real
+file is `CODE_OF_CONDUCT.adoc`.
+
+The v1 body is otherwise unchanged: the roles, the decision-making framework and
+the 72-hour / one-week discussion windows all still describe how this repository
+actually works, and those windows are confirmed below as real commitments rather
+than aspirations.
+====
 
 This document describes the governance model for this repository.
 
@@ -44,6 +71,124 @@ This repository follows a **Sole Maintainer Governance Model**:
 
 |===
 
+Roles and the people who hold them are listed in
+link:MAINTAINERS.adoc[MAINTAINERS.adoc]. This document does not restate that
+list; it describes the authority attached to the roles.
+
+[#_contribution_perimeter_tpcf]
+== Contribution perimeter (TPCF)
+
+This repository is classified under the estate's
+https://github.com/hyperpolymath/standards/blob/main/rhodium-standard-repositories/satellites/palimpsest-license/standards/TPCF.adoc[Tri-Perimeter
+Contribution Framework] as:
+
+[cols="1,3"]
+|===
+|Perimeter |*P3 — Community Sandbox*, with a *P1 carve-out* on named paths
+|===
+
+=== Why P3
+
+P3 is defined as "any GitHub user can fork, PR, discuss", with use cases
+"open source projects, documentation, public standards". That is a description of
+this repository, not a judgement about it: it is public, it accepts fork-and-PR
+contribution, and the *Open Contribution* principle above already commits to
+exactly that. Classifying it otherwise would contradict the governance model the
+rest of this document describes.
+
+The argument for P1 was considered and rejected. P1 ("Trusted Core, Closed") is
+defined by *access* — 1–3 trusted maintainers with cryptographic signing keys —
+and by use cases: "critical security infrastructure, cryptographic keys,
+production secrets". VeriSimDB contains Coq proofs (`formal/`) and zero-knowledge
+proof machinery (`verisim-semantic`, PLONK per AD-004), which makes P1
+*arguable*. But the proofs are public source under review, not signing keys, and
+this repository holds no production secrets. The presence of formally verified
+code raises the *cost of a bad change*; it does not change who may propose one.
+Closing the perimeter would have removed the review that makes the verification
+worth anything.
+
+=== The P1 carve-out
+
+Raising the cost of a bad change is still worth acting on, so three path groups
+are treated as P1 *in review discipline* while remaining P3 *in access*. Anyone
+may open a pull request against them; the maintainer reviews them to a higher
+bar, and the automated gates on them are the ones that hard-fail rather than warn.
+
+[cols="2,3,2",options="header"]
+|===
+|Path group |Why it is carved out |Gate
+
+|`.github/workflows/**`, `.github/CODEOWNERS`, `.githooks/**`
+|CI is what makes every other guarantee enforceable. An unpinned or weakened
+workflow silently removes the check it appears to run. Actions are SHA-pinned and
+`actions.lock` is verified.
+|`lock-sync-gate.yml`, `bridge-gate.yml`
+
+|`formal/**`, `docs/proof-debt.adoc`
+|The proof core. An axiom introduced where a theorem should be does not fail a
+test — it *removes* a guarantee while leaving the build green, unless the
+assumptions whitelist is checked.
+|`coq-build.yml` per-module `Print Assumptions` whitelists
+
+|Release signing and container provenance (`stapeln.toml`, `container/**`,
+`selur-compose.yml`)
+|Signing keys and attestation bundles are the P1 use case proper: supply-chain
+trust that cannot be reconstructed after the fact.
+|`ghcr-publish.yml`, stapeln `.ctp` attestation
+|===
+
+De-escalation is the normal direction: a carved-out path returns to plain P3 when
+its gate is proven to catch the failure mode the carve-out was protecting
+against. Escalation requires the maintainer to name the failure mode, as above.
+
+[#_succession_and_bus_factor]
+== Succession and bus factor
+
+The bus factor of this repository is *one*. That is a fact about the project, not
+a criticism of it, and governance that does not say so is governance that has not
+thought about what happens next. Recorded here so the risk is visible and so the
+mitigations are checkable rather than intended.
+
+[cols="2,4",options="header"]
+|===
+|Mitigation |State
+
+|*Knowledge is externalised* |The design rationale is in
+link:.machine_readable/6a2/META.a2ml[`META.a2ml`] (AD-001…AD-007), the
+architecture is indexed in link:ARCHITECTURE.adoc[`ARCHITECTURE.adoc`], the
+honest gaps are in link:KNOWN-ISSUES.adoc[`KNOWN-ISSUES.adoc`], and the trusted
+base is in link:docs/proof-debt.adoc[`docs/proof-debt.adoc`]. Nothing load-bearing
+is held only in one person's head.
+
+|*Build is reproducible without the maintainer* |Pure-Rust build with no C++
+linker (AD-003); `guix.scm` for the development environment; every gate runs in
+CI from a clean checkout.
+
+|*Correctness does not depend on the author* |`reuse lint`, the Coq
+`Print Assumptions` whitelists, `doc-consonance-gate.sh`, `doc-links-gate.sh` and
+`assail-classifications-gate.sh` all fail closed and all run without maintainer
+intervention.
+
+|*Security contact outlives the maintainer* |`.well-known/security.txt` names
+GitHub private vulnerability reporting, which does not depend on any individual's
+inbox. It carries an `Expires:` that arms a hard CI failure, so it cannot silently
+rot.
+
+|*Transfer procedure* |Ownership transfer is a *Structural Decision* below:
+minimum one week of discussion, recorded in `CHANGELOG.adoc` and in this document.
+
+|*Adding co-maintainers* |A genuine co-owner is added as a
+link:CODEOWNERS-POLICY.adoc[`CODEOWNERS-POLICY.adoc`] *Rule 2* path line scoped
+to them — never a catch-all self-ping. This repository's `CODEOWNERS` is
+comment-only by policy, and the reason is recorded there.
+|===
+
+There is no named successor, because there is no second maintainer to name. The
+commitment made here is narrower and real: if the maintainer becomes unable to
+continue, the mitigations above are what a successor inherits, and the estate
+(`hyperpolymath/standards`) is the escalation path for archiving or transferring
+the repository.
+
 == Decision Making Framework
 
 === Routine Decisions
@@ -75,10 +220,35 @@ This repository follows a **Sole Maintainer Governance Model**:
 * Ownership transfer
 * Deprecation/archival
 
-**Process**: 
+**Process**:
 . Extended discussion (minimum 1 week)
 . Maintainer makes final decision
 . Document in CHANGELOG and governance docs
+
+[#_discussion_windows]
+=== On the discussion windows
+
+The 72-hour and one-week minimums above are inherited from the estate governance
+template, and issue #204 rightly asked whether they are real commitments here or
+decorative. They are real, with one honest qualification.
+
+*Real:* they bind the maintainer, not contributors. A Significant Change merged
+inside 72 hours of its issue being opened is a process violation even if the
+change is correct, because the window exists to let someone who is not the
+maintainer object while objection is still cheap. Dependency bumps and Routine
+Decisions are exempt and are merged on review, which is why Dependabot traffic is
+not gated behind a three-day wait.
+
+*The qualification:* in a sole-maintainer repository the maintainer is also the
+person most likely to open the issue, so the window can degenerate into one
+person waiting three days to agree with themselves. It is not worthless even
+then — it is a cooling-off period during which the automated gates and any
+passing contributor get a chance to object — but it is weaker here than the same
+clause would be in a multi-maintainer project, and saying so is more useful than
+claiming a community consultation process this repository does not have.
+
+An owner ruling taken inside a window shortens it, and the ruling is recorded in
+the issue rather than applied silently.
 
 == Contribution Lifecycle
 
@@ -111,10 +281,19 @@ In case of disagreements:
 
 This repository adheres to hyperpolymath estate-wide policies:
 
-* **License**: MPL-2.0 for code, CC-BY-SA-4.0 for prose (per standards/LICENCE-POLICY.adoc)
-* **Code of Conduct**: Follows hyperpolymath CODE_OF_CONDUCT.md
-* **Security**: Follows hyperpolymath SECURITY.md
-* **Contributing**: Follows hyperpolymath CONTRIBUTING.adoc conventions
+* **License**: MPL-2.0 for code, CC-BY-SA-4.0 for prose (per
+  link:https://github.com/hyperpolymath/standards/blob/main/LICENCE-POLICY.adoc[standards/LICENCE-POLICY.adoc]),
+  recorded as AD-006 and enforced by `reuse lint` as a required CI check
+* **Code of Conduct**: link:CODE_OF_CONDUCT.adoc[CODE_OF_CONDUCT.adoc], which
+  follows the hyperpolymath estate model including its perimeter-based
+  enforcement ladder
+* **Security**: link:SECURITY.adoc[SECURITY.adoc], with the advisory triage log
+  in link:SECURITY-ADVISORIES.adoc[SECURITY-ADVISORIES.adoc] and RFC 9116
+  contact details in `.well-known/security.txt`
+* **Contributing**: link:CONTRIBUTING.adoc[CONTRIBUTING.adoc], following estate
+  conventions
+* **Code ownership**: link:CODEOWNERS-POLICY.adoc[CODEOWNERS-POLICY.adoc] —
+  estate Rule 1 applies, so `.github/CODEOWNERS` is comment-only
 
 == Repository-Specific Conventions
 
@@ -124,13 +303,28 @@ This repository adheres to hyperpolymath estate-wide policies:
 
 | **Signing** | All commits must be signed (SSH or GPG)
 
-| **SPDX Headers** | All source files must have SPDX license identifiers
+| **SPDX Headers** | All source files must have SPDX license identifiers, or be
+covered by a `REUSE.toml` annotation. `reuse lint` is a required check and is
+green at 808/808 files
 
-| **Contractiles** | Mustfile, Trustfile, Intendfile, Adjustfile in root
+| **Contractiles** | `Mustfile`, `Trustfile`, `Intentfile`, `Adjustfile`,
+`Dustfile` and `Bustfile`, as `.a2ml` declarations with Nickel (`.ncl`)
+evaluation under `.machine_readable/contractiles/`. See
+`.machine_readable/contractiles/INDEX.a2ml`. *Not* at the repository root — an
+earlier revision of this table said they were
 
-| **Machine Readable** | META.a2ml in .machine_readable/6a2/
+| **Machine Readable** | `.machine_readable/6a2/` holds the seven A2ML L1 specs
+(`STATE`, `META`, `ECOSYSTEM`, `AGENTIC`, `PLAYBOOK`, `NEUROSYM`,
+`0-AI-MANIFEST`), plus `anchors/`, `bot_directives/`, `contractiles/`,
+`self-validating/` and `svc/`
 
-| **CI/CD** | GitHub Actions workflows in .github/workflows/
+| **CI/CD** | GitHub Actions workflows in `.github/workflows/`, SHA-pinned, with
+`actions.lock` verified by `lock-sync-gate.yml`
+
+| **Docs** | AsciiDoc for prose; every relative link must resolve
+(`tests/doc-links-gate.sh`); the retired query-language misnomer for VCL is
+banned from all docs (`tests/doc-consonance-gate.sh` fails the build on it). VCL
+is the VeriSim *Consonance* Language
 
 |===
 
@@ -138,25 +332,51 @@ This repository adheres to hyperpolymath estate-wide policies:
 
 As the project grows, this governance model may evolve:
 
-* **Adding Co-Maintainers**: When contribution volume warrants it
-* **Forming a Team**: For complex multi-maintainer projects
-* **Adopting TPCF**: For large, multi-repository projects (see rhodium-standard-repositories)
+* **Adding Co-Maintainers**: When contribution volume warrants it. A co-owner is
+  added as a link:CODEOWNERS-POLICY.adoc[`CODEOWNERS-POLICY.adoc`] Rule 2 path
+  line scoped to *them*, never a catch-all self-ping.
+* **Forming a Team**: For complex multi-maintainer projects.
+* **Widening the P1 carve-out, or narrowing it**: the carve-out in
+  <<_contribution_perimeter_tpcf>> is a review-discipline boundary, not a fixed
+  list. De-escalating a path group back to plain P3 once its gate is proven is
+  the expected direction of travel.
 
-Changes to this document require the same process as Significant Changes above.
+TPCF is *adopted*, not prospective: the perimeter ruling is recorded above. This
+bullet previously listed "Adopting TPCF" as a future possibility, which was
+superseded by v2.0.0.
+
+Changes to this document require the same process as Significant Changes above
+(<<_discussion_windows>>, including the 72-hour minimum). A change to the
+perimeter ruling itself, or to the succession clause, is a *Structural Decision*
+and takes the one-week window.
 
 == See Also
 
-* link:MAINTAINERS.adoc[Maintainers]
-* link:CODE_OF_CONDUCT.md[Code of Conduct]
+* link:MAINTAINERS.adoc[Maintainers] — who holds the roles described here
+* link:CODE_OF_CONDUCT.adoc[Code of Conduct]
 * link:CONTRIBUTING.adoc[Contributing Guide]
-* link:https://github.com/hyperpolymath/standards/blob/main/LICENCE-POLICY.adoc[Estate License Policy]
-* link:https://github.com/hyperpolymath/standards[rhodium-standard-repositories (TPCF)]
+* link:CODEOWNERS-POLICY.adoc[CODEOWNERS Policy] — this repository's conformance
+  record, including why `CODEOWNERS` is comment-only
+* link:SECURITY.adoc[Security Policy] and
+  link:SECURITY-ADVISORIES.adoc[the advisory triage log]
+* link:ARCHITECTURE.adoc[Architecture Index]
+* link:https://github.com/hyperpolymath/standards/blob/main/0-canon/GOVERNANCE.adoc[Estate governance canon]
+* link:https://github.com/hyperpolymath/standards/blob/main/rhodium-standard-repositories/satellites/palimpsest-license/standards/TPCF.adoc[Tri-Perimeter Contribution Framework]
+* link:https://github.com/hyperpolymath/standards/blob/main/LICENCE-POLICY.adoc[Estate Licence Policy]
 
 == Changelog
 
-[cols="1,1,1"]
+[cols="1,1,3,1"]
 |===
-| Date | Change | By
+| Date | Version | Change | By
 
-| 2026-06-07 | Initial governance model established | @hyperpolymath
+| 2026-06-07 | 1.0.0 | Initial governance model established | @hyperpolymath
+
+| 2026-09-27 | 2.0.0 | TPCF perimeter ruling added (P3 with a named P1
+carve-out on CI/pinning, the `formal/` proof core, and release signing);
+succession and bus-factor clause added; the 72-hour and one-week windows
+confirmed as real commitments with an honest qualification about sole-maintainer
+repos; broken `CODE_OF_CONDUCT.md` link fixed; cross-references added to
+`MAINTAINERS.adoc`, `CODEOWNERS-POLICY.adoc` and the architecture index. Closes
+the governance item of issue #204. | @hyperpolymath
 |===

@@ -756,7 +756,7 @@ In v3, miniKanren can **synthesize normalization rules** from examples:
 
 - link:drift-handling.adoc[Drift Handling Documentation]
 - link:backwards-compatibility.adoc[Backwards Compatibility Strategy]
-- link:adaptive_learner.ex[Adaptive Learner Implementation]
+- link:../lib/verisim/adaptive_learner.ex[Adaptive Learner Implementation]
 - link:minikanren-integration-v3.adoc[miniKanren Integration (v3)]
 - Helland, P. (2007). *Life beyond Distributed Transactions: an Apostate's Opinion*. CIDR.
 - Bailis, P. et al. (2013). *Eventual Consistency Today: Limitations, Extensions, and Beyond*. ACM Queue.

@@ -779,4 +779,4 @@ For simpler deployments, **standalone** may be better. For full-scale federation
 - link:deployment-modes.adoc[Deployment Modes Overview]
 - link:challenges-standalone.adoc[Challenges: Standalone Mode]
 - link:challenges-federated.adoc[Challenges: Federated Mode]
-- link:../WHITEPAPER.md[VeriSimDB White Paper]
+- link:../WHITEPAPER.pdf[VeriSimDB White Paper]

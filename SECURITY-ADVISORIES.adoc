@@ -1,0 +1,247 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Security advisories — triage log
+:toc: left
+:toclevels: 3
+:icons: font
+
+[.lead]
+Triaged record of open, deferred and closed security advisories against
+`hyperpolymath/verisimdb`. Updated whenever an advisory is resolved or a
+deferral is re-evaluated.
+Modelled on the estate register at
+https://github.com/hyperpolymath/standards/blob/main/3-practice/SECURITY-ADVISORIES.adoc[`standards/3-practice/SECURITY-ADVISORIES.adoc`].
+
+This file records *dispositions*, not alerts. The reporting process, threat
+model, scope and safe-harbour terms are in link:SECURITY.adoc[`SECURITY.adoc`];
+the scanner findings that are not dependency advisories are tracked in issue
+#203 with their registry at
+link:audits/assail-classifications.a2ml[`audits/assail-classifications.a2ml`].
+
+[cols="1,1"]
+|===
+|Last triage |2026-09-27, against HEAD `681d635`
+|Live (unresolved, unmitigated) |*0*
+|Deferred with reason |*2* (one upstream blocker, both non-default features)
+|Closed |*8* (1 GHSA + 5 RUSTSEC + 2 superseded)
+|===
+
+== Deferred (with reason)
+
+Both live in `deny.toml`'s `[advisories] ignore` list, which carries the same
+rationale. They are recorded here because a suppression in a config file is not
+a triage: the config says *what* was ignored, this says *why that is acceptable*
+and *what would change the answer*.
+
+=== RUSTSEC-2026-0194 + RUSTSEC-2026-0195 — `quick-xml` 0.37.5 (DoS, triaged 2026-07-21, re-verified 2026-09-27)
+
+*Advisories:* `RUSTSEC-2026-0194` is a quadratic duplicate-attribute check;
+`RUSTSEC-2026-0195` is an unbounded namespace-declaration allocation. Both are
+denial-of-service on XML parsing. Both are fixed upstream in `quick-xml` 0.41.0.
+
+*Why it cannot be fixed here:* `quick-xml` is reached *only* through
+`oxigraph 0.5.9` → `{oxrdfxml, sparesults}`. `oxigraph` 0.5.9 is the latest
+published release and still requires `quick-xml ^0.37`, so *there is no
+resolution of this dependency tree that avoids it*. This is not a decision to
+postpone an upgrade; it is an upstream blocker with no workaround.
+
+*Exposure assessment:*
+
+[cols="1,3"]
+|===
+|Build configuration |Exposed?
+
+|Stock build (`cargo build`)
+|*No.* `verisim-graph`'s `oxigraph-backend` feature is not in `default`
+(`rust-core/verisim-graph/Cargo.toml` → `default = []`), so a stock build does
+not link `quick-xml` at all. The default graph backend is pure-Rust redb
+(AD-003).
+
+|CI (`rust-ci.yml`)
+|*No.* No workflow enables `oxigraph-backend`; verified by grepping every
+`*.yml` for the feature name.
+
+|Opt-in build with `--features oxigraph-backend`
+|*Yes, conditionally.* Only RDF/XML and SPARQL-XML parsing of *untrusted* input
+is affected. An opt-in build parsing trusted RDF is not exposed to a DoS that
+requires attacker-controlled XML.
+|===
+
+*Severity rationale:* DoS-only, non-default feature, no CI exposure, and the
+affected parsers are not on any untrusted-input path in the default
+configuration. Consistent with a deferral rather than an emergency.
+
+*Re-evaluate trigger:* **when `oxigraph` publishes a release requiring
+`quick-xml >= 0.41`.** At that point the ignore entries must be removed and the
+tree re-resolved — not left to rot. A secondary trigger: if `oxigraph-backend`
+is ever promoted into `default`, this deferral becomes invalid immediately and
+both advisories become live.
+
+*Cross-reference:* the same rationale is duplicated in `.cargo/audit.toml:22`
+and `deny.toml:35`. That duplication is deliberate (two tools read two configs)
+but it does mean a future re-triage has to update three places. Worth
+consolidating when the deferral is next touched.
+
+== Closed
+
+=== GHSA-4w2j-m93h-cj5j — `quinn-proto`, high, remote memory exhaustion (closed 2026-09-27)
+
+*Advisory:* remote memory exhaustion in `quinn-proto`, the QUIC protocol
+implementation behind `quinn`. Severity high. At the time of issue #203's
+measurement (2026-07-28) this was the repository's *sole live High finding*, with
+2 alert instances.
+
+*Closed by:* **removal of the dependency chain, not by a version bump.** The
+path was:
+
+----
+burn 0.20 → cubecl-cpu → tracel-llvm-bundler (build dep) → reqwest 0.12 → quinn → quinn-proto
+----
+
+`burn` was the ML stack behind the tensor modality's optional backend. It was
+removed from the workspace entirely in 0.2.0 ("`burn = "0.21"` removed from
+workspace — unused after Tier 2 test work removed the only consumer").
+
+*Verification at HEAD `681d635` (2026-09-27):*
+
+[cols="2,3"]
+|===
+|Check |Result
+
+|`burn` in `Cargo.lock`
+|*absent* — 0 burn crates, as `deny.toml` records
+
+|`quinn` / `quinn-proto` in `Cargo.lock`
+|*absent*
+
+|`cubecl*` / `tracel-llvm-bundler` in `Cargo.lock`
+|*absent*
+
+|`reqwest` version
+|*0.13.2* — the direct-dependency bump mentioned in the old note
+
+|`grep -ril quinn` over the whole tree
+|one hit: the stale `Cargo.toml` comment (removed by this change)
+|===
+
+*Residual defect found while closing this:* `Cargo.toml:126–129` still carried a
+NOTE reading "Waiting for burn 0.21 stable release", directly contradicting
+`deny.toml`'s "the `burn` ML stack is no longer a dependency at all". A stale
+comment that contradicts an adjacent authoritative file is worse than no comment,
+because it sends the next maintainer to wait for a release that will never be
+needed. *Removed.*
+
+*Note on measurement method:* the Dependabot alerts API returns
+`403 Resource not accessible by integration` for the token used to write this, so
+the closure is established from the lockfile and the manifests rather than from
+the alerts feed. That is stronger evidence in this case: the lockfile shows *why*
+the chain is gone, whereas a cleared alert only shows that it is.
+
+=== Five burn-era RUSTSEC entries (closed 2026-07-21)
+
+`RUSTSEC-2024-0436` (`paste`), `RUSTSEC-2025-0134` (`rustls-pemfile`),
+`RUSTSEC-2025-0141` (`bincode`), `RUSTSEC-2026-0002` (`lru`),
+`RUSTSEC-2026-0105` (`core2`).
+
+*Closed by:* the same `burn` removal as above. Recorded in `deny.toml`: all five
+were reported by `cargo-deny` as `advisory-not-detected`, meaning *they were
+suppressing nothing* — they were dead config left over from a dependency that had
+already gone. Removing them was cleanup, not a security decision.
+
+This is worth stating plainly because an `ignore` list that grows monotonically
+is a common failure mode: entries outlive the vulnerabilities they were written
+for and quietly widen the surface where a real future advisory could hide.
+
+=== `bincode` (closed, dependency removed)
+
+`Cargo.toml` records: "bincode removed — not used in codebase. Use postcard or
+ciborium for future serialization needs." `RUSTSEC-2025-0141` was one of the
+five above; the underlying exposure closed with the removal.
+
+=== `oxrocksdb-sys` C++ dependency (closed, AD-003)
+
+Not a CVE but a supply-chain exposure: a C++ linker requirement and a large
+native attack surface in the default build. Closed by making redb the pure-Rust
+default and feature-flagging Oxigraph. This is *the reason* the two deferred
+`quick-xml` advisories are non-exposing in a stock build — the deferral and the
+architectural decision are coupled, and promoting `oxigraph-backend` to default
+would undo that coupling.
+
+→ `KNOWN-ISSUES.adoc` #24, AD-003 in
+link:.machine_readable/6a2/META.a2ml[`.machine_readable/6a2/META.a2ml`]
+
+=== `protoc` build-time binary requirement (closed)
+
+A build-time toolchain dependency that no longer applies.
+→ `KNOWN-ISSUES.adoc` #25
+
+=== Two superseded suppressions in the `assail` registry
+
+`audits/assail-classifications.a2ml` carries 2 *Critical*-severity
+`HardcodedSecret` suppressions. Issue #203 asked that these be re-read at source
+rather than trusted, on the grounds that they are the only two Criticals in the
+repository. *Re-read 2026-09-27; both rationales hold.*
+
+[cols="2,3",options="header"]
+|===
+|File |Finding and verification
+
+|`elixir-orchestration/lib/verisim/federation/adapters/object_storage.ex`
+|Lines 25–50, inside `@moduledoc`. MinIO/S3 configuration *examples*.
+`minioadmin` is MinIO's published default credential and matches
+`connectors/test-infra/`; the `AKIA…` string is a literal ellipsis placeholder,
+not a truncated real key. No credential present.
+
+|`connectors/clients/elixir/lib/verisim_client/federation.ex`
+|Line 21, inside `@moduledoc`. A usage example reading
+`api_key: "example-peer-key-123"` — an `example-` prefixed placeholder. No
+credential present.
+|===
+
+Both remain classified. Neither is a live secret.
+
+== Researcher credits
+
+*There are none yet.* No external researcher has reported a vulnerability to
+this project, so there is nobody to credit. This section is stated explicitly
+rather than omitted, because an absent acknowledgements section is ambiguous
+between "nobody has helped" and "we forgot to record it", and the second reading
+is the one that discourages the first reporter.
+
+`SECURITY.adoc` commits to crediting reporters in the published advisory and in
+release notes unless they prefer anonymity. When the first advisory is published,
+the reporter is credited here and in
+`SECURITY.adoc`'s Hall of Fame. Note that `SECURITY.adoc` currently links its
+Hall of Fame to a `SECURITY-ACKNOWLEDGMENTS.md` that does not exist; until that
+file is written, this section is the acknowledgements record.
+
+== How this register is maintained
+
+* An advisory is *Closed* only when the exposure is gone, and the entry names
+  *what* removed it — a version bump, a feature flag, or a dependency deletion.
+  "The alert cleared" is not a closure reason.
+* An advisory is *Deferred* only with a named upstream blocker and an explicit
+  *re-evaluate trigger*. A deferral without a trigger is an ignore entry.
+* Severity is recorded as upstream assigns it; *exposure* is assessed separately
+  and may be materially lower. Both are stated, because collapsing them is how a
+  high-severity non-exposed finding gets treated as an emergency and a
+  low-severity exposed one gets ignored.
+* The `deny.toml` `[advisories]` block warns that a local `cargo deny` run
+  against an unpopulated advisory database reports "advisories ok" having checked
+  *nothing*. CI clones a fresh database every run and is the authority. Any
+  triage recorded here should be reproducible from CI, not from a local run.
+* `cargo-deny`'s detection is sensitive to feature resolution: default features
+  do *not* surface the `quick-xml` advisories above, while `--all-features` and
+  the CI container both do. Triage against the stricter resolution.
+
+== See also
+
+* link:SECURITY.adoc[`SECURITY.adoc`] — reporting, threat model, scope, safe
+  harbour, response timeline
+* link:audits/assail-classifications.a2ml[`audits/assail-classifications.a2ml`] —
+  the panic-attack finding registry, with per-finding audit trails
+* link:deny.toml[`deny.toml`] — advisory, licence, ban and source policy
+* `.github/workflows/security-scan.yml` — the weekly `panic-attack` scan
+* `.github/workflows/secret-scanner.yml`, `.github/workflows/codeql.yml`,
+  `.github/workflows/scorecard.yml` — the other supply-chain gates
+* Issue #203 — the panic-attack category sweep this register complements

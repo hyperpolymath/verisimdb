@@ -1,7 +1,7 @@
 == VeriSimDB Documentation Index
 
 ____
-Last updated: 2026-05-25. This file is the table of contents for
+Last updated: 2026-09-27. This file is the table of contents for
 everything under `+docs/+` and the top-level project documents.
 ____
 
@@ -16,13 +16,13 @@ readers, plus the artefacts the RSR template requires.
 |link:../README.adoc[README.adoc] |Project entry point — what VeriSimDB
 is, how to install/run, where to look next
 
-|link:../ROADMAP.md[ROADMAP.md] |Criticality-ordered work plan (Phase
+|link:../ROADMAP.adoc[ROADMAP.adoc] |Criticality-ordered work plan (Phase
 1–8)
 
 |link:../CHANGELOG.adoc[CHANGELOG.adoc] |Versioned history of all
 notable changes
 
-|link:../TESTING.md[TESTING.md] |Testing & benchmarking standards (hard
+|link:../TESTING.adoc[TESTING.adoc] |Testing & benchmarking standards (hard
 CI gates per language, property-test patterns, fuzz corpus location)
 
 |link:../KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc] |Honest-gaps audit trail —
@@ -31,15 +31,15 @@ all 25 catalogued issues with resolution status
 |link:../AUDIT.adoc[AUDIT.adoc] |RSR audit-index pointing to
 KNOWN-ISSUES, TESTING, SECURITY, CHANGELOG
 
-|link:../SECURITY.md[SECURITY.md] |Threat model, disclosure process,
+|link:../SECURITY.adoc[SECURITY.adoc] |Threat model, disclosure process,
 supported versions
 
-|link:../CONTRIBUTING.md[CONTRIBUTING.md] |How to propose changes, run
+|link:../CONTRIBUTING.adoc[CONTRIBUTING.adoc] |How to propose changes, run
 gates locally
 
 |link:../MAINTAINERS.adoc[MAINTAINERS.adoc] |Active maintainers
 
-|link:../CODE_OF_CONDUCT.md[CODE_OF_CONDUCT.md] |Community standards
+|link:../CODE_OF_CONDUCT.adoc[CODE_OF_CONDUCT.adoc] |Community standards
 
 |link:../LICENSE[LICENSE] |MPL-2.0
 
@@ -47,16 +47,44 @@ gates locally
 project
 
 |link:../justfile[justfile] |Task definitions for the `+just+` runner
+
+|link:../EXPLAINME.adoc[EXPLAINME.adoc] |*Orientation — read this first.* The
+conceptual model: consonance subjects, modal witnesses, the identity lifecycle
+
+|link:../ARCHITECTURE.adoc[ARCHITECTURE.adoc] |Architecture *index*: component
+map, the AD-001…AD-007 decision register, and "read this next, by question"
+
+|link:../FAQ.adoc[FAQ.adoc] |Short answers with pointers to the long ones;
+harvested, not re-answered
+
+|link:../GOVERNANCE.adoc[GOVERNANCE.adoc] |Governance model, TPCF contribution
+perimeter, succession and bus factor
+
+|link:../MAINTAINERS.adoc[MAINTAINERS.adoc] |Who holds the roles GOVERNANCE
+describes
+
+|link:../CODEOWNERS-POLICY.adoc[CODEOWNERS-POLICY.adoc] |This repo's CODEOWNERS
+conformance record, and why `.github/CODEOWNERS` is comment-only
+
+|link:../SECURITY-ADVISORIES.adoc[SECURITY-ADVISORIES.adoc] |Advisory triage log:
+open / deferred-with-reason / closed, with re-evaluate triggers
+
+|link:../ULTRAPLAN-2026-09-27.adoc[ULTRAPLAN-2026-09-27.adoc] |Dated working
+plan with its measurement evidence — the house convention for a census plus a
+ranked forward plan
 |===
 
 === docs/ tree
 
 ==== Architecture
 
-* link:architecture/abi-ffi.md[docs/architecture/abi-ffi.md] — ABI/FFI
-contract for cross-language calls (Rust ↔ Elixir ↔ Idris2)
-* link:architecture/topology.md[docs/architecture/topology.md] — Process
+* link:architecture/topology.adoc[docs/architecture/topology.adoc] — Process
 topology and deployment shapes
+* link:architecture/abi-ffi.adoc[docs/architecture/abi-ffi.adoc] — ABI/FFI
+contract for cross-language calls (Rust ↔ Elixir ↔ Idris2 ↔ Zig)
+* link:architecture/snifs-bridge.adoc[docs/architecture/snifs-bridge.adoc] —
+SNIFs WASM bridge: the single cross-language boundary for BEAM-side access, with
+the scope analysis that decides what may cross it (issue #86)
 
 ==== Decisions (ADR-style)
 
@@ -64,31 +92,31 @@ topology and deployment shapes
 — Why Rust over alternatives for the core
 * link:decisions/kraft-comparison.adoc[docs/decisions/kraft-comparison.adoc]
 — Why KRaft for the consensus layer
-* link:decisions/proven-coherence.md[docs/decisions/proven-coherence.md]
+* link:decisions/proven-coherence.adoc[docs/decisions/proven-coherence.md]
 — Notes on the proven library integration
 
 ==== Deployment
 
 * link:deployment/deployment.adoc[docs/deployment/deployment.adoc] —
 Full deployment guide (Podman, selur-compose, Containerfile)
-* link:deployment/void-setup.md[docs/deployment/void-setup.md] — Void
+* link:deployment/void-setup.adoc[docs/deployment/void-setup.md] — Void
 Linux dev environment setup
 
 ==== Status & implementation tracking
 
-* link:status/planner.md[docs/status/planner.md] — verisim-planner
+* link:status/planner.adoc[docs/status/planner.md] — verisim-planner
 implementation status
 * link:status/implementation-plan.adoc[docs/status/implementation-plan.adoc]
 — Original timeline-based execution plan (V1–V5)
 
 ==== Releases
 
-* link:releases/v0.1.0-alpha.md[docs/releases/v0.1.0-alpha.md] —
+* link:releases/v0.1.0-alpha.adoc[docs/releases/v0.1.0-alpha.md] —
 Narrative release announcement for v0.1.0-alpha (2026-02-04)
 
 ==== Papers & whitepaper
 
-* link:papers/whitepaper.md[docs/papers/whitepaper.md] — VeriSimDB
+* link:papers/whitepaper.adoc[docs/papers/whitepaper.md] — VeriSimDB
 whitepaper (Markdown source)
 * link:papers/whitepaper.pdf[docs/papers/whitepaper.pdf] — Whitepaper
 PDF artefact
@@ -121,10 +149,10 @@ materials
 
 ==== Design notes (dated, point-in-time)
 
-* link:design/DESIGN-2026-02-27-level-data-model.md[docs/design/DESIGN-2026-02-27-level-data-model.md]
+* link:design/DESIGN-2026-02-27-level-data-model.adoc[docs/design/DESIGN-2026-02-27-level-data-model.md]
 * link:design/DESIGN-2026-02-27-strategic-improvements.adoc[docs/design/DESIGN-2026-02-27-strategic-improvements.adoc]
 * link:design/DESIGN-2026-02-27-vcl-dt-assessment.adoc[docs/design/DESIGN-2026-02-27-vcl-dt-assessment.adoc]
-* link:design/DESIGN-2026-02-28-panll-interop-telemetry.md[docs/design/DESIGN-2026-02-28-panll-interop-telemetry.md]
+* link:design/DESIGN-2026-02-28-panll-interop-telemetry.adoc[docs/design/DESIGN-2026-02-28-panll-interop-telemetry.md]
 
 ==== VCL language
 
@@ -209,9 +237,24 @@ the project
 
 Under link:../.machine_readable/[`+.machine_readable/+`]:
 
-* `+STATE.scm+` — current project state and progress
-* `+META.scm+` — architecture decisions and development practices
-* `+ECOSYSTEM.scm+` — position in the ecosystem and related projects
+These are A2ML (`.a2ml`) artefacts, not Scheme (`.scm`) ones — an earlier
+revision of this index named three `.scm` files that have never existed here.
+Seven L1 specs live under `+6a2/+`:
+
+* `+6a2/STATE.a2ml+` — current project state, component status, proof status
+* `+6a2/META.a2ml+` — architecture decisions (AD-001…AD-007), development
+practices, design rationale. *Canonical for the decision register*, which
+link:../ARCHITECTURE.adoc[ARCHITECTURE.adoc] transcribes
+* `+6a2/ECOSYSTEM.a2ml+` — position in the ecosystem and related projects
+* `+6a2/AGENTIC.a2ml+` — AI-agent operational gating and safety controls
+* `+6a2/PLAYBOOK.a2ml+` — executable plans and operational runbooks
+* `+6a2/NEUROSYM.a2ml+` — symbolic semantics and composition algebra
+* `+6a2/0-AI-MANIFEST.a2ml+` — AI manifest
+
+Alongside `+6a2/+`: `+anchors/+` (estate exception anchors), `+bot_directives/+`
+(per-bot policy, including cross-thread quarantine), `+contractiles/+`
+(Nickel-evaluated Mustfile / Trustfile / Intentfile / Adjustfile / Dustfile /
+Bustfile), `+self-validating/+` and `+svc/+`, plus `+ENSAID_CONFIG.a2ml+`.
 
 === Workflow & CI
 
@@ -256,8 +299,6 @@ Erlang) access via the SNIFs WASM bridge — see `+hyperpolymath/snifs+`.
 |`+debugger/+` |Idris2 + Rust |ABI/FFI debugger
 
 |`+ffi/zig/+` |Zig |Zig FFI
-
-|`+v-api-gateway/+` |V |V-language API gateway
 
 |`+fuzz/+`, `+rust-core/fuzz/+` |Rust |Fuzz harnesses (libFuzzer via
 cargo-fuzz)

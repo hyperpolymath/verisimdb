@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# RFC 9116 — security.txt for hyperpolymath/verisimdb
+# https://www.rfc-editor.org/rfc/rfc9116.html
+#
+# ── READ THIS BEFORE EDITING ────────────────────────────────────────────────
+# The presence of this file ARMS A HARD CI GATE.
+#
+# The estate `wellknown` job in hyperpolymath/standards
+# .github/workflows/governance-reusable.yml (lines 1091-1155) behaves as
+# follows:
+#
+#   * While this file is ABSENT, the job emits `::warning::No security.txt
+#     found.` and exits 0. It warns; it does not fail.
+#   * Once this file EXISTS, the job hard-errors (`::error::` + exit 1) if
+#     `^Contact:` is missing, if `^Expires:` is missing, or if `Expires:` is
+#     in the past. It also warns from 30 days before expiry.
+#
+# So the eventual red build is BY DESIGN, not a regression. It is a scheduled
+# reminder that this file needs renewing, and it is deliberately unignorable:
+# a security.txt that silently expires stops being a way to report a
+# vulnerability while still looking like one.
+#
+# RENEWAL: bump `Expires:` below to roughly one year forward, and update the
+# `Last updated` line. Do not delete the file to make CI green — that returns
+# the gate to warn-only and loses the contact information.
+#
+# ── CANONICAL URL ───────────────────────────────────────────────────────────
+# GitHub does NOT serve repository-level .well-known/ over HTTP. Verified
+# 2026-09-27: GET https://github.com/hyperpolymath/verisimdb/.well-known/security.txt
+# returns 404, while GitHub's own org-level
+# https://github.com/.well-known/security.txt returns 200. The `Canonical:`
+# field below therefore points at the raw content URL, which is the only
+# location that actually serves this file. GitHub's UI surfaces the reporting
+# flow via the `Contact:` advisory URL instead.
+
+# === Primary contact ===
+# GitHub private vulnerability reporting. This is the preferred method: it is
+# private, it does not require disclosing an email address, and it gives the
+# reporter automatic credit when the advisory is published. Named as the
+# preferred method in SECURITY.adoc.
+Contact: https://github.com/hyperpolymath/verisimdb/security/advisories/new
+
+# === Expiration ===
+# One year from the date this file was added. See the renewal note above.
+Expires: 2027-09-27T00:00:00Z
+
+# === Policy ===
+# Threat model, disclosure policy, scope (in/out), safe harbour, and the
+# response timeline: 48h initial response, 7d triage, status every 7d,
+# 90d resolution target, 90d coordinated disclosure.
+Policy: https://github.com/hyperpolymath/verisimdb/blob/main/SECURITY.adoc
+
+# === Acknowledgments ===
+# Triage log of open, deferred and closed advisories, with per-advisory
+# exposure assessment and explicit re-evaluate triggers. Researcher credits
+# are recorded there; as of 2026-09-27 there are none yet, and that file says
+# so explicitly rather than omitting the section.
+Acknowledgments: https://github.com/hyperpolymath/verisimdb/blob/main/SECURITY-ADVISORIES.adoc
+
+# === Preferred languages ===
+Preferred-Languages: en
+
+# === Canonical ===
+Canonical: https://raw.githubusercontent.com/hyperpolymath/verisimdb/main/.well-known/security.txt
+
+# === Hiring ===
+Hiring: https://github.com/hyperpolymath/verisimdb/blob/main/CONTRIBUTING.adoc
+
+# === Note on Encryption ===
+# No `Encryption:` field is published. RFC 9116 makes it optional, and this
+# repository deliberately does not advertise a PGP fingerprint it cannot commit
+# to maintaining: a stale key is worse than no key, because a reporter who
+# encrypts to a key nobody holds gets silence instead of a fallback path. The
+# GitHub private-advisory `Contact:` above does not require a key at all, which
+# is the reason it is the preferred method. If a maintained key is added later,
+# publish it here and on keys.openpgp.org, and add a re-evaluate trigger for it
+# in SECURITY-ADVISORIES.adoc.
+
+# Last updated: 2026-09-27 (added; arms the RFC 9116 gate as described above)

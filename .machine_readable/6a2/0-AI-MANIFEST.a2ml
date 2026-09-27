@@ -1,3 +1,15 @@
+;; SPDX-License-Identifier: MPL-2.0
+;; SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+;;
+;; 0-AI-MANIFEST.a2ml — AI-assistant context for the 6a2 metadata directory.
+;;
+;; Header style note: the other six specs in this directory open with a `;;`
+;; SPDX block. This file did not, and `.githooks/validate-a2ml.sh` reported
+;; "Missing SPDX-License-Identifier in first 10 lines" as a result — the only
+;; warning in a 32-file scan. It was compliant with `reuse lint` regardless,
+;; because REUSE.toml's `.machine_readable/**` aggregate covers it; the two
+;; tools check different things. Added 2026-09-27.
+
 # AI Manifest for 6a2 Directory
 
 ## Purpose

@@ -6,6 +6,24 @@
 (* Version: 3.0 — Octad (8 modalities), provenance conditions, spatial conditions *)
 (* Date: 2026-02-27 *)
 
+(* ------------------------------------------------------------------------
+   DUPLICATE-GRAMMAR NOTICE (added 2026-09-27)
+   Two copies of this normative grammar are committed:
+     * spec/grammar.ebnf        <- THIS FILE, treated as canonical
+     * docs/vcl-grammar.ebnf    <- near-duplicate in the docs tree
+   They were byte-identical in substance; the only differences were this
+   file's @taxonomy and copyright lines and a stale "VQL" wording in the
+   case-insensitivity comment below (now corrected to "VCL").
+   This file is treated as canonical because it carries the @taxonomy tag,
+   carries the copyright line, and is the copy cited by README.adoc,
+   EXPLAINME.adoc, 0-AI-MANIFEST.a2ml and spec/system-specs.adoc.
+   Maintaining two normative grammars is a drift hazard, not a feature:
+   any future edit MUST be applied to both, or the duplicate retired.
+   Consolidating them (deleting one and leaving a pointer) is an owner
+   decision, because deleting a normative artefact is not a documentation
+   edit. Tracked in ULTRAPLAN-2026-09-27.adoc.
+   ------------------------------------------------------------------------ *)
+
 (* ============================================================================
    1. TOP-LEVEL STRUCTURE
    ============================================================================ *)
@@ -294,7 +312,7 @@ comment = '--', { ? any character except newline ? }, '\n'  (* Line comment *)
 (* ============================================================================
    12. RESERVED KEYWORDS
    ============================================================================ *)
-(* Keywords are case-insensitive in VQL *)
+(* Keywords are case-insensitive in VCL *)
 keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
          | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT' | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL'
          | 'HEXAD' | 'FEDERATION' | 'STORE'
