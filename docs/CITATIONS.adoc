@@ -1,36 +1,114 @@
-= RSR-template-repo - Citation Guide
-:toc:
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= VeriSimDB — Citation Guide
+:toc: left
+:toclevels: 2
+
+[NOTE]
+====
+This file was generated unmodified from the RSR template and cited
+`RSR-template-repo` under the placeholder author "Polymath, Hyper". It has been
+corrected to cite this project. Author, title, licence and URL are taken from
+`Cargo.toml` (`authors`, `license`, `homepage`), `MAINTAINERS.adoc` and the
+per-file SPDX headers; the version and date are from `CHANGELOG.adoc`.
+
+If you are citing a *specific* release, substitute its version and date from
+link:../CHANGELOG.adoc[CHANGELOG.adoc] for the `0.2.0` / 2026 used below. The
+`main` branch moves, so a citation to it should carry a commit SHA or an access
+date.
+====
 
 == BibTeX
 
 [source,bibtex]
 ----
-@software{rsr-template-repo_2025,
-  author = {Polymath, Hyper},
-  title = {RSR-template-repo},
-  year = {2025},
-  url = {https://github.com/hyperpolymath/RSR-template-repo},
-  license = {MPL-2.0}
+@software{verisimdb_2026,
+  author       = {Jewell, Jonathan D. A.},
+  title        = {VeriSimDB: The Veridical Simulacrum Database},
+  year         = {2026},
+  version      = {0.2.0},
+  url          = {https://github.com/hyperpolymath/verisimdb},
+  license      = {MPL-2.0},
+  note         = {A federated identity-consonance engine: each entity is
+                  maintained across up to eight modal witnesses (the octad) with
+                  continuous cross-modal drift detection and self-normalisation.
+                  Documentation licensed CC-BY-SA-4.0.}
 }
 ----
 
+If you are citing the *formal development* rather than the software, the Coq
+modules under `formal/` are the artefact, and
+link:proof-debt.adoc[`docs/proof-debt.adoc`] states the strength of each result —
+including which are closed, which are closed only modulo standard primitives,
+which are structural over uninterpreted operations, and which rest on an axiom.
+Citing the proofs without that distinction would overstate them.
+
 == Harvard Style
 
-Polymath, H. (2025) _RSR-template-repo_ [Computer software]. Available at: https://github.com/hyperpolymath/RSR-template-repo
+Jewell, J.D.A. (2026) _VeriSimDB: The Veridical Simulacrum Database_ (version
+0.2.0) [Computer software]. Available at:
+https://github.com/hyperpolymath/verisimdb
 
 == OSCOLA
 
-Hyper Polymath, 'RSR-template-repo' (2025) <https://github.com/hyperpolymath/RSR-template-repo>
+Jonathan D.A. Jewell, 'VeriSimDB: The Veridical Simulacrum Database' (2026)
+<https://github.com/hyperpolymath/verisimdb>
 
 == MLA
 
-Polymath, Hyper. "RSR-template-repo." 2025, github.com/hyperpolymath/RSR-template-repo.
+Jewell, Jonathan D.A. _VeriSimDB: The Veridical Simulacrum Database_. Version
+0.2.0, 2026, github.com/hyperpolymath/verisimdb.
 
 == APA 7
 
-Polymath, H. (2025). _RSR-template-repo_ [Computer software]. GitHub. https://github.com/hyperpolymath/RSR-template-repo
+Jewell, J. D. A. (2026). _VeriSimDB: The Veridical Simulacrum Database_ (Version
+0.2.0) [Computer software]. GitHub. https://github.com/hyperpolymath/verisimdb
 
-== See Also
+== Related artefacts worth citing separately
 
-* link:../CITATION.cff[CITATION.cff]
-* link:../codemeta.json[codemeta.json]
+[cols="2,3"]
+|===
+|Artefact |Cite when
+
+|link:papers/whitepaper.adoc[`docs/papers/whitepaper.adoc`] (also
+`WHITEPAPER.pdf` at the repository root) |you are citing the design argument
+rather than the implementation
+
+|link:papers/arcvix-octad-data-model.tex[`docs/papers/arcvix-octad-data-model.tex`]
+|you are citing the octad data model specifically
+
+|link:papers/references.bib[`docs/papers/references.bib`] |you need the prior
+work this system builds on (Codd, Stonebraker, Malkov & Yashunin for HNSW,
+Shapiro et al. for CRDTs, Pierce for the type theory)
+
+|link:../formal/CROSS-REPO-MAP.adoc[`formal/CROSS-REPO-MAP.adoc`] |you are
+citing the cross-repository proof obligations shared with `vcl-ut`,
+`echo-types`, `tropical-resource-typing` and `kategoria`
+
+|link:VCL-SPEC.adoc[`docs/VCL-SPEC.adoc`] |you are citing the VeriSim
+Consonance Language itself
+|===
+
+== Machine-readable citation metadata
+
+*Not present.* This section previously linked to `CITATION.cff` and
+`codemeta.json` at the repository root; neither file was ever written, and a link
+to a file that does not exist is worse than a statement that it does not.
+
+Both are worth adding, and both are mechanical once the metadata above is agreed:
+
+* https://citation-file-format.github.io/[`CITATION.cff`] — read by GitHub, which
+  renders a "Cite this repository" button.
+* https://codemeta.github.io/[`codemeta.json`] — the CodeMeta crosswalk, read by
+  Zenodo and other archives.
+
+They should be generated from the same facts as this file, not written
+independently, or the two will drift apart in the way this file drifted from the
+project it described. Until they exist, cite from this document.
+
+== Licence of this document
+
+CC-BY-SA-4.0, per the estate policy that prose carries CC-BY-SA-4.0 and code
+carries MPL-2.0 (AD-006 in
+link:../.machine_readable/6a2/META.a2ml[`.machine_readable/6a2/META.a2ml`]). Note
+that the *software* being cited is MPL-2.0; this citation guide is not.

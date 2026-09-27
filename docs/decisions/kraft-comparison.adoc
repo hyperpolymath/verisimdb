@@ -65,5 +65,5 @@ VeriSimDB's federated registry could potentially:
 
 == References
 
-- link:docs/technical-specification-kraft-metadata-log.adoc[VeriSimDB KRaft Integration Spec]
+- link:../technical-specification-kraft-metadata-log.adoc[VeriSimDB KRaft Integration Spec]
 - https://cwiki.apache.org/confluence/display/KAFKA/KIP-500%3A+Replace+ZooKeeper+with+a+Self-Managed+Metadata+Quorum[KIP-500: Replace ZooKeeper with a Self-Managed Metadata Quorum]

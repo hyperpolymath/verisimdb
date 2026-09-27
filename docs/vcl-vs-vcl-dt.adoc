@@ -120,6 +120,31 @@ generated. At L10, the proof certificate is assembled and attached to the result
 
 == The Six PROOF Types
 
+[WARNING]
+====
+*The six types enumerated below do not match the normative grammar, and this
+page has deliberately not been rewritten to make them match.*
+
+`spec/grammar.ebnf` v3.0 and `src/vcl/VCLParser.affine` define:
+
+    proof_type = 'EXISTENCE' | 'CITATION' | 'ACCESS' | 'INTEGRITY'
+               | 'PROVENANCE' | 'CUSTOM' ;
+
+Three subsections below instead name `CONSISTENCY`, `FRESHNESS` and
+`AUTHORIZATION`, which are not grammar terminals; and the grammar's `CITATION`,
+`ACCESS` and `CUSTOM` have no subsection here. `link:VCL-SPEC.adoc[VCL-SPEC.adoc]`
+records this as known inconsistency #2 and rules that the specification follows
+the grammar and implementation.
+
+Which side is the target is an *open owner decision*, not a documentation edit:
+either the grammar is right and these three subsections describe proof types that
+were never implemented, or this page describes an intended v-next proof set and
+the grammar is behind. Rewriting six normative subsections in either direction
+would silently pick a winner, so the divergence is flagged rather than resolved.
+Until that decision lands, treat the grammar as authoritative for what a VCL
+statement will actually accept today.
+====
+
 Every `PROOF` clause takes the form `PROOF <TYPE>(<Contract>)`:
 
 === EXISTENCE

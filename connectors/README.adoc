@@ -301,7 +301,7 @@ across REST, gRPC, and SDK code generation.
 == Related Documentation
 
 * link:../README.adoc[VeriSimDB README] -- project overview and quick start
-* link:../WHITEPAPER.md[Whitepaper] -- formal description of the octad model
+* link:../WHITEPAPER.pdf[Whitepaper] -- formal description of the octad model
 * link:../docs/[docs/] -- design documents and architecture decisions
 * link:../rust-core/verisim-api/src/federation.rs[federation.rs] -- Rust federation implementation
 * link:../rust-core/verisim-octad/src/lib.rs[octad lib.rs] -- canonical Octad type definitions

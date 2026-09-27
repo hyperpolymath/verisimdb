@@ -96,7 +96,7 @@ LIMIT 10;
 **Octad schema changes:**
 
 ```scheme
-;; STATE.scm tracks schema version
+;; STATE.a2ml tracks schema version
 (metadata
   (schema-version "1.2.0")  ; Current Octad schema
   (min-compatible-version "1.0.0"))  ; Oldest readable format

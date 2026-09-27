@@ -15,13 +15,18 @@ audit artefacts; it doesn't duplicate their content.
 See link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc].
 
 Tracks open and resolved technical gaps. Every item names the affected
-location, the original problem, the resolution (or current status), and
-the impact. As of 2026-05-25 all 25 catalogued issues are resolved; the
-file is preserved as the audit trail.
+location, the original problem, the resolution (or current status), and the
+impact. As of 2026-09-27 the file catalogues *31* items: *28 resolved* and
+*3 open* (#29 HTTP API has no authentication, #30 cross-request transactions
+return 501, #31 `at_time` returns partial data for multi-update entities).
+
+This section previously stated that "all 25 catalogued issues are resolved",
+which was an overclaim in the one document whose purpose is to be the honest
+audit trail. The count and status are now measured from the file itself.
 
 == Testing & benchmarking standards
 
-See link:TESTING.md[TESTING.md].
+See link:TESTING.adoc[TESTING.adoc].
 
 Documents the test pyramid, hard CI gates per language, property-test
 patterns, fuzz corpus location, supply-chain checks, and the next-tier
@@ -30,9 +35,20 @@ concurrency model-checking, bench-as-PR-gate, AFL++).
 
 == Security policy
 
-See link:SECURITY.md[SECURITY.md].
+See link:SECURITY.adoc[SECURITY.adoc].
 
-Threat model, disclosure process, supported versions.
+Threat model, disclosure process, supported versions, safe harbour and response
+timeline.
+
+The *advisory triage log* — open, deferred and closed advisories with
+per-advisory exposure assessment and explicit re-evaluate triggers — is
+link:SECURITY-ADVISORIES.adoc[SECURITY-ADVISORIES.adoc]. RFC 9116 contact
+details are in `.well-known/security.txt`.
+
+Non-advisory scanner findings (panic-attack categories) are dispositioned in
+`audits/assail-classifications.a2ml`; its keys are validated by
+`scripts/validate-assail-classifications.sh` and gated by
+`tests/assail-classifications-gate.sh`.
 
 == Changelog
 
@@ -43,12 +59,22 @@ non-canonical) live under link:docs/releases/[docs/releases/].
 
 == Documentation index
 
-See link:docs/INDEX.md[docs/INDEX.md] for the full documentation tree.
+See link:docs/INDEX.adoc[docs/INDEX.md] for the full documentation tree.
 
 == Machine-readable state
 
 See link:.machine_readable/[.machine_readable/]:
 
-- `STATE.scm` — current project state and progress
-- `META.scm` — architecture decisions and development practices
-- `ECOSYSTEM.scm` — position in the ecosystem and related projects
+The directory holds A2ML (`.a2ml`) artefacts, not Scheme (`.scm`) ones. Seven
+L1 specs live under `6a2/`:
+
+- `6a2/STATE.a2ml` — current project state, component status, proof status
+- `6a2/META.a2ml` — architecture decisions (AD-001…AD-007), development
+  practices, design rationale. *Canonical for the decision register*, which
+  link:ARCHITECTURE.adoc[ARCHITECTURE.adoc] transcribes
+- `6a2/ECOSYSTEM.a2ml` — position in the ecosystem and related projects
+- `6a2/AGENTIC.a2ml`, `6a2/PLAYBOOK.a2ml`, `6a2/NEUROSYM.a2ml`,
+  `6a2/0-AI-MANIFEST.a2ml`
+
+Alongside `6a2/`: `anchors/`, `bot_directives/`, `contractiles/`
+(Nickel-evaluated policy), `self-validating/` and `svc/`.

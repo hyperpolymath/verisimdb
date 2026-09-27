@@ -480,4 +480,4 @@ LIMIT 10
 - link:reversibility-design.adoc[Reversibility Design] - Full technical specification
 - link:../lib/verisim/query_planner_config.ex[Query Planner Config] - Source code
 - link:../lib/verisim/query_planner_bidirectional.ex[Bidirectional Optimization] - Source code
-- link:../src/vql/VQLExplain.res[EXPLAIN Implementation] - Source code
+- link:../src/vcl/VCLExplain.affine[EXPLAIN Implementation] - Source code

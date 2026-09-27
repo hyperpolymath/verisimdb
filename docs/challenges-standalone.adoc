@@ -446,4 +446,4 @@ For larger deployments, consider **hybrid** or **federated** mode to mitigate th
 - link:deployment-modes.adoc[Deployment Modes Overview]
 - link:challenges-hybrid.adoc[Challenges: Hybrid Mode]
 - link:challenges-federated.adoc[Challenges: Federated Mode]
-- link:../WHITEPAPER.md[VeriSimDB White Paper]
+- link:../WHITEPAPER.pdf[VeriSimDB White Paper]

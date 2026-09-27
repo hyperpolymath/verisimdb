@@ -300,9 +300,20 @@ We believe in recognising security researchers who help us improve.
 
 ==== Hall of Fame
 
-Researchers who report valid vulnerabilities will be acknowledged in our
-link:SECURITY-ACKNOWLEDGMENTS.md[Security Acknowledgments] (unless they
-prefer anonymity).
+Researchers who report valid vulnerabilities will be acknowledged in the
+researcher-credits section of
+link:SECURITY-ADVISORIES.adoc[SECURITY-ADVISORIES.adoc] (unless they prefer
+anonymity).
+
+[NOTE]
+====
+This section previously pointed at a `SECURITY-ACKNOWLEDGMENTS.md` that was never
+written. The advisory triage log is the acknowledgements record now, so there is
+one place to update rather than two. As of 2026-09-27 there are no external
+researcher credits: nobody has reported a vulnerability to this project. That is
+stated explicitly rather than left implied, because an empty acknowledgements
+file is indistinguishable from a forgotten one.
+====
 
 Recognition includes:
 
@@ -343,7 +354,7 @@ To stay informed about security updates:
 * *GitHub Security Advisories*: Published at
 https://github.com/hyperpolymath/verisimdb/security/advisories[Security
 Advisories]
-* *Release notes*: Security fixes noted in link:CHANGELOG.md[CHANGELOG]
+* *Release notes*: Security fixes noted in link:CHANGELOG.adoc[CHANGELOG]
 
 ==== Update Policy
 
@@ -394,8 +405,8 @@ When using VeriSimDB, we recommend:
 
 * https://github.com/hyperpolymath/verisimdb/security/advisories[Security
 Advisories]
-* link:CHANGELOG.md[Changelog]
-* link:CONTRIBUTING.md[Contributing Guidelines]
+* link:CHANGELOG.adoc[Changelog]
+* link:CONTRIBUTING.adoc[Contributing Guidelines]
 * https://cve.mitre.org/[CVE Database]
 * https://www.first.org/cvss/calculator/3.1[CVSS Calculator]
 
@@ -414,7 +425,7 @@ via GitHub] or j.d.a.jewell@open.ac.uk
 |https://github.com/hyperpolymath/verisimdb/discussions[GitHub
 Discussions]
 
-|*Other enquiries* |See link:README.md[README] for contact information
+|*Other enquiries* |See link:README.adoc[README] for contact information
 |===
 
 '''''

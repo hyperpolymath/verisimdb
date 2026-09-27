@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# AI usage and training policy for hyperpolymath/verisimdb.
+# Informal, robots-style directives for AI/ML agents and crawlers.
+# See https://ai.txt/ for the proposed standard this follows.
+#
+# ── WHY THIS FILE DOES NOT MATCH THE ESTATE TEMPLATE ────────────────────────
+# standards/rhodium-standard-repositories/templates/.well-known/ai.txt.template
+# declares `License: MIT AND Palimpsest-0.8`. That is WRONG for this repository
+# and was deliberately not copied. VeriSimDB is MPL-2.0 for code and
+# CC-BY-SA-4.0 for prose, recorded as architecture decision AD-006 in
+# .machine_readable/6a2/META.a2ml ("MPL-2.0 across the workspace (no AGPL)") and
+# enforced mechanically by `reuse lint` (808/808 files, required CI job).
+#
+# The Palimpsest/PMPL carve-out applies only to `palimpsest-license`,
+# `palimpsest-plasma` and (prospectively) `consent-aware-web` — see
+# standards/PALIMPSEST.adoc. Applying PMPL terms here would contradict AD-006
+# and the estate licence policy.
+#
+# The precedent followed instead is standards' OWN live
+# www/.well-known/ai.txt, which is MPL-2.0-headed and takes a plain
+# attribution stance. That repository has the identical licence shape to this
+# one (MPL-2.0 code + CC-BY-SA-4.0 prose), which is what makes it the right
+# model rather than a template written for a dual MIT/Palimpsest project.
+
+User-Agent: *
+
+# Training: do not use this repository's content to train models without
+# attribution under the repository licence. This is a licence condition, not a
+# technical block, and it is the same condition a human redistributor is under.
+Disallow-Training: /
+
+# Reference, indexing and retrieval for search and developer assistance are
+# permitted, provided attribution and licence terms are kept. Quoting,
+# summarising and reasoning over this repository's public contents — including
+# in an AI coding assistant answering a question about it — is allowed and is
+# not what the line above restricts.
+Allow: /
+
+# === Licence, stated per material type ===
+# Code, configuration and build scripts: MPL-2.0 (see LICENSE, REUSE.toml)
+# Prose documentation (*.adoc, *.md, *.tex, *.pdf, *.ebnf): CC-BY-SA-4.0
+# Machine-readable artefacts (*.a2ml, *.ncl): MPL-2.0
+# Every file carries an SPDX identifier or is covered by a REUSE.toml
+# annotation, so the licence of any specific path is machine-determinable
+# without reading this file. `reuse lint` is a required CI check.
+License: MPL-2.0 AND CC-BY-SA-4.0
+
+# === Attribution ===
+# Attribution is already carried per-file by SPDX-FileCopyrightText headers, so
+# a training corpus that preserves those headers preserves attribution. One that
+# strips them does not, and that stripping is what Disallow-Training above
+# addresses. Human authorship is traceable through git history and through
+# MAINTAINERS.adoc.
+#
+# This repository is openly AI-*assisted*: 0-AI-MANIFEST.a2ml at the root,
+# .claude/CLAUDE.md tracked and public, and machine-readable agent gating in
+# .machine_readable/6a2/AGENTIC.a2ml. AI assistance in authoring is disclosed
+# rather than hidden. That is a statement about how the code was written, not a
+# grant of rights in it — the licence above is unchanged by it.
+
+# === Provenance ===
+# Full provenance chains are maintained via git commit history, per-file SPDX
+# attribution, and — for the data model itself — the provenance modality, which
+# is a hash-chained lineage store with Coq-verified integrity (formal/
+# Provenance.v, P2/P3). A repository whose subject matter is provenance
+# integrity should be able to show its own.
+
+# === Bot policy ===
+# Per-bot directives live in .machine_readable/bot_directives/ and are the
+# authoritative policy for named estate bots (echidnabot, finishbot, glambot,
+# rhodibot, seambot, sustainabot, robot-repo-automaton, robot-repo-cleaner),
+# including cross-thread-quarantine.a2ml. This file is the summary for
+# everything else.
+
+Contact: https://github.com/hyperpolymath/verisimdb/security/advisories/new
+Policy: https://github.com/hyperpolymath/verisimdb/blob/main/SECURITY.adoc
+Manifest: https://github.com/hyperpolymath/verisimdb/blob/main/0-AI-MANIFEST.a2ml
+Governance: https://github.com/hyperpolymath/verisimdb/blob/main/GOVERNANCE.adoc
+
+# Last updated: 2026-09-27

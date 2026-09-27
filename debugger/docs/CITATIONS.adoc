@@ -1,36 +1,81 @@
-= RSR-template-repo - Citation Guide
-:toc:
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= verisimdb-debugger — Citation Guide
+:toc: left
+:toclevels: 2
+
+[NOTE]
+====
+This file was generated unmodified from the RSR template and cited
+`RSR-template-repo` under the placeholder author "Polymath, Hyper". It has been
+corrected to cite this crate. Name, version, author, licence and description are
+taken from `debugger/Cargo.toml`.
+
+The debugger is an *in-tree crate* at `debugger/` inside the `verisimdb`
+repository. `debugger/Cargo.toml` previously declared
+`repository = "https://github.com/hyperpolymath/verisimdb-debugger"`, which
+returns *404* — no such repository exists. That field has been corrected to point
+at this repository, since a crate that publishes with an unreachable `repository`
+URL sends every reader somewhere that does not exist.
+====
 
 == BibTeX
 
 [source,bibtex]
 ----
-@software{rsr-template-repo_2025,
-  author = {Polymath, Hyper},
-  title = {RSR-template-repo},
-  year = {2025},
-  url = {https://github.com/hyperpolymath/RSR-template-repo},
-  license = {MPL-2.0}
+@software{verisimdb_debugger_2026,
+  author       = {Jewell, Jonathan D. A.},
+  title        = {verisimdb-debugger: Interactive Debugger and Visualization
+                  Tool for VeriSimDB},
+  year         = {2026},
+  version      = {0.1.0},
+  url          = {https://github.com/hyperpolymath/verisimdb/tree/main/debugger},
+  license      = {MPL-2.0},
+  note         = {In-tree crate of the VeriSimDB repository. TUI debugger and
+                  ABI/FFI visualisation for the octad modality stores.}
 }
 ----
 
+Cite the *parent* system as
+link:../../docs/CITATIONS.adoc[`docs/CITATIONS.adoc`] describes; cite this crate
+only when the debugger itself is the subject.
+
 == Harvard Style
 
-Polymath, H. (2025) _RSR-template-repo_ [Computer software]. Available at: https://github.com/hyperpolymath/RSR-template-repo
+Jewell, J.D.A. (2026) _verisimdb-debugger: Interactive Debugger and Visualization
+Tool for VeriSimDB_ (version 0.1.0) [Computer software]. Available at:
+https://github.com/hyperpolymath/verisimdb/tree/main/debugger
 
 == OSCOLA
 
-Hyper Polymath, 'RSR-template-repo' (2025) <https://github.com/hyperpolymath/RSR-template-repo>
+Jonathan D.A. Jewell, 'verisimdb-debugger' (2026)
+<https://github.com/hyperpolymath/verisimdb/tree/main/debugger>
 
 == MLA
 
-Polymath, Hyper. "RSR-template-repo." 2025, github.com/hyperpolymath/RSR-template-repo.
+Jewell, Jonathan D.A. _verisimdb-debugger: Interactive Debugger and Visualization
+Tool for VeriSimDB_. Version 0.1.0, 2026,
+github.com/hyperpolymath/verisimdb/tree/main/debugger.
 
 == APA 7
 
-Polymath, H. (2025). _RSR-template-repo_ [Computer software]. GitHub. https://github.com/hyperpolymath/RSR-template-repo
+Jewell, J. D. A. (2026). _verisimdb-debugger: Interactive debugger and
+visualization tool for VeriSimDB_ (Version 0.1.0) [Computer software]. GitHub.
+https://github.com/hyperpolymath/verisimdb/tree/main/debugger
 
-== See Also
+== Machine-readable citation metadata
 
-* link:../CITATION.cff[CITATION.cff]
-* link:../codemeta.json[codemeta.json]
+*Not present.* This section previously linked to `../CITATION.cff` and
+`../codemeta.json`; neither file exists at the repository root or in `debugger/`.
+
+If citation metadata is added, it belongs at the *repository* root, not here, so
+that the parent system and this crate share one record. See
+link:../../docs/CITATIONS.adoc[`docs/CITATIONS.adoc`] for the parent citation and
+for the `CITATION.cff` / `codemeta.json` rationale.
+
+== Licence of this document
+
+CC-BY-SA-4.0, per the estate policy that prose carries CC-BY-SA-4.0 and code
+carries MPL-2.0 (AD-006 in
+link:../../.machine_readable/6a2/META.a2ml[`.machine_readable/6a2/META.a2ml`]).
+The *crate* being cited is MPL-2.0.

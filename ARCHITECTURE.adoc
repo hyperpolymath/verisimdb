@@ -1,0 +1,322 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Architecture Index
+:toc: left
+:toclevels: 2
+:icons: font
+
+[.lead]
+This is an *index*, not a description. VeriSimDB's architecture is already
+written down in about fifteen places; the problem this file solves is that nobody
+could find which one. Every entry below links to the document that is
+authoritative for its subject. Where two documents disagree, the one marked
+*canonical* wins, and the disagreement is named rather than papered over.
+
+For orientation — what VeriSimDB *is* — read link:EXPLAINME.adoc[EXPLAINME.adoc]
+first. This file assumes you already know that an entity is a consonance subject
+with up to eight modal witnesses.
+
+== Architecture decision records
+
+The decisions are recorded machine-readably in
+link:.machine_readable/6a2/META.a2ml[`.machine_readable/6a2/META.a2ml`] under
+`(architecture-decisions …)`. *That file is canonical.* The table below is a
+transcription for human readers; if it and the a2ml diverge, the a2ml is right
+and this table has drifted.
+
+[cols="1,3,4,2",options="header"]
+|===
+|ID |Decision |Rationale |Source
+
+|AD-001
+|Marr's three levels of analysis as the design lens
+|Computational / algorithmic / implementational separation keeps the octad
+invariant clean
+|`.claude/CLAUDE.md` §"Design Philosophy"
+
+|AD-002
+|Rust core + Elixir orchestration split
+|Rust for performance-critical modality stores; Elixir/OTP for distributed
+coordination and fault tolerance
+|`README.adoc` + `.claude/CLAUDE.md` §"Architecture"
+
+|AD-003
+|Pluggable storage backend (`verisim-storage`) with redb as the pure-Rust default
+|Eliminates the `oxrocksdb-sys` C++ dependency; Oxigraph is feature-flagged
+|`rust-core/verisim-storage` + `rust-core/verisim-graph`
+
+|AD-004
+|PLONK as the ZKP scheme for the VCL-DT `PROOF` clause
+|Universal trusted setup, small proofs, recursion, circuit flexibility
+|`contractiles/trust/Trustfile`
+
+|AD-005
+|Git-backed flat-file store for GitHub CI integration (the `verisimdb-data` repo)
+|No persistent server needed for a ~290-repo scanning workflow; `verisim-api`
+runs locally as needed
+|`.claude/CLAUDE.md` §"GitHub CI Integration"
+
+|AD-006
+|MPL-2.0 across the workspace (no AGPL)
+|Sole-owner repo under the estate licence-policy umbrella
+|`LICENSE` + `Cargo.toml` + PR #101 (closes #82)
+
+|AD-007
+|Tantivy 0.26 with `order_by_score()` for TopDocs
+|Tantivy 0.26 collector API change; `lz4_flex` + `lru` CVE resolution via a
+transitive bump
+|PR #76
+|===
+
+Two further decisions are recorded elsewhere and are not in META.a2ml. They are
+listed here so the register is not silently incomplete:
+
+* *KRaft for the metadata/consensus layer* — see
+  link:docs/decisions/kraft-comparison.adoc[`docs/decisions/kraft-comparison.adoc`].
+* *Rust over SPARK for the core* — see
+  link:docs/decisions/rust-spark-stance.adoc[`docs/decisions/rust-spark-stance.adoc`],
+  with the follow-on stance in
+  link:docs/decisions/proven-coherence.adoc[`docs/decisions/proven-coherence.adoc`].
+
+If these should be AD-008 and AD-009 in META.a2ml, that is a one-commit change;
+it has not been made because promoting a decision record into the machine-readable
+register is an owner call, not a transcription.
+
+== Component map
+
+=== Rust core (`rust-core/`)
+
+Sixteen crates. The eight modality stores are the octad; the rest are the
+machinery around it.
+
+[cols="2,4",options="header"]
+|===
+|Crate |Role
+
+|`verisim-octad`
+|The unified entity layer — one entity, eight synchronised representations.
+*Read this first.*
+
+|`verisim-graph` |Graph modality — RDF and property-graph storage. Pure-Rust
+redb default; Oxigraph behind a feature flag (AD-003)
+|`verisim-vector` |Vector modality — HNSW similarity search
+|`verisim-tensor` |Tensor modality — multi-dimensional arrays via `ndarray`
+|`verisim-semantic` |Semantic modality — ontology and type system via CBOR proofs
+|`verisim-document` |Document modality — full-text search via Tantivy (AD-007)
+|`verisim-temporal` |Temporal modality — time-series and versioning
+|`verisim-provenance` |Provenance modality — origin tracking, lineage chains,
+actor trails
+|`verisim-spatial` |Spatial modality — geospatial coordinates, geometry,
+proximity
+
+|`verisim-drift`
+|Cross-modal consistency monitoring — the differentiator
+
+|`verisim-normalizer`
+|Self-normalisation engine — repairs the drift `verisim-drift` reports
+
+|`verisim-planner` |Cost-based query planner
+|`verisim-wal` |Write-ahead log for crash recovery
+|`verisim-storage` |Pluggable backend abstraction (AD-003)
+|`verisim-api` |HTTP + gRPC API server. *The largest crate and the least
+tested* — see link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc]
+|`verisim-repl` |Interactive VCL REPL
+|`verisim-nif` |Rustler NIF bridge for in-process calls from Elixir. *Currently
+a stub* — tracked in issue #61
+|===
+
+=== Elixir orchestration (`elixir-orchestration/`)
+
+OTP supervision over the Rust core. Subsystems: `entity`, `drift`, `query`,
+`schema`, `federation`, `consensus`, `api`, `telemetry`, `hypatia`, plus
+`rust_client.ex`, `nif_bridge.ex`, `transport.ex` and `health_checker.ex`.
+
+The query path is the part worth understanding:
+
+----
+VCL string ──► VCLBridge (GenServer) ──► Port (stdin/stdout JSON)
+                                            │
+                                            ▼
+                              AffineScript parser (src/vcl/)
+                                            │
+              VCLTGate (admissibility) ◄────┘
+                       │
+                       ▼
+              VCLExecutor ──► VCLTypeChecker ──► QueryRouter ──► Rust core
+----
+
+`VCLBridge` keeps a long-running parser process and falls back to a built-in
+Elixir parser if it is unavailable. *Type checking has no fallback* — with no
+parser process, `{:error, :type_checker_unavailable}` is returned, because
+silently passing would defeat VCL-DT. `VCLTGate` checks epistemic statements for
+VCL-total admissibility before execution and *fails closed*: a gate timeout or
+crash blocks the statement rather than allowing it.
+
+=== VCL language layer (`src/vcl/`)
+
+Eleven AffineScript modules: `VCLTypes`, `VCLError`, `VCLParser`,
+`VCLBidir`, `VCLTypeChecker`, `VCLProofObligation`, `VCLContext`, `VCLExplain`,
+`VCLSubtyping`, `VCLCircuit`, `VCLParser_test`.
+
+[NOTE]
+====
+These were ReScript `.res` files under `src/vql/` until recently. Documents that
+still say `src/vql/VQLParser.res` are describing a tree that no longer exists.
+The residual `vql` spellings in Rust (`verisim-api/src/vql.rs`,
+`verisim-planner/src/vql_bridge.rs`) and in the user-facing route
+`/api/v1/vql/execute` are *deliberate* and tracked under the staged rename in
+issue #84 — `tests/doc-consonance-gate.sh` scopes them out so the gate stays
+green while the rename is in flight.
+====
+
+=== Cross-language boundary (`connectors/`)
+
+First-class SDKs: *Rust, Elixir, ReScript, Julia, Zig*. Shared contracts live in
+`connectors/shared/` (`openapi/`, `proto/`, `json-schema/`); test infrastructure
+in `connectors/test-infra/`.
+
+Other BEAM languages (Gleam, Erlang, and prospectively LFE / Hamler / Akula) are
+*not* getting per-language SDKs. They route through the SNIFs WASM bridge — see
+link:docs/architecture/snifs-bridge.adoc[`docs/architecture/snifs-bridge.adoc`]
+and issue #86. The Gleam SDK was retired on 2026-06-01 (PR #85) for exactly this
+reason.
+
+The ABI is defined in *Idris2* with formal proofs and the FFI is implemented in
+*Zig*; the reasoning for both is in
+link:docs/architecture/abi-ffi.adoc[`docs/architecture/abi-ffi.adoc`].
+
+== Read this next, by question
+
+[cols="2,3",options="header"]
+|===
+|If you want to know… |Read
+
+|how the processes fit together and what talks to what
+|link:docs/architecture/topology.adoc[`docs/architecture/topology.adoc`]
+(*canonical* for process topology)
+
+|how a value crosses a language boundary
+|link:docs/architecture/abi-ffi.adoc[`docs/architecture/abi-ffi.adoc`]
+(*canonical* for ABI/FFI)
+
+|how to actually deploy this
+|link:docs/deployment/deployment.adoc[`docs/deployment/deployment.adoc`], then
+link:docs/deployment-modes.adoc[`docs/deployment-modes.adoc`] for
+standalone / federated / hybrid and how to migrate between them
+
+|what drift is, how it is detected, and how it is repaired
+|link:docs/drift-handling.adoc[`docs/drift-handling.adoc`] (*canonical*), with
+the three deployment-specific treatments in
+link:docs/challenges-standalone.adoc[`challenges-standalone.adoc`],
+link:docs/challenges-federated.adoc[`challenges-federated.adoc`] and
+link:docs/challenges-hybrid.adoc[`challenges-hybrid.adoc`]
+
+|at which levels consistency is maintained, and push vs pull
+|link:docs/normalization-cascade.adoc[`docs/normalization-cascade.adoc`]
+
+|how a VCL statement is routed and executed
+|link:docs/vcl-architecture.adoc[`docs/vcl-architecture.adoc`] (dual-path
+router)
+
+|what VCL actually means, normatively
+|link:docs/VCL-SPEC.adoc[`docs/VCL-SPEC.adoc`] (*canonical*), with the grammar in
+link:docs/vcl-grammar.ebnf[`docs/vcl-grammar.ebnf`], the operational semantics in
+link:docs/vcl-formal-semantics.adoc[`docs/vcl-formal-semantics.adoc`] and the
+type system in link:docs/vcl-type-system.adoc[`docs/vcl-type-system.adoc`]
+
+|how VCL differs from SQL, and what it deliberately lacks
+|link:docs/vcl-vs-sql.adoc[`docs/vcl-vs-sql.adoc`] — *read the warning below
+first*
+
+|how queries are costed and optimised
+|link:docs/query-optimization-overview.adoc[`docs/query-optimization-overview.adoc`]
+and link:docs/status/planner.adoc[`docs/status/planner.adoc`]
+
+|what is formally proven, and to what strength
+|link:docs/proof-debt.adoc[`docs/proof-debt.adoc`] (*canonical* for the trusted
+base), then `formal/` itself
+
+|where the honest gaps are
+|link:KNOWN-ISSUES.adoc[`KNOWN-ISSUES.adoc`] — 31 catalogued, 28 resolved, *3
+open*
+
+|what changed and when
+|link:CHANGELOG.adoc[`CHANGELOG.adoc`]
+|===
+
+[WARNING]
+====
+`docs/vcl-vs-sql.adoc` is *stale in three specific ways*, and
+`docs/VCL-SPEC.adoc` §"Known Inconsistencies in Existing Documents" already says
+so: it calls VCL read-only, it says there are no mutations, and it says
+`GROUP BY` / `ORDER BY` / aggregates are absent. All three were true of v1.0 and
+are false of the implemented grammar. The spec resolves them "in favour of the
+implemented grammar and source code". Until that comparison guide is corrected,
+treat VCL-SPEC as authoritative on what the language does.
+====
+
+== Formal verification
+
+Nine Coq modules under `formal/`, compiled and assumption-gated by
+`.github/workflows/coq-build.yml`. The gate is *rigorous and honest*: each module
+carries a per-module assumptions whitelist, so an axiom appearing where it should
+not fails the build rather than passing quietly.
+
+Current status is calibrated to a machine-checked `Print Assumptions` audit and
+is recorded in two places that agree:
+
+* link:docs/proof-debt.adoc[`docs/proof-debt.adoc`] — the trusted-base ledger.
+* `.machine_readable/6a2/STATE.a2ml` → `(formal-proofs …)`.
+
+In summary: *0 axioms* for Transaction (C2) and VCL (V2); *closed modulo standard
+primitives* for Octad, Provenance (P2/P3) and WAL (C7); *structural over
+uninterpreted operations, not implementation-linked* for Drift (D1/D2) and
+Normalizer (N2); and *one crux axiomatised* — Planner/PlannerSemantic Q1
+(`optimize_is_permutation`).
+
+Two things are owed and both are recorded in issue #113: discharging the Q1
+axiom, and adding a Coq-model ↔ Rust-implementation refinement link. Without the
+second, the proofs are about an abstract model, which `STATE.a2ml` states plainly
+rather than overstating.
+
+`formal/CROSS-REPO-MAP.adoc` maps each proof obligation onto the sibling
+repositories (`vcl-ut`, `echo-types`, `tropical-resource-typing`, `kategoria`)
+whose existing results bear on it — issue #84 is the research track behind that
+map.
+
+== Machine-readable architecture sources
+
+These are not documentation; they are artefacts that gates read.
+
+[cols="2,4",options="header"]
+|===
+|Path |Role
+
+|`.machine_readable/6a2/META.a2ml` |*Canonical* for architecture decisions,
+development practices and design rationale
+|`.machine_readable/6a2/STATE.a2ml` |Project state, component status, proof
+status, session history
+|`.machine_readable/6a2/ECOSYSTEM.a2ml` |Position in the estate and related
+projects
+|`.machine_readable/6a2/AGENTIC.a2ml` |AI-agent operational gating and safety
+controls
+|`.machine_readable/6a2/PLAYBOOK.a2ml` |Executable plans and operational runbooks
+|`.machine_readable/6a2/NEUROSYM.a2ml` |Symbolic semantics and composition
+algebra
+|`.machine_readable/anchors/ANCHOR.a2ml` |Estate exception anchors
+|`.machine_readable/contractiles/` |`Mustfile`, `Trustfile`, `Intendfile`,
+`Adjustfile`, `Dustfile`, `Bustfile` — Nickel-evaluated policy
+|`.machine_readable/bot_directives/` |Per-bot policy, including
+`cross-thread-quarantine.a2ml`
+|`0-AI-MANIFEST.a2ml` |Top-level AI manifest
+|===
+
+== See also
+
+* link:README.adoc[README.adoc] — capabilities, comparisons, quick start
+* link:EXPLAINME.adoc[EXPLAINME.adoc] — orientation; the conceptual model
+* link:ROADMAP.adoc[ROADMAP.adoc] — criticality-ordered work plan
+* link:GOVERNANCE.adoc[GOVERNANCE.adoc] — how decisions get made here
+* link:docs/INDEX.adoc[docs/INDEX.adoc] — the full documentation tree
+* link:FAQ.adoc[FAQ.adoc] — short answers with pointers to long ones
+* link:TESTING.adoc[TESTING.adoc] — test pyramid and CI gates

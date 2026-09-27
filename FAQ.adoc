@@ -1,0 +1,367 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Frequently Asked Questions
+:toc: left
+:toclevels: 2
+:icons: font
+
+[.lead]
+Short answers, each pointing at the document that gives the long one. Nothing
+here is a new claim: every answer is harvested from an existing canonical source
+and linked to it. Where a source has itself gone stale, the answer gives the
+*current* behaviour and names the stale document, because a FAQ that quietly
+repeats a superseded answer is worse than no FAQ.
+
+Two FAQ-shaped documents already exist and are not duplicated here:
+
+* link:docs/business/pr/faq.adoc[`docs/business/pr/faq.adoc`] — 317 lines for
+  press, analysts and enterprise evaluators, including the competitive
+  positioning against Neo4j, Pinecone, Weaviate, ArangoDB and SurrealDB, and the
+  licensing/commercial questions.
+* link:EXPLAINME.adoc[`EXPLAINME.adoc`] — the conceptual orientation. If you read
+  only one thing, read that.
+
+This file covers the questions those two do not: the ones a developer or a
+contributor actually hits.
+
+== The basics
+
+=== Is VeriSimDB a database?
+
+Yes, in all three deployment modes — standalone (a traditional multimodal
+database), federated (a distributed database with controlled consistency) and
+hybrid (partly local, partly federated). The architectural point is that it
+*also* enables federation without forcing you into that model.
+
+→ link:docs/deployment-modes.adoc#_is_verisimdb_a_database[`docs/deployment-modes.adoc` §"Is VeriSimDB a Database?"]
+
+=== What is the octad?
+
+Eight modalities per entity: *graph, vector, tensor, semantic, document,
+temporal, provenance, spatial*. Not every entity needs all eight — the octad is
+the maximum set, and each entity populates the witnesses it has.
+
+Eight is not an arbitrary number. Each modality captures a distinct entity-level
+semantic: structure (graph), similarity (vector), high-dimensional shape
+(tensor), type-system intent (semantic), text content (document), time
+(temporal), origin (provenance), location (spatial). Together they span the
+practical entity-representation space without redundancy.
+
+→ `README.adoc` §"The Octad"; rationale recorded as `rationale-octad` in
+link:.machine_readable/6a2/META.a2ml[`.machine_readable/6a2/META.a2ml`]
+
+=== What is drift?
+
+Divergence between modal witnesses of the same entity. A document is edited
+before its embedding is recomputed; a spatial coordinate is refined
+independently of the text that describes it; a graph edge outlives the document
+it points at. VeriSimDB detects it, classifies it by type, scores its severity,
+and can repair it automatically.
+
+→ link:docs/drift-handling.adoc[`docs/drift-handling.adoc`]
+
+=== Why "consonance" instead of "consistency"?
+
+Classic databases enforce consistency up front — transactions, locks — and treat
+divergence as an error to prevent. VeriSimDB *expects* modal witnesses to drift
+and treats drift as a first-class, typed condition to be measured and repaired.
+The maintained property is consonance: the witnesses still refer to the same
+identity, within policy.
+
+The practical consequence is that a modality failure is *not* automatically an
+identity failure. `document changed, vector stale` is modal drift, repairable by
+normalisation. `hash chain broken` is a provenance/integrity failure.
+`remote node asserts an incompatible type` is a federation conflict needing
+arbitration. `all live witnesses retracted` is an inactive or tombstoned
+identity. Four different states, four different proof obligations, four different
+repair paths.
+
+→ link:EXPLAINME.adoc#_why_consonance_not_consistency[`EXPLAINME.adoc` §"Why consonance, not consistency"]
+
+=== What is VCL?
+
+The *VeriSim Consonance Language*. Statements are either *propositions*
+(`DECLARE`, `ASSERT`, `RETRACT`) or *epistemic requests* (`INSPECT`, `VERIFY`),
+plus `MERGE` / `SPLIT` / `NORMALISE`. They are directed at a consonance engine,
+not queries against a passive store.
+
+[IMPORTANT]
+====
+The name is *Consonance*, not *Query*. "VeriSim Query Language" is a retired
+misnomer, and `tests/doc-consonance-gate.sh` fails the build if it reappears in
+any `*.adoc`, `*.md` or `*.a2ml`. The legacy spelling survives in *code*
+identifiers only (`vql_executor`, `/api/v1/vql/execute`, `vql-bridge/`), which is
+deliberate and tracked under issue #84's staged rename.
+====
+
+→ link:docs/VCL-SPEC.adoc[`docs/VCL-SPEC.adoc`] (canonical),
+link:docs/vcl-grammar.ebnf[`docs/vcl-grammar.ebnf`],
+link:docs/vcl-examples.adoc[`docs/vcl-examples.adoc`]
+
+=== How does VCL differ from SQL?
+
+It borrows keywords (`SELECT`, `FROM`, `WHERE`, `LIMIT`, `OFFSET`) and shares
+almost nothing else. `SELECT` picks *modalities*, not columns. `FROM` names a
+`STORE`, a `HEXAD` (one entity by UUID) or a `FEDERATION`. There are no `JOIN`s
+— the graph modality replaces them, since relationships are first-class. And the
+`PROOF` clause requests a verifiable guarantee about the result, which has no SQL
+analogue at all.
+
+[WARNING]
+====
+link:docs/vcl-vs-sql.adoc[`docs/vcl-vs-sql.adoc`] is *stale in three specific
+ways*: it calls VCL read-only, it says there are no mutations, and it says
+`GROUP BY`, `ORDER BY` and aggregates are absent. All three were true of v1.0 and
+are false of the implemented grammar — mutations are parsed
+(`VCLBridge.parse_mutation/2`) and routed, and INSERT/UPDATE/DELETE bypass the
+admissibility gate in favour of the proof-verification path.
+`docs/VCL-SPEC.adoc` §"Known Inconsistencies in Existing Documents" already
+records all three and resolves them in favour of the implementation. Until that
+comparison guide is corrected, trust VCL-SPEC.
+====
+
+→ link:docs/vcl-vs-sql.adoc[`docs/vcl-vs-sql.adoc`] (with the caveat above),
+link:docs/VCL-SPEC.adoc[`docs/VCL-SPEC.adoc`]
+
+=== What is VCL-total?
+
+The proof-bearing safety substrate *behind* VCL, living in the sibling repository
+https://github.com/hyperpolymath/vcl-ut[`vcl-ut`]. It decides whether a proposed
+identity transition is *admissible* under schema, modality, provenance, authority,
+freshness, resource, effect, federation and proof constraints.
+
+The proof goal is deliberately narrow — not "prove the whole database correct",
+but "prove that *this* identity transition is admissible, traceable, authorised,
+and consonant enough to affect live state".
+
+In this repo the consumer half is `VeriSim.Query.VCLTGate`, which shells out to
+the `vclt-gate` binary when `VERISIM_VCLT_GATE` is set and *fails closed*: a
+timeout, a crash or an unparseable response blocks the statement rather than
+allowing it.
+
+→ link:EXPLAINME.adoc#_vcl_vcl_total_and_verisimdb[`EXPLAINME.adoc` §"VCL, VCL-total, and VeriSimDB"],
+`elixir-orchestration/lib/verisim/query/vclt_gate.ex`
+
+== Building and running
+
+=== What do I need to build it?
+
+Rust (edition 2021) and Elixir 1.17+. *No C++ linker is required* — the build is
+pure Rust. That is a deliberate consequence of AD-003: `oxrocksdb-sys` was
+removed in favour of redb, and Oxigraph sits behind a feature flag.
+
+----
+cargo build                          # Rust core
+cd elixir-orchestration && mix deps.get && mix compile
+----
+
+→ `README.adoc` §"Quick Start"
+
+=== How do I run it?
+
+----
+cargo run -p verisim-api             # HTTP + gRPC server
+cd elixir-orchestration && iex -S mix   # orchestration, in another terminal
+----
+
+[WARNING]
+====
+The HTTP API has *no built-in authentication*. Every endpoint is unauthenticated:
+any client that can reach the port can read, write or delete any entity. There is
+no bearer-token check, no mTLS and no authorisation layer. In development this is
+intentional. In any deployment reachable by untrusted clients you must put a
+gateway (svalinn, nginx, or similar) in front of it. This is
+link:KNOWN-ISSUES.adoc#_29_http_api_has_no_authentication_open[Known Issue #29]
+and it is *open*.
+====
+
+=== How many tests are there?
+
+Measured 2026-09-27: *694 Rust tests* (437 `#[test]` + 257 `#[tokio::test]`),
+*680 Elixir tests*, 28 Criterion benchmark functions, 5 `proptest!` blocks and 4
+libFuzzer targets.
+
+[NOTE]
+====
+`README.adoc` §"Test" still says "Rust: 510+ tests" and "Elixir: 160+ tests".
+Both were true when written and both understate the current suite — the Elixir
+figure by more than four times. Issue #79 tracks the next expansion
+(694 → 1,800 Rust, 5 → 60 `proptest!` blocks, 28 → 90 benches).
+====
+
+→ link:TESTING.adoc[`TESTING.adoc`] for the pyramid and the CI gates
+
+=== Is it production-ready?
+
+No, and the honest answer is more useful than a qualified yes. Three things are
+open and each is a deployment blocker for a different reason:
+
+[cols="1,3,2",options="header"]
+|===
+|Issue |What |Consequence
+
+|#29 |HTTP API has no authentication
+|Must sit behind a gateway. Do not expose the port
+
+|#30 |Cross-request transactions return `501 Not Implemented`
+|No multi-round-trip transaction. The in-process `TransactionManager` tracks
+lifetime within a single request only
+
+|#31 |`at_time` returns partial data for multi-update entities
+|Temporal reconstruction is reliable only for entities mutated in a single write
+|===
+
+The `501`s are *deliberate*. Those four endpoints previously returned 200 with
+fabricated success objects; they were changed to honest 501s in 0.2.0 under the
+principle recorded in the CHANGELOG as "July-1 credibility: honesty over fake
+success".
+
+Data-plane replication is also absent — every modality store is single-instance,
+and federation today is leaderless *read* fanout with no cross-peer write
+coordination.
+
+→ link:KNOWN-ISSUES.adoc[`KNOWN-ISSUES.adoc`] (31 catalogued, 28 resolved, 3
+open), `ROADMAP.adoc` §Phase 6
+
+=== What is the coverage gate?
+
+Rust is gated at 60% via `cargo-llvm-cov`. Elixir's floor is currently *40*
+(`elixir-orchestration/coveralls.json` → `minimum_coverage`), not 60: actual
+coverage settled near 42.6% once the federation adapters grew live-service-only
+branches, which is a threshold mismatch rather than a regression. The staged ramp
+back to 60 has dated phases.
+
+→ link:elixir-orchestration/coveralls-coverage-targets.adoc[`elixir-orchestration/coveralls-coverage-targets.adoc`]
+
+== Architecture and internals
+
+=== What is it written in?
+
+*Rust* for the core engine and the modality stores (16 crates under
+`rust-core/`); *Elixir/OTP* for orchestration, supervision and federation;
+*AffineScript* for the VCL parser and type checker (`src/vcl/`); *Idris2* for the
+ABI definition and the VCL-DT type checker; *Zig* for the FFI implementation;
+*Coq* for the formal proofs (9 modules under `formal/`).
+
+→ link:ARCHITECTURE.adoc[`ARCHITECTURE.adoc`] for the full component map
+
+=== Why Rust and Elixir, and why that split?
+
+AD-002: Rust for performance-critical modality stores, Elixir/OTP for distributed
+coordination and fault tolerance. The boundary is a NIF/port boundary —
+`VCLBridge` keeps a long-running parser process over stdin/stdout JSON, and
+`verisim-nif` is intended to make the Rust core callable in-process.
+
+*`verisim-nif` is currently a stub* returning `nif_placeholder`; the real
+host-side implementation is tracked in issue #61. It is also the only crate in
+the workspace with zero tests.
+
+→ link:ARCHITECTURE.adoc#_architecture_decision_records[`ARCHITECTURE.adoc`],
+link:docs/architecture/abi-ffi.adoc[`docs/architecture/abi-ffi.adoc`]
+
+=== How do other BEAM languages talk to it?
+
+Through the *SNIFs WASM bridge*, not through per-language SDKs. The Gleam SDK was
+retired on 2026-06-01 (PR #85) precisely because the answer to "do we ship a
+Gleam SDK?" is a single principled no: ship one SNIF-compatible WASM module that
+any BEAM language can call via `wasmex`, and WASM guest faults become BEAM error
+tuples instead of killing the VM.
+
+First-class SDKs remain Rust, Elixir, ReScript, Julia and Zig.
+
+→ link:docs/architecture/snifs-bridge.adoc[`docs/architecture/snifs-bridge.adoc`],
+issue #86
+
+=== What is actually formally proven?
+
+Calibrated to a machine-checked `Print Assumptions` audit, and stated at the
+strength it was actually proved at:
+
+[cols="2,3",options="header"]
+|===
+|Strength |Modules
+
+|*0 axioms* (fully closed) |Transaction (C2), VCL (V2)
+|*Closed modulo standard primitives* |Octad O-series + R1–R3, Provenance (P2/P3,
+abstract hash), WAL (C7, decidable equality)
+|*Structural over uninterpreted operations* — **not** implementation-linked
+|Drift (D1/D2), Normalizer (N2)
+|*Crux currently an axiom* |Planner / PlannerSemantic Q1
+(`optimize_is_permutation`)
+|===
+
+Two things are owed: discharging the Q1 axiom, and adding a Coq-model ↔
+Rust-implementation refinement link. Without the second, the proofs are about an
+abstract model. An earlier claim of "8/8 closed / foundation-pack DONE" was an
+overclaim and has been removed.
+
+`coq-build.yml` carries a per-module assumptions whitelist, so an axiom appearing
+where it should not fails the build.
+
+→ link:docs/proof-debt.adoc[`docs/proof-debt.adoc`] (the trusted-base ledger),
+`.machine_readable/6a2/STATE.a2ml` → `(formal-proofs …)`, issue #113
+
+=== What licence?
+
+*MPL-2.0* for code, *CC-BY-SA-4.0* for prose. That is AD-006 — "MPL-2.0 across
+the workspace (no AGPL)" — and it is enforced mechanically: `reuse lint` is green
+at 808/808 files and runs as a required CI job.
+
+→ link:LICENSE[`LICENSE`], link:REUSE.toml[`REUSE.toml`],
+`.well-known/ai.txt` for the AI-training stance
+
+== Contributing
+
+=== How do decisions get made?
+
+Sole-maintainer governance. The repository sits at *TPCF Perimeter 3 (Community
+Sandbox)* — anyone can fork, PR and discuss — with a *Perimeter 1 carve-out* for
+the paths where a bad change does real damage: CI/CD workflow pinning, release
+signing, and the `formal/` proof core.
+
+Significant changes get a minimum 72 hours of discussion; structural changes
+(repo purpose, licence, ownership transfer, archival) get a minimum week. These
+are real commitments, not aspirations.
+
+→ link:GOVERNANCE.adoc[`GOVERNANCE.adoc`], link:MAINTAINERS.adoc[`MAINTAINERS.adoc`],
+link:CONTRIBUTING.adoc[`CONTRIBUTING.adoc`]
+
+=== What will fail my PR?
+
+The gates that actually block:
+
+* *`reuse lint`* — every file needs copyright and licence information.
+* *`tests/doc-consonance-gate.sh`* — the string "VeriSim Query Language" in any
+  doc fails the build.
+* *`tests/doc-links-gate.sh`* — a broken relative link in any `*.adoc` fails the
+  build.
+* *`coq-build.yml`* — per-module `Print Assumptions` whitelists; an unexpected
+  axiom fails.
+* *`tests/assail-classifications-gate.sh`* — every `(file …)` key in
+  `audits/assail-classifications.a2ml` must resolve to a real path.
+* *`governance.yml`* — the estate reusable workflow, including RFC 9116
+  `security.txt` validation once that file exists.
+
+Plus `rust-ci.yml`, `elixir-ci.yml`, CodeQL, Scorecard, gitleaks and Hypatia.
+
+→ link:TESTING.adoc[`TESTING.adoc`], link:CONTRIBUTING.adoc[`CONTRIBUTING.adoc`],
+`.github/workflows/`
+
+=== How do I report a security problem?
+
+Via
+https://github.com/hyperpolymath/verisimdb/security/advisories/new[GitHub's private vulnerability reporting],
+which is the preferred method and gives automatic credit when the advisory is
+published. Full disclosure policy, safe harbour, scope and response timelines are
+in link:SECURITY.adoc[`SECURITY.adoc`]. Published advisories and their triage
+history are in
+link:SECURITY-ADVISORIES.adoc[`SECURITY-ADVISORIES.adoc`].
+
+=== Where do I go next?
+
+* link:EXPLAINME.adoc[`EXPLAINME.adoc`] — orientation, if you have not read it
+* link:README.adoc[`README.adoc`] — capabilities, comparisons, quick start
+* link:ARCHITECTURE.adoc[`ARCHITECTURE.adoc`] — the architecture index
+* link:docs/INDEX.adoc[`docs/INDEX.adoc`] — the full documentation tree
+* link:KNOWN-ISSUES.adoc[`KNOWN-ISSUES.adoc`] — the honest gaps
+* link:ROADMAP.adoc[`ROADMAP.adoc`] — what is planned, by criticality

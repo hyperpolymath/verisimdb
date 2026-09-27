@@ -4,6 +4,17 @@
 (* Version: 3.0 — Octad (8 modalities), provenance conditions, spatial conditions *)
 (* Date: 2026-02-27 *)
 
+(* ------------------------------------------------------------------------
+   DUPLICATE-GRAMMAR NOTICE (added 2026-09-27)
+   This file is a near-duplicate of spec/grammar.ebnf, which is treated as
+   canonical (it carries the @taxonomy tag and the copyright line, and is the
+   copy cited by README.adoc, EXPLAINME.adoc, 0-AI-MANIFEST.a2ml and
+   spec/system-specs.adoc). The two were identical in substance.
+   Any edit to the grammar MUST be applied to both files, or this duplicate
+   retired. Consolidation is an owner decision; see
+   ULTRAPLAN-2026-09-27.adoc.
+   ------------------------------------------------------------------------ *)
+
 (* ============================================================================
    1. TOP-LEVEL STRUCTURE
    ============================================================================ *)

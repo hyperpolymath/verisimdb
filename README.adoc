@@ -482,16 +482,16 @@ WARNING: The HTTP API has **no built-in authentication**. In development this is
 
 [source,bash]
 ----
-cargo test                    # Rust: 510+ tests
+cargo test                    # Rust: 694 tests (437 #[test] + 257 #[tokio::test])
 cd elixir-orchestration
-mix test                      # Elixir: 160+ tests (VCL, consensus, telemetry, federation, hypatia)
+mix test                      # Elixir: 680 tests (VCL, consensus, telemetry, federation, hypatia)
 ----
 
 === CI & Coverage
 
 * `cargo-llvm-cov` (Rust) + `excoveralls` (Elixir) wired into CI, LCOV/JSON uploaded to Codecov.
 * `elixir-orchestration` coverage floor is currently `40` (`coveralls.json` → `coverage_options.minimum_coverage`). Actual coverage settled near 42.6 % once federation adapters grew live-service-only branches; this is a threshold mismatch, not a regression.
-* Staged ramp back to `60` is documented with target dates in link:elixir-orchestration/coveralls-coverage-targets.md[`elixir-orchestration/coveralls-coverage-targets.md`] (Phase 1: 50 by 2026-07-15; Phase 2: 60 by 2026-09-01).
+* Staged ramp back to `60` is documented with target dates in link:elixir-orchestration/coveralls-coverage-targets.adoc[`elixir-orchestration/coveralls-coverage-targets.md`] (Phase 1: 50 by 2026-07-15; Phase 2: 60 by 2026-09-01).
 
 === Container
 
@@ -567,10 +567,10 @@ grpcurl -plaintext -d '{"id": "entity-001"}' \
 
 ----
 verisimdb/
-├── rust-core/                 # Rust modality stores (pure Rust, no C++)
+├── rust-core/                 # Rust modality stores (pure Rust, no C++ linker)
 │   ├── verisim-graph/         # Graph (SimpleGraphStore default, Oxigraph optional)
 │   ├── verisim-vector/        # Vector (HNSW similarity search)
-│   ├── verisim-tensor/        # Tensor (ndarray/Burn)
+│   ├── verisim-tensor/        # Tensor (ndarray)
 │   ├── verisim-semantic/      # Semantic (CBOR proof blobs)
 │   ├── verisim-document/      # Document (Tantivy full-text search)
 │   ├── verisim-temporal/      # Temporal (version history)
@@ -579,24 +579,55 @@ verisimdb/
 │   ├── verisim-octad/         # Unified octad entity
 │   ├── verisim-drift/         # Drift detection
 │   ├── verisim-normalizer/    # Self-normalisation
+│   ├── verisim-planner/       # Cost-based query planner
+│   ├── verisim-repl/          # Interactive VCL REPL
+│   ├── verisim-storage/       # Pluggable storage backend abstraction
+│   ├── verisim-nif/           # Rustler NIF bridge (scaffold; see issue #61)
 │   ├── verisim-wal/           # Write-ahead log
 │   └── verisim-api/           # HTTP/gRPC/GraphQL API
 ├── elixir-orchestration/      # Elixir/OTP coordination layer
 │   ├── lib/verisim/
 │   │   ├── drift/             # DriftMonitor GenServer
 │   │   ├── entity/            # EntityServer (per-entity GenServer)
-│   │   ├── query/             # VCL parser, executor, bridge
+│   │   ├── query/             # VCL bridge, executor, type checker, VCLTGate
+│   │   ├── federation/        # Peer adapters (MongoDB, Redis, Neo4j, …)
 │   │   └── rust_client.ex     # HTTP client for Rust core
+│   ├── bench/                 # Benchee benchmark scripts
 │   └── test/
-├── demos/
-│   └── drift-detection/       # Drift detection demo script
+├── src/                       # AffineScript + Idris2 sources
+│   ├── vcl/                   # VCL parser + bidirectional type checker (11 modules)
+│   ├── registry/              # Federation registry + KRaft metadata log
+│   └── abi/                   # Idris2 ABI definitions (Foreign, Layout, Types)
+├── lib/                       # Auxiliary Elixir modules (planner config, query
+│                              #   cache, circuit breaker, error recovery)
+├── connectors/
+│   ├── clients/               # SDKs: rust, elixir, rescript, julia, zig
+│   ├── shared/                # openapi/, proto/, json-schema/ contracts
+│   └── test-infra/            # Federation adapter test stack
+├── formal/                    # Coq proofs (9 modules) + CROSS-REPO-MAP.adoc
+├── debugger/                  # In-tree crate: TUI debugger + ABI/FFI visualisation
+├── ffi/zig/                   # Zig FFI implementation
+├── benches/                   # Criterion benchmarks
+├── fuzz/                      # libFuzzer targets (also rust-core/fuzz/)
+├── playground/                # VCL playground web UI
+├── container/                 # Containerfile, stapeln/svalinn config
+├── demos/drift-detection/     # Drift detection demo script
 ├── docs/                      # Specifications and design documents
+│   ├── INDEX.adoc             # Documentation tree index — start here
+│   ├── VCL-SPEC.adoc          # Normative VCL specification
 │   ├── vcl-grammar.ebnf       # VCL formal grammar
-│   ├── vcl-formal-semantics.adoc
-│   └── vcl-type-system.adoc
-├── registry/                  # ReScript federation registry
-└── .machine_readable/         # STATE.scm, META.scm, ECOSYSTEM.scm
+│   ├── architecture/          # topology, abi-ffi, snifs-bridge
+│   ├── decisions/             # ADR-style decision records
+│   └── proof-debt.adoc        # Trusted-base ledger for the Coq development
+├── scripts/                   # Gate and demo scripts
+├── tests/                     # doc-consonance, doc-links and assail gates
+├── audits/                    # assail-classifications.a2ml finding registry
+└── .machine_readable/         # STATE.a2ml, META.a2ml, ECOSYSTEM.a2ml (+ 4 more)
 ----
+
+For the full component map, the architecture decision register (AD-001…AD-007)
+and a "read this next, by question" index, see
+link:ARCHITECTURE.adoc[ARCHITECTURE.adoc].
 
 == Use Cases
 
@@ -614,15 +645,15 @@ ZKP proofs and dependent types enable tamper-evident knowledge exchange. VCL-tot
 
 == Documentation
 
-See link:docs/INDEX.md[docs/INDEX.md] for the complete documentation tree.
+See link:docs/INDEX.adoc[docs/INDEX.md] for the complete documentation tree.
 
 Quick links:
 
-* link:ROADMAP.md[Roadmap] — criticality-ordered work plan (Phase 1–8)
+* link:ROADMAP.adoc[Roadmap] — criticality-ordered work plan (Phase 1–8)
 * link:CHANGELOG.adoc[Changelog] — versioned history of all notable changes
-* link:TESTING.md[Testing & Benchmarking Standards] — CI gates, property tests, fuzz corpus
-* link:KNOWN-ISSUES.adoc[Known Issues] — honest-gaps audit (25/25 resolved)
-* link:SECURITY.md[Security Policy] — threat model and disclosure process
+* link:TESTING.adoc[Testing & Benchmarking Standards] — CI gates, property tests, fuzz corpus
+* link:KNOWN-ISSUES.adoc[Known Issues] — honest-gaps audit (31 catalogued, 28 resolved, 3 open)
+* link:SECURITY.adoc[Security Policy] — threat model and disclosure process
 * link:AUDIT.adoc[Audit Index] — RSR audit-trail index
 
 VCL language (file paths retain the historical `vcl-` / `VCL-` names; the in-repo file rename is a separate, tracked cleanup):
@@ -637,28 +668,28 @@ VCL language (file paths retain the historical `vcl-` / `VCL-` names; the in-rep
 Deployment & operations:
 
 * link:docs/deployment/deployment.adoc[Deployment Guide] — Podman, selur-compose, Containerfile
-* link:docs/deployment/void-setup.md[Void Linux Dev Setup]
+* link:docs/deployment/void-setup.adoc[Void Linux Dev Setup]
 * link:docs/deployment-modes.adoc[Deployment Modes] — standalone, federated, hybrid
 * link:docs/safety-and-fault-tolerance.adoc[Safety & Fault Tolerance]
 * link:docs/drift-handling.adoc[Drift Handling] — detection, repair, federation drift
 
 Architecture & decisions:
 
-* link:docs/architecture/topology.md[Process Topology]
-* link:docs/architecture/abi-ffi.md[ABI/FFI Contract]
+* link:docs/architecture/topology.adoc[Process Topology]
+* link:docs/architecture/abi-ffi.adoc[ABI/FFI Contract]
 * link:docs/decisions/rust-spark-stance.adoc[Why Rust] (decision record)
 * link:docs/decisions/kraft-comparison.adoc[Why KRaft] (decision record)
-* link:docs/decisions/proven-coherence.md[Proven Library Integration]
+* link:docs/decisions/proven-coherence.adoc[Proven Library Integration]
 
 Papers:
 
-* link:docs/papers/whitepaper.md[VeriSimDB Whitepaper] (Markdown source)
+* link:docs/papers/whitepaper.adoc[VeriSimDB Whitepaper] (Markdown source)
 * link:docs/papers/whitepaper.pdf[Whitepaper PDF]
 * link:docs/papers/arcvix-octad-data-model.tex[ARCVIX Octad Data-Model Paper]
 
 Releases:
 
-* link:docs/releases/v0.1.0-alpha.md[v0.1.0-alpha Release Notes]
+* link:docs/releases/v0.1.0-alpha.adoc[v0.1.0-alpha Release Notes]
 
 == License
 
@@ -666,4 +697,4 @@ MPL-2.0
 
 == Contributing
 
-See link:CONTRIBUTING.md[CONTRIBUTING.md] for guidelines.
+See link:CONTRIBUTING.adoc[CONTRIBUTING.adoc] for guidelines.

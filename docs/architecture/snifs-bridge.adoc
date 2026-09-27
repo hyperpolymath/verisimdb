@@ -1,0 +1,351 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= SNIFs WASM Bridge — design and boundary analysis
+:toc: left
+:toclevels: 3
+:icons: font
+
+[NOTE]
+====
+*Status: design, not implementation.* This is step 6 of issue #86, written so the
+step-1 owner decision can be taken against evidence rather than against the
+sketch in the issue. No `verisim.wasm` artefact exists and no SNIF wrapper has
+been spiked.
+
+*The headline finding is that issue #86's two options are both mis-specified
+against what SNIFs actually is.* Read <<sec-scope>> before <<sec-options>>. The
+short version: SNIFs has *no WASI and no filesystem*, and *no BEAM terms cross
+its boundary* — only `i32/i64/f32/f64` and byte-buffers. That rules out Option B
+outright and rules most of Option A's proposed surface out with it. What survives
+is a narrower and more defensible bridge: *pure-compute kernels, not stores*.
+====
+
+== What this bridge is for
+
+Architectural position agreed 2026-06-01: BEAM-side cross-language access to
+VeriSimDB flows through *one* boundary rather than through a per-language SDK.
+The question "do we ship a Gleam SDK?" is answered once, with a principled no —
+ship a SNIF-compatible WASM module that any BEAM language can call, and Gleam,
+Erlang, LFE, Hamler and Akula all get access through it.
+
+That decision is *sound and is not revisited here*. The Gleam SDK was retired in
+PR #85 on exactly this basis, and the SDK matrix dropped from six first-class
+clients to five (Rust, Elixir, ReScript, Julia, Zig). What this document revises
+is the *shape* of the boundary, because the shape proposed in #86 does not fit
+the upstream project's stated scope.
+
+[#sec-scope]
+== What SNIFs actually is, and what that constrains
+
+https://github.com/hyperpolymath/snifs[SNIFs] — *Safer (sandboxed) NIFs* — keeps
+the NIF *interface* and replaces its *implementation*: the guest compiles to
+WebAssembly and runs in a `wasmtime` sandbox via `wasmex`, so a guest fault
+becomes a catchable `{:error, reason}` tuple and the calling BEAM process
+survives. A normal NIF runs native code inside the VM's address space, so any
+fault in it kills the entire VM.
+
+The scope statement in its README is precise, and the precision is the part that
+matters here:
+
+[cols="2,4",options="header"]
+|===
+|Property |Consequence for VeriSimDB
+
+|*Like-for-like replacement for pure native computation over numbers and
+byte-buffers* — crypto, compression, parsing, DSP, math kernels
+|The drift scorer, the planner's cost algebra, vector distance kernels and proof
+verification are all in this class. The stores are not.
+
+|*Only `i32/i64/f32/f64` and bytes cross the boundary.* A normal NIF receives
+actual BEAM terms and reads binaries zero-copy; a SNIF sees only what you
+marshal into linear memory
+|Every `Octad`, `DriftReport` or proof witness must be serialised by the caller
+and deserialised by the guest. #86 attributed this cost to Option B alone; it is
+a property of *SNIFs*, and therefore applies to Option A identically.
+
+|*No I/O of any kind.* The guest is `wasm32-freestanding` with *no WASI*
+(upstream ADR-002)
+|*Decisive.* No filesystem, no sockets. `verisim-storage` (redb),
+`verisim-document` (tantivy), `verisim-graph` (Oxigraph), `verisim-wal` and the
+whole HTTP/gRPC surface require I/O and *cannot* run in the guest.
+
+|*The result is fallible:* `{:ok, values} \| {:error, reason}`
+|Aligns exactly with the principle `rust-core/verisim-nif/src/lib.rs` already
+encodes: "an unimplemented operation MUST fail loudly, never fake success". A
+scaffold that returned canned success JSON once turned a write into *silent data
+loss reported as success*. SNIFs' interface makes that class of bug inexpressible.
+
+|*Out of scope:* BEAM-term manipulation, `enif_make_resource`, monitors,
+message-sending, dirty scheduling, zero-copy binaries
+|No long-lived guest-side handle to a store. A SNIF call is stateless compute;
+state stays in the host.
+
+|*Scope ceiling by design:* graduated integration, capability negotiation and
+transaction-gating are deliberately *not* SNIF features — upstream routes them to
+the *cleave* and *groove* projects
+|Do not plan VeriSimDB features that require the bridge to negotiate
+capabilities or gate transactions. That is asking SNIFs to be something it has
+explicitly decided not to be.
+|===
+
+=== Measured overhead
+
+From upstream's in-BEAM benchmark (OTP 25, `fibonacci(20)`, n=2000):
+
+[cols="3,1,1,1,3",options="header"]
+|===
+|Case |mean µs |p50 µs |p99 µs |Note
+
+|Per-call (compile every call) |3978 |3571 |10594 |the naive path — *do not do this*
+|*Pooled* (compile once) |70 |*29* |500 |56× faster than per-call
+|Buffer round-trip (`sum_f32`) |20 |15 |71 |the data-marshalling case
+|Port (OS process, isolated) |1617 |1445 |4483 |the *other* isolated option
+|===
+
+Three numbers drive the design:
+
+* *~29 µs fixed dispatch per call.* This dominates tiny, high-frequency calls and
+  amortises to nothing once a call does real work. A drift score for one entity is
+  not "real work" at this granularity — *batch it*.
+* *Pooled SNIF is ~23× cheaper than a Port* for the same crash isolation. Since
+  VeriSimDB's current BEAM↔Rust paths are HTTP (`VERISIM_TRANSPORT=http`) and a
+  parser Port (`VCLBridge`), the bridge is a genuine improvement over the Port,
+  not merely over nothing.
+* *Compute is ~1.1–1.5× native* (upstream's estimate, not yet measured for its
+  kernels). This is the only *unamortisable* tax, so it bounds the benefit for
+  long calls: a kernel that is 1.4× slower but crash-isolated may still be worth
+  it, and the arithmetic should be done per kernel rather than assumed.
+
+*Critical invariant:* Zig guests must be compiled `-OReleaseSafe`. `ReleaseFast`
+removes bounds checks and turns the same faults into *silent wrong answers* —
+empirically verified upstream, and used there as the negative control. For a
+database whose entire purpose is detecting silent divergence, shipping a
+`ReleaseFast` bridge would be self-refuting.
+
+[#sec-options]
+== Option A, Option B, and the option that actually works
+
+#86 offers two delivery options and recommends "A long-term, B as the v0 if it
+ships faster". Measured against the scope above, neither survives as written.
+
+=== Option B — `verisim-api` as the WASM target: *not viable*
+
+#86 describes compiling the HTTP/JSON API gateway to WASM and having SNIFs wrap
+it and "serve it locally". Serving anything locally requires sockets. SNIFs
+permits *no I/O at all* (ADR-002, no WASI). This is not a performance trade-off
+or an invasive refactor — it is a capability the guest does not have.
+
+There is a nearby shape that *does* work, and it is worth naming because it is
+probably what Option B was reaching for: the host performs all I/O and the guest
+is a pure *request handler* over byte-buffers — bytes in, bytes out, no sockets.
+But that is not "the API gateway compiled to WASM"; it is a serialised
+compute kernel with an HTTP-shaped input format, and it inherits all of Option A's
+marshalling costs while adding a JSON encode/decode hop on top. It is strictly
+worse than picking the right kernels directly.
+
+*Recommendation: drop Option B.*
+
+=== Option A — `verisim-core` compiled to WASM: *viable only for part of the surface*
+
+#86 proposes carving out the rust-core API surface that does not need tokio, and
+names `OctadStore`, `DriftCalculator` and `Normalizer` as likely candidates while
+excluding the planner/optimizer and async federation.
+
+The tokio test is necessary but *not sufficient*. Removing async gets you a
+crate that compiles for `wasm32-unknown-unknown`; it does not get you a crate
+that can run without a filesystem.
+
+[cols="2,2,2,4",options="header"]
+|===
+|Candidate |#86 said |Verdict |Why
+
+|`OctadStore` (`verisim-octad`, `verisim-storage`)
+|through WASM
+|*❌ No*
+|Persists through redb / tantivy / Oxigraph. All three need a filesystem. No WASI.
+
+|`Normalizer` (`verisim-normalizer`)
+|through WASM
+|*❌ No*
+|Repair *writes*. Reads and writes both need the stores, which need I/O.
+
+|`DriftCalculator` (`verisim-drift`)
+|through WASM
+|*✅ Yes*
+|Computes a scalar severity over modal views. Pure numeric compute — SNIFs'
+stated sweet spot. Needs the views marshalled in, but produces a small result.
+
+|Planner / optimizer (`verisim-planner`)
+|*excluded* by #86
+|*✅ Yes — and #84 strengthens the case*
+|Issue #84 observes the planner is *already secretly tropical*: `parallel` takes
+`max` (tropical addition) and `sequential` sums `time_ms` (tropical
+multiplication). That is pure arithmetic over a plan DAG. It is a better bridge
+candidate than several things #86 included, and excluding it looks like an error
+rather than a judgement.
+
+|Vector distance kernels (`verisim-vector`)
+|not considered
+|*✅ Yes — best-measured case*
+|Cosine / Euclidean over `f32` buffers is precisely the shape of upstream's own
+`sum_f32` buffer-round-trip benchmark (p50 15 µs, p99 71 µs). The only candidate
+with a directly comparable published measurement.
+
+|Proof verification (`verisim-semantic`, CBOR + `sha2`)
+|not considered
+|*⚠️ Conditional*
+|"Crypto, parsing" is explicitly inside SNIFs' scope, but witnesses are
+byte-buffers that must be marshalled both ways, and the ZKP surface is
+partly `NotImplemented` today. Worth spiking *after* drift and cost.
+
+|`verisim-wal`, `verisim-api`, federation
+|excluded
+|*❌ Correctly excluded*
+|Filesystem and sockets respectively. #86 got these right.
+|===
+
+=== Option C — the recommendation: *pure-compute kernels, host keeps all I/O*
+
+State the boundary as a rule rather than a list, so the next crate can be
+classified without re-litigating this document:
+
+[IMPORTANT]
+====
+*A VeriSimDB function may cross the SNIF boundary if and only if it is total
+over marshalled numeric/byte input, produces marshalled numeric/byte output, and
+performs no I/O.* Stores, WAL, API and federation stay host-side. Kernels cross.
+====
+
+Concretely, the v0 bridge surface is four kernels:
+
+. *drift scoring* — `verisim-drift`: modal views in, severity + drift type out
+. *plan costing* — `verisim-planner`: plan DAG in, tropical cost estimate out
+. *vector distance* — `verisim-vector`: `f32` buffers in, distances out
+. *octad checksum* — `verisim-octad`'s identity/consonance hash, which is pure
+  over serialised modal data and is the cheapest useful thing to prove the
+  plumbing with
+
+Everything else stays native. This is a *smaller* bridge than #86 proposed, and
+it is smaller for a reason that will still be true in a year: the constraint is
+upstream's ADR-002, not VeriSimDB's ambition.
+
+=== Where the bridge sits relative to `verisim-nif`
+
+`rust-core/verisim-nif` is a Rustler NIF scaffold — an honest stub returning
+`{:error, :not_implemented}` for every operation, tracked in issue #61, and the
+only crate in the workspace with zero tests. The Elixir transport selector is:
+
+----
+VERISIM_TRANSPORT=http   # default: HTTP to the verisim-api server
+VERISIM_TRANSPORT=nif    # demand NIF: surfaces {:error, :not_implemented} loudly
+VERISIM_TRANSPORT=auto   # NIF only if OPERATIONAL, else HTTP — today always HTTP
+----
+
+The SNIF bridge is a *fourth* transport, not a replacement for the NIF crate:
+
+----
+VERISIM_TRANSPORT=snif   # crash-isolated WASM kernels; host retains all I/O
+----
+
+Two consequences worth stating now:
+
+* A Rustler NIF runs native code *inside* the VM's address space, so a fault in
+  it kills the BEAM. A SNIF does not. If both eventually exist, `snif` is the
+  safer default for the kernels it covers and `nif` remains the path for anything
+  needing BEAM terms or resources.
+* `verisim-nif` being untested and `verisim-snif` being unbuilt are the same gap
+  viewed from two directions: *the in-process transport has never been exercised*.
+  Issue #79 ranks `verisim-nif` as the worst test-density crate in the workspace
+  (0 tests / 135 LOC). Whatever gets built here should not repeat that.
+
+== Sequence
+
+Revised from #86's six steps. The revision is that step 3 is *answered by this
+document* rather than left open, and that step 1's decision is reframed.
+
+[cols="1,3,2,3",options="header"]
+|===
+|# |Step |Owner |Note
+
+|1
+|Ratify Option C (kernels, not stores) and record why A and B do not survive
+contact with SNIFs' scope
+|*owner ruling*
+|This document is the briefing. It is one decision, and it unblocks everything
+below
+
+|2
+|Spike: one kernel end-to-end. *Recommended: vector distance*, because upstream
+publishes a directly comparable `sum_f32` buffer-round-trip measurement to check
+the result against
+|1–2 days
+|Success criterion is a p50 near upstream's 15 µs and a caller that survives a
+deliberately trapping guest
+
+|3
+|Define the marshalling codec for the four v0 kernels
+|architectural
+|#84 step 4 proposes wiring the vcl-ut wire-codec in for query-shaped calls. For
+*these* kernels that is over-engineering: they carry fixed-width numeric arrays,
+not queries. Use a flat binary layout and reserve the wire codec for VCL-shaped
+calls if they ever cross
+
+|4
+|Second kernel: drift scoring. Third: plan costing
+|—
+|Drift is the differentiating feature and the one whose correctness matters most;
+costing is the one #84 has a theorem waiting for
+
+|5
+|Publish `verisim.wasm` per release; publish the SNIF wrapper as a hex package
+|—
+|Must be built `-OReleaseSafe` (or the Rust equivalent with overflow and bounds
+checks *on*). A `ReleaseFast` artefact would be a silent-wrong-answer generator
+in a drift-detection database
+
+|6
+|Add `VERISIM_TRANSPORT=snif` and *test it*
+|—
+|Include a crash-isolation test in the style upstream uses: force a guest trap
+and assert the calling process survives. `verisim-nif`'s zero-test record is the
+counter-example
+|===
+
+== Open questions this document does not answer
+
+* *Does the ~29 µs dispatch floor change any current call pattern?* VeriSimDB's
+  drift monitor scores entities on a schedule; if it scores one entity per call,
+  the floor dominates and batching is mandatory rather than optional. That needs
+  a measurement of the current call granularity, which needs a running system.
+* *Rust or Zig for the guest?* SNIFs supports both at parity. VeriSimDB's kernels
+  are Rust, so Rust avoids a rewrite; but Zig is where upstream's five crash-mode
+  test surface lives, and `-OReleaseSafe` is a Zig flag with no exact Rust
+  analogue (the Rust equivalent is keeping `overflow-checks` and bounds checks on
+  in a release profile, which this repo currently *disables* — `Cargo.toml` sets
+  `panic = "abort"`, `lto = true`, `codegen-units = 1`). That profile
+  interaction needs checking before a Rust guest is assumed safe.
+* *Is crash isolation the right reason?* For a database whose value proposition
+  is *detecting* divergence, a kernel that silently returns a wrong drift score
+  is worse than one that crashes. SNIFs converts crashes into errors, which is the
+  right direction — but only if the guest keeps its checks. This is the same
+  question as the previous bullet and it is the one that matters most.
+
+== Related
+
+* Issue #86 — this document is its step 6
+* Issue #84 — cross-repo synthesis; the tropical-planner observation used above,
+  and the vcl-ut wire-codec proposal
+* Issue #79 — test expansion; `verisim-nif` at 0 tests / 135 LOC is the
+  worst-served crate in the workspace
+* https://github.com/hyperpolymath/snifs[`hyperpolymath/snifs`] — upstream:
+  README (scope and benchmarks), ADR-002 (no WASI), `demo/` (wasmex loader +
+  ExUnit suite), `verification/proofs/agda/SnifIsolation.agda` (the SEC-1
+  crash-isolation theorem)
+* link:abi-ffi.adoc[`docs/architecture/abi-ffi.adoc`] — the Idris2/Zig ABI
+  contract, which is a *different* cross-language boundary and should not be
+  conflated with this one
+* link:topology.adoc[`docs/architecture/topology.adoc`] — process topology
+* link:../../ARCHITECTURE.adoc[`ARCHITECTURE.adoc`] — component map and decision
+  register
+* `rust-core/verisim-nif/src/lib.rs` — the honest-stub rationale and the
+  transport selector

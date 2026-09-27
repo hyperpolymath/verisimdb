@@ -118,11 +118,11 @@ Both modes use the same parser and produce the same AST. They diverge at the **q
                      └───────────────────┬──────────────────────────────┘
                                          │
                                    ┌─────▼──────┐
-                                   │   Parser    │ (ReScript / Elixir fallback)
+                                   │   Parser    │ (AffineScript / Elixir fallback)
                                    └─────┬──────┘
                                          │ AST
                                    ┌─────▼──────┐
-                                   │ Type Check  │ (VQLBidir.res)
+                                   │ Type Check  │ (VCLBidir.affine)
                                    └─────┬──────┘
                                          │
                               ┌──────────┴──────────┐
@@ -152,7 +152,7 @@ Both modes use the same parser and produce the same AST. They diverge at the **q
 ----
 
 `[.implemented]` Parser, basic type checking, query routing, store dispatch. +
-`[.partial]` Bidirectional type inference (implemented in ReScript, not wired to runtime Lean checker). +
+`[.partial]` Bidirectional type inference (implemented in AffineScript, not wired to runtime Lean checker). +
 `[.planned]` ZKP proof generation via `proven-library` / `sanctify`.
 
 === Conformance Levels
@@ -422,7 +422,7 @@ VCL's type system operates over these primitive types:
 
 [cols="1,2,2"]
 |===
-| Type | Description | ReScript Representation
+| Type | Description | AffineScript Representation
 
 | `Int`
 | Arbitrary-precision integer
@@ -514,7 +514,7 @@ In slipstream mode, the type checker validates:
 3. **Operator compatibility** — Comparison operators match operand types
 4. **Aggregate validity** — Aggregate functions operate on appropriate types (e.g., `SUM` requires numeric)
 
-.ReScript type representation
+.AffineScript type representation
 [source,rescript]
 ----
 type rec vclType =
@@ -531,7 +531,7 @@ type rec vclType =
   | NeverType
 ----
 
-`[.implemented]` All simple type checking in `VQLBidir.res`.
+`[.implemented]` All simple type checking in `VCLBidir.affine`.
 
 === Dependent Types (VCL-DT Path)
 
@@ -607,7 +607,7 @@ The subtyping relation stem:[\tau_1 <: \tau_2] governs when a value of type stem
 \end{aligned}
 ++++
 
-`[.implemented]` Structural subtyping in `VQLBidir.res`.
+`[.implemented]` Structural subtyping in `VCLBidir.affine`.
 
 === Type Inference (Bidirectional)
 
@@ -616,7 +616,7 @@ VCL uses **bidirectional type checking** with two modes:
 * **Synthesis** (stem:[\Gamma \vdash e \Rightarrow \tau]) — Infer the type of an expression from its structure.
 * **Checking** (stem:[\Gamma \vdash e \Leftarrow \tau]) — Verify that an expression has an expected type.
 
-The `synthesizeQuery` function in `VQLBidir.res` walks the query AST through nine phases:
+The `synthesizeQuery` function in `VCLBidir.affine` walks the query AST through nine phases:
 
 1. Resolve modalities from SELECT clause
 2. Check source (HEXAD/FEDERATION/STORE) typing
@@ -639,7 +639,7 @@ The `synthesizeQuery` function in `VQLBidir.res` walks the query AST through nin
 \frac{\Gamma \vdash q : \text{Query}[M] \quad \Gamma \vdash p : \text{ProofSpec}[\phi]}{\Gamma \vdash q\ \text{PROOF}\ p \Rightarrow \Sigma r : \text{QueryResult}[M]. \text{Proof}[\phi(r)]} \quad \text{(T-ProvedQuery)}
 ++++
 
-`[.implemented]` Bidirectional type inference in `VQLBidir.res` (841 lines, 9-phase pipeline).
+`[.implemented]` Bidirectional type inference in `VCLBidir.affine` (841 lines, 9-phase pipeline).
 
 === Refinement Types
 
@@ -1622,17 +1622,17 @@ Certificates are independently verifiable — any party with the verification ke
 
 The execution pipeline flows through three layers:
 
-1. **ReScript Core** — Parsing, type checking, query plan generation
+1. **AffineScript Core** — Parsing, type checking, query plan generation
 2. **Elixir Orchestrator** — Query routing, federation fan-out, drift handling
 3. **Rust Modality Stores** — Per-modality query execution
 
 .Execution pipeline
 ----
 VCL String
-  → Parser (ReScript VQLParser.res / Elixir vcl_bridge.ex fallback)
+  → Parser (AffineScript VCLParser.affine / Elixir vcl_bridge.ex fallback)
   → AST
-  → Type Checker (VQLBidir.res)
-  → Query Plan Generator (VQLExplain.res)
+  → Type Checker (VCLBidir.affine)
+  → Query Plan Generator (VCLExplain.affine)
   → Condition Classifier (pushdown vs cross-modal)
   → Elixir QueryRouter GenServer
     → Route to stores by modality:
@@ -1712,7 +1712,7 @@ Optimization hints:
   - VECTOR + DOCUMENT queries can execute in parallel
 ----
 
-.Per-modality base costs (from VQLExplain.res)
+.Per-modality base costs (from VCLExplain.affine)
 [cols="1,1"]
 |===
 | Modality | Base Cost
@@ -1842,7 +1842,7 @@ VCL provides structured error responses with error codes, messages, and recovery
 | Suspicious inconsistencies suggesting Byzantine behaviour
 |===
 
-`[.implemented]` All error types defined in `VQLError.res` (447 lines). Structured JSON error responses.
+`[.implemented]` All error types defined in `VCLError.affine` (447 lines). Structured JSON error responses.
 
 
 // ============================================================================
@@ -1859,7 +1859,7 @@ This section provides an honest assessment of what is implemented, partially imp
 |===
 | Feature | Version | Notes
 
-| VCL Parser (ReScript)
+| VCL Parser (AffineScript)
 | 2.0
 | 1154 lines, monadic parser combinators. Handles all grammar productions.
 
@@ -1869,19 +1869,19 @@ This section provides an honest assessment of what is implemented, partially imp
 
 | Bidirectional Type Checker
 | 2.0
-| `VQLBidir.res` (841 lines). 9-phase pipeline. Cross-modal checking, mutation checking.
+| `VCLBidir.affine` (841 lines). 9-phase pipeline. Cross-modal checking, mutation checking.
 
 | Type System
 | 2.0
-| `VQLTypes.res` (296 lines). Pi types, Sigma types, proof types, structural equality.
+| `VCLTypes.affine` (296 lines). Pi types, Sigma types, proof types, structural equality.
 
 | Error System
 | 2.0
-| `VQLError.res` (447 lines). 5 error categories, 40+ error kinds, JSON serialization.
+| `VCLError.affine` (447 lines). 5 error categories, 40+ error kinds, JSON serialization.
 
 | EXPLAIN Plans
 | 2.0
-| `VQLExplain.res` (427 lines). Per-modality cost estimation, performance hints.
+| `VCLExplain.affine` (427 lines). Per-modality cost estimation, performance hints.
 
 | Query Executor
 | 2.0
@@ -1943,7 +1943,7 @@ This section provides an honest assessment of what is implemented, partially imp
 | Cross-modal write atomicity
 | INSERT/UPDATE/DELETE execute but atomic cross-modal writes (all modalities or none) are not guaranteed.
 
-| VCL Bridge (Elixir ↔ ReScript)
+| VCL Bridge (Elixir ↔ AffineScript)
 | Port-based communication works. Falls back to built-in Elixir parser when Deno/Node unavailable.
 |===
 
@@ -2736,7 +2736,7 @@ This specification is the authoritative reference for VCL language behaviour. Th
 | 63 comprehensive examples covering all VCL constructs, both execution paths, error cases, and advanced use cases. 1078 lines.
 
 | link:vcl-architecture.adoc[`vcl-architecture.adoc`]
-| Dual-path routing architecture, ReScript/Elixir/Rust stack, metadata storage, audit trail, drift detection, API endpoint, performance comparison. 708 lines.
+| Dual-path routing architecture, AffineScript/Elixir/Rust stack, metadata storage, audit trail, drift detection, API endpoint, performance comparison. 708 lines.
 
 | link:vcl-vs-vcl-dt.adoc[`vcl-vs-vcl-dt.adoc`]
 | Detailed comparison of Slipstream vs VCL-DT execution paths, six proof types, performance implications, honest implementation status. 282 lines.
@@ -2751,42 +2751,73 @@ This specification is the authoritative reference for VCL language behaviour. Th
 |===
 | File | Role
 
-| `src/vql/VQLParser.res`
-| ReScript parser (1154 lines). Monadic combinator library + grammar.
+| `src/vcl/VCLParser.affine`
+| AffineScript parser (1201 lines). Monadic combinator library + grammar,
+including the three mutation parsers.
 
-| `src/vql/VQLTypes.res`
-| Core type definitions (296 lines). Modality, primitive, VCL, and proof types.
+| `src/vcl/VCLTypes.affine`
+| Core type definitions (311 lines). Modality, primitive, VCL, and proof types.
 
-| `src/vql/VQLBidir.res`
-| Bidirectional type inference engine (841 lines). 9-phase synthesis pipeline.
+| `src/vcl/VCLBidir.affine`
+| Bidirectional type inference engine (858 lines). 9-phase synthesis pipeline,
+including `synthesizeMutation`.
 
-| `src/vql/VQLError.res`
-| Structured error types (447 lines). 5 categories, 40+ error kinds.
+| `src/vcl/VCLError.affine`
+| Structured error types (464 lines). 5 categories, 40+ error kinds.
 
-| `src/vql/VQLExplain.res`
-| EXPLAIN plan generation (427 lines). Cost estimation and hints.
+| `src/vcl/VCLExplain.affine`
+| EXPLAIN plan generation (442 lines). Cost estimation and hints.
+
+| `src/vcl/VCLTypeChecker.affine`
+| Type-checker entry points and mode selection (407 lines).
+
+| `src/vcl/VCLSubtyping.affine`
+| Structural subtyping relations (253 lines).
+
+| `src/vcl/VCLContext.affine`
+| Typing context: bindings, modality scope, proof environment (253 lines).
+
+| `src/vcl/VCLProofObligation.affine`
+| Proof-obligation generation for `PROOF`-carrying statements (257 lines).
+
+| `src/vcl/VCLCircuit.affine`
+| Circuit-breaker hooks on the query path (77 lines).
+
+| `src/vcl/VCLParser_test.affine`
+| Parser test suite, co-located with the module (564 lines).
 
 | `elixir-orchestration/lib/verisim/query/query_router.ex`
-| Elixir query router GenServer (187 lines). Routes by modality.
+| Elixir query router GenServer (189 lines). Routes by modality.
 
 | `elixir-orchestration/lib/verisim/query/vcl_bridge.ex`
-| Elixir ↔ ReScript bridge (672 lines). Built-in fallback parser.
+| Elixir ↔ AffineScript bridge (801 lines). Built-in fallback parser.
 
 | `elixir-orchestration/lib/verisim/query/vcl_executor.ex`
-| Full VCL executor (1162 lines). Parse → type check → plan → route → aggregate.
+| Full VCL executor (2310 lines). Parse → type check → plan → route → aggregate.
 |===
+
+[NOTE]
+====
+The paths and line counts above were re-measured against HEAD `681d635` on
+2026-09-27. An earlier revision of this table named `src/vql/VQL{Parser,Types,
+Bidir,Error,Explain}.res` — files that do not exist. That was residue from two
+completed migrations: the `vql` → `vcl` rename, and ReScript → AffineScript
+(zero `.res` files remain in the tree; 32 `.affine` files do). The counts had
+also drifted materially, most notably `vcl_executor.ex` at 1162 claimed versus
+2310 actual. Six modules present in `src/vcl/` were not listed at all.
+====
 
 === Known Inconsistencies in Existing Documents
 
 For transparency, these inconsistencies exist between the pre-v2.0 documents:
 
-1. **`vcl-vs-sql.adoc`** states VCL lacks GROUP BY, ORDER BY, aggregates, and mutations. This was true for v1.0 but is incorrect for v2.0. The grammar, parser, and executor all support these features.
+1. *[closed 2026-09-27]* **`vcl-vs-sql.adoc`** stated VCL lacks GROUP BY, ORDER BY, aggregates, and mutations. That was true for v1.0 but incorrect for v2.0: the grammar, parser, and executor all support these features. The page has now been corrected in place, so this is no longer a live divergence.
 
-2. **`vcl-vs-vcl-dt.adoc`** lists six proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION) which differ from the grammar's six (EXISTENCE, CITATION, ACCESS, INTEGRITY, PROVENANCE, CUSTOM). This specification follows the grammar and implementation.
+2. *[open — owner decision required]* **`vcl-vs-vcl-dt.adoc`** lists six proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION) which differ from the grammar's six (EXISTENCE, CITATION, ACCESS, INTEGRITY, PROVENANCE, CUSTOM). This specification follows the grammar and implementation. The divergent page now carries a prominent WARNING block naming the mismatch; its six normative subsections were *not* rewritten, because doing so in either direction would silently decide whether the grammar or that page is the target.
 
-3. **`vcl-vs-sql.adoc`** describes VCL as "read-only" which is no longer accurate after v2.0 mutations.
+3. *[closed 2026-09-27]* **`vcl-vs-sql.adoc`** described VCL as "read-only", which is no longer accurate after v2.0 mutations. The page now states that the Octad API is the *preferred* write path while recording that the grammar and parser do implement `INSERT`/`UPDATE`/`DELETE` as retained legacy forms.
 
-This specification resolves all three inconsistencies in favour of the implemented grammar and source code.
+Items 1 and 3 are resolved in the source documents themselves. Item 2 remains open pending an owner decision, and is flagged at the point of divergence rather than resolved unilaterally.
 
 // ============================================================================
 // APPENDIX E: VCL-dt++ EXTENSIONS (TYPELL INTEGRATION)
@@ -2797,7 +2828,16 @@ This specification resolves all three inconsistencies in favour of the implement
 
 VCL-dt++ extends VCL v3.0 with six optional clauses that provide maximal type-theoretic strictness. These extensions are consumed by the **Typell verification kernel** (the formal verification substrate for PanLL) and are specified normatively in the grammar delta file:
 
-* link:../../typeql-experimental/docs/vcl-dtpp-grammar.ebnf[`vcl-dtpp-grammar.ebnf`] — EBNF grammar delta (199 lines)
+* `vcl-dtpp-grammar.ebnf` — EBNF grammar delta (199 lines). *Not reachable.*
+  This document cited it at the relative path
+  `../../typeql-experimental/docs/vcl-dtpp-grammar.ebnf`, which assumed the
+  sibling repository was checked out alongside this one. That link was dead in
+  any standalone clone, and `hyperpolymath/typeql-experimental` itself returns
+  HTTP 404 as of 2026-09-27, so the file cannot be resolved even with the
+  sibling present. Cross-repository references in this document are given as
+  absolute URLs for exactly this reason; this one has no URL to give. The
+  grammar delta needs re-homing — see issue #84, whose cross-repo synthesis
+  track covers the VCL-dt++ / Typell boundary.
 
 All six clauses are optional and composable in any combination. They append after the standard query structure with no keyword conflicts against VCL v3.0's 60+ reserved keywords.
 
@@ -2983,7 +3023,7 @@ Idris2 ABI mapping: `BoundedResource : (n : Nat) -> Type`. Generalises linear ty
 
 ==== Combined: Maximal Strictness
 
-All six clauses composed together (see also link:../../typell/docs/design/DESIGN-2026-03-01-typell-vision.md[Typell Vision Document]):
+All six clauses composed together (see also link:https://github.com/hyperpolymath/typell/blob/main/docs/design/DESIGN-2026-03-01-typell-vision.adoc[Typell Vision Document]):
 
 [source,sql]
 ----
@@ -3006,7 +3046,7 @@ VCL-dt++ queries are verified by the Typell kernel via JSON-RPC:
 typell.check(query, "vcl-dt++") → TypeResult
 ----
 
-The kernel returns: types, proof obligations, linear tracking, session protocol compliance, effect analysis, modal scope verification, and proof certificates. See the link:../../typell/docs/design/DESIGN-2026-03-01-typell-vision.md[Typell Vision Document] for the full verification protocol specification.
+The kernel returns: types, proof obligations, linear tracking, session protocol compliance, effect analysis, modal scope verification, and proof certificates. See the link:https://github.com/hyperpolymath/typell/blob/main/docs/design/DESIGN-2026-03-01-typell-vision.adoc[Typell Vision Document] for the full verification protocol specification.
 
 === Status
 

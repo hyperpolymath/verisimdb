@@ -7,7 +7,7 @@
 
 == Overview
 
-This document describes the **corrected** VCL (VeriSim Consonance Language) architecture, aligned with link:../design-decisions.adoc[Architecture Design Decisions] and the link:../WHITEPAPER.md[VeriSimDB White Paper].
+This document describes the **corrected** VCL (VeriSim Consonance Language) architecture, aligned with link:../ARCHITECTURE.adoc[the architecture decision register] and the link:../WHITEPAPER.pdf[VeriSimDB White Paper].
 
 **Key Corrections from Initial Design:**
 
@@ -625,8 +625,8 @@ let searchPapers = async () => {
 
 - link:vcl-grammar.ebnf[VCL Grammar (EBNF)]
 - link:vcl-examples.adoc[VCL Examples]
-- link:../WHITEPAPER.md[VeriSimDB White Paper]
-- link:../design-decisions.adoc[Architecture Design Decisions]
+- link:../WHITEPAPER.pdf[VeriSimDB White Paper]
+- link:../ARCHITECTURE.adoc[Architecture Index] — the component map and the AD-001…AD-007 decision register
 - link:technical-specification-kraft-metadata-log.adoc[KRaft Metadata Log]
 - link:challenges-federated.adoc[Federated Deployment Challenges]
 
@@ -637,11 +637,11 @@ let searchPapers = async () => {
 
 | CockroachDB for metadata
 | ReScript + Raft
-| Simpler, sufficient for <20 nodes (link:../design-decisions.adoc:247[])
+| Simpler, sufficient for <20 nodes
 
 | Fluree for audit trails
 | verisim-temporal (Merkle trees)
-| Lighter weight, no blockchain overhead (link:../design-decisions.adoc:140[])
+| Lighter weight, no blockchain overhead
 
 | No drift integration
 | DriftMonitor checks
@@ -653,7 +653,7 @@ let searchPapers = async () => {
 
 | CockroachDB geo-partitioning
 | Raft quorum
-| Only migrate to CockroachDB if >20 nodes (link:../design-decisions.adoc:224[])
+| Only migrate to CockroachDB if >20 nodes
 |===
 
 == Appendix B: Technology Stack

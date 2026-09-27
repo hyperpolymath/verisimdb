@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# humanstxt.org — the humans responsible for this repository.
+# Team from MAINTAINERS.adoc; stack from README.adoc's project structure and
+# the language policy recorded in .machine_readable/6a2/META.a2ml.
+
+/* TEAM */
+  Lead Maintainer: Jonathan D.A. Jewell
+  Contact: j.d.a.jewell [at] open.ac.uk
+  GitHub: https://github.com/hyperpolymath
+  Role: Project lead, core development, formal methods, governance
+
+  Governance model: sole maintainer (see GOVERNANCE.adoc)
+  Contribution perimeter: TPCF Perimeter 3 — Community Sandbox, with a
+                          Perimeter 1 carve-out for CI/CD pinning, release
+                          signing and the formal/ proof core.
+
+/* THANKS */
+  Contributors: https://github.com/hyperpolymath/verisimdb/graphs/contributors
+  Security reporters: none yet — see SECURITY-ADVISORIES.adoc, which says so
+                     plainly rather than omitting the section.
+
+  The hyperpolymath estate, whose sibling repositories this one depends on
+  intellectually and mechanically:
+    - vcl-ut                     VCL-total: the proof-bearing safety substrate
+                                 behind VCL (certified Idris2 + trusted parser)
+    - standards                  RSR canon, reusable CI/CD and security
+                                 workflows, A2ML and Nickel format definitions
+    - snifs                      Safe NIFs via WebAssembly sandboxing — the
+                                 single cross-language boundary for BEAM-side
+                                 access (issue #86)
+    - echo-types                 constructive Agda for proof-relevant structured
+                                 loss; the residue taxonomy that drift detection
+                                 is being aligned to
+    - tropical-resource-typing   max-plus tropical algebra for worst-case
+                                 bounds; the planner is already secretly
+                                 tropical (parallel = max, sequential = +)
+    - kategoria                  the 10-level type-safety challenge used as a
+                                 per-level conformance test bed
+
+/* SITE */
+  Project: VeriSimDB — the Veridical Simulacrum Database
+  What it is: a federated identity-consonance engine. Not primarily a database
+              of records: each entity is a consonance subject maintained across
+              up to eight modal witnesses (the octad), with continuous drift
+              detection and self-normalisation.
+  Repository: https://github.com/hyperpolymath/verisimdb
+  Documentation: https://github.com/hyperpolymath/verisimdb/tree/main/docs
+  Architecture index: ARCHITECTURE.adoc
+  Orientation: EXPLAINME.adoc
+
+  Languages, and what each is for:
+    Rust           core engine + the eight modality stores (16 crates)
+    Elixir/OTP     orchestration, supervision, federation coordination
+    AffineScript   VCL parser + bidirectional type checker (src/vcl/)
+    Idris2         ABI definition with formal proofs; VCL-DT type checker
+    Zig            FFI implementation
+    Coq            formal proofs (9 modules in formal/, Coq 8.18)
+    Nickel         contractile policy evaluation (.machine_readable/contractiles/)
+
+  Key dependencies:
+    redb           graph storage — pure-Rust default, no C++ linker (AD-003)
+    Oxigraph       graph storage — optional, feature-flagged
+    tantivy 0.26   document modality, full-text (AD-007)
+    hnsw_rs        vector modality, HNSW similarity search
+    ndarray        tensor modality
+    axum + tonic   HTTP and gRPC API surface
+    rustls + ring  TLS, pure Rust — no OpenSSL, no aws-lc-sys/cmake
+
+  Build: cargo + mix; just (Justfile) for task running; Podman/selur-compose
+         for containers; Guix for the development environment (guix.scm).
+         Pure Rust — no C++ linker required for a stock build.
+  CI/CD: GitHub Actions, SHA-pinned. 21 required checks on main, including
+         reuse lint, Coq Print Assumptions whitelists, doc-consonance,
+         doc-links, CodeQL, OpenSSF Scorecard, gitleaks, cargo-deny and
+         the weekly panic-attack security scan.
+  Licences: MPL-2.0 for code, CC-BY-SA-4.0 for prose (AD-006 — "MPL-2.0 across
+            the workspace, no AGPL"). REUSE-3.3 compliant, 808/808 files.
+  Standards: RFC 9116 (security.txt), SPDX/REUSE, Rhodium Standard Repository
+             (RSR) framework, Tri-Perimeter Contribution Framework (TPCF).
+
+  Machine-readable state: .machine_readable/6a2/ (A2ML) — STATE, META,
+            ECOSYSTEM, AGENTIC, PLAYBOOK, NEUROSYM, 0-AI-MANIFEST.
+  Bot policy: .machine_readable/bot_directives/
+  AI training policy: .well-known/ai.txt
+
+/* NOTE */
+  This repository is instrumented for AI-assisted development and records that
+  fact rather than hiding it: 0-AI-MANIFEST.a2ml at the root, .claude/CLAUDE.md
+  tracked and public, and machine-readable agent gating in
+  .machine_readable/6a2/AGENTIC.a2ml. Every number asserted in the project
+  documentation is meant to carry the command that measured it. Where one does
+  not, that is treated as a defect.
+
+  Last updated: 2026-09-27

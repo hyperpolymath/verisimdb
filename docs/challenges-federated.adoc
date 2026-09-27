@@ -923,4 +923,4 @@ For simpler use cases, **standalone** or **hybrid** modes are recommended.
 - link:challenges-hybrid.adoc[Challenges: Hybrid Mode]
 - link:technical-specification-kraft-metadata-log.adoc[KRaft Metadata Log Specification]
 - link:zkp-and-sanctify-integration.adoc[Zero-Trust Security with ZKP]
-- link:../WHITEPAPER.md[VeriSimDB White Paper]
+- link:../WHITEPAPER.pdf[VeriSimDB White Paper]
