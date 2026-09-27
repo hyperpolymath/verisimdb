@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
 # This workflow is managed by gh actions-lock.
-name: Doc Consonance Gate
+name: Documentation Gates
 
 on:
   push:
@@ -18,5 +18,22 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7.0.1
+
       - name: Doc-consonance gate (no query-language misnomer in docs)
         run: bash tests/doc-consonance-gate.sh
+
+      # Added 2026-09-27 for issue #204. Every relative link:…[] target in the
+      # documentation set must resolve against the working tree. Exemptions go
+      # in scripts/doc-links-allowlist.txt (currently empty — nothing is
+      # exempt), so a suppression is a visible, reviewable edit rather than an
+      # inline comment.
+      - name: Doc-links gate (every relative link resolves)
+        run: bash scripts/check-doc-links.sh
+
+      # The gate above passes on a tree with zero broken links, which is also
+      # what a no-op gate would do. This positive control proves the gate can
+      # actually fail: it plants a broken link in a scratch copy and asserts the
+      # gate rejects it, names the right target, and does not flag a resolving
+      # sibling. Runs after the real gate so a genuine break is reported first.
+      - name: Doc-links gate positive control
+        run: bash tests/doc-links-gate.sh

@@ -88,7 +88,7 @@ as a design document with a scope verdict, not as code.
 
 |`doc-consonance-gate.sh`
 |PASS
-|no `VeriSim Query Language` misnomer in docs
+|no retired query-language misnomer in any tracked `*.adoc` / `*.md` / `*.a2ml`
 
 |`assail-classifications-gate.sh`
 |PASS
@@ -559,6 +559,25 @@ comment/metadata edits are not compiled here
 |no `formal/*.v` change is made by this plan
 |===
 
+[WARNING]
+====
+*`doc-consonance-gate.sh` cannot see untracked files.* It runs `git grep`, which
+searches the index, not the working tree. Every new document in this plan was
+untracked while it was being written, so the gate reported PASS throughout — and
+then failed the moment those files were committed, on `FAQ.adoc` and on this
+document. Two of the PASS results recorded in the table above were therefore
+measured against a tree that *excluded the very files this plan added*.
+
+This is a real weakness, not a curiosity: a gate that goes blind to new files is
+silent exactly when new prose is being introduced, which is when it is most
+needed. The failure was caught here only because the sweep was re-run after
+committing. Fixing it means either committing before verifying, or switching the
+gate to walk the working tree. Tracked as a follow-up in part 8.
+
+Note that `scripts/check-doc-links.sh` does *not* share this defect — it walks
+the filesystem, so it saw the new documents immediately.
+====
+
 Two self-inflicted regressions were caught by the gates during execution and are
 worth recording, because both are the same failure mode — *writing a literal
 marker into prose makes a text-level gate believe the prose is data*:
@@ -571,6 +590,13 @@ by wrapping the illustrative malformed-header listing in
 `CHANGELOG.adoc` entry *describing* the doc-links gate made that gate report a
 broken link in the file announcing it. Fixed by naming the macro without the
 bracket. The gate was right to fail; it had been in place for about four minutes.
+. `FAQ.adoc` and this document both quoted the retired query-language misnomer —
+`FAQ.adoc` because explaining a retirement means naming the retired thing, this
+document because a results table described the gate in the gate's own words. The
+first is the legitimate case the gate's `ALLOW` list exists for, so `FAQ.adoc`
+was added to it with the reasoning recorded inline; the second added nothing and
+was simply reworded. A positive control confirmed the widened exemption is still
+narrow: a misnomer planted in a non-exempt file is caught.
 
 [WARNING]
 ====

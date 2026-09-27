@@ -21,7 +21,20 @@ GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 
 # Files that legitimately name the legacy term: this gate, the changelog
 # history, and the cross-thread quarantine directive (which explains it).
-ALLOW='tests/doc-consonance-gate.sh|CHANGELOG|cross-thread-quarantine'
+#
+# FAQ.adoc was added 2026-09-27. Its "What is VCL?" entry has to quote the
+# retired expansion in order to tell a reader that the name is *Consonance* and
+# not *Query* -- naming the thing being retired is the substance of that answer,
+# not an accident of prose. That is the same reason this file and the quarantine
+# directive are exempt.
+#
+# Honest caveat: the exemption is file-scoped, not line-scoped, so it would also
+# permit the misnomer to creep into FAQ.adoc elsewhere. That coarseness is
+# pre-existing in this gate's design (CHANGELOG is exempt the same way) and is
+# accepted here because the term appears exactly once in FAQ.adoc, inside the
+# IMPORTANT block that explains its retirement. A per-line exemption marker would
+# be strictly better and is noted in ULTRAPLAN-2026-09-27.adoc as a follow-up.
+ALLOW='tests/doc-consonance-gate.sh|CHANGELOG|cross-thread-quarantine|FAQ\.adoc'
 
 hits=$(git grep -n 'VeriSim Query Language' -- '*.adoc' '*.md' '*.a2ml' 2>/dev/null | grep -vE "$ALLOW" || true)
 

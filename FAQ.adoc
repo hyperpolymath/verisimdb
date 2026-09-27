@@ -331,10 +331,13 @@ link:CONTRIBUTING.adoc[`CONTRIBUTING.adoc`]
 The gates that actually block:
 
 * *`reuse lint`* — every file needs copyright and licence information.
-* *`tests/doc-consonance-gate.sh`* — the string "VeriSim Query Language" in any
-  doc fails the build.
-* *`tests/doc-links-gate.sh`* — a broken relative link in any `*.adoc` fails the
-  build.
+* *`tests/doc-consonance-gate.sh`* — the retired query-language misnomer, in any
+  tracked `*.adoc`, `*.md` or `*.a2ml`, fails the build. See the note above for
+  the small list of files exempted because they have to name it in order to
+  explain its retirement.
+* *`scripts/check-doc-links.sh`* — a relative link whose target does not resolve
+  fails the build. `tests/doc-links-gate.sh` is its positive control: it plants a
+  broken link in a scratch copy to prove the gate can actually fail.
 * *`coq-build.yml`* — per-module `Print Assumptions` whitelists; an unexpected
   axiom fails.
 * *`tests/assail-classifications-gate.sh`* — every `(file …)` key in
