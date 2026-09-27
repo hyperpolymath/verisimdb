@@ -52,6 +52,7 @@ Issue #113 and the residue left by the 2026-07-07 docs-hygiene pass.
 - *`.machine_readable/6a2/README.adoc`*: "6 core A2ML files" → 7, listed the seventh, and corrected the standards-repo URL to its real `1-formats/a2ml` path.
 - *`Cargo.toml`*: the `quinn-proto` suppression note still described an open transitive chain. Replaced with the accurate closure (burn removed in 0.2.0, chain gone; `quinn` is absent from `Cargo.lock`).
 - Eight link *labels* whose targets had been fixed but whose display text still named the old file (`link:SECURITY.adoc[SECURITY.md]`) were synced.
+- *`CONTRIBUTING.adoc`*: its repository-structure block claimed "14 workspace members" where `Cargo.toml` declares 18 (17 `rust-core/verisim-*` crates plus `benches`), and omitted `verisim-provenance`, `verisim-spatial` and `verisim-nif`. It described `verisim-tensor` as Burn-backed (Burn was removed in 0.2.0), called the octad a "6-modal entity" when it has eight, listed a root `contractiles/` directory that does not exist (they live under `.machine_readable/contractiles/`), and described `.machine_readable/` as holding "SCM checkpoint files". Its allowed-languages table listed *ReScript* while the adjacent "Not Accepted" list told contributors to use AffineScript instead — both are now correct, and ReScript is recorded as retired with the two historical directory names that were deliberately not renamed.
 
 === Removed
 

@@ -37,29 +37,48 @@ mix test
 
 ....
 verisimdb/
-├── rust-core/                # Rust crates (14 workspace members)
+├── rust-core/                # Rust crates (17 of the 18 workspace members)
 │   ├── verisim-api/          # HTTP/gRPC API server
-│   ├── verisim-graph/        # Graph modality (RDF/Property Graph)
+│   ├── verisim-graph/        # Graph modality (SimpleGraphStore default, Oxigraph optional)
 │   ├── verisim-vector/       # Vector modality (HNSW)
-│   ├── verisim-tensor/       # Tensor modality (Burn)
+│   ├── verisim-tensor/       # Tensor modality (ndarray)
 │   ├── verisim-semantic/     # Semantic modality (CBOR proofs)
 │   ├── verisim-document/     # Document modality (Tantivy)
 │   ├── verisim-temporal/     # Temporal modality (versioning)
-│   ├── verisim-octad/        # Unified 6-modal entity
+│   ├── verisim-provenance/   # Provenance modality (hash-chain lineage)
+│   ├── verisim-spatial/      # Spatial modality (R-tree geospatial)
+│   ├── verisim-octad/        # Unified 8-modal entity (the octad)
 │   ├── verisim-drift/        # Drift detection
 │   ├── verisim-normalizer/   # Self-normalization
 │   ├── verisim-planner/      # Cost-based query planner
 │   ├── verisim-repl/         # Interactive VCL REPL
 │   ├── verisim-wal/          # Write-ahead log
-│   └── verisim-storage/      # Storage backend abstraction
+│   ├── verisim-storage/      # Storage backend abstraction
+│   └── verisim-nif/          # Rustler NIF bridge (scaffold; see issue #61)
+├── benches/                  # Criterion benchmarks (the 18th workspace member)
 ├── elixir-orchestration/     # Elixir/OTP coordination layer
-├── playground/               # VCL Playground PWA (ReScript)
+├── src/                      # AffineScript sources (VCL parser, registry, ABI)
+├── playground/               # VCL Playground PWA (AffineScript)
 ├── container/                # Containerfile for Podman builds
 ├── docs/                     # Architecture and design documents
-├── contractiles/             # Trust, security, and policy contracts
-├── .machine_readable/        # SCM checkpoint files
+├── formal/                   # Coq proofs (9 modules)
+├── debugger/                 # In-tree TUI debugger + ABI/FFI visualisation
+├── .machine_readable/        # A2ML specs (6a2/, anchors/, contractiles/, …)
 └── .github/workflows/        # CI/CD pipelines
 ....
+
+[NOTE]
+====
+The 18th workspace member is `benches/`, not a crate; `Cargo.toml` `members`
+lists 17 `rust-core/verisim-*` crates plus `benches`. An earlier revision of this
+tree said "14 workspace members", omitted `verisim-provenance`,
+`verisim-spatial` and `verisim-nif`, described `verisim-tensor` as Burn-backed
+(Burn was removed from the workspace in 0.2.0 — it is ndarray only), called the
+octad a "6-modal entity" when it has eight modalities, and listed a root
+`contractiles/` directory that does not exist (the contractiles live under
+`.machine_readable/contractiles/`). `.machine_readable/` holds A2ML artefacts,
+not Scheme checkpoint files.
+====
 
 '''''
 
@@ -165,13 +184,21 @@ cargo fmt --check
 |Language |Use Case
 |*Rust* |Core database engine, modality stores, CLI tools
 |*Elixir* |OTP orchestration, distributed coordination
-|*ReScript* |VCL parser, playground PWA
-|*VCL* |VeriSim Consonance Language (query interface)
+|*AffineScript* |VCL parser and type checker (`src/vcl/`), federation registry
+(`src/registry/`), playground PWA
+|*Idris2* |VCL-DT type checker / proof bridge; ABI definitions (`src/abi/`)
+|*Coq* |Formal proofs (`formal/`, 9 modules)
+|*Zig* |FFI implementation (`ffi/zig/`), SNIFs guest code
+|*VCL* |VeriSim Consonance Language (the query interface itself)
 |===
 
 ==== Not Accepted
 
 * TypeScript (use AffineScript instead)
+* ReScript — retired in favour of AffineScript. Zero `.res` files remain in the
+  tree; 32 `.affine` files do. Two directory names are still historical
+  (`connectors/clients/rescript/`, `playground/src/`) and were deliberately not
+  renamed, because renaming a client-SDK directory is a consumer-visible break
 * Python (use Rust or Julia instead)
 * Go (use Rust instead)
 * Node.js/npm/bun (use Deno if JS runtime needed)
