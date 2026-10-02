@@ -40,6 +40,6 @@ jobs:
     #
     # Pin includes canonical .affine language detection and preserves
     # JSON.parseExn coverage after the ReScript-to-AffineScript migration.
-    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@5e7575340961a21098d8d9600461038897016a4d # main 2026-08-24
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@acdb9821a67fe0a275b39f1b388be364df7fbd4a # main 2026-08-24
     secrets:
       VERISIMDB_PAT: ${{ secrets.VERISIMDB_PAT }}
