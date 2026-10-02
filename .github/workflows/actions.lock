@@ -125,7 +125,7 @@ dependencies:
         repo_id: 260749683
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
-        commit: 'sha1-6bed0761d98439e5a578e2877258200ad565ba87'
+        commit: 'sha1-89b12181fb390509a0842a86cc55eeb8eb928c1d'
         owner_id: 1940490
         repo_id: 260749683
     'dtolnay/rust-toolchain@v1':
