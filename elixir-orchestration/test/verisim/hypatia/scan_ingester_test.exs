@@ -255,4 +255,51 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
       assert {:error, :not_found} = ScanIngester.get_scan("nonexistent-repo")
     end
   end
+
+  # A stand-in Rust core that accepts every octad, so the success branch of
+  # ingest_scan/1 runs instead of the unavailable-core fallback.
+  defmodule AcceptingRustCore do
+    @behaviour Plug
+    def init(test_pid), do: test_pid
+
+    def call(conn, test_pid) do
+      send(test_pid, {:rust_core_hit, conn.method, conn.request_path})
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(201, ~s({"id":"accepted"}))
+    end
+  end
+
+  describe "when the Rust core accepts the scan" do
+    setup do
+      server =
+        start_supervised!({Bandit, plug: {AcceptingRustCore, self()}, ip: :loopback, port: 0})
+
+      {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
+      previous = Application.fetch_env(:verisim, :rust_core_url)
+      Application.put_env(:verisim, :rust_core_url, "http://127.0.0.1:#{port}/api/v1")
+
+      on_exit(fn ->
+        case previous do
+          {:ok, url} -> Application.put_env(:verisim, :rust_core_url, url)
+          :error -> Application.delete_env(:verisim, :rust_core_url)
+        end
+      end)
+
+      :ok
+    end
+
+    test "the scan is still indexed locally and visible to PatternQuery" do
+      assert {:ok, octad_id} = ScanIngester.ingest_scan(sample_scan())
+      assert_received {:rust_core_hit, "POST", "/api/v1/octads"}
+
+      assert [%{octad_id: ^octad_id}] = ScanIngester.list_scans()
+
+      health = VeriSim.Hypatia.PatternQuery.pipeline_health()
+      assert health.total_scans == 1
+      assert health.total_weak_points == 2
+      assert health.repos_scanned == 1
+    end
+  end
 end

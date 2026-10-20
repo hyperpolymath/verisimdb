@@ -201,21 +201,8 @@ defmodule VeriSim.Hypatia.PatternQuery do
   # Private Helpers
   # ---------------------------------------------------------------------------
 
-  defp extract_weak_points(scan) do
-    # Weak points might be in the document body or the original report
-    case scan do
-      %{document: %{body: body}} when is_binary(body) ->
-        # Parse weak points from the stored JSON report
-        case Jason.decode(body) do
-          {:ok, %{"assail_report" => %{"weak_points" => wps}}} -> wps
-          {:ok, %{"weak_points" => wps}} -> wps
-          _ -> []
-        end
-
-      _ ->
-        []
-    end
-  end
+  defp extract_weak_points(%{weak_points: wps}) when is_list(wps), do: wps
+  defp extract_weak_points(_scan), do: []
 
   defp extract_all_weak_points(scans) do
     Enum.flat_map(scans, &extract_weak_points/1)

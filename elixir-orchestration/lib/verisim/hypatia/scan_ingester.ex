@@ -73,6 +73,12 @@ defmodule VeriSim.Hypatia.ScanIngester do
 
     octad_input = build_octad(octad_id, repo_name, report)
 
+    # Always index locally: PatternQuery reads only this table, so a scan the
+    # Rust core accepted must land here too, or it is invisible to analytics.
+    # The index keeps the structured findings beside the octad; the document
+    # body is prose for full-text search and cannot be parsed back into them.
+    store_local(octad_id, Map.put(octad_input, :weak_points, report["weak_points"] || []))
+
     case RustClient.create_octad(octad_input) do
       {:ok, _result} ->
         Logger.info("Hypatia: ingested scan for #{repo_name} as #{octad_id}")
@@ -81,11 +87,9 @@ defmodule VeriSim.Hypatia.ScanIngester do
       {:error, reason} ->
         Logger.warning(
           "Hypatia: failed to ingest scan for #{repo_name} via Rust core, " <>
-            "storing locally: #{inspect(reason)}"
+            "kept in the local index only: #{inspect(reason)}"
         )
 
-        # Fallback: store in ETS for local querying
-        store_local(octad_id, octad_input)
         {:ok, octad_id}
     end
   end
@@ -314,17 +318,28 @@ defmodule VeriSim.Hypatia.ScanIngester do
   end
 
   # ---------------------------------------------------------------------------
-  # Private: Local ETS Storage (fallback when Rust core unavailable)
+  # Private: Local ETS scan index (read by PatternQuery; written on every ingest)
   # ---------------------------------------------------------------------------
+
+  @doc """
+  Create the local scan index. Called from `VeriSim.Application.start/2` so the
+  table is owned by the application master and lives as long as the app; an
+  ETS table created lazily would die with whichever process first touched it.
+  """
+  def init_table, do: ensure_ets_table()
 
   defp ensure_ets_table do
     case :ets.info(:hypatia_scans) do
       :undefined ->
         :ets.new(:hypatia_scans, [:named_table, :set, :public])
+        :ok
 
       _ ->
         :ok
     end
+  rescue
+    # Another process created the table between the info check and new/2.
+    ArgumentError -> :ok
   end
 
   defp store_local(octad_id, octad_input) do

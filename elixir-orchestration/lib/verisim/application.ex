@@ -11,6 +11,9 @@ defmodule VeriSim.Application do
 
   @impl true
   def start(_type, _args) do
+    # Owned by this (application master) process so it outlives callers.
+    VeriSim.Hypatia.ScanIngester.init_table()
+
     children = [
       # Telemetry supervisor
       VeriSim.Telemetry,

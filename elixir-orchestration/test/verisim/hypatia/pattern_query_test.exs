@@ -124,8 +124,9 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
       assert health.total_scans == 4
       assert health.repos_scanned == 4
-      # Weak points are in document body, not directly accessible
-      assert health.total_weak_points == 0
+      assert health.total_weak_points == 10
+      assert health.severity_distribution == %{"High" => 5, "Medium" => 4, "Low" => 1}
+      assert hd(health.top_categories) == {"PanicPath", 6}
     end
   end
 
@@ -135,10 +136,13 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
   describe "cross_repo_patterns/1" do
     test "returns empty when no shared patterns meet threshold" do
-      # Our test data has PanicPath:Medium in alpha, beta, gamma, delta
-      # but pattern extraction depends on document body parsing
-      patterns = PatternQuery.cross_repo_patterns(100)
-      assert patterns == []
+      assert PatternQuery.cross_repo_patterns(100) == []
+    end
+
+    test "finds the pattern shared by three repos" do
+      # PanicPath:Medium is in alpha, beta and gamma; delta's PanicPath is Low.
+      assert [{"PanicPath:Medium", 3, repos}] = PatternQuery.cross_repo_patterns(3)
+      assert Enum.sort(repos) == ["repo-alpha", "repo-beta", "repo-gamma"]
     end
   end
 
@@ -147,9 +151,8 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
   # ===========================================================================
 
   describe "severity_distribution/0" do
-    test "returns a map" do
-      dist = PatternQuery.severity_distribution()
-      assert is_map(dist)
+    test "counts findings per severity" do
+      assert PatternQuery.severity_distribution() == %{"High" => 5, "Medium" => 4, "Low" => 1}
     end
   end
 
@@ -158,9 +161,10 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
   # ===========================================================================
 
   describe "category_distribution/0" do
-    test "returns a sorted list" do
+    test "counts findings per category, most frequent first" do
       dist = PatternQuery.category_distribution()
-      assert is_list(dist)
+      assert hd(dist) == {"PanicPath", 6}
+      assert Enum.sort(tl(dist)) == [{"InputValidation", 2}, {"UnsafeCode", 2}]
     end
   end
 
@@ -206,9 +210,11 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
   # ===========================================================================
 
   describe "weakness_hotspots/0" do
-    test "returns a list of hotspots" do
+    test "groups findings by file" do
       hotspots = PatternQuery.weakness_hotspots()
-      assert is_list(hotspots)
+      # Every fixture finding is in a distinct file.
+      assert length(hotspots) == 10
+      assert Enum.all?(hotspots, fn {_loc, data} -> data.count == 1 end)
     end
   end
 end
