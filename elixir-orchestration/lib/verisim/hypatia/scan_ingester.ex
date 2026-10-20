@@ -335,6 +335,8 @@ defmodule VeriSim.Hypatia.ScanIngester do
   """
   def init_table, do: ensure_ets_table()
 
+  # Ensures the public, named scan index exists, tolerating concurrent creation.
+  # Returns :ok whether the table already existed or was just created.
   defp ensure_ets_table do
     case :ets.info(:hypatia_scans) do
       :undefined ->
