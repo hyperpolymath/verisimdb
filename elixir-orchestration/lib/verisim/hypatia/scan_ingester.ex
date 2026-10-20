@@ -77,7 +77,14 @@ defmodule VeriSim.Hypatia.ScanIngester do
     # Rust core accepted must land here too, or it is invisible to analytics.
     # The index keeps the structured findings beside the octad; the document
     # body is prose for full-text search and cannot be parsed back into them.
-    store_local(octad_id, Map.put(octad_input, :weak_points, report["weak_points"] || []))
+    # ingest_seq orders a repo's scans so PatternQuery can pick the latest.
+    store_local(
+      octad_id,
+      Map.merge(octad_input, %{
+        weak_points: report["weak_points"] || [],
+        ingest_seq: System.unique_integer([:positive, :monotonic])
+      })
+    )
 
     case RustClient.create_octad(octad_input) do
       {:ok, _result} ->
