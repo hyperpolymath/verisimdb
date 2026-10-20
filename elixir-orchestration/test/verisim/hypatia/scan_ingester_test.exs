@@ -14,6 +14,8 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
 
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias VeriSim.Hypatia.ScanIngester
 
   setup do
@@ -241,6 +243,14 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
       scans = ScanIngester.list_scans()
       assert length(scans) == 2
     end
+
+    test "keeps both scans of one repo ingested within the same second" do
+      assert {:ok, first} = ScanIngester.ingest_scan(sample_scan())
+      assert {:ok, second} = ScanIngester.ingest_scan(sample_scan())
+
+      refute first == second
+      assert length(ScanIngester.list_scans()) == 2
+    end
   end
 
   describe "get_scan/1" do
@@ -291,7 +301,16 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
     end
 
     test "the scan is still indexed locally and visible to PatternQuery" do
-      assert {:ok, octad_id} = ScanIngester.ingest_scan(sample_scan())
+      # The fallback branch also returns {:ok, id}; the log line proves the
+      # Rust core's 201 was taken as success.
+      log =
+        capture_log(fn ->
+          assert {:ok, octad_id} = ScanIngester.ingest_scan(sample_scan())
+          send(self(), {:octad_id, octad_id})
+        end)
+
+      assert log =~ "Hypatia: ingested scan"
+      assert_received {:octad_id, octad_id}
       assert_received {:rust_core_hit, "POST", "/api/v1/octads"}
 
       assert [%{octad_id: ^octad_id}] = ScanIngester.list_scans()

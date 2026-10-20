@@ -310,11 +310,18 @@ defmodule VeriSim.Hypatia.ScanIngester do
     |> String.replace(~r/[^a-zA-Z0-9_-]/, "")
   end
 
+  # Second resolution alone collides when one repo is ingested twice in the
+  # same second (e.g. ingest_directory/1 over historical scans), and the later
+  # scan would silently replace the earlier one. The monotonic suffix keeps
+  # ids unique within the node and still ordered by time.
   defp timestamp_id do
-    DateTime.utc_now()
-    |> DateTime.to_iso8601(:basic)
-    |> String.replace(~r/[^0-9]/, "")
-    |> String.slice(0, 14)
+    stamp =
+      DateTime.utc_now()
+      |> DateTime.to_iso8601(:basic)
+      |> String.replace(~r/[^0-9]/, "")
+      |> String.slice(0, 14)
+
+    "#{stamp}-#{System.unique_integer([:positive, :monotonic])}"
   end
 
   # ---------------------------------------------------------------------------
