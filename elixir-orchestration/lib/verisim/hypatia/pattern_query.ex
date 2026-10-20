@@ -201,6 +201,8 @@ defmodule VeriSim.Hypatia.PatternQuery do
   # Private Helpers
   # ---------------------------------------------------------------------------
 
+  # Returns the structured findings from the local scan index, or an empty list
+  # when findings are missing or are not a list.
   defp extract_weak_points(%{weak_points: wps}) when is_list(wps), do: wps
   defp extract_weak_points(_scan), do: []
 
