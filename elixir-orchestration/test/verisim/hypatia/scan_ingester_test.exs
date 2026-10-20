@@ -225,6 +225,51 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
     test "returns error for non-existent directory" do
       assert {:error, {:dir_read_error, _}} = ScanIngester.ingest_directory("/nonexistent/dir")
     end
+
+    test "ingests oldest file first, so the newest becomes the repo's latest scan",
+         %{dir: dir} do
+      # The names sort the other way round from the files' age.
+      newer = put_in(sample_scan(), ["assail_report", "weak_points"], [])
+      File.write!(Path.join(dir, "a-newer.json"), Jason.encode!(newer))
+      File.write!(Path.join(dir, "b-older.json"), Jason.encode!(sample_scan()))
+      File.touch!(Path.join(dir, "b-older.json"), 1_700_000_000)
+      File.touch!(Path.join(dir, "a-newer.json"), 1_800_000_000)
+
+      assert {:ok, [{"b-older.json", _}, {"a-newer.json", _}]} =
+               ScanIngester.ingest_directory(dir)
+
+      assert {:ok, %{weak_points: []}} = ScanIngester.get_scan("protocol-squisher")
+    end
+  end
+
+  describe "scan history" do
+    test "get_scan/1 returns the latest scan of a repo" do
+      ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(put_in(sample_scan(), ["assail_report", "weak_points"], []))
+
+      assert {:ok, %{weak_points: []}} = ScanIngester.get_scan("protocol-squisher")
+    end
+
+    test "keeps at most :hypatia_scan_history scans per repo, dropping the oldest" do
+      previous = Application.fetch_env(:verisim, :hypatia_scan_history)
+      Application.put_env(:verisim, :hypatia_scan_history, 2)
+
+      on_exit(fn ->
+        case previous do
+          {:ok, n} -> Application.put_env(:verisim, :hypatia_scan_history, n)
+          :error -> Application.delete_env(:verisim, :hypatia_scan_history)
+        end
+      end)
+
+      {:ok, oldest} = ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(sample_scan_flat())
+
+      ids = Enum.map(ScanIngester.list_scans(), & &1.octad_id)
+      assert length(ids) == 3
+      refute oldest in ids
+    end
   end
 
   # ===========================================================================

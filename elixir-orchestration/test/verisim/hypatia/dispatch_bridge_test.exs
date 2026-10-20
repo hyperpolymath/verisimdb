@@ -257,4 +257,16 @@ defmodule VeriSim.Hypatia.DispatchBridgeTest do
       assert drift == []
     end
   end
+
+  describe "ingest_dispatch_summary/1" do
+    test "records the summary without adding a scan to the Hypatia index", %{data_path: dp} do
+      case :ets.info(:hypatia_scans) do
+        :undefined -> :ok
+        _ -> :ets.delete_all_objects(:hypatia_scans)
+      end
+
+      assert {:ok, "dispatch:summary:" <> _} = DispatchBridge.ingest_dispatch_summary(dp)
+      assert VeriSim.Hypatia.ScanIngester.list_scans() == []
+    end
+  end
 end

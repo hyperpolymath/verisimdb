@@ -271,15 +271,39 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
     end
   end
 
+  describe "two repos that share a basename" do
+    setup do
+      ingest_at("/org-a/api", [finding("PanicPath", "Medium", "src/lib.rs")])
+      ingest_at("/org-b/api", [finding("PanicPath", "Medium", "src/lib.rs")])
+      :ok
+    end
+
+    test "are counted as two repos" do
+      health = PatternQuery.pipeline_health()
+      assert health.repos_scanned == 6
+      assert health.total_weak_points == 12
+
+      assert [{"PanicPath:Medium", 5, repos}] = PatternQuery.cross_repo_patterns(3)
+      assert Enum.count(repos, &(&1 == "api")) == 2
+    end
+
+    test "keep separate hotspots" do
+      hotspots = PatternQuery.weakness_hotspots()
+      assert Enum.count(hotspots, fn {key, _} -> key == {"api", "src/lib.rs"} end) == 2
+    end
+  end
+
   defp finding(category, severity, location) do
     %{"category" => category, "severity" => severity, "location" => location}
   end
 
-  defp ingest(repo, weak_points) do
+  defp ingest(repo, weak_points), do: ingest_at("/repos/#{repo}", weak_points)
+
+  defp ingest_at(program_path, weak_points) do
     {:ok, _} =
       ScanIngester.ingest_scan(%{
         "assail_report" => %{
-          "program_path" => "/repos/#{repo}",
+          "program_path" => program_path,
           "language" => "rust",
           "frameworks" => [],
           "weak_points" => weak_points

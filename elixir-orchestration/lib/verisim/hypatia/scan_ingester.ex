@@ -78,11 +78,15 @@ defmodule VeriSim.Hypatia.ScanIngester do
     # The index keeps the structured findings beside the octad; the document
     # body is prose for full-text search and cannot be parsed back into them.
     # ingest_seq orders a repo's scans so PatternQuery can pick the latest.
+    # repo_key is the repo's identity: the full program path, because the
+    # basename in repo_name is display-only and collides across orgs and
+    # monorepo subdirectories (/org-a/api vs /org-b/api).
     store_local(
       octad_id,
       Map.merge(octad_input, %{
         weak_points: report["weak_points"] || [],
-        ingest_seq: System.unique_integer([:positive, :monotonic])
+        ingest_seq: System.unique_integer([:positive, :monotonic]),
+        repo_key: report["program_path"] || repo_name
       })
     )
 
@@ -130,9 +134,14 @@ defmodule VeriSim.Hypatia.ScanIngester do
   def ingest_directory(dir_path) when is_binary(dir_path) do
     case File.ls(dir_path) do
       {:ok, files} ->
+        # Oldest file first: reports carry no timestamp of their own, and
+        # ingest order decides which scan of a repo counts as its latest.
         results =
           files
           |> Enum.filter(&String.ends_with?(&1, ".json"))
+          |> Enum.sort_by(fn file ->
+            {file_mtime(Path.join(dir_path, file)), file}
+          end)
           |> Enum.map(fn file ->
             path = Path.join(dir_path, file)
             {file, ingest_file(path)}
@@ -167,10 +176,12 @@ defmodule VeriSim.Hypatia.ScanIngester do
   def get_scan(repo_name) when is_binary(repo_name) do
     ensure_ets_table()
 
+    # The latest scan, not whichever one ETS happens to return first.
     :ets.tab2list(:hypatia_scans)
-    |> Enum.find(fn {_id, data} ->
+    |> Enum.filter(fn {_id, data} ->
       get_in(data, [:metadata, :repo_name]) == repo_name
     end)
+    |> Enum.max_by(fn {_id, data} -> data[:ingest_seq] || 0 end, fn -> nil end)
     |> case do
       {id, data} -> {:ok, Map.put(data, :octad_id, id)}
       nil -> {:error, :not_found}
@@ -361,6 +372,26 @@ defmodule VeriSim.Hypatia.ScanIngester do
   defp store_local(octad_id, octad_input) do
     ensure_ets_table()
     :ets.insert(:hypatia_scans, {octad_id, octad_input})
+    prune_history(octad_input[:repo_key])
     :ok
+  end
+
+  # Keep the newest `:hypatia_scan_history` scans per repo (default 50), so a
+  # long-lived node rescanning on every CI run does not grow without bound.
+  defp prune_history(repo_key) do
+    limit = Application.get_env(:verisim, :hypatia_scan_history, 50)
+
+    :ets.tab2list(:hypatia_scans)
+    |> Enum.filter(fn {_id, data} -> data[:repo_key] == repo_key end)
+    |> Enum.sort_by(fn {_id, data} -> data[:ingest_seq] || 0 end, :desc)
+    |> Enum.drop(limit)
+    |> Enum.each(fn {id, _data} -> :ets.delete(:hypatia_scans, id) end)
+  end
+
+  defp file_mtime(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, %File.Stat{mtime: mtime}} -> mtime
+      {:error, _} -> 0
+    end
   end
 end
