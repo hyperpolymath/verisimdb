@@ -148,7 +148,9 @@ defmodule VeriSim.Aspect.ConcurrencyTest do
 
       # All successes should be structurally identical.
       if length(unique_results) > 1 do
-        flunk("Concurrent parse of identical query produced #{length(unique_results)} different ASTs")
+        flunk(
+          "Concurrent parse of identical query produced #{length(unique_results)} different ASTs"
+        )
       end
     end
 
@@ -281,7 +283,8 @@ defmodule VeriSim.Aspect.ConcurrencyTest do
           Task.async(fn ->
             KRaftNode.propose(
               node_id,
-              {:register_store, "mono-store-#{i}-#{suffix}", "http://localhost:#{9100 + i}", ["vector"]}
+              {:register_store, "mono-store-#{i}-#{suffix}", "http://localhost:#{9100 + i}",
+               ["vector"]}
             )
           end)
         end
@@ -330,8 +333,10 @@ defmodule VeriSim.Aspect.ConcurrencyTest do
       # The monitor's status must remain structurally valid.
       status = DriftMonitor.status()
       assert is_map(status)
+
       assert status[:overall_health] in [:healthy, :warning, :degraded, :critical],
              "Invalid overall_health after concurrent drift reports: #{inspect(status[:overall_health])}"
+
       assert is_integer(status[:entities_with_drift]) and status[:entities_with_drift] >= 0,
              "entities_with_drift is non-integer: #{inspect(status[:entities_with_drift])}"
     end
@@ -394,8 +399,10 @@ defmodule VeriSim.Aspect.ConcurrencyTest do
       for i <- 1..@concurrency do
         iri = "https://concurrent.test.org/Type#{i}-#{suffix}"
         type = SchemaRegistry.get_type(iri)
+
         assert not is_nil(type),
                "Type #{iri} missing from registry after concurrent registration"
+
         assert type.label == "Concurrent Type #{i}"
       end
     end

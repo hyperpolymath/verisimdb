@@ -88,7 +88,8 @@ defmodule VeriSim.Aspect.SecurityTest do
 
     test "semicolon injection in WHERE clause is rejected or escaped" do
       # Attempt to inject a second VCL statement via a WHERE literal.
-      query = ~S(SELECT DOCUMENT.* FROM HEXAD 'entity-001' WHERE DOCUMENT.title = 'a'; DELETE HEXAD 'entity-001')
+      query =
+        ~S(SELECT DOCUMENT.* FROM HEXAD 'entity-001' WHERE DOCUMENT.title = 'a'; DELETE HEXAD 'entity-001')
 
       result = VCLBridge.parse(query)
 
@@ -104,6 +105,7 @@ defmodule VeriSim.Aspect.SecurityTest do
           # The presence of a mutation field on a query AST would be a bug.
           refute Map.has_key?(ast, :mutation),
                  "Parser produced a mutation in a SELECT query — injection risk"
+
           refute Map.has_key?(ast, :delete),
                  "Parser produced a delete op in a SELECT query — injection risk"
       end
@@ -143,6 +145,7 @@ defmodule VeriSim.Aspect.SecurityTest do
 
       # The parser must return either {:ok, _} or {:error, _} — never raise.
       result = VCLBridge.parse(query)
+
       assert match?({:ok, _}, result) or match?({:error, _}, result),
              "Parser must not raise on oversized input"
     end
@@ -154,6 +157,7 @@ defmodule VeriSim.Aspect.SecurityTest do
       query = "SELECT DOCUMENT.* FROM HEXAD 'entity-001' WHERE #{nested}"
 
       result = VCLBridge.parse(query)
+
       assert match?({:ok, _}, result) or match?({:error, _}, result),
              "Parser must not overflow on deeply nested conditions"
     end
@@ -303,6 +307,7 @@ defmodule VeriSim.Aspect.SecurityTest do
         {:ok, results} ->
           Enum.each(results, fn item ->
             id = item["id"] || item[:id] || ""
+
             refute String.starts_with?(id, "tenant-b::"),
                    "Cross-tenant leak: tenant-A result contains tenant-B item: #{inspect(item)}"
           end)
@@ -317,6 +322,7 @@ defmodule VeriSim.Aspect.SecurityTest do
         {:ok, results} ->
           Enum.each(results, fn item ->
             id = item["id"] || item[:id] || ""
+
             refute String.starts_with?(id, "tenant-a::"),
                    "Cross-tenant leak: tenant-B result contains tenant-A item: #{inspect(item)}"
           end)
@@ -416,7 +422,8 @@ defmodule VeriSim.Aspect.SecurityTest do
       # Pass a proof spec that is missing required fields.
       query_ast = %{
         modalities: [:graph],
-        proof: [%{raw: "EXISTENCE()"}]  # Missing contract name
+        # Missing contract name
+        proof: [%{raw: "EXISTENCE()"}]
       }
 
       result = VCLTypeChecker.typecheck(query_ast)
