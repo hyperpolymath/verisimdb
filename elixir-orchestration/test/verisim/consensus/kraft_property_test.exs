@@ -60,9 +60,12 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
 
   # Generates a valid store-registration command payload.
   defp store_command_gen do
-    gen all name <- string(:alphanumeric, min_length: 4, max_length: 12),
-            port <- integer(9_000..9_999),
-            modality <- member_of(~w(graph vector document tensor semantic temporal spatial provenance)) do
+    gen all(
+          name <- string(:alphanumeric, min_length: 4, max_length: 12),
+          port <- integer(9_000..9_999),
+          modality <-
+            member_of(~w(graph vector document tensor semantic temporal spatial provenance))
+        ) do
       {:register_store, "store-#{name}", "http://localhost:#{port}", [modality]}
     end
   end
@@ -134,11 +137,14 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
   # ---------------------------------------------------------------------------
 
   property "leader uniqueness: exactly one leader per cluster after convergence" do
-    check all size <- cluster_size_gen(),
-              max_runs: 5 do
+    check all(
+            size <- cluster_size_gen(),
+            max_runs: 5
+          ) do
       {ids, pids} = start_cluster(size)
 
       {leader_count, _roles} = await_leader(ids)
+
       assert leader_count == 1,
              "Expected exactly 1 leader in #{size}-node cluster"
 
@@ -162,9 +168,11 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
   # ---------------------------------------------------------------------------
 
   property "log replication: commands written to leader appear on all nodes" do
-    check all size <- cluster_size_gen(),
-              command <- store_command_gen(),
-              max_runs: 5 do
+    check all(
+            size <- cluster_size_gen(),
+            command <- store_command_gen(),
+            max_runs: 5
+          ) do
       {ids, pids} = start_cluster(size)
       await_leader(ids)
 
@@ -179,6 +187,7 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
       # Every node's registry must contain the store after replication.
       for id <- ids do
         registry = KRaftNode.registry(id)
+
         assert Map.has_key?(registry.stores, store_name),
                "Node #{id} missing store #{store_name} after replication. " <>
                  "Registry: #{inspect(Map.keys(registry.stores))}"
@@ -200,9 +209,11 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
   # ---------------------------------------------------------------------------
 
   property "state machine: sequential commands produce consistent final state on all nodes" do
-    check all size <- cluster_size_gen(),
-              commands <- list_of(store_command_gen(), min_length: 2, max_length: 5),
-              max_runs: 5 do
+    check all(
+            size <- cluster_size_gen(),
+            commands <- list_of(store_command_gen(), min_length: 2, max_length: 5),
+            max_runs: 5
+          ) do
       {ids, pids} = start_cluster(size)
       await_leader(ids)
 
@@ -244,8 +255,10 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
   # ---------------------------------------------------------------------------
 
   property "partition tolerance: write to leader in full cluster always succeeds" do
-    check all command <- store_command_gen(),
-              max_runs: 10 do
+    check all(
+            command <- store_command_gen(),
+            max_runs: 10
+          ) do
       # Use a fixed 3-node cluster for partition tests.
       {ids, pids} = start_cluster(3)
       await_leader(ids)
@@ -262,8 +275,10 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
   end
 
   property "partition tolerance: proposal to follower redirects to leader (not silent drop)" do
-    check all command <- store_command_gen(),
-              max_runs: 5 do
+    check all(
+            command <- store_command_gen(),
+            max_runs: 5
+          ) do
       {ids, pids} = start_cluster(3)
       await_leader(ids)
 
@@ -310,6 +325,7 @@ defmodule VeriSim.Consensus.KRaftPropertyTest do
     Process.sleep(100)
 
     registry = KRaftNode.registry(node_id)
+
     assert Map.has_key?(registry.stores, store_name),
            "Leader should see its own committed write immediately"
 
