@@ -40,7 +40,7 @@ defmodule VeriSim.Hypatia.DispatchBridge do
 
   require Logger
 
-  alias VeriSim.Hypatia.ScanIngester
+  alias VeriSim.RustClient
 
   @dispatch_dir "dispatch"
   @outcomes_dir "outcomes"
@@ -258,14 +258,19 @@ defmodule VeriSim.Hypatia.DispatchBridge do
       }
     }
 
-    ScanIngester.ingest_scan(%{
-      "assail_report" => %{
-        "program_path" => "dispatch-summary",
-        "language" => "n/a",
-        "frameworks" => [],
-        "weak_points" => []
-      }
-    })
+    # Persist the summary octad itself. This used to go through
+    # ScanIngester.ingest_scan/1 with a placeholder "dispatch-summary" scan,
+    # which stored an empty scan instead of the summary and, since every
+    # scan is now indexed, showed up as a scanned repo in PatternQuery.
+    case RustClient.create_octad(octad_input) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Hypatia: dispatch summary #{octad_id} kept locally only: #{inspect(reason)}"
+        )
+    end
 
     # Also store the full summary in local ETS
     ensure_ets_table()

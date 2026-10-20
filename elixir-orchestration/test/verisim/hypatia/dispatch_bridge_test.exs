@@ -257,4 +257,63 @@ defmodule VeriSim.Hypatia.DispatchBridgeTest do
       assert drift == []
     end
   end
+
+  # A stand-in Rust core that accepts every octad and reports what it was sent.
+  defmodule CapturingRustCore do
+    @behaviour Plug
+    def init(test_pid), do: test_pid
+
+    def call(conn, test_pid) do
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(test_pid, {:octad_posted, conn.request_path, Jason.decode!(body)})
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(201, ~s({"id":"accepted"}))
+    end
+  end
+
+  describe "ingest_dispatch_summary/1" do
+    setup do
+      server =
+        start_supervised!({Bandit, plug: {CapturingRustCore, self()}, ip: :loopback, port: 0})
+
+      {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
+      previous = Application.fetch_env(:verisim, :rust_core_url)
+      Application.put_env(:verisim, :rust_core_url, "http://127.0.0.1:#{port}/api/v1")
+
+      on_exit(fn ->
+        case previous do
+          {:ok, url} -> Application.put_env(:verisim, :rust_core_url, url)
+          :error -> Application.delete_env(:verisim, :rust_core_url)
+        end
+      end)
+
+      case :ets.info(:hypatia_scans) do
+        :undefined -> :ok
+        _ -> :ets.delete_all_objects(:hypatia_scans)
+      end
+
+      :ok
+    end
+
+    test "persists the summary octad itself, not a placeholder scan", %{data_path: dp} do
+      assert {:ok, octad_id} = DispatchBridge.ingest_dispatch_summary(dp)
+      expected_summary = dp |> DispatchBridge.summarize() |> Jason.encode!() |> Jason.decode!()
+
+      # Sent to the Rust core: the summary octad.
+      assert_received {:octad_posted, "/api/v1/octads", posted}
+      assert posted["octad_id"] == octad_id
+      assert posted["metadata"]["type"] == "dispatch_summary"
+      assert Jason.decode!(posted["document"]["body"]) == expected_summary
+
+      # Kept locally: the same octad.
+      assert [{^octad_id, local}] = :ets.lookup(:hypatia_dispatch_summaries, octad_id)
+      assert local.provenance.source == "hypatia-dispatch"
+      assert Jason.decode!(local.document.body) == expected_summary
+
+      # And no scan in the Hypatia index.
+      assert VeriSim.Hypatia.ScanIngester.list_scans() == []
+    end
+  end
 end

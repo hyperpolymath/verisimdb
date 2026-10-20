@@ -124,8 +124,9 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
       assert health.total_scans == 4
       assert health.repos_scanned == 4
-      # Weak points are in document body, not directly accessible
-      assert health.total_weak_points == 0
+      assert health.total_weak_points == 10
+      assert health.severity_distribution == %{"High" => 5, "Medium" => 4, "Low" => 1}
+      assert hd(health.top_categories) == {"PanicPath", 6}
     end
   end
 
@@ -135,10 +136,13 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
   describe "cross_repo_patterns/1" do
     test "returns empty when no shared patterns meet threshold" do
-      # Our test data has PanicPath:Medium in alpha, beta, gamma, delta
-      # but pattern extraction depends on document body parsing
-      patterns = PatternQuery.cross_repo_patterns(100)
-      assert patterns == []
+      assert PatternQuery.cross_repo_patterns(100) == []
+    end
+
+    test "finds the pattern shared by three repos" do
+      # PanicPath:Medium is in alpha, beta and gamma; delta's PanicPath is Low.
+      assert [{"PanicPath:Medium", 3, repos}] = PatternQuery.cross_repo_patterns(3)
+      assert Enum.sort(repos) == ["repo-alpha", "repo-beta", "repo-gamma"]
     end
   end
 
@@ -147,9 +151,8 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
   # ===========================================================================
 
   describe "severity_distribution/0" do
-    test "returns a map" do
-      dist = PatternQuery.severity_distribution()
-      assert is_map(dist)
+    test "counts findings per severity" do
+      assert PatternQuery.severity_distribution() == %{"High" => 5, "Medium" => 4, "Low" => 1}
     end
   end
 
@@ -158,9 +161,10 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
   # ===========================================================================
 
   describe "category_distribution/0" do
-    test "returns a sorted list" do
+    test "counts findings per category, most frequent first" do
       dist = PatternQuery.category_distribution()
-      assert is_list(dist)
+      assert hd(dist) == {"PanicPath", 6}
+      assert Enum.sort(tl(dist)) == [{"InputValidation", 2}, {"UnsafeCode", 2}]
     end
   end
 
@@ -188,16 +192,60 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
 
   describe "repos_by_severity/1" do
     test "ranks repos by High severity" do
-      repos = PatternQuery.repos_by_severity("High")
-
       # repo-alpha has 1 High, repo-beta has 1, repo-gamma has 2, repo-delta has 1
-      assert is_list(repos)
+      assert [{"repo-gamma", 2} | rest] = PatternQuery.repos_by_severity("High")
+      assert Enum.sort(rest) == [{"repo-alpha", 1}, {"repo-beta", 1}, {"repo-delta", 1}]
+    end
 
-      if length(repos) > 0 do
-        {top_repo, top_count} = hd(repos)
-        assert is_binary(top_repo)
-        assert is_integer(top_count)
-      end
+    test "lists a rescanned repo once, from its latest scan" do
+      ingest("repo-gamma", [finding("PanicPath", "High", "src/net.rs")])
+
+      assert {"repo-gamma", 1} in PatternQuery.repos_by_severity("High")
+      assert length(PatternQuery.repos_by_severity("High")) == 4
+    end
+  end
+
+  # ===========================================================================
+  # Rescans: aggregates read the latest scan per repo
+  # ===========================================================================
+
+  describe "a rescan of a repo" do
+    setup do
+      # repo-alpha had 3 findings; its rescan has 1.
+      ingest("repo-alpha", [finding("UnsafeCode", "High", "src/ffi.rs")])
+      :ok
+    end
+
+    test "replaces that repo's findings in the aggregates" do
+      health = PatternQuery.pipeline_health()
+
+      assert health.total_scans == 5
+      assert health.repos_scanned == 4
+      assert health.total_weak_points == 8
+      assert PatternQuery.severity_distribution() == %{"High" => 5, "Medium" => 2, "Low" => 1}
+    end
+
+    test "stays in the repo's history" do
+      assert [%{weak_point_count: 3}, %{weak_point_count: 1}] =
+               PatternQuery.temporal_trends("repo-alpha")
+    end
+  end
+
+  # ===========================================================================
+  # Missing fields
+  # ===========================================================================
+
+  describe "findings without a severity or category" do
+    test "share one \"unknown\" bucket with findings that say \"unknown\"" do
+      ingest("repo-epsilon", [
+        %{"location" => "a.ex", "category" => "PanicPath"},
+        %{"location" => "b.ex", "category" => "PanicPath", "severity" => "unknown"},
+        %{"location" => "c.ex", "severity" => "Low"}
+      ])
+
+      assert PatternQuery.severity_distribution()["unknown"] == 2
+      assert {"unknown", 1} in PatternQuery.category_distribution()
+      assert PatternQuery.pipeline_health().total_weak_points == 13
     end
   end
 
@@ -206,9 +254,60 @@ defmodule VeriSim.Hypatia.PatternQueryTest do
   # ===========================================================================
 
   describe "weakness_hotspots/0" do
-    test "returns a list of hotspots" do
+    test "groups findings by file" do
       hotspots = PatternQuery.weakness_hotspots()
-      assert is_list(hotspots)
+      # Every fixture finding is in a distinct file.
+      assert length(hotspots) == 10
+      assert Enum.all?(hotspots, fn {_loc, data} -> data.count == 1 end)
     end
+
+    test "keeps the same path in two repos as two files" do
+      ingest("repo-epsilon", [finding("PanicPath", "Medium", "src/lib.rs")])
+
+      hotspots = Map.new(PatternQuery.weakness_hotspots())
+      assert map_size(hotspots) == 11
+      assert hotspots[{"repo-alpha", "src/lib.rs"}].count == 1
+      assert hotspots[{"repo-epsilon", "src/lib.rs"}].count == 1
+    end
+  end
+
+  describe "two repos that share a basename" do
+    setup do
+      ingest_at("/org-a/api", [finding("PanicPath", "Medium", "src/lib.rs")])
+      ingest_at("/org-b/api", [finding("PanicPath", "Medium", "src/lib.rs")])
+      :ok
+    end
+
+    test "are counted as two repos" do
+      health = PatternQuery.pipeline_health()
+      assert health.repos_scanned == 6
+      assert health.total_weak_points == 12
+
+      assert [{"PanicPath:Medium", 5, repos}] = PatternQuery.cross_repo_patterns(3)
+      assert Enum.count(repos, &(&1 == "api")) == 2
+    end
+
+    test "keep separate hotspots" do
+      hotspots = PatternQuery.weakness_hotspots()
+      assert Enum.count(hotspots, fn {key, _} -> key == {"api", "src/lib.rs"} end) == 2
+    end
+  end
+
+  defp finding(category, severity, location) do
+    %{"category" => category, "severity" => severity, "location" => location}
+  end
+
+  defp ingest(repo, weak_points), do: ingest_at("/repos/#{repo}", weak_points)
+
+  defp ingest_at(program_path, weak_points) do
+    {:ok, _} =
+      ScanIngester.ingest_scan(%{
+        "assail_report" => %{
+          "program_path" => program_path,
+          "language" => "rust",
+          "frameworks" => [],
+          "weak_points" => weak_points
+        }
+      })
   end
 end

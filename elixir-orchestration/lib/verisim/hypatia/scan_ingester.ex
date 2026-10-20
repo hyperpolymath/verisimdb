@@ -73,6 +73,23 @@ defmodule VeriSim.Hypatia.ScanIngester do
 
     octad_input = build_octad(octad_id, repo_name, report)
 
+    # Always index locally: PatternQuery reads only this table, so a scan the
+    # Rust core accepted must land here too, or it is invisible to analytics.
+    # The index keeps the structured findings beside the octad; the document
+    # body is prose for full-text search and cannot be parsed back into them.
+    # ingest_seq orders a repo's scans so PatternQuery can pick the latest.
+    # repo_key is the repo's identity: the full program path, because the
+    # basename in repo_name is display-only and collides across orgs and
+    # monorepo subdirectories (/org-a/api vs /org-b/api).
+    store_local(
+      octad_id,
+      Map.merge(octad_input, %{
+        weak_points: report["weak_points"] || [],
+        ingest_seq: System.unique_integer([:positive, :monotonic]),
+        repo_key: report["program_path"] || repo_name
+      })
+    )
+
     case RustClient.create_octad(octad_input) do
       {:ok, _result} ->
         Logger.info("Hypatia: ingested scan for #{repo_name} as #{octad_id}")
@@ -81,11 +98,9 @@ defmodule VeriSim.Hypatia.ScanIngester do
       {:error, reason} ->
         Logger.warning(
           "Hypatia: failed to ingest scan for #{repo_name} via Rust core, " <>
-            "storing locally: #{inspect(reason)}"
+            "kept in the local index only: #{inspect(reason)}"
         )
 
-        # Fallback: store in ETS for local querying
-        store_local(octad_id, octad_input)
         {:ok, octad_id}
     end
   end
@@ -119,9 +134,14 @@ defmodule VeriSim.Hypatia.ScanIngester do
   def ingest_directory(dir_path) when is_binary(dir_path) do
     case File.ls(dir_path) do
       {:ok, files} ->
+        # Oldest file first: reports carry no timestamp of their own, and
+        # ingest order decides which scan of a repo counts as its latest.
         results =
           files
           |> Enum.filter(&String.ends_with?(&1, ".json"))
+          |> Enum.sort_by(fn file ->
+            {file_mtime(Path.join(dir_path, file)), file}
+          end)
           |> Enum.map(fn file ->
             path = Path.join(dir_path, file)
             {file, ingest_file(path)}
@@ -151,19 +171,29 @@ defmodule VeriSim.Hypatia.ScanIngester do
   end
 
   @doc """
-  Get scan data for a specific repo name.
+  Get the latest scan for a repo, given its full program path or its
+  basename. A basename shared by two repos matches both; pass the path to
+  pick one.
   """
-  def get_scan(repo_name) when is_binary(repo_name) do
+  def get_scan(repo) when is_binary(repo) do
     ensure_ets_table()
 
+    # The latest scan, not whichever one ETS happens to return first.
     :ets.tab2list(:hypatia_scans)
-    |> Enum.find(fn {_id, data} ->
-      get_in(data, [:metadata, :repo_name]) == repo_name
-    end)
+    |> Enum.filter(fn {_id, data} -> matches_repo?(data, repo) end)
+    |> Enum.max_by(fn {_id, data} -> data[:ingest_seq] || 0 end, fn -> nil end)
     |> case do
       {id, data} -> {:ok, Map.put(data, :octad_id, id)}
       nil -> {:error, :not_found}
     end
+  end
+
+  @doc """
+  True when an index entry belongs to `repo`, given as the repo's full
+  program path (its identity) or its basename (display name).
+  """
+  def matches_repo?(entry, repo) do
+    entry[:repo_key] == repo or get_in(entry, [:metadata, :repo_name]) == repo
   end
 
   # ---------------------------------------------------------------------------
@@ -306,30 +336,73 @@ defmodule VeriSim.Hypatia.ScanIngester do
     |> String.replace(~r/[^a-zA-Z0-9_-]/, "")
   end
 
+  # Second resolution alone collides when one repo is ingested twice in the
+  # same second (e.g. ingest_directory/1 over historical scans), and the later
+  # scan would silently replace the earlier one. The monotonic suffix keeps
+  # ids unique within the node and still ordered by time.
   defp timestamp_id do
-    DateTime.utc_now()
-    |> DateTime.to_iso8601(:basic)
-    |> String.replace(~r/[^0-9]/, "")
-    |> String.slice(0, 14)
+    stamp =
+      DateTime.utc_now()
+      |> DateTime.to_iso8601(:basic)
+      |> String.replace(~r/[^0-9]/, "")
+      |> String.slice(0, 14)
+
+    "#{stamp}-#{System.unique_integer([:positive, :monotonic])}"
   end
 
   # ---------------------------------------------------------------------------
-  # Private: Local ETS Storage (fallback when Rust core unavailable)
+  # Private: Local ETS scan index (read by PatternQuery; written on every ingest)
   # ---------------------------------------------------------------------------
 
+  @doc """
+  Create the local scan index. Called from `VeriSim.Application.start/2` so the
+  table is owned by the application master and lives as long as the app; an
+  ETS table created lazily would die with whichever process first touched it.
+  """
+  def init_table, do: ensure_ets_table()
+
+  # Ensures the public, named scan index exists, tolerating concurrent creation.
+  # Returns :ok whether the table already existed or was just created.
   defp ensure_ets_table do
     case :ets.info(:hypatia_scans) do
       :undefined ->
         :ets.new(:hypatia_scans, [:named_table, :set, :public])
+        :ok
 
       _ ->
         :ok
     end
+  rescue
+    # Another process created the table between the info check and new/2.
+    ArgumentError -> :ok
   end
 
   defp store_local(octad_id, octad_input) do
     ensure_ets_table()
     :ets.insert(:hypatia_scans, {octad_id, octad_input})
+    prune_history(octad_input[:repo_key])
     :ok
+  end
+
+  # Keep the newest `:hypatia_scan_history` scans per repo (default 50), so a
+  # long-lived node rescanning on every CI run does not grow without bound.
+  defp prune_history(repo_key) do
+    limit = Application.get_env(:verisim, :hypatia_scan_history, 50)
+
+    # Fetch only this repo's {id, ingest_seq} pairs, not the whole table.
+    :ets.select(:hypatia_scans, [
+      {{:"$1", %{repo_key: :"$2", ingest_seq: :"$3"}}, [{:==, :"$2", {:const, repo_key}}],
+       [{{:"$1", :"$3"}}]}
+    ])
+    |> Enum.sort_by(fn {_id, seq} -> seq end, :desc)
+    |> Enum.drop(limit)
+    |> Enum.each(fn {id, _seq} -> :ets.delete(:hypatia_scans, id) end)
+  end
+
+  defp file_mtime(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, %File.Stat{mtime: mtime}} -> mtime
+      {:error, _} -> 0
+    end
   end
 end
