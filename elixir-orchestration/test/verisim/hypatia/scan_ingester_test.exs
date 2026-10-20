@@ -14,6 +14,8 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
 
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias VeriSim.Hypatia.ScanIngester
 
   setup do
@@ -223,6 +225,59 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
     test "returns error for non-existent directory" do
       assert {:error, {:dir_read_error, _}} = ScanIngester.ingest_directory("/nonexistent/dir")
     end
+
+    test "ingests oldest file first, so the newest becomes the repo's latest scan",
+         %{dir: dir} do
+      # The names sort the other way round from the files' age.
+      newer = put_in(sample_scan(), ["assail_report", "weak_points"], [])
+      File.write!(Path.join(dir, "a-newer.json"), Jason.encode!(newer))
+      File.write!(Path.join(dir, "b-older.json"), Jason.encode!(sample_scan()))
+      File.touch!(Path.join(dir, "b-older.json"), 1_700_000_000)
+      File.touch!(Path.join(dir, "a-newer.json"), 1_800_000_000)
+
+      assert {:ok, [{"b-older.json", _}, {"a-newer.json", _}]} =
+               ScanIngester.ingest_directory(dir)
+
+      assert {:ok, %{weak_points: []}} = ScanIngester.get_scan("protocol-squisher")
+    end
+  end
+
+  describe "scan history" do
+    test "get_scan/1 takes a full program path as well as a basename" do
+      ScanIngester.ingest_scan(sample_scan())
+      path = "/var/mnt/eclipse/repos/protocol-squisher"
+
+      assert {:ok, %{repo_key: ^path}} = ScanIngester.get_scan(path)
+      assert {:ok, %{repo_key: ^path}} = ScanIngester.get_scan("protocol-squisher")
+    end
+
+    test "get_scan/1 returns the latest scan of a repo" do
+      ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(put_in(sample_scan(), ["assail_report", "weak_points"], []))
+
+      assert {:ok, %{weak_points: []}} = ScanIngester.get_scan("protocol-squisher")
+    end
+
+    test "keeps at most :hypatia_scan_history scans per repo, dropping the oldest" do
+      previous = Application.fetch_env(:verisim, :hypatia_scan_history)
+      Application.put_env(:verisim, :hypatia_scan_history, 2)
+
+      on_exit(fn ->
+        case previous do
+          {:ok, n} -> Application.put_env(:verisim, :hypatia_scan_history, n)
+          :error -> Application.delete_env(:verisim, :hypatia_scan_history)
+        end
+      end)
+
+      {:ok, oldest} = ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(sample_scan())
+      ScanIngester.ingest_scan(sample_scan_flat())
+
+      ids = Enum.map(ScanIngester.list_scans(), & &1.octad_id)
+      assert length(ids) == 3
+      refute oldest in ids
+    end
   end
 
   # ===========================================================================
@@ -241,6 +296,14 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
       scans = ScanIngester.list_scans()
       assert length(scans) == 2
     end
+
+    test "keeps both scans of one repo ingested within the same second" do
+      assert {:ok, first} = ScanIngester.ingest_scan(sample_scan())
+      assert {:ok, second} = ScanIngester.ingest_scan(sample_scan())
+
+      refute first == second
+      assert length(ScanIngester.list_scans()) == 2
+    end
   end
 
   describe "get_scan/1" do
@@ -253,6 +316,62 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
 
     test "returns error for unknown repo" do
       assert {:error, :not_found} = ScanIngester.get_scan("nonexistent-repo")
+    end
+  end
+
+  # A stand-in Rust core that accepts every octad, so the success branch of
+  # ingest_scan/1 runs instead of the unavailable-core fallback.
+  defmodule AcceptingRustCore do
+    @behaviour Plug
+    def init(test_pid), do: test_pid
+
+    def call(conn, test_pid) do
+      send(test_pid, {:rust_core_hit, conn.method, conn.request_path})
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(201, ~s({"id":"accepted"}))
+    end
+  end
+
+  describe "when the Rust core accepts the scan" do
+    setup do
+      server =
+        start_supervised!({Bandit, plug: {AcceptingRustCore, self()}, ip: :loopback, port: 0})
+
+      {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
+      previous = Application.fetch_env(:verisim, :rust_core_url)
+      Application.put_env(:verisim, :rust_core_url, "http://127.0.0.1:#{port}/api/v1")
+
+      on_exit(fn ->
+        case previous do
+          {:ok, url} -> Application.put_env(:verisim, :rust_core_url, url)
+          :error -> Application.delete_env(:verisim, :rust_core_url)
+        end
+      end)
+
+      :ok
+    end
+
+    test "the scan is still indexed locally and visible to PatternQuery" do
+      # The fallback branch also returns {:ok, id}; the log line proves the
+      # Rust core's 201 was taken as success.
+      log =
+        capture_log(fn ->
+          assert {:ok, octad_id} = ScanIngester.ingest_scan(sample_scan())
+          send(self(), {:octad_id, octad_id})
+        end)
+
+      assert log =~ "Hypatia: ingested scan"
+      assert_received {:octad_id, octad_id}
+      assert_received {:rust_core_hit, "POST", "/api/v1/octads"}
+
+      assert [%{octad_id: ^octad_id}] = ScanIngester.list_scans()
+
+      health = VeriSim.Hypatia.PatternQuery.pipeline_health()
+      assert health.total_scans == 1
+      assert health.total_weak_points == 2
+      assert health.repos_scanned == 1
     end
   end
 end

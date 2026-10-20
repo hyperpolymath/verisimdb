@@ -17,6 +17,10 @@ defmodule VeriSim.Hypatia.PatternQuery do
   - `temporal_trends/1` — How a repo's scan results change over time
   - `repos_by_severity/1` — Repos ranked by severity count
   - `weakness_hotspots/0` — Files with highest weakness density
+
+  Every aggregate over findings reads the *latest* scan of each repo, so a
+  repo rescanned on every CI run is counted once, not once per run.
+  `temporal_trends/1` is the one view over the full scan history.
   """
 
   require Logger
@@ -41,17 +45,17 @@ defmodule VeriSim.Hypatia.PatternQuery do
   """
   def pipeline_health do
     scans = ScanIngester.list_scans()
+    current = latest_per_repo(scans)
 
-    all_weak_points = extract_all_weak_points(scans)
+    all_weak_points = extract_all_weak_points(current)
 
     %{
       total_scans: length(scans),
       total_weak_points: length(all_weak_points),
-      repos_scanned:
-        scans |> Enum.map(&get_in(&1, [:metadata, :repo_name])) |> Enum.uniq() |> length(),
+      repos_scanned: length(current),
       severity_distribution: severity_distribution(all_weak_points),
       top_categories: top_categories(all_weak_points, 10),
-      average_weak_points_per_repo: safe_avg(length(all_weak_points), length(scans)),
+      average_weak_points_per_repo: safe_avg(length(all_weak_points), length(current)),
       last_scan_timestamp: latest_timestamp(scans)
     }
   end
@@ -69,25 +73,18 @@ defmodule VeriSim.Hypatia.PatternQuery do
   The pattern key is `"category:severity"` (e.g., `"PanicPath:Medium"`).
   """
   def cross_repo_patterns(min_repos \\ 3) do
-    scans = ScanIngester.list_scans()
-
     # Build pattern → [repo_names] map
     pattern_repos =
-      scans
-      |> Enum.flat_map(fn scan ->
-        repo = get_in(scan, [:metadata, :repo_name]) || "unknown"
-        weak_points = extract_weak_points(scan)
-
-        weak_points
-        |> Enum.map(fn wp ->
-          category = wp["category"] || "unknown"
-          severity = wp["severity"] || "unknown"
-          pattern_key = "#{category}:#{severity}"
-          {pattern_key, repo}
-        end)
+      current_scans()
+      |> extract_all_weak_points()
+      |> Enum.map(fn wp ->
+        {"#{wp["category"]}:#{wp["severity"]}", {wp["repo_key"], wp["repo"]}}
       end)
       |> Enum.group_by(fn {key, _} -> key end, fn {_, repo} -> repo end)
-      |> Map.new(fn {key, repos} -> {key, Enum.uniq(repos)} end)
+      # Count distinct repos by identity; report their display names.
+      |> Map.new(fn {key, repos} ->
+        {key, repos |> Enum.uniq_by(&elem(&1, 0)) |> Enum.map(&elem(&1, 1))}
+      end)
 
     pattern_repos
     |> Enum.filter(fn {_key, repos} -> length(repos) >= min_repos end)
@@ -103,15 +100,14 @@ defmodule VeriSim.Hypatia.PatternQuery do
   Returns a map of severity level → count across all scans.
   """
   def severity_distribution do
-    ScanIngester.list_scans()
+    current_scans()
     |> extract_all_weak_points()
     |> severity_distribution()
   end
 
   defp severity_distribution(weak_points) do
     weak_points
-    |> Enum.group_by(& &1["severity"])
-    |> Map.new(fn {severity, items} -> {severity || "unknown", length(items)} end)
+    |> Enum.frequencies_by(& &1["severity"])
   end
 
   # ---------------------------------------------------------------------------
@@ -122,10 +118,9 @@ defmodule VeriSim.Hypatia.PatternQuery do
   Returns a map of category → count across all scans, sorted by count descending.
   """
   def category_distribution do
-    ScanIngester.list_scans()
+    current_scans()
     |> extract_all_weak_points()
-    |> Enum.group_by(& &1["category"])
-    |> Map.new(fn {cat, items} -> {cat || "unknown", length(items)} end)
+    |> Enum.frequencies_by(& &1["category"])
     |> Enum.sort_by(fn {_cat, count} -> count end, :desc)
   end
 
@@ -134,16 +129,18 @@ defmodule VeriSim.Hypatia.PatternQuery do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Returns scan results for a specific repo over time, enabling drift detection.
+  Returns scan results for a repo over time, enabling drift detection.
+  `repo` is the repo's full program path or its basename; a basename shared
+  by two repos includes both histories.
 
   Each entry contains the scan timestamp and weak point count, sorted
   chronologically.
   """
-  def temporal_trends(repo_name) when is_binary(repo_name) do
+  def temporal_trends(repo) when is_binary(repo) do
     ScanIngester.list_scans()
-    |> Enum.filter(fn scan ->
-      get_in(scan, [:metadata, :repo_name]) == repo_name
-    end)
+    |> Enum.filter(&ScanIngester.matches_repo?(&1, repo))
+    # ingest_seq breaks same-second ties; ETS returns entries in hash order.
+    |> Enum.sort_by(&{get_in(&1, [:metadata, :scan_timestamp]), &1[:ingest_seq] || 0})
     |> Enum.map(fn scan ->
       %{
         octad_id: scan[:octad_id],
@@ -152,7 +149,6 @@ defmodule VeriSim.Hypatia.PatternQuery do
         severity_counts: get_in(scan, [:metadata, :severity_counts]) || %{}
       }
     end)
-    |> Enum.sort_by(& &1.timestamp)
   end
 
   # ---------------------------------------------------------------------------
@@ -162,10 +158,11 @@ defmodule VeriSim.Hypatia.PatternQuery do
   @doc """
   Returns repos ranked by total weakness count for a given severity level.
 
-  Useful for identifying which repos need the most attention.
+  Useful for identifying which repos need the most attention. Each repo
+  appears once, counted from its latest scan.
   """
   def repos_by_severity(severity \\ "High") do
-    ScanIngester.list_scans()
+    current_scans()
     |> Enum.map(fn scan ->
       repo = get_in(scan, [:metadata, :repo_name]) || "unknown"
       counts = get_in(scan, [:metadata, :severity_counts]) || %{}
@@ -183,14 +180,17 @@ defmodule VeriSim.Hypatia.PatternQuery do
   @doc """
   Returns files ranked by weakness density across all repos.
 
-  Identifies the most problematic files in the entire ecosystem.
+  Identifies the most problematic files in the entire ecosystem. Keys are
+  `{repo, location}`: the same relative path in two repos is two files.
+  Findings are grouped by repo identity (the full program path), so two
+  distinct repos that share a basename are two entries with the same name.
   """
   def weakness_hotspots do
-    ScanIngester.list_scans()
+    current_scans()
     |> extract_all_weak_points()
-    |> Enum.group_by(& &1["location"])
-    |> Map.new(fn {location, items} ->
-      {location || "unknown",
+    |> Enum.group_by(&{&1["repo_key"], &1["location"] || "unknown"})
+    |> Enum.map(fn {{_key, location}, [first | _] = items} ->
+      {{first["repo"], location},
        %{count: length(items), categories: Enum.map(items, & &1["category"]) |> Enum.uniq()}}
     end)
     |> Enum.sort_by(fn {_loc, data} -> data.count end, :desc)
@@ -201,21 +201,39 @@ defmodule VeriSim.Hypatia.PatternQuery do
   # Private Helpers
   # ---------------------------------------------------------------------------
 
-  defp extract_weak_points(scan) do
-    # Weak points might be in the document body or the original report
-    case scan do
-      %{document: %{body: body}} when is_binary(body) ->
-        # Parse weak points from the stored JSON report
-        case Jason.decode(body) do
-          {:ok, %{"assail_report" => %{"weak_points" => wps}}} -> wps
-          {:ok, %{"weak_points" => wps}} -> wps
-          _ -> []
-        end
+  defp current_scans, do: latest_per_repo(ScanIngester.list_scans())
 
-      _ ->
-        []
-    end
+  # One scan per repo: the most recently ingested (highest ingest_seq).
+  # Repos are identified by repo_key (the full program path); repo_name is the
+  # basename, for display only, and two distinct repos can share it.
+  defp latest_per_repo(scans) do
+    scans
+    |> Enum.group_by(&repo_key/1)
+    |> Enum.map(fn {_repo, repo_scans} -> Enum.max_by(repo_scans, &(&1[:ingest_seq] || 0)) end)
   end
+
+  # Returns the structured findings from the local scan index, or an empty list
+  # when findings are missing or are not a list. Each finding is tagged with
+  # its repo, and a missing category/severity becomes "unknown" here, so the
+  # aggregators never see both nil and "unknown" as separate keys.
+  defp extract_weak_points(%{weak_points: wps} = scan) when is_list(wps) do
+    repo = get_in(scan, [:metadata, :repo_name]) || "unknown"
+    key = repo_key(scan)
+
+    Enum.map(wps, fn wp ->
+      Map.merge(wp, %{
+        "repo" => repo,
+        "repo_key" => key,
+        "category" => wp["category"] || "unknown",
+        "severity" => wp["severity"] || "unknown"
+      })
+    end)
+  end
+
+  defp extract_weak_points(_scan), do: []
+
+  defp repo_key(scan),
+    do: scan[:repo_key] || get_in(scan, [:metadata, :repo_name]) || "unknown"
 
   defp extract_all_weak_points(scans) do
     Enum.flat_map(scans, &extract_weak_points/1)
@@ -223,8 +241,7 @@ defmodule VeriSim.Hypatia.PatternQuery do
 
   defp top_categories(weak_points, limit) do
     weak_points
-    |> Enum.group_by(& &1["category"])
-    |> Enum.map(fn {cat, items} -> {cat || "unknown", length(items)} end)
+    |> Enum.frequencies_by(& &1["category"])
     |> Enum.sort_by(fn {_cat, count} -> count end, :desc)
     |> Enum.take(limit)
   end

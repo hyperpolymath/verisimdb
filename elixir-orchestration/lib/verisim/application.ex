@@ -9,8 +9,17 @@ defmodule VeriSim.Application do
 
   use Application
 
+  @doc """
+  Initializes the local Hypatia scan index and starts the supervision tree.
+
+  The application master owns the index so it outlives individual scan callers.
+  Returns the result of `Supervisor.start_link/2`.
+  """
   @impl true
   def start(_type, _args) do
+    # Owned by this (application master) process so it outlives callers.
+    VeriSim.Hypatia.ScanIngester.init_table()
+
     children = [
       # Telemetry supervisor
       VeriSim.Telemetry,
