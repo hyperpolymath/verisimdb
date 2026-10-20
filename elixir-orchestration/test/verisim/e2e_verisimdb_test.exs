@@ -38,6 +38,7 @@ defmodule VeriSimDB.E2ETest do
     RustClient,
     QueryRouter
   }
+
   alias VeriSim.Query.{VCLBridge, VCLExecutor}
   alias VeriSim.Test.VCLTestHelpers, as: H
 
@@ -80,10 +81,11 @@ defmodule VeriSimDB.E2ETest do
       assert initial_state.version == 0
 
       # Update the entity to enable document and vector modalities.
-      {:ok, updated_state} = EntityServer.update(entity_id, [
-        {:modality, :document, true},
-        {:modality, :vector, true}
-      ])
+      {:ok, updated_state} =
+        EntityServer.update(entity_id, [
+          {:modality, :document, true},
+          {:modality, :vector, true}
+        ])
 
       assert updated_state.modalities.document == true
       assert updated_state.modalities.vector == true
@@ -95,14 +97,17 @@ defmodule VeriSimDB.E2ETest do
       assert read_back.modalities.document == true
     end
 
-    test "create entity via RustClient, read back from same session", %{rust_available: rust_available} do
+    test "create entity via RustClient, read back from same session", %{
+      rust_available: rust_available
+    } do
       if not rust_available do
         # Rust core unavailable — test the graceful degradation path instead.
-        result = RustClient.create_octad(%{
-          title: "E2E Lifecycle Test",
-          body: "Testing full lifecycle without Rust core",
-          embedding: List.duplicate(0.5, 384)
-        })
+        result =
+          RustClient.create_octad(%{
+            title: "E2E Lifecycle Test",
+            body: "Testing full lifecycle without Rust core",
+            embedding: List.duplicate(0.5, 384)
+          })
 
         # Must return a structured error, not raise.
         assert match?({:error, _}, result),
@@ -136,6 +141,7 @@ defmodule VeriSimDB.E2ETest do
       Process.sleep(100)
 
       status = DriftMonitor.status()
+
       assert status[:overall_health] in [:healthy, :warning, :degraded, :critical],
              "DriftMonitor returned invalid health status: #{inspect(status[:overall_health])}"
     end
@@ -168,16 +174,21 @@ defmodule VeriSimDB.E2ETest do
 
       assert :graph in (ast[:modalities] || [])
       assert :vector in (ast[:modalities] || [])
+
       refute :document in (ast[:modalities] || []),
              "SELECT GRAPH, VECTOR should not include :document"
     end
 
-    test "VCL INSERT → read-back round-trip (when Rust available)", %{rust_available: rust_available} do
+    test "VCL INSERT → read-back round-trip (when Rust available)", %{
+      rust_available: rust_available
+    } do
       if not rust_available do
         # Execute the mutation path, verify graceful error.
-        mutation_query = "INSERT HEXAD WITH DOCUMENT(title = 'E2E Insert Test', body = 'VCL insert round-trip')"
+        mutation_query =
+          "INSERT HEXAD WITH DOCUMENT(title = 'E2E Insert Test', body = 'VCL insert round-trip')"
 
         result = VCLBridge.parse_statement(mutation_query)
+
         case result do
           {:ok, ast} ->
             exec_result = VCLExecutor.execute_statement(ast)
@@ -189,7 +200,8 @@ defmodule VeriSimDB.E2ETest do
         end
       else
         # Full round-trip with Rust.
-        mutation_query = "INSERT HEXAD WITH DOCUMENT(title = 'E2E Insert Test', body = 'VCL insert round-trip')"
+        mutation_query =
+          "INSERT HEXAD WITH DOCUMENT(title = 'E2E Insert Test', body = 'VCL insert round-trip')"
 
         case VCLBridge.parse_statement(mutation_query) do
           {:ok, ast} ->
@@ -227,10 +239,13 @@ defmodule VeriSimDB.E2ETest do
       {:ok, plan} = VCLExecutor.execute(ast, explain: true)
 
       assert is_map(plan)
+
       assert Map.has_key?(plan, :strategy),
              "Explain plan missing :strategy field: #{inspect(plan)}"
+
       assert Map.has_key?(plan, :steps),
              "Explain plan missing :steps field: #{inspect(plan)}"
+
       assert is_list(plan[:steps])
     end
 
@@ -286,8 +301,10 @@ defmodule VeriSimDB.E2ETest do
 
       # Retrieve and verify.
       retrieved = SchemaRegistry.get_type("https://e2e.test.org/E2EDocument-#{suffix}")
+
       assert not is_nil(retrieved),
              "Registered type should be retrievable immediately"
+
       assert retrieved.label == "E2E Document Type"
     end
 
@@ -326,6 +343,7 @@ defmodule VeriSimDB.E2ETest do
       hierarchy = SchemaRegistry.type_hierarchy("verisim:Document")
       assert is_list(hierarchy)
       assert "verisim:Document" in hierarchy
+
       assert "verisim:Entity" in hierarchy,
              "Type hierarchy must include verisim:Entity as root"
     end
