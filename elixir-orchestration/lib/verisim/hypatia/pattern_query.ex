@@ -129,16 +129,16 @@ defmodule VeriSim.Hypatia.PatternQuery do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Returns scan results for a specific repo over time, enabling drift detection.
+  Returns scan results for a repo over time, enabling drift detection.
+  `repo` is the repo's full program path or its basename; a basename shared
+  by two repos includes both histories.
 
   Each entry contains the scan timestamp and weak point count, sorted
   chronologically.
   """
-  def temporal_trends(repo_name) when is_binary(repo_name) do
+  def temporal_trends(repo) when is_binary(repo) do
     ScanIngester.list_scans()
-    |> Enum.filter(fn scan ->
-      get_in(scan, [:metadata, :repo_name]) == repo_name
-    end)
+    |> Enum.filter(&ScanIngester.matches_repo?(&1, repo))
     # ingest_seq breaks same-second ties; ETS returns entries in hash order.
     |> Enum.sort_by(&{get_in(&1, [:metadata, :scan_timestamp]), &1[:ingest_seq] || 0})
     |> Enum.map(fn scan ->

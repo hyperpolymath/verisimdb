@@ -243,6 +243,14 @@ defmodule VeriSim.Hypatia.ScanIngesterTest do
   end
 
   describe "scan history" do
+    test "get_scan/1 takes a full program path as well as a basename" do
+      ScanIngester.ingest_scan(sample_scan())
+      path = "/var/mnt/eclipse/repos/protocol-squisher"
+
+      assert {:ok, %{repo_key: ^path}} = ScanIngester.get_scan(path)
+      assert {:ok, %{repo_key: ^path}} = ScanIngester.get_scan("protocol-squisher")
+    end
+
     test "get_scan/1 returns the latest scan of a repo" do
       ScanIngester.ingest_scan(sample_scan())
       ScanIngester.ingest_scan(put_in(sample_scan(), ["assail_report", "weak_points"], []))

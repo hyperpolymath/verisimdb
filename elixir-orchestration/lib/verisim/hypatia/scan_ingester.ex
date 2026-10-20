@@ -171,21 +171,29 @@ defmodule VeriSim.Hypatia.ScanIngester do
   end
 
   @doc """
-  Get scan data for a specific repo name.
+  Get the latest scan for a repo, given its full program path or its
+  basename. A basename shared by two repos matches both; pass the path to
+  pick one.
   """
-  def get_scan(repo_name) when is_binary(repo_name) do
+  def get_scan(repo) when is_binary(repo) do
     ensure_ets_table()
 
     # The latest scan, not whichever one ETS happens to return first.
     :ets.tab2list(:hypatia_scans)
-    |> Enum.filter(fn {_id, data} ->
-      get_in(data, [:metadata, :repo_name]) == repo_name
-    end)
+    |> Enum.filter(fn {_id, data} -> matches_repo?(data, repo) end)
     |> Enum.max_by(fn {_id, data} -> data[:ingest_seq] || 0 end, fn -> nil end)
     |> case do
       {id, data} -> {:ok, Map.put(data, :octad_id, id)}
       nil -> {:error, :not_found}
     end
+  end
+
+  @doc """
+  True when an index entry belongs to `repo`, given as the repo's full
+  program path (its identity) or its basename (display name).
+  """
+  def matches_repo?(entry, repo) do
+    entry[:repo_key] == repo or get_in(entry, [:metadata, :repo_name]) == repo
   end
 
   # ---------------------------------------------------------------------------
@@ -381,11 +389,14 @@ defmodule VeriSim.Hypatia.ScanIngester do
   defp prune_history(repo_key) do
     limit = Application.get_env(:verisim, :hypatia_scan_history, 50)
 
-    :ets.tab2list(:hypatia_scans)
-    |> Enum.filter(fn {_id, data} -> data[:repo_key] == repo_key end)
-    |> Enum.sort_by(fn {_id, data} -> data[:ingest_seq] || 0 end, :desc)
+    # Fetch only this repo's {id, ingest_seq} pairs, not the whole table.
+    :ets.select(:hypatia_scans, [
+      {{:"$1", %{repo_key: :"$2", ingest_seq: :"$3"}}, [{:==, :"$2", {:const, repo_key}}],
+       [{{:"$1", :"$3"}}]}
+    ])
+    |> Enum.sort_by(fn {_id, seq} -> seq end, :desc)
     |> Enum.drop(limit)
-    |> Enum.each(fn {id, _data} -> :ets.delete(:hypatia_scans, id) end)
+    |> Enum.each(fn {id, _seq} -> :ets.delete(:hypatia_scans, id) end)
   end
 
   defp file_mtime(path) do
