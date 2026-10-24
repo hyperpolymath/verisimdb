@@ -96,6 +96,7 @@ pub enum GraphObject {
 ///
 /// All graph backends implement this trait, allowing the octad store to be
 /// generic over the concrete backend.
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait GraphStore: Send + Sync {
     /// Insert a triple

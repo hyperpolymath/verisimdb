@@ -373,6 +373,7 @@ pub mod veri_sim_planner_server {
     )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with VeriSimPlannerServer.
+    #[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
     #[async_trait]
     pub trait VeriSimPlanner: std::marker::Send + std::marker::Sync + 'static {
         /// Optimize a logical plan into a physical plan.
@@ -896,6 +897,7 @@ pub mod veri_sim_octad_server {
     )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with VeriSimOctadServer.
+    #[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
     #[async_trait]
     pub trait VeriSimOctad: std::marker::Send + std::marker::Sync + 'static {
         /// Create a new octad.

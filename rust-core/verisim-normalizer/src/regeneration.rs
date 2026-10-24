@@ -454,6 +454,7 @@ pub struct RegenerationEngine {
 /// which target to regenerate) into actual data mutations.  The engine calls
 /// these methods; callers provide the implementation appropriate to their
 /// storage backend.
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait::async_trait]
 pub trait ModalityRegenerator: Send + Sync {
     /// Regenerate `target` modality data from `source` modality data.

@@ -95,6 +95,7 @@ pub struct NormalizationChange {
 }
 
 /// Normalization strategy trait
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait NormalizationStrategy: Send + Sync {
     /// Get strategy name

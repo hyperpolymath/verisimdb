@@ -140,6 +140,7 @@ impl TimeRange {
 }
 
 /// Temporal store trait for cross-modal consistency
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait TemporalStore: Send + Sync {
     /// Type of data being versioned
@@ -360,6 +361,7 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
 }
 
 /// Time-series store for metrics
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait TimeSeriesStore: Send + Sync {
     type Value: Clone + Send + Sync;

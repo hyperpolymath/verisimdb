@@ -305,6 +305,7 @@ pub struct Octad {
 }
 
 /// Octad store - manages entities across all modalities
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait OctadStore: Send + Sync {
     /// Create a new Octad entity
