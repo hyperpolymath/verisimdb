@@ -37,3 +37,12 @@ jobs:
       # sibling. Runs after the real gate so a genuine break is reported first.
       - name: Doc-links gate positive control
         run: bash tests/doc-links-gate.sh
+
+      # Added 2026-10-24 for issue #299. docs/modality-profile.adoc is prose that
+      # asserts eight octad slots, seven settable payload fields and a closed
+      # schema. This binds those claims to modality.json, octad-input.json and the
+      # Rust core, so the document cannot quietly describe an implementation that
+      # no longer exists. Python 3 stdlib only — no new action, no new dependency,
+      # so actions.lock is unchanged.
+      - name: Modality-contract gate (modality-profile doc matches schema + core)
+        run: bash tests/modality-contract-gate.sh

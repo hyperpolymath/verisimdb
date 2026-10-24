@@ -78,6 +78,12 @@ ranked forward plan
 
 ==== Architecture
 
+* link:modality-profile.adoc[docs/modality-profile.adoc] — Modality-profile
+terminology and cardinality semantics: *canonical* for "consonance subject" vs
+"modality set" vs "modality profile" vs "Octad", for which modalities are
+required or optional in the current implementation, and for what the API does
+*not* accept (arbitrary subsets, variable arity). Also records the
+OpenAPI-vs-server request-body divergence (issue #299).
 * link:architecture/topology.adoc[docs/architecture/topology.adoc] — Process
 topology and deployment shapes
 * link:architecture/abi-ffi.adoc[docs/architecture/abi-ffi.adoc] — ABI/FFI

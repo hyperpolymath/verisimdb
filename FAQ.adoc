@@ -50,6 +50,29 @@ practical entity-representation space without redundancy.
 → `README.adoc` §"The Octad"; rationale recorded as `rationale-octad` in
 link:.machine_readable/6a2/META.a2ml[`.machine_readable/6a2/META.a2ml`]
 
+=== Is "octad" the same as a "modality profile"? Can my profile have three modalities?
+
+No, and not today. Three different things were being described by one word:
+
+* a *modality set* — which modalities one subject actually has right now. This
+  varies per entity, and a subset is normal.
+* a *modality profile* — the selection an implementation supports: its named,
+  versioned slot list and required/optional rules. For this implementation, that
+  is the Octad, with eight fixed slots.
+* the *Octad* — VeriSimDB's specifically named eight-modality model and API, and
+  the name to use only for that.
+
+So "up to eight modal witnesses" describes membership, not a variable-arity
+contract. `OctadInput` has seven optional payload modalities plus `metadata`;
+`temporal` is written by the store on every create/update; the schema is closed
+(`additionalProperties: false`), so a ninth or custom modality is not expressible.
+Three-modality *membership* is fine and supported; a three-slot *profile* is not
+implemented. `HEXAD` is a legacy VCL keyword naming the octad source, not a
+six-modality profile.
+
+→ link:docs/modality-profile.adoc[`docs/modality-profile.adoc`] (*canonical* for
+the terms, the cardinality rules and the OpenAPI-vs-server divergence)
+
 === What is drift?
 
 Divergence between modal witnesses of the same entity. A document is edited
