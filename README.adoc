@@ -17,7 +17,7 @@ toc::[]
 
 VeriSimDB is not primarily a database of records. It is a federated consonance engine for continuously maintained identity claims.
 
-A VeriSimDB "entity" is best understood as a **consonance subject**: an identity under active maintenance across multiple modal witnesses. Those witnesses may include graph structure, vector embeddings, tensor data, semantic annotations, documents, temporal history, provenance chains, and spatial references. Together they form the octad view of an identity.
+A VeriSimDB "entity" is best understood as a **consonance subject**: an identity under active maintenance across multiple modal witnesses. Those witnesses may include graph structure, vector embeddings, tensor data, semantic annotations, documents, temporal history, provenance chains, and spatial references. This implementation's **modality profile** is the **Octad** — eight fixed modality slots. Together they form the octad view of an identity. Any one subject's **modality set** may be a strict subset of those eight; that is normal, and it is a property of the subject, not a variable-arity API.
 
 The central problem VeriSimDB solves is not merely storing these views. The central problem is deciding whether they still refer to the same identity, whether they have drifted, whether a repair or normalisation is justified, whether a federated claim should be accepted, and whether an identity claim should be strengthened, weakened, merged, split, retracted, tombstoned, or expunged under policy.
 
@@ -61,6 +61,15 @@ These states have different proof obligations and different repair paths.
 
 |Modality Witness
 |One modal presentation of a subject: graph, vector, tensor, semantic, document, temporal, provenance, or spatial.
+
+|Modality Set
+|The membership alone: which modalities are present for one subject right now. Implementation- and entity-specific; a strict subset of the profile's slots is normal.
+
+|Modality Profile
+|The selection an implementation supports — its named, versioned slot list and required/optional rules. This implementation's profile is the Octad (eight fixed slots); it is not selectable per request.
+
+|Octad
+|VeriSimDB's specifically named eight-modality model and API. A proper noun for this project's model, not a generic word for a modality group. See link:docs/modality-profile.adoc[`docs/modality-profile.adoc`].
 
 |Drift Report
 |Evidence that one or more modal witnesses no longer cohere.
@@ -107,7 +116,7 @@ Traditional tools detect drift _after_ it causes downstream failures. VeriSimDB 
 
 == What VeriSimDB Does
 
-VeriSimDB is a **federated consonance engine**. Each consonance subject is maintained across up to 8 modal witnesses (the **octad**), with continuous drift detection and self-normalisation:
+VeriSimDB is a **federated consonance engine**. Each consonance subject is maintained across the **octad** — eight fixed modality slots in this implementation's modality profile, with continuous drift detection and self-normalisation. A given subject's *modality set* may fill fewer than eight of them; "up to 8" describes membership, not a variable-arity contract (link:docs/modality-profile.adoc[details]):
 
 ----
 ┌─────────────────────────────────────────────────────────────┐

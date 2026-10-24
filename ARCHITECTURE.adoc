@@ -14,7 +14,10 @@ authoritative for its subject. Where two documents disagree, the one marked
 
 For orientation — what VeriSimDB *is* — read link:EXPLAINME.adoc[EXPLAINME.adoc]
 first. This file assumes you already know that an entity is a consonance subject
-with up to eight modal witnesses.
+whose eight fixed *modality slots* form the Octad, and that any one subject's
+*modality set* may be a subset of them
+(link:docs/modality-profile.adoc[`docs/modality-profile.adoc`] is canonical for
+that distinction).
 
 == Architecture decision records
 
@@ -217,6 +220,12 @@ link:docs/challenges-hybrid.adoc[`challenges-hybrid.adoc`]
 |how a VCL statement is routed and executed
 |link:docs/vcl-architecture.adoc[`docs/vcl-architecture.adoc`] (dual-path
 router)
+
+|what "modality profile", "modality set" and "Octad" mean, which modalities are
+required or optional, and whether the API takes arbitrary subsets
+|link:docs/modality-profile.adoc[`docs/modality-profile.adoc`] (*canonical for
+the vocabulary and for cardinality*; it also lists the OpenAPI-vs-server request
+body divergence found while writing it)
 
 |what VCL actually means, normatively
 |link:docs/VCL-SPEC.adoc[`docs/VCL-SPEC.adoc`] (*canonical*), with the grammar in

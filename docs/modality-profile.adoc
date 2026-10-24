@@ -1,0 +1,394 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Modality Profiles: Terminology and Cardinality
+:toc: left
+:toclevels: 3
+:icons: font
+
+[.lead]
+This document fixes the *vocabulary* for describing which modalities a
+consonance subject has, and states the *cardinality semantics* of the current
+Octad implementation. It changes no wire format, no schema and no API. It exists
+so that downstream projects can say "modality profile" without implying that
+VeriSimDB accepts arbitrary modality subsets or variable arity today.
+
+Terminology half of issue #299. Normative for *words*, not for *contracts*: where
+this document and the code/schema disagree, the code/schema win and this document
+has a bug.
+
+// The two annotations below are read by
+// scripts/check-modality-contract.py (via tests/modality-contract-gate.sh).
+// They are the machine-checkable half of this document: the doc cannot drift
+// away from connectors/shared/json-schema/ and the Rust core without CI saying
+// so. Keep the exact `// modality-contract:` prefix.
+//
+// modality-contract: octad-slots = graph, vector, tensor, semantic, document, temporal, provenance, spatial
+// modality-contract: payload-fields = graph, vector, tensor, semantic, document, provenance, spatial, metadata
+
+== 1. The vocabulary: four terms, three of them often confused
+
+[cols="1,3,2",options="header"]
+|===
+|Term |Means |Cardinality
+
+|*consonance subject*
+|The lifecycle-managed identity under consideration — one entity, maintained
+across its witnesses. This is the noun the whole system is about.
+|One identity; not a set.
+
+|*modality set*
+|The membership alone: *which* modalities are actually present for one subject
+at one moment, with no claim about why those and not others.
+|Implementation- and entity-specific. Need not be all slots, need not be fixed.
+
+|*modality profile*
+|The *selection* an implementation supports: the named, versioned list of
+modality slots it can populate, and the rules for what is required, optional and
+always written. This is a property of the implementation (and its version), not
+of an individual entity.
+|Implementation-specific. For the current Octad implementation: exactly 8 slots,
+fixed.
+
+|*Octad*
+|VeriSimDB's specifically named eight-modality model and API — the eight slots
+below, `OctadInput`, `OctadStore`, `verisim-octad`. "Octad" is a proper noun for
+this project's model. It is not a generic word for "a modality group".
+|Exactly 8. Always.
+|===
+
+=== Usage rules
+
+* Say *modality profile* when describing what an implementation supports, how
+  many slots it has, what is required, or which version defines it.
+* Say *modality set* when describing membership only — for example "the subject's
+  modality set is {document, temporal}".
+* Say *Octad* only for VeriSimDB's eight-slot model and its API types. Do not use
+  it as a synonym for "a modality profile" in the abstract, and do not use it for
+  another project's eight (or n) modality grouping.
+* *"Hexad" is not a generic name for a modality group.* In this repository it is
+  a legacy VCL *keyword* (see <<hexad>>), and in downstream projects it is a
+  project-specific label. Do not infer a six-slot wire format from it, and do not
+  translate it as "six modalities".
+* Cardinality belongs to the profile, never to the generic terms. "Modality
+  profile" alone does not tell you 8, 6 or 3 — you have to name the profile (here:
+  the Octad).
+
+== 2. The Octad's eight slots
+
+The slot names are the modality identifiers defined by
+`connectors/shared/json-schema/modality.json`:
+
+[cols="1,3",options="header"]
+|===
+|Slot |What it holds
+
+|`graph` |RDF triples and property-graph edges — relationships between entities.
+|`vector` |Dense embedding for similarity search.
+|`tensor` |Multi-dimensional numeric array (shape + flattened data).
+|`semantic` |Ontological type annotations, properties, proof blobs.
+|`document` |Full-text searchable content (title, body, fields).
+|`temporal` |Version history and time-travel.
+|`provenance` |Origin tracking, transformation chain, actor trail (hash chain).
+|`spatial` |Geospatial coordinates, geometry types, proximity queries.
+|===
+
+These same eight names appear as the eight `bool` fields of
+`ModalityStatus` in `rust-core/verisim-octad/src/lib.rs`, and as the eight type
+parameters of the concrete `OctadStore` alias in `rust-core/verisim-api/src/lib.rs`.
+
+[[hexad]]
+== 3. `HEXAD` is a legacy keyword, not a six-modality profile
+
+`spec/grammar.ebnf` (v3.0, canonical) and its near-duplicate
+`docs/vcl-grammar.ebnf` both define:
+
+[source,ebnf]
+----
+hexad_source = 'HEXAD', uuid ;
+----
+
+`HEXAD` is a *source keyword* meaning "one entity, addressed by UUID". It selects
+the Octad source in a `FROM` clause. It is:
+
+* *not* a modality profile;
+* *not* a claim of six modalities;
+* retained only for backward compatibility with statements already written.
+
+The keyword is a grammar-version question, not a documentation edit: renaming or
+removing it changes the accepted language and therefore needs an owner decision
+and a grammar version bump (see <<change-control>>).
+
+== 4. How the terms relate
+
+----
+consonance subject  (one identity, e.g. entity-001)
+        │
+        │ is maintained across the slots declared by
+        ▼
+modality profile    (chosen by the implementation + version in use)
+        │           current implementation: the Octad → 8 fixed slots
+        │ declares a fixed slot list, never a variable one
+        ▼
+8 Octad slots       graph, vector, tensor, semantic,
+        │           document, temporal, provenance, spatial
+        │ each slot is independently present or absent for this subject
+        ▼
+modality set        ⊆ the 8 slots. Observed, not configured.
+        │           e.g. {document, temporal}
+        ▼
+consonance / drift  measured over the members that are present
+----
+
+Two consequences worth stating plainly, because they are the most common
+misreading:
+
+. *The profile is not per-request.* There is no API parameter that chooses a
+  profile, no `profile` field in a payload, and no negotiation. The profile is
+  whatever the deployed code version implements.
+. *A sparse modality set is normal, not an error.* A subject with
+  `{document, temporal}` is a valid consonance subject. Whether that is
+  *sufficient* is a policy and drift question, not a schema question.
+
+== 5. Required and optional modalities (current implementation)
+
+Verified against the current source, not against intent:
+
+[cols="2,2,2,4",options="header"]
+|===
+|Slot |Settable via `OctadInput` |May be absent |Notes
+
+|`graph` |yes, `Option` |yes |Absent if omitted at create.
+|`vector` |yes, `Option` |yes |`embedding` length must match the store's
+configured `vector_dimension`.
+|`tensor` |yes, `Option` |yes |`shape` product must equal `data` length.
+|`semantic` |yes, `Option` |yes |No required sub-fields.
+|`document` |yes, `Option` |yes |`title` and `body` required within the payload.
+|`provenance` |yes, `Option` |yes |No event is recorded unless you supply one
+(see <<divergences>>, item 2).
+|`spatial` |yes, `Option` |yes |`latitude` and `longitude` required within the
+payload.
+|`temporal` |*no* |no |Not addressable through `OctadInput` on the server side.
+The store always appends a version snapshot, so `temporal` is `true` after every
+create and update.
+|===
+
+*Nothing is required at create.* `OctadInput::default()` is a valid input: it
+produces a subject whose modality set is `{temporal}`.
+
+`metadata` is *not* a modality. It is a `HashMap<String, String>` carried
+alongside the entity and indexed by no modality.
+
+=== Completeness is observed, not enforced
+
+`ModalityStatus::is_complete()` returns `true` only when all eight slots are
+present, and `ModalityStatus::missing()` names the rest. Both are *observations*.
+
+`OctadConfig` declares a `require_complete: bool` (default `false`), but no code
+currently reads it — a repository-wide search finds only the declaration and the
+default. Completeness is therefore *not* a precondition for a write in this
+version. That is a real gap, stated here rather than papered over; if a future
+version starts enforcing it, the code is authoritative and this section is stale.
+
+=== Create versus update
+
+* *Create* populates exactly the payload fields supplied.
+* *Update merges.* A supplied modality is replaced; an omitted modality is left
+  untouched, and its presence flag carries over from the pre-update status
+  (the store seeds `modality_status` from the existing record). An update that
+  supplies one modality therefore does *not* shrink the modality set.
+
+=== "No ninth modality" is a schema property, not a promise
+
+`connectors/shared/json-schema/octad-input.json` closes the object with
+`"additionalProperties": false` and enumerates exactly the seven payload
+modalities plus `metadata`. A different modality name is not expressible in that
+schema.
+
+Caveat, because it matters for implementers: the Rust types themselves do not set
+`deny_unknown_fields`, so at that layer unknown JSON keys are *ignored* rather
+than rejected. Schema-level closure and Rust-level leniency are both true; do not
+rely on either as validation of a consumer's intent.
+
+== 6. Version and cardinality: how they are represented today
+
+There is *no* versioned profile object on the wire, and this document does not
+invent one. Cardinality is expressed *implicitly and redundantly* in three
+places:
+
+. the eight-name enum in `connectors/shared/json-schema/modality.json`;
+. the eight `bool` fields of `ModalityStatus`;
+. the eight type parameters of the concrete `OctadStore` alias.
+
+The version identifiers that actually exist are:
+
+[cols="1,2",options="header"]
+|===
+|Artefact |Version marker present today
+
+|VCL grammar |`Version: 3.0` in `spec/grammar.ebnf`
+|HTTP API |`connectors/shared/openapi/verisim-api-v1.yaml` (v1 in the filename)
+|JSON Schema |`$id` URLs under `https://verisim.db/schema/` — *unversioned*
+|Rust crates |Cargo crate versions
+|===
+
+Note there is no `profile_version`, no `cardinality` field, and no schema version
+field. Adding one would be a contract change (see <<change-control>>).
+
+== 7. Examples of the supported cases
+
+Rust, against the core types (`verisim_octad`). Each example states the resulting
+*modality set*, which is what an operator actually observes through
+`GET`/`status`.
+
+=== A subject with one payload modality — the minimal supported case
+
+[source,rust]
+----
+let input = OctadInput {
+    document: Some(OctadDocumentInput {
+        title: "Field note".into(),
+        body: "A single-witness subject.".into(),
+        fields: HashMap::new(),
+    }),
+    ..OctadInput::default()
+};
+let octad = store.create(input).await?;
+// modality set: {document, temporal}   (temporal is always written)
+assert!(!octad.status.modality_status.is_complete());
+assert_eq!(octad.status.modality_status.missing().len(), 6);
+----
+
+=== A subject with every payload modality — the complete case
+
+[source,rust]
+----
+let input = OctadBuilder::new()
+    .with_relationships(vec![("relates_to", "entity-002")])
+    .with_embedding(vec![0.0; 384])          // matches vector_dimension
+    .with_tensor(vec![2, 2], vec![1.0, 2.0, 3.0, 4.0])
+    .with_types(vec!["https://schema.org/Person"])
+    .with_document("Profile", "Full-witness subject.")
+    .with_provenance("created", "operator", "imported from source system")
+    .with_spatial(51.5074, -0.1278)
+    .build();
+let octad = store.create(input).await?;
+// modality set: all eight
+assert!(octad.status.modality_status.is_complete());
+----
+
+=== A partial update does not shrink the set
+
+[source,rust]
+----
+// Subject currently at {document, spatial, temporal}
+let update = OctadInput {
+    vector: Some(OctadVectorInput { embedding: vec![0.0; 384], model: None }),
+    ..OctadInput::default()
+};
+let octad = store.update(&id, update).await?;
+// modality set: {document, spatial, temporal, vector} — nothing removed, and a
+// new temporal version snapshot was appended
+----
+
+=== Inspecting a modality set through the legacy `HEXAD` keyword
+
+[source,sql]
+----
+-- Presence check across slots; HEXAD names the entity, not a 6-slot profile.
+SELECT * FROM HEXAD 'entity-001'
+  WHERE PROVENANCE EXISTS AND TENSOR NOT EXISTS
+----
+
+== 8. What the current version does *not* support
+
+Do not promise these to downstream consumers on the strength of the vocabulary in
+this document:
+
+* selecting a *modality profile* per request, per tenant or per entity;
+* variable arity — a 3-slot, 6-slot or 12-slot profile;
+* a ninth or custom modality, beyond the eight slots
+  (`additionalProperties: false`);
+* arbitrary *slot lists* in the payload — you choose which slots to supply, but
+  the slot vocabulary is fixed;
+* enabling or disabling slots at the store level (`require_complete` is inert, see
+  above);
+* any `HEXAD`-implies-six-modalities reading.
+
+Some hand-written *client* types go further than the server: the Zig and Julia
+clients carry a `modalities` list, and the Rust and Elixir clients carry a
+`temporal` input field. Those are client-side model choices; the server-side
+`OctadInput` has neither. See <<divergences>>.
+
+[[divergences]]
+== 9. Known contract divergences (reported here, not resolved here)
+
+These are real and were found while checking this document against the source.
+*None* is fixed by this change, because each one moves a wire contract or a
+client API and needs an owner ruling.
+
+. *The OpenAPI request body does not match the running server.*
+  `connectors/shared/openapi/verisim-api-v1.yaml` binds `POST`/`PUT` on
+  `/api/v1/octads` to `json-schema/octad-input.json` — a *nested* object
+  (`graph`, `vector`, `document`, `semantic`, …). The server accepts
+  `OctadRequest` (`rust-core/verisim-api/src/lib.rs`), a *flattened* object
+  (`title`, `body`, `embedding`, `types`, `relationships`, `tensor`, `provenance`,
+  `spatial`, `metadata`). A body built from the schema is accepted by serde but
+  its nested keys are unknown to `OctadRequest` and silently ignored.
+. *The OpenAPI description promises an automatic provenance event.* It says a
+  `created` provenance event is recorded automatically on create. The store
+  records provenance only when `provenance` is supplied, and
+  `create_octad_handler` adds none, so `provenance_chain_length` can be `0`.
+. *The hand-written client `OctadInput` types differ from the core type.* The Rust
+  (`connectors/clients/rust/src/types.rs`) and Elixir clients declare a
+  `temporal` input, and `name`/`description`; the Zig and Julia clients declare a
+  `modalities` list. The core type and the schema declare neither.
+. *The Rust client's create path posts a shape the server does not parse.*
+  `connectors/clients/rust/src/octad.rs` posts its own `OctadInput` straight to
+  `/api/v1/octads`, so the body is nested (`graph`, `vector`, `document`, …).
+  Those keys are unknown to the server's flattened `OctadRequest` and are
+  ignored, which would silently create a near-empty subject rather than fail.
+  This is a *static reading* of both sides — no toolchain is available in the
+  environment where this was written, so it was **not** verified end-to-end.
+  It is the strongest argument for item 1's ruling: the contract has drifted at
+  three layers at once, and only an owner decision can pick which one is
+  canonical.
+. *Two normative grammar copies.* `spec/grammar.ebnf` and `docs/vcl-grammar.ebnf`
+  must be edited together (already tracked as an owner decision).
+. *The JSON-Schema `$id`s are unversioned*, so "the versioned contract" cannot be
+  cited by schema URL alone; cite the file plus its git revision.
+
+[[change-control]]
+== 10. Change control
+
+[cols="2,3",options="header"]
+|===
+|Change |Needs
+
+|Adding/removing a modality slot, or variable arity
+|Owner approval **and** a new versioned schema + API, plus tests against that
+version. Not a documentation edit.
+
+|Renaming or removing the `HEXAD` keyword
+|Owner approval and a VCL grammar version bump (both grammar copies).
+
+|Reconciling the OpenAPI body with `OctadRequest` (either direction)
+|Owner approval: it is a breaking wire change to one side or the other.
+
+|Adding a `profile`/`profile_version`/`cardinality` field
+|Owner approval: new wire behaviour, so no "clarification" can introduce it.
+
+|Clarifying wording in this document
+|Ordinary review. `tests/modality-contract-gate.sh` must stay green.
+|===
+
+== See also
+
+* link:../EXPLAINME.adoc[`EXPLAINME.adoc`] — orientation, the conceptual model.
+* link:../README.adoc[`README.adoc`] — capabilities and quick start.
+* link:VCL-SPEC.adoc[`docs/VCL-SPEC.adoc`] — normative VCL semantics.
+* link:../spec/grammar.ebnf[`spec/grammar.ebnf`] — canonical surface grammar
+(v3.0), where `HEXAD` is defined.
+* link:../connectors/shared/json-schema/modality.json[`modality.json`] — the
+modality enum.
+* link:../connectors/shared/json-schema/octad-input.json[`octad-input.json`] —
+the create/update input schema.
