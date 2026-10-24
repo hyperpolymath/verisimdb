@@ -96,6 +96,7 @@ pub enum DistanceMetric {
 }
 
 /// Vector store trait for cross-modal consistency
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait VectorStore: Send + Sync {
     /// Insert or update an embedding

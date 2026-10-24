@@ -239,6 +239,7 @@ impl ProofBlob {
 }
 
 /// Semantic store trait for cross-modal consistency
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait SemanticStore: Send + Sync {
     /// Register a type in the ontology

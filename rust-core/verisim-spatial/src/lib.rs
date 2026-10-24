@@ -210,6 +210,7 @@ pub struct SpatialSearchResult {
 /// Async trait for spatial storage backends.
 ///
 /// Implementations must be `Send + Sync` for safe sharing across Tokio tasks.
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait SpatialStore: Send + Sync {
     /// Index (upsert) spatial data for an entity.

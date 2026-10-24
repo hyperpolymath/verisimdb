@@ -110,6 +110,7 @@ pub struct SearchResult {
 }
 
 /// Document store trait for cross-modal consistency
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait DocumentStore: Send + Sync {
     /// Index a document

@@ -296,6 +296,7 @@ impl ProvenanceChain {
 ///
 /// Implementations must be `Send + Sync` so they can be shared across
 /// Tokio tasks.
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait ProvenanceStore: Send + Sync {
     /// Record a new provenance event for an entity.

@@ -19,6 +19,7 @@ use crate::error::StorageError;
 /// serde-based serialization and namespace prefixing.
 ///
 /// Implementations must be safe to share across threads and tokio tasks.
+#[allow(clippy::double_must_use)] // async-trait adds a bare #[must_use] to boxed futures
 #[async_trait]
 pub trait StorageBackend: Send + Sync {
     /// Retrieve the value associated with `key`.
