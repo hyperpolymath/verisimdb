@@ -200,6 +200,8 @@ pub struct ApiConfig {
 }
 
 impl Default for ApiConfig {
+    /// Return an IPv6 loopback configuration with HTTP on port 8080 and gRPC on
+    /// port 50051, CORS disabled and no explicit persistence directory.
     fn default() -> Self {
         Self {
             host: "[::1]".to_string(),

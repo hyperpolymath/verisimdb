@@ -23,6 +23,27 @@ defmodule VeriSim.Query.VCLTGate do
   @max_input_bytes 1_048_576
   @max_output_bytes 65_536
 
+  @doc """
+  Check a statement with the executable selected by `VERISIM_VCLT_GATE`.
+
+  `schema` is the optional OctadSchema map sent with the statement in the
+  version-1 JSON request; it defaults to `%{}`. See
+  `vcl-ut/docs/vclt-gate-contract.adoc` for the schema format.
+
+  Returns `:skip` when the environment variable is unset or empty, or `:admit`
+  for exit 0 with a valid certification response. Exit 1 returns
+  `{:reject, reasons}` with a non-empty list of strings, falling back to
+  `"inadmissible (no detail)"` when the response has no usable failure details.
+
+  Invocation and encoding exceptions, invalid success responses, other exit
+  statuses, timeouts and exceeded size limits return `{:error, :gate_failed}`.
+  The encoded request may contain at most 1 MiB and stdout at most 64 KiB.
+  Execution requires GNU `timeout` and is limited to five seconds, with a
+  further 500 ms allowed for collecting the result.
+
+  A configured gate receives the request through `--input` in a private
+  temporary file; cleanup is attempted after invocation, including on failure.
+  """
   @spec check(String.t(), map()) ::
           :skip | :admit | {:reject, [String.t()]} | {:error, :gate_failed}
   def check(statement, schema \\ %{}) do

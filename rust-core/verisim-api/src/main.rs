@@ -7,6 +7,13 @@
 
 use verisim_api::ApiConfig;
 
+/// Run the API using environment configuration, with loopback listeners and CORS
+/// disabled by default. The binary does not configure authentication.
+///
+/// With both `VERISIM_TLS_CERT` and `VERISIM_TLS_KEY` set, serve HTTPS only;
+/// otherwise serve HTTP and, unless its port is zero, gRPC. A partial TLS pair
+/// returns an error. Store initialisation, listener setup and TLS loading errors
+/// returned by the selected server are propagated.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Install ring as the default crypto provider (pure Rust, no OpenSSL/aws-lc-sys)
@@ -112,6 +119,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Return `127.0.0.1` when IPv4 is enabled, otherwise bracketed IPv6 loopback
+/// (`[::1]`), ready to append a port when forming a socket address.
 fn loopback_host(enable_ipv4: bool) -> &'static str {
     if enable_ipv4 {
         "127.0.0.1"

@@ -13,6 +13,8 @@ defmodule VeriSim.Application do
   Initializes the local Hypatia scan index and starts the supervision tree.
 
   The application master owns the index so it outlives individual scan callers.
+  The orchestration HTTP API binds to `127.0.0.1` unless the `:verisim`
+  application setting `:orch_api_ip` overrides the address.
   Returns the result of `Supervisor.start_link/2`.
   """
   @impl true
