@@ -45,7 +45,7 @@ The gates that guard this state, all re-run green on 2026-10-25:
 |Gate |Result |What it holds
 
 |`tests/doc-consonance-gate.sh` |PASS |no "VeriSim Query Language" misnomer
-|`scripts/check-doc-links.sh` |PASS — 377 links / 102 documents, 0 exempt
+|`scripts/check-doc-links.sh` |PASS — 389 links / 103 documents, 0 exempt (PR check)
 |every relative `link:` resolves
 |`scripts/check-modality-contract.py` |PASS — 8 slots, 8 payload fields
 |the document cannot quietly describe an implementation that no longer exists
@@ -130,7 +130,9 @@ Rules that follow, and that downstream projects should be told:
 == 4. Cardinality and required/optional, verified against source
 
 Every row below was read from the code at the time of the change, not inferred
-from intent. Named evidence is given so it can be re-checked cheaply.
+from intent, and re-checked at git revision
+`3b58ddd591e40d1cc8f7b6f44e99778fda3e4fee` (`3b58ddd` below).
+All source paths and line ranges in the evidence column refer to that revision.
 
 [cols="2,2,2,4",options="header"]
 |===
@@ -138,38 +140,49 @@ from intent. Named evidence is given so it can be re-checked cheaply.
 
 |8 fixed slots, no negotiation
 |yes
-|8-name enum in `connectors/shared/json-schema/modality.json`; 8 `bool` fields of
-`ModalityStatus`; 8 type parameters of the concrete `OctadStore` alias
+|`3b58ddd`: 8-name enum in `connectors/shared/json-schema/modality.json:8–17`;
+8 `bool` fields of `ModalityStatus` in `rust-core/verisim-octad/src/lib.rs:128–139`;
+8 type parameters of `ConcreteOctadStore` in `rust-core/verisim-api/src/lib.rs:88–117`
 |no `profile` field, no negotiation anywhere
 |All 7 payload modalities optional
 |yes
-|`OctadInput::default()` is a valid create
+|`3b58ddd`: `OctadInput` derives `Default`, with 7 `Option` fields in
+`rust-core/verisim-octad/src/lib.rs:185–204`; create handles them conditionally in
+`rust-core/verisim-octad/src/store.rs:833–967`
 |nothing is required at create
 |`temporal` is not settable server-side, and is always written
 |yes
-|absent from `verisim_octad::OctadInput`; the store appends a version snapshot on
-every create *and* update
+|`3b58ddd`: absent from `OctadInput` in `rust-core/verisim-octad/src/lib.rs:185–204`;
+the store appends a version snapshot on every create *and* update in
+`rust-core/verisim-octad/src/store.rs:969–986,1226–1241`
 |`modality_status.temporal == true` after any write
 |`metadata` is not a modality
 |yes
-|`HashMap<String, String>`, indexed by no modality
+|`3b58ddd`: `HashMap<String, String>` in `rust-core/verisim-octad/src/lib.rs:202–203`;
+not indexed by any modality per `connectors/shared/json-schema/octad-input.json:208–212`
 |it is carried alongside the entity, not witnessed
 |Update merges and never shrinks the set
 |yes
-|`modality_status` is seeded from the existing record in `store.rs`
+|`3b58ddd`: `modality_status` is seeded from the existing record and flags are
+only set for supplied modalities in `rust-core/verisim-octad/src/store.rs:1091–1224`
 |omitting a modality on update leaves it untouched
 |Completeness is observed, not enforced
 |yes
-|`ModalityStatus::is_complete()` exists; `OctadConfig::require_complete` is
-declared but read by no code
+|`3b58ddd`: `ModalityStatus::is_complete()` in `rust-core/verisim-octad/src/lib.rs:141–152`;
+`OctadConfig::require_complete` in the same file at lines 359–378.
+Repository-wide search for `require_complete` found only its declaration and
+default assignment in Rust source, no reads
 |a partial subject is valid; this is a real gap, documented as one
 |No ninth modality is expressible in the schema
 |yes
-|`octad-input.json` closes the object with `additionalProperties: false`
+|`3b58ddd`: `connectors/shared/json-schema/octad-input.json:213–215` closes the
+object with `additionalProperties: false`
 |a custom modality name is not expressible
 |The Rust types are nonetheless lenient
 |yes
-|no `deny_unknown_fields` on `OctadRequest` or the core `OctadInput`
+|`3b58ddd`: no `deny_unknown_fields` on `OctadRequest` in
+`rust-core/verisim-api/src/lib.rs:271–292` or core `OctadInput` in
+`rust-core/verisim-octad/src/lib.rs:185–204`
 |unknown JSON keys are *ignored*, not rejected
 |===
 
@@ -222,7 +235,8 @@ in link:modality-profile.adoc[§3] and §10 of the same document.
 
 [[divergences]]
 The issue assumed "the versioned contract". There isn't one contract; there are
-five descriptions of one payload, and they disagree:
+six descriptions of one payload (grouping JSON Schema and OpenAPI in one row),
+and they disagree:
 
 [cols="3,2,3",options="header"]
 |===
@@ -383,9 +397,12 @@ Nothing else in this handover is blocked on a ruling.
 == 11. Verified here, and not verified
 
 *Executed on 2026-10-24 and re-executed 2026-10-25:* `doc-consonance`,
-`doc-links` (377 links / 102 documents, 0 exempt), `assail-classifications`
+`doc-links` (389 links / 103 documents, 0 exempt; PR check), `assail-classifications`
 (including its positive control) and the new `modality-contract-gate` (including
 all four planted drift directions). All pass.
+
+The PR-check link totals above were reproduced at git revision
+`e78dd7727c757ee48f2d68d074f7ae6c8fec3f9c`.
 
 *Not executed:* no `cargo`, `rustc`, `mix`, `bun` or `coqc` is available in this
 environment, and crates.io is network-blocked, so **no Rust, Elixir or Coq build
