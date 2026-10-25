@@ -1,0 +1,484 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Handover — issue #299, modality-profile terminology and cardinality
+:toc: left
+:toclevels: 3
+:icons: font
+
+[.lead]
+A complete handover of the issue #299 session, so the next person does not have
+to reconstruct it from a pull-request diff and a conversation. It states what
+landed, what was verified and how, what was *not* verified, which decisions are
+still the owner's, and what is left in what order.
+
+[cols="1,3",options="header"]
+|===
+|Field |Value
+
+|Issue |`hyperpolymath/verisimdb#299` — *Define modality-profile terminology and
+cardinality semantics* — **still OPEN** (deliberately: see <<verdict,§2>>)
+|Deliverable |PR `#313` — **MERGED** 2026-10-24T10:42:12Z, merge commit `cb6c538`,
++826/−8 across 10 files
+|Session |2026-10-24; this handover written 2026-10-25
+|Change class |Documentation + one static gate. **No wire format, schema,
+grammar or API change.**
+|Follow-on work |None of it is implemented. See <<options,§8>> and <<remaining,§10>>
+|===
+
+== 1. Where things stand
+
+Everything #313 carried is on `main`. Nothing from this session is uncommitted,
+and no follow-on work exists in any branch.
+
+Three artefacts define the outcome:
+
+* link:modality-profile.adoc[`docs/modality-profile.adoc`] — 394 lines, canonical
+for the vocabulary and for cardinality.
+* `scripts/check-modality-contract.py` — 187 lines, stdlib only.
+* `tests/modality-contract-gate.sh` — 146 lines, a positive control for the above,
+wired into `.github/workflows/doc-consonance.yml` (*Documentation Gates*).
+
+The gates that guard this state, all re-run green on 2026-10-25:
+
+[cols="2,1,3",options="header"]
+|===
+|Gate |Result |What it holds
+
+|`tests/doc-consonance-gate.sh` |PASS |no "VeriSim Query Language" misnomer
+|`scripts/check-doc-links.sh` |PASS — 389 links / 103 documents, 0 exempt (PR check)
+|every relative `link:` resolves
+|`scripts/check-modality-contract.py` |PASS — 8 slots, 8 payload fields
+|the document cannot quietly describe an implementation that no longer exists
+|`tests/modality-contract-gate.sh` |PASS — 4 planted drift directions rejected
+|the checker above can actually fail
+|===
+
+== 2. What #299 asked for, and the honest verdict
+
+Filed 2026-10-04, no labels, no comments. The problem statement: current
+documentation described an entity as having "up to 8 modal witnesses (the
+octad)" while the public API/schema is named Octad; other integration projects
+still use "hexad" or fixed-count wording; future implementations may select
+different modular components.
+
+It proposed three terms and asked for four things. Verdict:
+
+[cols="3,1,4",options="header"]
+|===
+|Requested |Verdict |Where
+
+|Define the relationship between a consonance subject, its modality profile and
+the eight Octad slots |*Met* |link:modality-profile.adoc[§1, §4]
+|State whether a profile can omit modalities, which are required/optional, and
+how version/cardinality is represented |*Met*, verified against source |§5, §6
+|Add examples/tests for the supported cases |*Met* |§7, plus the contract gate
+|Clarify that `HEXAD` is a legacy alias only if that remains true in VCL
+|*Met* — confirmed still true in grammar v3.0 |§3
+|Keep transport/schema changes separate from the terminology decision |*Met* —
+no contract change; six divergences *reported* instead |§9
+|A number-agnostic phrase for downstream projects |*Met* at vocabulary level
+|§1
+|===
+
+[[verdict]]
+**Why the issue is still open.** One implicit criterion — that the contract is
+actually verified and versioned — is *not* met, and cannot be met by this change.
+There is no versioned contract to cite: the JSON-Schema `$id`s are unversioned,
+and the OpenAPI request body disagrees with the running server (<<divergences,§6>>,
+item 1). Closing on the strength of improved wording would be exactly the failure
+the issue warns about. It is referenced from the PR as *Refs*, not *Closes*.
+
+== 3. The vocabulary as adopted
+
+Use these three terms with these meanings, and only these meanings:
+
+[cols="1,3,2",options="header"]
+|===
+|Term |Means |Cardinality
+
+|*modality profile*
+|The selection an implementation supports: the named, versioned list of modality
+slots it can populate, plus the rules for what is required, optional and always
+written. A property of the *implementation and its version*.
+|Implementation-specific. This implementation: the Octad, exactly 8 slots, fixed.
+It is **not** selectable per request, per tenant or per entity.
+
+|*modality set*
+|The membership alone: which modalities are actually present for one subject at
+one moment. Says nothing about why.
+|Implementation- and entity-specific. Need not be all slots; a strict subset is
+normal, not an error.
+
+|*Octad*
+|VeriSimDB's specifically named eight-modality model and API — the eight slots,
+`OctadInput`, `OctadStore`, `verisim-octad`.
+|Exactly 8. Always. A proper noun for this project's model, not a generic word
+for "a modality group".
+|===
+
+Rules that follow, and that downstream projects should be told:
+
+* "Up to eight modal witnesses" describes **membership**, never a variable-arity
+  contract. A three-modality *set* is supported and normal; a three-slot
+  *profile* is not implemented.
+* "Hexad" is not a generic name for a modality group. In this repository it is a
+  legacy VCL keyword; elsewhere it is a project-specific label. Do not infer a
+  six-slot wire format from it.
+* Cardinality belongs to the profile. "Modality profile" on its own does not tell
+  you 8, 6 or 3 — you have to name the profile.
+
+== 4. Cardinality and required/optional, verified against source
+
+Every row below was read from the code at the time of the change, not inferred
+from intent, and re-checked at git revision
+`3b58ddd591e40d1cc8f7b6f44e99778fda3e4fee` (`3b58ddd` below).
+All source paths and line ranges in the evidence column refer to that revision.
+
+[cols="2,2,2,4",options="header"]
+|===
+|Fact |Holds |Evidence |Consequence
+
+|8 fixed slots, no negotiation
+|yes
+|`3b58ddd`: 8-name enum in `connectors/shared/json-schema/modality.json:8–17`;
+8 `bool` fields of `ModalityStatus` in `rust-core/verisim-octad/src/lib.rs:128–139`;
+8 type parameters of `ConcreteOctadStore` in `rust-core/verisim-api/src/lib.rs:88–117`
+|no `profile` field, no negotiation anywhere
+|All 7 payload modalities optional
+|yes
+|`3b58ddd`: `OctadInput` derives `Default`, with 7 `Option` fields in
+`rust-core/verisim-octad/src/lib.rs:185–204`; create handles them conditionally in
+`rust-core/verisim-octad/src/store.rs:833–967`
+|nothing is required at create
+|`temporal` is not settable server-side, and is always written
+|yes
+|`3b58ddd`: absent from `OctadInput` in `rust-core/verisim-octad/src/lib.rs:185–204`;
+the store appends a version snapshot on every create *and* update in
+`rust-core/verisim-octad/src/store.rs:969–986,1226–1241`
+|`modality_status.temporal == true` after any write
+|`metadata` is not a modality
+|yes
+|`3b58ddd`: `HashMap<String, String>` in `rust-core/verisim-octad/src/lib.rs:202–203`;
+not indexed by any modality per `connectors/shared/json-schema/octad-input.json:208–212`
+|it is carried alongside the entity, not witnessed
+|Update merges and never shrinks the set
+|yes
+|`3b58ddd`: `modality_status` is seeded from the existing record and flags are
+only set for supplied modalities in `rust-core/verisim-octad/src/store.rs:1091–1224`
+|omitting a modality on update leaves it untouched
+|Completeness is observed, not enforced
+|yes
+|`3b58ddd`: `ModalityStatus::is_complete()` in `rust-core/verisim-octad/src/lib.rs:141–152`;
+`OctadConfig::require_complete` in the same file at lines 359–378.
+Repository-wide search for `require_complete` found only its declaration and
+default assignment in Rust source, no reads
+|a partial subject is valid; this is a real gap, documented as one
+|No ninth modality is expressible in the schema
+|yes
+|`3b58ddd`: `connectors/shared/json-schema/octad-input.json:213–215` closes the
+object with `additionalProperties: false`
+|a custom modality name is not expressible
+|The Rust types are nonetheless lenient
+|yes
+|`3b58ddd`: no `deny_unknown_fields` on `OctadRequest` in
+`rust-core/verisim-api/src/lib.rs:271–292` or core `OctadInput` in
+`rust-core/verisim-octad/src/lib.rs:185–204`
+|unknown JSON keys are *ignored*, not rejected
+|===
+
+The last two rows together are the subtle one: **schema-level closure and
+Rust-level leniency are both true.** Do not rely on either as validation of a
+consumer's intent — a payload can be schema-invalid and still be accepted.
+
+=== How version and cardinality are represented today
+
+There is no versioned profile object on the wire, and the change deliberately did
+not invent one. Cardinality is expressed *implicitly and redundantly* in three
+places: the modality enum, `ModalityStatus`, and the concrete store alias.
+
+The version identifiers that actually exist:
+
+[cols="1,2",options="header"]
+|===
+|Artefact |Version marker present today
+
+|VCL grammar |`Version: 3.0` in `spec/grammar.ebnf`
+|HTTP API |`connectors/shared/openapi/verisim-api-v1.yaml` — v1 only in the filename
+|JSON Schema |`$id` URLs under `https://verisim.db/schema/` — *unversioned*
+|Rust crates |Cargo crate versions
+|===
+
+No `profile_version`, no `cardinality` field, no schema version field. Adding one
+is a contract change and therefore an owner decision, not a clarification.
+
+== 5. `HEXAD`, settled
+
+The issue asked for this to be clarified *only if it remains true*, so it was
+checked rather than assumed. Still true:
+
+[source,ebnf]
+----
+hexad_source = 'HEXAD', uuid ;
+----
+
+Present in `spec/grammar.ebnf` v3.0 (canonical) **and** its near-duplicate
+`docs/vcl-grammar.ebnf`. `HEXAD` is a *source keyword* meaning "one entity,
+addressed by UUID" — it selects the Octad source in a `FROM` clause. It is not a
+modality profile, not a claim of six modalities, and retained only for backward
+compatibility with statements already written.
+
+Renaming or removing it changes the accepted language, so it needs an owner
+decision and a grammar version bump applied to **both** copies. That is recorded
+in link:modality-profile.adoc[§3] and §10 of the same document.
+
+== 6. Divergences found — the durable payload of this work
+
+[[divergences]]
+The issue assumed "the versioned contract". There isn't one contract; there are
+six descriptions of one payload (grouping JSON Schema and OpenAPI in one row),
+and they disagree:
+
+[cols="3,2,3",options="header"]
+|===
+|Surface |Shape |Location
+
+|`verisim_octad::OctadInput` (domain) |nested |`rust-core/verisim-octad/src/lib.rs`
+|`json-schema/octad-input.json` + OpenAPI requestBody |nested
+|`connectors/shared/`
+|HTTP `OctadRequest` |**flat** — `title`, `body`, `embedding`, `types`,
+`relationships`, `tensor`, `provenance`, `spatial`, `metadata`
+|`rust-core/verisim-api/src/lib.rs`
+|gRPC `OctadCreateRequest` |flat, hand-mapped to nested
+|`proto/verisim.proto`, `grpc.rs`
+|GraphQL `OctadInput` |flat, but a *different* flat — `tensor_shape`/`tensor_data`,
+no relationships / provenance / spatial |`graphql.rs`
+|Rust connector client |nested, **posted to the flat endpoint**
+|`connectors/clients/rust/src/types.rs`
+|===
+
+None of these was fixed, because each moves a wire contract or a client API,
+which #299 explicitly keeps out of a terminology change. All six are written up
+in link:modality-profile.adoc[§9] and in the `CHANGELOG` entry:
+
+. *The OpenAPI request body does not match the running server.* The YAML binds
+  `POST`/`PUT /api/v1/octads` to the nested schema; the handler parses the flat
+  `OctadRequest`. A schema-shaped body is accepted and its nested keys are
+  silently ignored — the worst of the three possible behaviours.
+. *The OpenAPI description promises an automatic provenance event* ("A provenance
+  `created` event is recorded automatically"). The store records provenance only
+  when the caller supplies it and `create_octad_handler` adds none, so
+  `provenance_chain_length` can be `0`.
+. *Hand-written client input types diverge.* Rust and Elixir declare `temporal`
+  (plus `name`/`description`); Zig and Julia declare a `modalities` list; core and
+  schema declare neither.
+. *The shipped Rust client appears to create near-empty subjects.* It posts its
+  own nested `OctadInput` directly to the flat endpoint. Found by static reading
+  of both sides; **not** verified end-to-end — see <<provenance,§11>>.
+. *Two normative grammar copies* (`spec/grammar.ebnf`, `docs/vcl-grammar.ebnf`)
+  must be edited together. Pre-existing, already an owner decision.
+. *JSON-Schema `$id`s are unversioned*, so "the versioned contract" cannot be
+  cited by URL alone; cite file plus git revision.
+
+Consumers of the **flat HTTP** shape, which a change to nested would affect:
+`scripts/demo-consonance.sh`, `scripts/smoke-test.sh`, `scripts/two-node-test.sh`,
+`scripts/self-ingest.sh`, and `verisim-api`'s own tests. Consumers of the
+**nested** shape: the schema, the OpenAPI, the domain type, the gRPC mapping and
+the Rust client. That split is the real reason item 1 needs a ruling rather than
+an edit.
+
+== 7. Standards research: DEED, kyq and kyX
+
+Done because the question "can we generate both sides from one source?" arose.
+Answer, with evidence from `hyperpolymath/standards`:
+
+*DEED is the wrong layer.* `1-formats/deed/spec/DEED-GRAMMAR-SPEC.adoc` is
+v0.2.3, status **DRAFT, not ratified**; the normative grammar is `deed.abnf`
+v1.2.0. Its scope is "lexical structure, concrete syntax, the document forms, the
+identity rule, the conformance modes, and the validator obligation" — it models
+repository identity/pedigree through four doc-heads (`estate-deed`, `repo-deed`,
+`estate-atlas-deed`, `praxis-deed`), not request bodies. The typing chapter is
+**PROPOSED** and outside the v0.1 conformance surface, and the estate's own
+vocabulary file says "No reader enforces these obligations yet." Its validator is
+`deed_lint.js` (bun), which this repository does not run. Generating
+`OctadInput`/`OctadRequest` and the OpenAPI from a deed would extend an
+unratified identity grammar into an interface-definition language — a standards
+decision, and a wire contract pinned to something unratified.
+
+*`kyq` is not a generator.* `metadatastician/kyq` is "Kubernetes YAML Query"
+(formerly `kcq`, renamed 2026-10-14 by owner ruling D333): a KYAML parser, linter
+and jq-like query engine in AffineScript targeting WASM. Its sources do not
+compile yet.
+
+*`kyX` is the codegen-shaped thing, and it is planned only.* Ruling D334 renames
+the planned projection compiler `kcX` → `kyX` ("y for anything from X"); `kyq` is
+one consumer of the same KYAML front end. Standards' `nostos` vocabulary file is
+explicit: "Once the planned kyX projection compiler exists … None of this is
+implemented."
+
+Consequence: if deed- or schema-driven projections into OpenAPI and language
+types are wanted estate-wide, that is a **feature request on kyX**. Do not build it
+here first, and do not wait for it either (<<options,§8>> has a local route that
+needs no dependency).
+
+Two DEED-adjacent debts belong to *other* threads, not this one: this repository
+has no `<reponame>_chora.deed` (root carries the legacy `0-AI-MANIFEST.a2ml`;
+`dogfood-gate.yml` warns about it), and a `(contracts …)` vocabulary clause does
+not exist in v0.1 — so a deed cannot yet act even as a pointer-plus-digest to the
+canonical contract.
+
+[[options]]
+== 8. Options for item 1 (none implemented)
+
+|===
+|# |Option |Size |What it breaks |Note
+
+|**O0** |Document only — the state after #313 |0 |nothing |Fixes nothing
+|**O1** |`deny_unknown_fields` on `OctadRequest`; return `400` naming unknown
+keys; fixture test |S |`200` → `400` on junk payloads
+|**Safety fix. Do this first regardless of which shape wins.**
+|**O2** |Nested is canonical; flat becomes a documented legacy adapter with a
+deprecation header |M |nothing immediately
+|3 of the 4 modern surfaces already map nested
+|**O3** |Flat is canonical; rewrite the schema and fix the Rust client |M
+|schema, OpenAPI, domain type |Cheapest to ship, but keeps three flat variants to
+reconcile
+|**O4a** |Schema-as-source: a Python generator emits OpenAPI components and
+language stubs; CI diffs generated against committed |M |nothing
+|No new Rust dependency; reuses the `python3` the doc gates already require.
+Upgrades `check-modality-contract.py` from *compare* to *generate + diff*
+|**O4b** |Rust-as-source: `schemars` derive → JSON Schema → OpenAPI, golden-file
+gate |M |nothing |Adds a dev-dependency; neither `schemars` nor `utoipa` is in
+`Cargo.toml` today
+|**O5** |Version by media type (`application/vnd.verisimdb.octad.v2+json`) at
+the same URL |S |nothing |Matches the estate's IANA-registration habit; avoids a
+`/v2` fork
+|**O6** |File a `standards` issue for a deed `(contracts …)` clause, and a `kyX`
+codegen request |S |nothing |Correct long-term home; **not** a blocker
+|===
+
+**Recommended sequence:** `O1` now; one ruling that **nested is canonical**;
+then `O2` + `O4a`; `O5` if a soft cutover is wanted; `O6` in parallel as issues,
+never as a dependency.
+
+== 9. Decisions still needed from the owner
+
+. **Which shape is canonical** — nested (`verisim_octad::OctadInput`, which the
+  schema, OpenAPI and gRPC already map to), flat (`OctadRequest`, which every
+  script and every running test speaks), or "both, for one minor version"?
+. **May `deny_unknown_fields` ship now as a `400`?** (O1.) This is the only part
+  of item 1 that is a safety fix rather than a taste question.
+. **Item 2 direction** — delete the "automatic provenance event" sentence, or
+  make the create handler actually record one? Auto-recording changes provenance
+  chain lengths and therefore drift baselines, so deleting the sentence is the
+  safer first step.
+
+Nothing else in this handover is blocked on a ruling.
+
+[[remaining]]
+== 10. What is left, ranked
+
+. **O1 — the silent-create failure.** Highest severity, smallest diff. Blocked on
+   decision 2.
+. **Item 1 ruling and implementation** (O2 or O3, plus O4) with round-trip
+   fixtures: a `fixtures/nested.json` and a `fixtures/flat.json` must either
+   produce the same stored `Octad`, or one must fail loudly. Blocked on decision 1.
+. **Item 2 — provenance sentence versus behaviour.** One line either way.
+. **Item 3 — client input types.** Decide whether clients mirror the *domain*
+   type or the *wire* type; today they mirror neither consistently.
+. **Item 4 — confirm or refute the Rust client break** with a real `cargo test`
+   (impossible here: no toolchain). Add a contract test that posts a
+   client-built body to a running server.
+. **Item 5 — retire or keep the duplicate grammar.** Owner decision, already
+   tracked in `ULTRAPLAN-2026-09-27.adoc`.
+. **Item 6 — version the schema `$id`s?** Nearly free if O4a or O4b lands.
+. **Separate thread — the missing `_chora.deed`** surfaced during §7.
+
+[[provenance]]
+== 11. Verified here, and not verified
+
+*Executed on 2026-10-24 and re-executed 2026-10-25:* `doc-consonance`,
+`doc-links` (389 links / 103 documents, 0 exempt; PR check), `assail-classifications`
+(including its positive control) and the new `modality-contract-gate` (including
+all four planted drift directions). All pass.
+
+The PR-check link totals above were reproduced at git revision
+`e78dd7727c757ee48f2d68d074f7ae6c8fec3f9c`.
+
+*Not executed:* no `cargo`, `rustc`, `mix`, `bun` or `coqc` is available in this
+environment, and crates.io is network-blocked, so **no Rust, Elixir or Coq build
+or test ran**. No Rust source was changed by #313, so nothing new is untested —
+but the behavioural claims in link:modality-profile.adoc[§5] (`temporal` always
+written, update merges, `require_complete` unread, `deny_unknown_fields` absent)
+are *read from source*, and both the document and the `CHANGELOG` say so at the
+point where it matters. CI's first run is their first execution against a built
+binary.
+
+[[traps]]
+== 12. Traps for the next person
+
+* **Do not treat "up to 8" as API flexibility.** It is membership. This is the
+  single most common misreading and the reason the issue existed.
+* **Do not close #299** just because the wording improved. The contract half is
+  unverified until decisions 1 and 2 are ruled and implemented.
+* **`spec/grammar.ebnf` and `docs/vcl-grammar.ebnf` must move together.** Two
+  normative grammars is a drift hazard, not a feature.
+* **`.github/workflows/actions.lock` does not need regenerating for a `run:`
+  step** — only for new `uses:` refs. Verified: `scripts/check-lock-sync.sh`
+  checks `uses:` refs in both directions, not file hashes.
+* **Every relative `link:` must resolve**, or it must be added to
+  `scripts/doc-links-allowlist.txt` *with a reason*. The allowlist is currently
+  empty on purpose.
+* **`check-modality-contract.py` is deliberately narrow.** It compares, it asserts
+  only facts the document states, and it does **not** encode the known-broken
+  divergences as expected — a gate that freezes a known break stops reporting it.
+* **Do not write Rust-method shorthand as `T::f/0`** in these docs; that is Elixir
+  arity syntax. It is `T::f()`.
+
+== 13. Thread map
+
+[cols="2,3",options="header"]
+|===
+|Thread |Relationship
+
+|**#299** |The parent. Terminology met; contract half open. Carries decisions 1–3.
+|**PR #313** |Delivered §3–§6. Merged `cb6c538`. Referenced the issue with *Refs*.
+|**#204** |Prior documentation campaign that introduced the doc-consonance and
+doc-links gates. The new gate follows its positive-control pattern.
+|**#113** |Formal-proof debt. Untouched by this work.
+|**#296, #295** |Unrelated red CI gates. Untouched.
+|**Owner rulings D308 / D333 / D334** (`standards#1234`) |Govern grammar
+case-sensitivity, the kcq→kyq rename, and the kcX→kyX projection compiler
+respectively.
+|**`standards` DEED spec v0.2.3** |Relevant only if a `(contracts …)` clause is
+ever wanted (§7).
+|**Planned `kyX`** |Home for schema→OpenAPI→language projections (§7).
+|**`dogfood-gate.yml` / missing `_chora.deed`** |Repo-identity debt, separate.
+|===
+
+== 14. Reproduce
+
+[source,bash]
+----
+bash tests/doc-consonance-gate.sh
+bash scripts/check-doc-links.sh
+python3 scripts/check-modality-contract.py
+bash tests/modality-contract-gate.sh
+bash tests/assail-classifications-gate.sh
+----
+
+All five exit 0 on `main` as of 2026-10-25. The contract gate prints the slot and
+payload-field counts it compared, so a silent pass is distinguishable from a pass
+over changed data.
+
+== See also
+
+* link:modality-profile.adoc[`docs/modality-profile.adoc`] — canonical for the
+terminology and cardinality; §9 lists the six divergences in full.
+* link:INDEX.adoc[`docs/INDEX.adoc`] — documentation index.
+* link:../CHANGELOG.adoc[`CHANGELOG.adoc`] — the `[Unreleased]` entry of
+2026-10-24, including the "verified / not verified" note.
+* link:../FAQ.adoc[`FAQ.adoc`] — the short-answer form of §3 ("Is 'octad' the
+same as a 'modality profile'?").
+* link:../EXPLAINME.adoc[`EXPLAINME.adoc`] — conceptual orientation.
+* link:../ARCHITECTURE.adoc[`ARCHITECTURE.adoc`] — component map and the
+"read this next, by question" table.

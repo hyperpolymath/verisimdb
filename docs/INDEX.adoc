@@ -115,6 +115,13 @@ implementation status
 * link:status/implementation-plan.adoc[docs/status/implementation-plan.adoc]
 — Original timeline-based execution plan (V1–V5)
 
+==== Handovers
+
+* link:HANDOVER-2026-10-24.adoc[docs/HANDOVER-2026-10-24.adoc] — issue #299
+session handover: the modality-profile vocabulary as adopted, cardinality verified
+against source, the six contract divergences found, the DEED/kyq/kyX standards
+findings, the open owner decisions, and the ranked follow-on work
+
 ==== Releases
 
 * link:releases/v0.1.0-alpha.adoc[docs/releases/v0.1.0-alpha.md] —
