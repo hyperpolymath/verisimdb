@@ -28,7 +28,7 @@ defmodule VeriSim.Query.VCLTGate do
 
   `schema` is the optional OctadSchema map sent with the statement in the
   version-1 JSON request; it defaults to `%{}`. See
-  [the pinned VCLT contract](https://github.com/hyperpolymath/vcl-ut/blob/a8d31ffed8277f70afc8abd5f908304fc57b7c29/docs/vclt-gate-contract.adoc)
+  `https://github.com/hyperpolymath/vcl-ut/blob/a8d31ffed8277f70afc8abd5f908304fc57b7c29/docs/vclt-gate-contract.adoc`
   for the schema format.
 
   Returns `:skip` when the environment variable is unset or empty, or `:admit`
