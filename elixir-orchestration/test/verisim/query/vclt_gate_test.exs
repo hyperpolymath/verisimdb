@@ -37,7 +37,7 @@ defmodule VeriSim.Query.VCLTGateTest do
 
       File.write!(stub, """
       #!/bin/sh
-      echo '{"certified_level":6,"levels":[]}'
+      echo '{"schema_version":1,"admissible":true,"requested_level":6,"certified_level":6,"levels":[]}'
       exit 0
       """)
 
@@ -50,35 +50,23 @@ defmodule VeriSim.Query.VCLTGateTest do
     end
 
     @tag :tmp_dir
-    test "delivers the payload on stdin, unparsed by any shell", %{tmp_dir: tmp} do
+    test "delivers the payload via the producer v1 input-file contract, unparsed", %{tmp_dir: tmp} do
       stub = Path.join(tmp, "gate-stdin")
       observation = Path.join(tmp, "stdin-observation")
 
-      # Copy stdin verbatim to a file so the test can assert on exactly what the
-      # gate process received, then emit a valid admit response.
+      # Copy the input file verbatim, as specified by the producer v1 contract.
       File.write!(stub, """
       #!/bin/sh
-      cat > #{shell_quote(observation)}
-      echo '{"certified_level":6,"levels":[]}'
+      test "$1" = --input || exit 2
+      cat "$2" > #{shell_quote(observation)}
+      echo '{"schema_version":1,"admissible":true,"requested_level":6,"certified_level":6,"levels":[]}'
       exit 0
       """)
 
       File.chmod!(stub, 0o755)
       System.put_env("VERISIM_VCLT_GATE", stub)
 
-      # Every character here is one a shell parser would act on: single quotes
-      # (which would close an enclosing quote), `;` `|` `&` (separators), a
-      # backtick and `$(...)` (command substitution), `>` (redirection), plus a
-      # literal newline and tab in the schema value. If any part of the invocation
-      # passed through a shell, at least one of these would be consumed, expanded
-      # or split before reaching the gate.
-      #
-      # So asserting they survive byte-for-byte is a direct test of the property
-      # that matters — no shell sees the statement or schema. That is strictly
-      # stronger than what this test previously asserted (an unpredictable
-      # `vcltgate_*.json` file at mode 600, removed afterwards), which described
-      # the temp-file mechanism rather than the guarantee it existed to provide.
-      # A fixed shell redirection receives paths only as positional arguments.
+      # Metacharacters must survive byte-for-byte; no shell parses this input.
       hostile_statement =
         "INSPECT GRAPH FROM HEXAD abc WHERE id = '1' ; rm -rf / | x & `id` $(whoami) > /tmp/pwn"
 
@@ -155,7 +143,11 @@ defmodule VeriSim.Query.VCLTGateTest do
             ~s({"certified_level":-1,"levels":[]}),
             ~s({"certified_level":6,"levels":[{"status":"fail"}]}),
             ~s({"certified_level":"6","levels":[]}),
-            ~s({"certified_level":11,"levels":[]})
+            ~s({"certified_level":11,"levels":[]}),
+            ~s({"schema_version":2,"admissible":true,"requested_level":6,"certified_level":6,"levels":[]}),
+            ~s({"schema_version":1,"admissible":false,"requested_level":6,"certified_level":6,"levels":[]}),
+            ~s({"schema_version":1,"admissible":true,"requested_level":7,"certified_level":6,"levels":[]}),
+            ~s({"schema_version":1,"admissible":true,"requested_level":6,"certified_level":6,"levels":[{}]})
           ] do
         File.write!(stub, "#!/bin/sh\nprintf '%s' " <> shell_quote(response))
         File.chmod!(stub, 0o755)
@@ -164,7 +156,7 @@ defmodule VeriSim.Query.VCLTGateTest do
     end
 
     @tag :tmp_dir
-    test "executable path metacharacters are literal; private stdin file is removed", %{
+    test "executable path metacharacters are literal; private input file is removed", %{
       tmp_dir: tmp
     } do
       stub = Path.join(tmp, "gate ' ; $(false)")
@@ -172,10 +164,11 @@ defmodule VeriSim.Query.VCLTGateTest do
 
       File.write!(stub, """
       #!/bin/sh
-      readlink /proc/$$/fd/0 > #{shell_quote(observation)}
-      test "$(stat -c %a /proc/$$/fd/0 -L)" = 600 || exit 2
-      cat > /dev/null
-      echo '{"certified_level":6,"levels":[]}'
+      test "$1" = --input || exit 2
+      printf '%s' "$2" > #{shell_quote(observation)}
+      test "$(stat -c %a "$2")" = 600 || exit 2
+      cat "$2" > /dev/null
+      echo '{"schema_version":1,"admissible":true,"requested_level":6,"certified_level":6,"levels":[]}'
       """)
 
       File.chmod!(stub, 0o755)
@@ -205,7 +198,8 @@ defmodule VeriSim.Query.VCLTGateTest do
       System.put_env("VERISIM_VCLT_GATE", stub)
       assert {:error, :gate_failed} == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
       pid = pid_file |> File.read!() |> String.trim()
-      refute File.exists?("/proc/" <> pid)
+      {_output, status} = System.cmd("kill", ["-0", pid], stderr_to_stdout: true)
+      assert status != 0
     end
   end
 

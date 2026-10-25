@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
-# modality-contract-gate.sh — positive control for check-modality-contract.py.
+# modality-contract-gate.sh — positive control for check-modality-contract.sh.
 #
 # Same shape as tests/doc-links-gate.sh: run the real checker first, then plant
 # known-bad fixtures in a scratch tree and assert the checker (a) fails and
@@ -15,13 +15,13 @@
 # asserts the document is reported as no longer matching it.
 #
 # Fixtures are minimal copies, not the whole repository: the checker only needs
-# four inputs, and copying a Rust crate into /tmp to test a Python script would be
+# four inputs, and copying a Rust crate into /tmp to test the checker would be
 # slow without being any more convincing.
 
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-CHECKER="$REPO_ROOT/scripts/check-modality-contract.py"
+CHECKER="$REPO_ROOT/scripts/check-modality-contract.sh"
 FIXTURE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/verisimdb-modality-contract.XXXXXX")
 trap 'rm -rf -- "$FIXTURE_DIR"' EXIT
 
@@ -30,8 +30,8 @@ if [[ ! -x "$CHECKER" ]]; then
     exit 1
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 missing on runner — cannot check the modality contract" >&2
+if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq missing on runner — cannot check the modality contract" >&2
     exit 2
 fi
 
@@ -82,65 +82,40 @@ fi
 echo "[3/6] adding a ninth modality to the enum (doc must be reported stale)..."
 DIR_ENUM="$FIXTURE_DIR/enum"
 plant "$DIR_ENUM"
-python3 - "$DIR_ENUM/connectors/shared/json-schema/modality.json" <<'PY'
-import json, sys
-path = sys.argv[1]
-with open(path) as fh:
-    data = json.load(fh)
-data["enum"].append("topological")
-with open(path, "w") as fh:
-    json.dump(data, fh, indent=2)
-    fh.write("\n")
-PY
+jq '.enum += ["topological"]' "$DIR_ENUM/connectors/shared/json-schema/modality.json" > "$DIR_ENUM/enum.tmp"
+mv "$DIR_ENUM/enum.tmp" "$DIR_ENUM/connectors/shared/json-schema/modality.json"
 expect_failure "an enum with a ninth modality" "$DIR_ENUM" "topological"
 
 echo "[4/6] renaming a ModalityStatus field (doc must be reported stale)..."
 DIR_RUST="$FIXTURE_DIR/rust"
 plant "$DIR_RUST"
-python3 - "$DIR_RUST/rust-core/verisim-octad/src/lib.rs" <<'PY'
-import sys
-path = sys.argv[1]
-with open(path) as fh:
-    source = fh.read()
-# Rename only inside ModalityStatus, leaving every other `spatial` reference.
-start = source.index("pub struct ModalityStatus")
-end = source.index("}", source.index("pub spatial: bool", start))
-block = source[start:end]
-source = source[:start] + block.replace("pub spatial: bool", "pub geospatial: bool") + source[end:]
-with open(path, "w") as fh:
-    fh.write(source)
-PY
+sed -i '/pub struct ModalityStatus/,/^}/s/pub spatial: bool/pub geospatial: bool/' "$DIR_RUST/rust-core/verisim-octad/src/lib.rs"
 expect_failure "a renamed ModalityStatus field" "$DIR_RUST" "geospatial"
 
 echo "[5/6] opening the schema (doc promises a closed object)..."
 DIR_SCHEMA="$FIXTURE_DIR/schema"
 plant "$DIR_SCHEMA"
-python3 - "$DIR_SCHEMA/connectors/shared/json-schema/octad-input.json" <<'PY'
-import json, sys
-path = sys.argv[1]
-with open(path) as fh:
-    data = json.load(fh)
-data["additionalProperties"] = True
-with open(path, "w") as fh:
-    json.dump(data, fh, indent=2)
-    fh.write("\n")
-PY
+jq '.additionalProperties = true' "$DIR_SCHEMA/connectors/shared/json-schema/octad-input.json" > "$DIR_SCHEMA/schema.tmp"
+mv "$DIR_SCHEMA/schema.tmp" "$DIR_SCHEMA/connectors/shared/json-schema/octad-input.json"
 expect_failure "an open schema" "$DIR_SCHEMA" "additionalProperties"
 
 echo "[6/6] editing the doc's own slot list (doc contradicts the code)..."
 DIR_DOC="$FIXTURE_DIR/doc"
 plant "$DIR_DOC"
-python3 - "$DIR_DOC/docs/modality-profile.adoc" <<'PY'
-import sys
-path = sys.argv[1]
-with open(path) as fh:
-    text = fh.read()
-needle = "octad-slots = graph, vector, tensor, semantic, document, temporal, provenance, spatial"
-assert needle in text, "fixture no longer matches the annotation format"
-text = text.replace(needle, needle + ", acoustic")
-with open(path, "w") as fh:
-    fh.write(text)
-PY
+sed -i '\|^// modality-contract: octad-slots =|s/$/, acoustic/' "$DIR_DOC/docs/modality-profile.adoc"
 expect_failure "a doc slot list the code does not have" "$DIR_DOC" "acoustic"
 
 echo "PASS modality-contract-gate: checker passes the real tree and rejects all four planted drift directions"
+
+# A missing input/parser failure must never be mistaken for agreement.
+DIR_INVALID="$FIXTURE_DIR/invalid"
+plant "$DIR_INVALID"
+printf '{' > "$DIR_INVALID/connectors/shared/json-schema/modality.json"
+expect_failure "malformed JSON" "$DIR_INVALID" "invalid JSON"
+plant "$DIR_INVALID"
+sed -i 's/pub struct OctadInput/pub struct MissingInput/' "$DIR_INVALID/rust-core/verisim-octad/src/lib.rs"
+expect_failure "missing Rust input struct" "$DIR_INVALID" "OctadInput"
+plant "$DIR_INVALID"
+printf '\n// modality-contract: octad-slots = graph\n' >> "$DIR_INVALID/docs/modality-profile.adoc"
+expect_failure "duplicate annotation" "$DIR_INVALID" "duplicate"
+echo "PASS modality-contract-gate: malformed/missing/duplicate evidence fails closed"

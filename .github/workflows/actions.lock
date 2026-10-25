@@ -58,11 +58,11 @@ workflows:
     '.github/workflows/scorecard.yml':
         - 'hyperpolymath/standards@8750b94ac1bbe8c51ad13fe106669b13478f0b62'
     '.github/workflows/secret-scanner.yml':
-        - 'metadatastician/standards@84355587cb2a1f86e6882de83514a32db2646e7a'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/security-scan.yml':
         - 'hyperpolymath/panic-attack@8c2f1989a23521974f9f673bf73a6f39d68f3a4e'
     '.github/workflows/spark-theatre-gate.yml':
-        - 'hyperpolymath/standards@fcb8669169b4e9f5d9848608df880ae5fae812b4'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
 dependencies:
     'actions/attest-build-provenance@v4.2.2':
         ref: 'v4.2.2'
@@ -191,13 +191,6 @@ dependencies:
             - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
             - 'dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c'
             - 'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555'
-    'metadatastician/standards@84355587cb2a1f86e6882de83514a32db2646e7a':
-        ref: '84355587cb2a1f86e6882de83514a32db2646e7a'
-        commit: 'sha1-84355587cb2a1f86e6882de83514a32db2646e7a'
-        owner_id: 297579217
-        repo_id: 1116521501
-        uses:
-            - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
     'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d':
         ref: '8e48b1caade08a552646adeab66558ac43b4360d'
         commit: 'sha1-8e48b1caade08a552646adeab66558ac43b4360d'

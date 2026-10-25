@@ -54,7 +54,7 @@ Evidence paths below refer to the audited baseline unless marked changed here.
 |RAM promotion / caching |`ram_promotion.rs` maintains policy/status/accounting; does not prove a data-moving cache or hot-path benefit. |No new cache. Measure actual reusable authoring queries first.
 |Proofs |`proofs/coq/` and `docs/proof-debt.adoc` describe abstract models/axioms. No Creusot implementation proof was found. |Do not infer Rust correctness from a Coq model or a test count.
 |Unified adapter |Repository README still has `{{PROJECT_NAME}}` template content; no working gateway established by this audit. |Separate owner handoff; no edits to that repository.
-|Initialisation/governance |`REQUIRES_INITIALISATION.adoc` lists unresolved ownership/process items. Mustfile references `SECURITY.md` although repository uses `SECURITY.adoc`, and bans a language used by an existing contract checker. |Owner resolves policy inconsistencies; do not manufacture a pass.
+|Initialisation/governance |`REQUIRES_INITIALISATION.adoc` lists unresolved ownership/process items. Mustfile references `SECURITY.md` although repository uses `SECURITY.adoc`. The existing Python modality checker failed current governance. |Checker migrated here to Bash/awk/jq with all planted-failure controls retained; other ownership/policy gaps remain.
 |===
 
 Paths abbreviated above with crate names live under `rust-core/`.
@@ -106,10 +106,14 @@ All links identify the verified baseline, not this branch's later check results.
   mutations when authentication is explicitly configured.
 * Optional-persistence test setup: conditionally mutable configuration gets a
   unique directory; no production storage semantics changed.
-* VCL-total gate: supported stdin mechanism, private temporary input, literal
+* VCL-total gate: producer v1 `--input` mechanism, private temporary input, literal
   executable arguments, bounded stdout/input and a process deadline. Invalid
-  success responses fail closed. Requires trusted Unix executable, POSIX sh and
+  success responses fail closed. Requires trusted Unix executable and
   GNU timeout; missing tools fail closed. No payload is logged on exceptions.
+  No shell interprets the invocation. The producer contract was checked at
+  https://github.com/hyperpolymath/vcl-ut/blob/a8d31ffed8277f70afc8abd5f908304fc57b7c29/docs/vclt-gate-contract.adoc[vcl-ut a8d31ffe].
+  The actual producer binary was built and returned admission for a valid
+  INSPECT and rejection for malformed text through this Elixir consumer.
 * Direct NIF: retire Rustler and library loader; migration tombstone fails closed.
 * Cargo dependencies: tokio 1.53.0 to 1.53.3; clipboard-win 5.4.1 (yanked) to
   5.4.3; Tantivy 0.26.1 to 0.27.0 to remove lru 0.16.4. Rustler and its exclusive
@@ -118,6 +122,10 @@ All links identify the verified baseline, not this branch's later check results.
   do not delete the only copy of authored content.
 * Workflow references/lock closure: current canonical standards owner and valid
   commits; preserve third-party attribution and declared transitive action pins.
+  Secret scanning no longer inherits repository secrets it does not need.
+* Modality checker: Bash/awk/jq replaces the banned Python file; existing four
+  drift controls remain, plus malformed JSON, missing struct and duplicate
+  annotation rejection. No policy exemption added.
 * Documentation: remove claims that default storage is persistent, auth code is
   absent, or a conventional NIF remains a future option.
 
@@ -131,9 +139,12 @@ git diff --text 93d1548c43df8479ca07b5407e4224590cd995a8 -- Cargo.toml Cargo.loc
 
 == Verification ledger
 
-The baseline local workspace test run passed before the final Tantivy upgrade;
-that is not a pass for the upgraded dependency graph. Final command results and
-PR check URLs are recorded in the associated draft PR. Use the lockfile:
+The upgraded workspace passed local tests, Clippy, rustfmt and audit. Persistent
+API tests passed (86 library tests plus the loopback binary test). `cargo audit`
+reports zero vulnerabilities/warnings against advisory DB commit
+`21d909e4c8bd4e14c7aea58bf980c881a0053ab1`. `cargo deny` passes all four categories;
+it still warns about existing quick-xml exceptions not reached by default
+features. No exception was added or expanded. Use the lockfile:
 
 [source,shell]
 ----
@@ -143,6 +154,9 @@ cargo test --workspace --locked --no-fail-fast
 cargo test -p verisim-api --features persistent --locked
 cargo audit
 cargo deny check advisories bans licenses sources
+bash tests/modality-contract-gate.sh
+bash scripts/check-lock-sync.sh
+bash tests/tantivy-upgrade.sh
 cd elixir-orchestration
 MIX_ENV=test mix compile --warnings-as-errors
 mix format --check-formatted
@@ -154,7 +168,58 @@ CI uses OTP 27. Hex registry access failed; local bootstrap fetched the exact
 locked tarballs over verified TLS and checked both lockfile inner/outer digests
 before unpacking. No dependency constraints or checksums were weakened.
 A persistent build first failed with linker undefined-symbol errors after edits
-during compilation; a clean retry is required before attributing this to code.
+during compilation; the clean retry passed. Local tests use
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0` to fit
+the build environment; GitHub also passed its normal default-profile tests.
+Documentation link checks pass on a `git archive HEAD` tree, including planted
+broken-link controls. Scanning the development checkout also enters ignored Hex
+dependencies and reports upstream documentation links; this is not a tracked-tree
+pass. No link exemptions were added.
+
+=== Draft PR and hosted evidence
+
+https://github.com/hyperpolymath/verisimdb/pull/318[Draft PR #318] contains this
+work on `codex/game-estate-baseline`; main was not changed. At initial PR head
+`f5e2e143274678f8e2708b641a36472683d9779b`:
+
+* https://github.com/hyperpolymath/verisimdb/actions/runs/40194739396[Rust CI]:
+  tests, Clippy, rustfmt, docs, audit, deny, coverage and both fuzz builds passed.
+* https://github.com/hyperpolymath/verisimdb/actions/runs/40194739337[Elixir CI]:
+  compilation/tests, coverage, audit and benchmark-script compilation passed on
+  Elixir 1.17 / OTP 27. Local suite: 23 properties, 711 tests, zero failures,
+  121 excluded integration tests.
+* https://github.com/hyperpolymath/verisimdb/actions/runs/40194739901[Hypatia]:
+  passed, including the scoped Panic Attack and Pons Asinorum steps. This is
+  static review evidence, not a proof or a benchmark.
+* https://github.com/hyperpolymath/verisimdb/actions/runs/40194739892[Governance]:
+  now executes. Allowlist preflight rejects the transferred
+  `metadatastician/standards` owner; UUID-v8 checks reject existing non-v8
+  literals. The Python-file failure is repaired by the new checker. The shared
+  allowlist and identifier migration need coordinated owner decisions; no
+  exemptions or replacement identifiers have been invented here.
+* https://github.com/hyperpolymath/verisimdb/actions/runs/40194739929[Secret scan]
+  failed on the older callee lockfile; the follow-up pins the inspected current
+  callee. The SPARK caller also moves to that resolvable canonical reference.
+
+Follow-up heads must be checked independently; earlier green runs do not prove
+later edits pass. The PR body records the current head and latest check state.
+
+=== Failing identity/deletion reproducer — do not waive
+
+`bash tests/tantivy-upgrade.sh` writes an index with Tantivy 0.26.1 and opens it
+with 0.27.0. Stored id/title/body and text search round-trip successfully. The
+subsequent deletion assertion FAILS: `upgrade-fixture` is still searchable after
+`delete` and `commit`. `BASELINE_CONTROL=1 bash tests/tantivy-upgrade.sh` fails
+the same assertion on 0.26.1 before the upgrade, establishing a pre-existing bug.
+Both failures are retained and reproducible, not converted to expected success.
+
+`DocumentSchema::new` indexes `id` as tokenised `TEXT`, while `index`/`delete`
+delete an exact term containing the whole ID. Hyphenated IDs therefore do not
+match their indexed tokens. A fix must preserve exact identifier semantics,
+existing-index migration, update uniqueness and restart behaviour; simply
+replacing `TEXT` with `STRING` makes old schemas incompatible. Persistent open
+also reconstructs only id/title/body, dropping fields/metadata. This blocks
+source-integrity and deletion claims for M2 even though existing tests pass.
 
 `bash scripts/check-lock-sync.sh` verifies coverage, no orphan actions, transitive
 closure and exact workflow keys. The official gh-actions-lock v0.4.0 online

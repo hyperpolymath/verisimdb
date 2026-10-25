@@ -6,15 +6,15 @@ defmodule VeriSim.Query.VCLTGate do
 
   `VERISIM_VCLT_GATE` selects a trusted local executable. An unset gate returns
   `:skip`; configured gates fail closed on invocation, protocol or budget errors.
-  The gate receives a schema-version-1 JSON object on stdin. Exit 0 requires a
+  The gate receives a schema-version-1 JSON object through `--input`. Exit 0 requires a
   valid certification response; exit 1 rejects; any other status blocks.
 
-  Elixir 1.17 has no `System.cmd/3` stdin option. On Unix, a private temporary
-  file supplies stdin through a fixed shell program with positional arguments.
-  Neither executable paths nor payloads are interpolated into shell source.
+  Elixir 1.17 has no `System.cmd/3` stdin option. The producer's v1 contract
+  provides an equivalent `--input PATH` transport. A private temporary file
+  supplies the request; no shell parses either paths or payloads.
   GNU coreutils `timeout` bounds execution to five seconds, killing the process
   group on expiry. Input is limited to 1 MiB and collected stdout to 64 KiB.
-  Missing `timeout` or `sh` fails closed. This is host process I/O, not a SNIF.
+  Missing `timeout` fails closed. This is host process I/O, not a SNIF.
   """
 
   require Logger
@@ -66,7 +66,6 @@ defmodule VeriSim.Query.VCLTGate do
 
   defp invoke_gate(path, input) do
     timeout = System.find_executable("timeout") || raise "GNU timeout is required"
-    shell = System.find_executable("sh") || raise "POSIX shell is required"
 
     port =
       Port.open({:spawn_executable, timeout}, [
@@ -77,11 +76,8 @@ defmodule VeriSim.Query.VCLTGate do
         args: [
           "--signal=KILL",
           "#{@gate_timeout_ms / 1000}s",
-          shell,
-          "-c",
-          ~S(exec "$1" < "$2"),
-          "vclt-gate",
           Path.expand(path),
+          "--input",
           input
         ]
       ])
@@ -113,9 +109,16 @@ defmodule VeriSim.Query.VCLTGate do
 
   defp handle_gate_result(output, 0) do
     case Jason.decode(output) do
-      {:ok, %{"certified_level" => level, "levels" => levels}}
+      {:ok,
+       %{
+         "schema_version" => 1,
+         "admissible" => true,
+         "requested_level" => level,
+         "certified_level" => level,
+         "levels" => levels
+       }}
       when is_integer(level) and level >= 0 and level <= 10 and is_list(levels) ->
-        if Enum.all?(levels, &(is_map(&1) and &1["status"] != "fail")),
+        if Enum.all?(levels, &(is_map(&1) and &1["status"] == "pass")),
           do: :admit,
           else: {:error, :gate_failed}
 

@@ -42,7 +42,7 @@ jobs:
       # asserts eight octad slots, seven settable payload fields and a closed
       # schema. This binds those claims to modality.json, octad-input.json and the
       # Rust core, so the document cannot quietly describe an implementation that
-      # no longer exists. Python 3 stdlib only — no new action, no new dependency,
+      # no longer exists. Bash, awk and jq only — no new action, no new dependency,
       # so actions.lock is unchanged.
       - name: Modality-contract gate (modality-profile doc matches schema + core)
         run: bash tests/modality-contract-gate.sh
