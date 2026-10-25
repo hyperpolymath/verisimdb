@@ -77,15 +77,13 @@ jobs:
           /tmp/pons-target/release/pons scan . --format json --no-speculative > pons.json
       - name: Gate (non-speculative errors fail; zero-file scans exit 2)
         run: /tmp/pons-target/release/pons scan . --fail-on error --no-speculative
-      # Dependabot and fork PRs receive a read-only token no matter what
-      # the permissions block says; uploading there would fail the job
-      # after the gate already passed. The pons-report artifact below
-      # still carries the SARIF on those PRs.
+      # On pull_request the token may be read-only (Dependabot, forks)
+      # whatever the permissions block says, and actor-based conditions
+      # are spoofable surface (Hypatia). Code scanning is therefore fed
+      # from push/schedule runs; on PRs the gate above still enforces
+      # and the pons-report artifact carries the SARIF.
       - name: Upload SARIF
-        if: >-
-          always() && github.actor != 'dependabot[bot]' &&
-          (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.fork == false)
+        if: always() && github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.38.0 (4.38.1 blocked estate-wide; nexia-list#100)
         with:
           sarif_file: pons.sarif

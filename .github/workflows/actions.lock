@@ -47,6 +47,7 @@ workflows:
     '.github/workflows/ghcr-publish.yml':
         - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
+        - 'step-security/harden-runner@v2.22.2'
     '.github/workflows/governance.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/hypatia-scan.yml':
@@ -78,6 +79,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
     '.github/workflows/rust-ci.yml':
         - 'actions/checkout@v7.0.1'
+        - 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'rustsec/audit-check@v2.0.0'
@@ -128,6 +130,11 @@ dependencies:
         commit: 'sha1-368f82528645a54fb793d4d04e342629a3f51346'
         owner_id: 44036562
         repo_id: 438112499
+    'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a':
+        ref: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+        commit: 'sha1-043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+        owner_id: 44036562
+        repo_id: 192625955
     'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f':
         ref: 'v7.0.0'
         commit: 'sha1-bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
@@ -241,6 +248,11 @@ dependencies:
         commit: 'sha1-69366f33c96575abad1ee0dba8212993eecbe998'
         owner_id: 25397242
         repo_id: 523199201
+    'step-security/harden-runner@v2.22.2':
+        ref: 'v2.22.2'
+        commit: 'sha1-dc2769abcc0fcfbadfc1df54081c1608579ef6b2'
+        owner_id: 88700172
+        repo_id: 422287306
     'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
         ref: 'v2.9.3'
         commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'

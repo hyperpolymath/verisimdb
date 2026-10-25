@@ -37,6 +37,13 @@ jobs:
       id-token: write       # mint the OIDC token the attestation is signed with
       attestations: write   # write the build-provenance attestation (the "claim")
     steps:
+      # This job holds packages:write + an OIDC token and logs in to GHCR:
+      # monitor its outbound egress (audit mode; tighten to block with an
+      # allowlist once the endpoint set is observed stable).
+      - name: Harden runner (egress audit)
+        uses: step-security/harden-runner@v2.22.2
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
