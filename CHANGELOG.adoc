@@ -9,6 +9,11 @@ All notable changes to VeriSimDB are documented here. This project uses https://
 
 == [Unreleased]
 
+=== Added — Handover for the #299 session (2026-10-25)
+
+- *`docs/HANDOVER-2026-10-24.adoc`* — the complete record of the modality-profile session, written so the next person does not have to reconstruct it from a diff and a conversation: what landed in PR #313 (merged `cb6c538`), the vocabulary as adopted and the cardinality rows with their evidence, `HEXAD` settled against grammar v3.0, the six contract divergences, the DEED/kyq/kyX standards findings (DEED is a DRAFT identity format, kyq is a KYAML query tool, kyX is the planned and unimplemented projection compiler), eight options for the request-shape ruling, the three decisions still owed by the owner, the ranked remaining work, and an explicit "verified / not verified" section.
+- Indexed under a new *Handovers* section in `docs/INDEX.adoc`. Records plainly that issue #299 stays **open**: the terminology half is delivered, but the issue's implicit "the contract is verified and versioned" half cannot be met by a documentation change, and closing on improved wording is the failure mode the issue warns against.
+
 === Added — Modality-profile terminology and cardinality semantics (2026-10-24)
 
 Addresses the terminology half of issue #299. *Documentation and one static gate only — no wire format, schema or API change.* The issue's proposal is adopted verbatim: **modality profile** for an implementation's selected modalities, **modality set** for membership alone, **Octad** only for this project's specifically named eight-modality model/API.
