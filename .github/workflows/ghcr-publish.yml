@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 #
 # Publish the verisim-api container image to GHCR.
 #
@@ -39,7 +37,16 @@ jobs:
       id-token: write       # mint the OIDC token the attestation is signed with
       attestations: write   # write the build-provenance attestation (the "claim")
     steps:
+      # This job holds packages:write + an OIDC token and logs in to GHCR:
+      # monitor its outbound egress (audit mode; tighten to block with an
+      # allowlist once the endpoint set is observed stable).
+      - name: Harden runner (egress audit)
+        uses: step-security/harden-runner@v2.22.2
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build image (Podman)
         run: |
@@ -53,7 +60,7 @@ jobs:
         run: |
           podman run -d --name verisim-smoke -p 8080:8080 \
             -e VERISIM_ENABLE_IPV4=true "$IMAGE:latest"
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8080/health >/dev/null && break
             sleep 2
           done
@@ -65,6 +72,9 @@ jobs:
       - name: Push to GHCR
         id: push
         if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           SHORT_SHA="${GITHUB_SHA::12}"
           # Point podman's credential store at the DOCKER config path instead
@@ -80,8 +90,8 @@ jobs:
           # is red.
           mkdir -p "$HOME/.docker"
           export REGISTRY_AUTH_FILE="$HOME/.docker/config.json"
-          echo "${{ secrets.GITHUB_TOKEN }}" \
-            | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          printf '%s' "$GH_TOKEN" \
+            | podman login ghcr.io -u "$GH_ACTOR" --password-stdin
           # --digestfile records the real sha256 of the pushed manifest so the
           # attestation binds to exactly what the registry received.
           podman push --digestfile=/tmp/ghcr-digest "$IMAGE:$SHORT_SHA"

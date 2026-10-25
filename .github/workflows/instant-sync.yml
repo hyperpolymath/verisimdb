@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # Instant Forge Sync - Triggers propagation to all forges on push/release
 name: Instant Sync
 
@@ -34,4 +32,6 @@ jobs:
             }
 
       - name: Confirm
-        run: echo "::notice::Propagation triggered for ${{ github.event.repository.name }}"
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: echo "::notice::Propagation triggered for ${REPO_NAME}"

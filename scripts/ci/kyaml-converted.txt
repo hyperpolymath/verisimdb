@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MPL-2.0
+# Files converted to canonical KYAML. They must stay canonical:
+# scripts/ci/check-kyaml.sh enforces this list as a BLOCKING gate.
+# Convert a file with: bash scripts/ci/kyaml-format.sh <file>
+# then add its path here in the same commit. Shrinking this list requires
+# an owner ruling recorded in docs/CI-CD.adoc (ratchet, never silently).
+.github/FUNDING.yml

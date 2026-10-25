@@ -1,0 +1,106 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# proven-tests-and-benches lane — runs VeriSimDB's Idris2 model-invariant
+# suites (verification/proven-tests/) against the estate testing framework
+# at a pinned commit, and the native-suite evidence registry gate.
+#
+# What this proves, honestly: the *model* invariants (octad shape, drift
+# gate policy, provenance append-only shape) typecheck and pass as
+# Provisionally-Proven tests in the framework's tier vocabulary. It does
+# not prove the Rust implementation — that is cargo's job (rust-ci.yml)
+# plus the Coq development (coq-build.yml, the Actually-Proven tier).
+# The registry gate (scripts/ci/test-evidence.sh) keeps every native
+# suite's claimed tier in agreement with the files on disk.
+#
+# Toolchain shape mirrors proven-tests-and-benches' own ci.yml, including
+# the Chez-versioned Idris2 cache key (a stale fasl object is unloadable
+# by a newer Chez — the failure is recorded there, run 39254816071).
+name: proven-tests (Idris2)
+
+on:
+  pull_request:
+    paths:
+      - 'verification/**'
+      - 'formal/**'
+      - 'src/abi/**'
+      - 'scripts/ci/test-evidence.sh'
+      - '.github/workflows/proven-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'verification/**'
+      - 'formal/**'
+      - 'src/abi/**'
+      - 'scripts/ci/test-evidence.sh'
+      - '.github/workflows/proven-tests.yml'
+  schedule:
+    - cron: '23 4 * * 3'  # Weekly, Wednesday: framework-pin drift watch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IDRIS2_VERSION: "0.7.0"
+  PROVEN_TESTS_REF: eca682bcd419554f6779e72969902e6faef4fd9d
+
+jobs:
+  evidence-registry:
+    name: evidence registry agrees with the tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: bash scripts/ci/test-evidence.sh
+
+  idris2-suites:
+    name: Idris2 model-invariant suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout proven-tests-and-benches at the pin
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          repository: hyperpolymath/proven-tests-and-benches
+          ref: ${{ env.PROVEN_TESTS_REF }}
+          path: .proven-tests-and-benches
+      - name: Chez Scheme version (Idris2 cache key)
+        id: chez
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chezscheme libgmp-dev
+          v="$(dpkg-query -W -f='${Version}' chezscheme | tr -c 'A-Za-z0-9.' '-')"
+          [ -n "$v" ]
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: Cache Idris2 toolchain
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.idris2
+          key: idris2-v${{ env.IDRIS2_VERSION }}-${{ runner.os }}-chez${{ steps.chez.outputs.version }}
+      - name: Install Idris2 (framework's installer, at the pin)
+        working-directory: .proven-tests-and-benches
+        env:
+          IDRIS2_VERSION: v${{ env.IDRIS2_VERSION }}
+        run: bash scripts/install-idris2.sh
+      - name: Build + install the framework, then run VeriSimDB's suites
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.idris2/bin:$PATH"
+          for libdir in "$HOME"/.idris2/idris2-*/lib; do
+            export LD_LIBRARY_PATH="$libdir:${LD_LIBRARY_PATH:-}"
+          done
+          idris2 --version
+          (cd .proven-tests-and-benches && idris2 --build proven-tests.ipkg && idris2 --install proven-tests.ipkg)
+          (cd verification/proven-tests && idris2 --build verisimdb-proven.ipkg)
+          verification/proven-tests/build/exec/verisimdb-proven-tests

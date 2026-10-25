@@ -15,12 +15,23 @@ K9!
       allow_filesystem_write = true,
       allow_subprocess = true,
       signature_required = true,
+      # §8.3/§8.4 — the grant. Each flag above is a REQUEST for a capability,
+      # and a request the grant does not cover is a contradiction inside the
+      # pedigree, not a preference (K9-S007). Without this list the component
+      # asked for the network, the filesystem and subprocesses while granting
+      # itself nothing, so "default-deny" denied nothing. Keep it in step with
+      # the recipes below.
+      capabilities = [
+        "net.fetch",      # add-license fetches the licence text over HTTPS
+        "fs.write",       # create-structure and create-checkpoint-files write
+        "process.spawn",  # git, just, nickel, curl and mkdir are child processes
+      ],
     },
     metadata = {
       name = "setup-repo",
       version = "1.0.0",
       description = "Automated repository setup with RSR standards",
-      author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
+      author = "Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>",
     },
     warnings = [
       "This component has full system access",
@@ -28,6 +39,33 @@ K9!
       "Review Just recipes before execution",
       "Use dry-run mode first: ./must --dry-run run setup-repo.k9.ncl",
     ],
+    # §6.5/K9-S010 — mandatory at 'Hunt and may not be a placeholder: §9
+    # requires a dry_run precondition, i.e. a plan that was produced AND
+    # reviewed, and a reviewer cannot review a plan for a component that
+    # requests network, filesystem and subprocess access while describing none
+    # of it. Each entry names the recipe that causes it.
+    side_effects = [
+      "creates src/, docs/, tests/, scripts/, .github/workflows/ and .machine_readable/contractiles/k9/ under the current directory (create-structure)",
+      "writes STATE.a2ml, ECOSYSTEM.a2ml and META.a2ml in the repository root, overwriting any existing copies (create-checkpoint-files)",
+      "writes README.adoc in the repository root when add-readme is selected (add-readme)",
+      "downloads the licence text from https://raw.githubusercontent.com/hyperpolymath/pmpl/main/LICENSE to ./LICENSE when add-license is selected (add-license)",
+      "runs git init and sets repository-local user.name and user.email (init-git)",
+      "spawns git, just, nickel, curl, mkdir and the shell builtins as child processes (every recipe)",
+      "deletes STATE.a2ml, ECOSYSTEM.a2ml and META.a2ml from the current directory, after a 5-second pause, when clean is selected (clean)",
+    ],
+    # §10.1/K9-S009 — a 'Hunt component MUST carry a signature block. This one
+    # is what an example can honestly carry: a CLAIM that a signature exists,
+    # not a verified signature. With no external verifier the verdict is
+    # 'Present_Unverified (§10.2), and 'Present_Unverified is not the Hunt
+    # `signature` precondition (§10.4) — so this file is conforming, and it is
+    # still NOT authorised to run. Replace the block before use:
+    #   ./must sign setup-repo.k9.ncl
+    signature = {
+      algorithm = "Ed25519",
+      key_id = "setup-repo-example",
+      payload_hash = "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      signature = "EXAMPLE-NOT-A-REAL-SIGNATURE",
+    },
   },
 
   # Configuration with contracts
@@ -48,7 +86,7 @@ K9!
 
     # RSR compliance features to enable
     features = {
-      checkpoint_files | Bool = true,  # STATE.scm, ECOSYSTEM.scm, META.scm
+      checkpoint_files | Bool = true,  # STATE.a2ml, ECOSYSTEM.a2ml, META.a2ml
       security_workflows | Bool = true,  # CodeQL, Scorecard, etc.
       quality_checks | Bool = true,  # Linting, formatting
       mirroring | Bool = false,  # GitLab/Bitbucket mirrors
@@ -95,7 +133,7 @@ K9!
       commands = [
         "mkdir -p src/ docs/ tests/ scripts/",
         "mkdir -p .github/workflows/",
-        "mkdir -p .machine_readable/svc/k9/",
+        "mkdir -p .machine_readable/contractiles/k9/",
         "echo '✓ Directory structure created'",
       ],
     },
@@ -104,8 +142,8 @@ K9!
       description = "Initialize Git repository",
       commands = [
         "git init -b %{config.git.default_branch}",
-        "git config user.name 'Jonathan D.A. Jewell'",
-        "git config user.email 'j.d.a.jewell@open.ac.uk'",
+        "git config user.name '{{AUTHOR}}'",
+        "git config user.email '{{AUTHOR_EMAIL}}'",
         "echo '✓ Git initialized'",
       ],
     },
@@ -120,19 +158,19 @@ K9!
     },
 
     "create-checkpoint-files" = {
-      description = "Create STATE.scm, ECOSYSTEM.scm, META.scm",
+      description = "Create STATE.a2ml, ECOSYSTEM.a2ml, META.a2ml",
       commands = [
-        "echo '(state (version \"1.0.0\") (project \"%{config.repo_name}\"))' > STATE.scm",
-        "echo '(ecosystem (version \"1.0.0\") (name \"%{config.repo_name}\"))' > ECOSYSTEM.scm",
-        "echo '(meta (version \"1.0.0\") (project \"%{config.repo_name}\"))' > META.scm",
+        "echo '(state (version \"1.0.0\") (project \"%{config.repo_name}\"))' > STATE.a2ml",
+        "echo '(ecosystem (version \"1.0.0\") (name \"%{config.repo_name}\"))' > ECOSYSTEM.a2ml",
+        "echo '(meta (version \"1.0.0\") (project \"%{config.repo_name}\"))' > META.a2ml",
         "echo '✓ Checkpoint files created'",
       ],
     },
 
     "add-license" = {
-      description = "Add MPL-2.0 license",
+      description = "Add PMPL-1.0 license",
       commands = [
-        "curl -sL https://www.mozilla.org/media/MPL/2.0/index.txt -o LICENSE",
+        "curl -sL https://raw.githubusercontent.com/hyperpolymath/pmpl/main/LICENSE -o LICENSE",
         "echo '✓ License added'",
       ],
     },
@@ -153,7 +191,7 @@ K9!
         "echo '⚠️  This will delete all generated files'",
         "echo 'Press Ctrl+C to cancel, or wait 5 seconds...'",
         "sleep 5",
-        "rm -f STATE.scm ECOSYSTEM.scm META.scm",
+        "rm -f STATE.a2ml ECOSYSTEM.a2ml META.a2ml",
         "echo '✓ Cleaned'",
       ],
     },

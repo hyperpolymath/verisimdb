@@ -1,9 +1,33 @@
 == VeriSimDB Testing & Benchmarking Standards
 
 ____
-Last updated: 2026-05-24. Status: Tier 1 standards adopted; Tier 2/3
-documented as next steps.
+Last updated: 2026-10-25. Status: provenance-tier evidence registry is
+now CI-enforced (see below); lane map and ratchets in docs/CI-CD.adoc.
 ____
+
+=== Provenance tiers (proven-tests-and-benches) — enforced since 2026-10-25
+
+Every test/bench/fuzz/proof *file* is registered in
+`verification/test-registry.json` with a tier from the closed vocabulary
+of hyperpolymath/proven-tests-and-benches:
+
+* *actually-proven* — requires a named proof artefact (the Coq
+  development in `formal/`, 9 files, gated by coq-build.yml);
+* *provisionally-proven* — property, snapshot, fuzz, positive-control
+  gate scripts, and the Idris2 model suites in
+  `verification/proven-tests/` (run by proven-tests.yml);
+* *unproven* — ordinary unit/integration tests and benchmarks.
+
+`scripts/ci/test-evidence.sh` (rust-ci `test-evidence` job) fails when
+a file exists unregistered, a registered file is missing, a tier is
+outside the vocabulary, or an actually-proven suite names no proof.
+The counts in this document are the gate's output, not an aspiration:
+93 files (9 / 21 / 63 across the tiers). Inline Rust `#[cfg(test)]`
+modules run under cargo test and are not file-registered.
+
+Any new test file MUST be registered in the same PR, at an honest
+tier: a cargo unit test is `unproven` no matter how good it is, until
+its property is carried by a stronger artefact.
 
 === Levels of evidence
 

@@ -1,0 +1,9 @@
+;; SPDX-License-Identifier: CC-BY-SA-4.0
+;; SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+;; verisimdb_chora.deed — the VeriSimDB repo deed (standards 1-formats/deed).
+;; Runtime/CI truth lives in docs/CI-CD.adoc; identity facts here are the
+;; deed-grammar projection of 0-AI-MANIFEST.a2ml, kept minimal on purpose.
+(repo-deed
+  :schema-version "1.0.0"
+  :canonical-name "verisimdb"
+  (status :present #t :ended #f :note "Veridical Simulacrum Database: 8-modality octad store with self-normalization"))

@@ -1,14 +1,26 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # Fuzz testing for VeriSimDB query engine and FFI layers
 # Addresses OpenSSF Scorecard "Fuzzing" check
+#
+# This lane used to run `cargo fuzz check ... || true` under
+# `continue-on-error: true` — a gate that could not fail, which is not a
+# gate (squabble != bypass applies to our own checks too). It now type-checks
+# every fuzz manifest on stable: a harness that stops compiling fails here,
+# on the PR that broke it. Actual fuzz *execution* stays with
+# ClusterFuzzLite (cflite_pr.yml / cflite_batch.yml), which has the
+# sanitizer + corpus infrastructure a `cargo check` lane cannot fake.
 name: Fuzz Testing
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'fuzz/**'
+      - 'rust-core/fuzz/**'
+      - 'debugger/fuzz/**'
+      - '.github/workflows/fuzz.yml'
+  pull_request:
     paths:
       - 'fuzz/**'
       - 'rust-core/fuzz/**'
@@ -21,37 +33,42 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   fuzz-core:
     name: Core Fuzz Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
-      - name: Run core fuzz compile check
+      - name: Check core fuzz harnesses compile
         run: |
-          cd rust-core/fuzz
-          timeout 300 cargo fuzz check --all-targets 2>/dev/null || true
-        continue-on-error: true
+          set -euo pipefail
+          cargo check --manifest-path fuzz/Cargo.toml --all-targets
+          cargo check --manifest-path rust-core/fuzz/Cargo.toml --all-targets
 
   fuzz-debugger:
     name: Debugger Fuzz Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
-      - name: Run debugger fuzz compile check
-        run: |
-          cd debugger/fuzz
-          timeout 300 cargo fuzz check --all-targets 2>/dev/null || true
-        continue-on-error: true
+      - name: Check debugger fuzz harnesses compile
+        run: cargo check --manifest-path debugger/fuzz/Cargo.toml --all-targets

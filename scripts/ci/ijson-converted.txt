@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MPL-2.0
+# Files canonicalised to I-JSON (RFC 7493) + JCS (RFC 8785) under estate
+# JSON policy D306. They must stay canonical: .github/workflows/ijson-jcs.yml
+# enforces this list as a BLOCKING gate via scripts/ci/check-ijson-jcs.sh
+# --enforce. Fix a failure with: ijson-jcs fix <file>
+# (hyperpolymath/ijson-jcs is the estate tool; do not hand-format JSON.)
+# Shrinking this list requires an owner ruling in docs/CI-CD.adoc.
+.github/label-classifier.json
+.github/labels.json
+verification/test-registry.json

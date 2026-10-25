@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
 # bridge-gate.yml -- merge-orchestration CVE/bump gate.
@@ -33,6 +31,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: B3 gate -- nix bumps (no network)
         env:
@@ -44,9 +44,16 @@ jobs:
           fi
 
       - name: Build panic-attack (Patch-Bridge)
+        env:
+          # Pinned: an unpinned default-branch clone made this gate's verdict
+          # a function of upstream's day, not of this repo's review. Bump
+          # deliberately, in lockstep with security-scan.yml's pin.
+          PANIC_ATTACK_REF: b5530834a839734d1d181bfe6edb0d43d4233cf4
         run: |
           git clone --depth 1 https://github.com/hyperpolymath/panic-attack /tmp/pa
-          cargo build --release --features http --manifest-path /tmp/pa/Cargo.toml
+          git -C /tmp/pa fetch -q --depth 1 origin "$PANIC_ATTACK_REF"
+          git -C /tmp/pa checkout -q "$PANIC_ATTACK_REF"
+          cargo build --release --locked --features http --manifest-path /tmp/pa/Cargo.toml
           echo "/tmp/pa/target/release" >> "$GITHUB_PATH"
 
       - name: Bridge triage (queries OSV) -> BridgeReport

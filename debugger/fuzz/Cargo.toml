@@ -7,6 +7,12 @@ edition = "2021"
 [package.metadata]
 cargo-fuzz = true
 
+# Prevent this from interfering with workspaces (same as fuzz/ and
+# rust-core/fuzz — without this, cargo walks up into a parent workspace
+# and `cargo check --manifest-path` refuses the package outright).
+[workspace]
+members = ["."]
+
 [dependencies]
 libfuzzer-sys = "0.4"
 

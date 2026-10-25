@@ -511,6 +511,23 @@ container-run *args:
 ci: deps quality
     @echo "CI pipeline complete!"
 
+# Audit the CI itself, with the same pins as .github/workflows/ci-meta.yml
+# (zizmor + actionlint + lock-sync + test-evidence + format converted lists)
+ci-meta:
+    @echo "→ lock-sync (3 clauses)"
+    bash scripts/check-lock-sync.sh
+    @echo "→ test-evidence (proven-tests registry)"
+    bash scripts/ci/test-evidence.sh
+    @echo "→ zizmor"
+    zizmor --config .zizmor.yml .github/workflows/
+    @echo "→ actionlint"
+    actionlint -color
+    @echo "→ KYAML (converted list blocking)"
+    bash scripts/ci/check-kyaml.sh
+    @echo "→ I-JSON/JCS (converted list blocking)"
+    bash scripts/ci/check-ijson-jcs.sh --enforce $(grep -v '^[[:space:]]*\(#\|$\)' scripts/ci/ijson-converted.txt)
+    @echo "CI meta-audit complete!"
+
 # Install git hooks
 install-hooks:
     @mkdir -p .git/hooks

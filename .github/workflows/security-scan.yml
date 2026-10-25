@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 
 name: Security Scan
 
@@ -40,6 +38,14 @@ jobs:
     #
     # Pin includes canonical .affine language detection and preserves
     # JSON.parseExn coverage after the ReScript-to-AffineScript migration.
-    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@8c2f1989a23521974f9f673bf73a6f39d68f3a4e # main 2026-08-24
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@b5530834a839734d1d181bfe6edb0d43d4233cf4 # main 2026-10-25
+    with:
+      # This lane reported success regardless of findings for its whole life
+      # (the reusable's default is 'none' for backwards compatibility).
+      # Critical is the honest first ratchet for a main-branch report that
+      # also dispatches to verisimdb-data; 'high' is sequenced in
+      # docs/CI-CD.adoc once the classification baseline is clean.
+      # PR-time scanning with the same threshold lives in deep-recon.yml.
+      fail_on_severity: "critical"
     secrets:
       VERISIMDB_PAT: ${{ secrets.VERISIMDB_PAT }}

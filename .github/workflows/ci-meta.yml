@@ -1,0 +1,100 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# CI Meta — the lane that audits the CI itself.
+#
+# Three independent views, because each is blind to what the others see:
+#   * zizmor       — GitHub Actions security posture (injection, pinning,
+#                    credential persistence, excessive permissions).
+#   * actionlint   — workflow syntax/semantics + shellcheck of run: bodies.
+#   * cicd-squabbler (`squabble chains`) — cross-repo CI dependency graph:
+#                    dead upstreams and dependency cycles exit 4 (blocking);
+#                    pin skew and diamonds are reported. Squabble never
+#                    bypasses a gate: green here means the graph is sound,
+#                    not that a check was skipped.
+#   * KYAML        — estate YAML policy Y-3 (D280): report-only repo scan +
+#                    blocking converted-stay-canonical list.
+#
+# Tool pins: zizmor via pip (exact version), actionlint via `go install`
+# (exact version), squabble via the attested composite action pinned to a
+# cicd-squabbler commit (the binary inside is sha256 + attestation pinned).
+name: CI Meta (zizmor, actionlint, squabbler, KYAML)
+
+on:
+  # Deliberately NO path filters: these jobs are required-check candidates
+  # (docs/CI-CD.adoc R-7), and a path-filtered required check stays
+  # "pending" forever on PRs that touch other paths, dead-locking merge.
+  # The jobs are cheap; they run on everything.
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * 1'  # Weekly, Monday: upstream pin/graph drift watch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-audit:
+    name: zizmor + actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned auditors
+        run: |
+          set -euo pipefail
+          pip install --quiet "zizmor==1.31.1"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+      - name: zizmor (Actions security audit)
+        run: zizmor --config .zizmor.yml .github/workflows/
+      - name: actionlint (workflow + shell audit)
+        run: |
+          set -uo pipefail
+          # The gate is the findings count below; actionlint also exits 1
+          # when it finds things, and its JSON is the evidence either way.
+          if actionlint -format '{{json .}}' > /tmp/actionlint.json; then
+            echo "actionlint: clean"
+          fi
+          jq -r '.[] | "::error file=\(.filepath),line=\(.line),col=\(.column)::actionlint [\(.kind)]: \(.message)"' /tmp/actionlint.json
+          count="$(jq 'length' /tmp/actionlint.json)"
+          echo "actionlint findings: $count"
+          [ "$count" -eq 0 ]
+
+  squabble-chains:
+    name: cicd-squabbler chains
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      attestations: read  # the squabble installer verifies its attestation
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Cross-repo CI dependency graph (read-only)
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@14f853fde902ab2d7631070d87a9dc9122e01013
+        with:
+          args: |
+            chains
+            .
+            --follow
+            1
+
+  kyaml:
+    name: KYAML conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: KYAML report + converted-stay-canonical
+        run: bash scripts/ci/check-kyaml.sh
