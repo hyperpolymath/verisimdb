@@ -21,7 +21,12 @@ jq -e . "$REG" >/dev/null || { echo "test-evidence: $REG is not valid JSON" >&2;
 
 # Discover every test / bench / fuzz / proof artefact in the tree.
 mapfile -t FOUND < <(
-  { find rust-core benches fuzz tests formal verification \
+  # Every .rs directly under a crate's tests/ dir (or the root tests/) is a
+  # cargo test target whatever its name — `integration.rs` counts exactly
+  # like `integration_tests.rs`, so discovery may not rely on name patterns
+  # for those. Name patterns below catch test artefacts living elsewhere.
+  { find rust-core tests -path '*/tests/*.rs' -type f 2>/dev/null
+    find rust-core benches fuzz tests formal verification \
       \( -name '*_test.rs' -o -name '*_tests.rs' -o -name 'test_*.rs' \
          -o -name 'integration_test.rs' -o -name 'property_tests.rs' \
          -o -name 'snapshot_tests.rs' -o -name '*_benchmarks.rs' \

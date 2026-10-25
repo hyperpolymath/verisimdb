@@ -65,6 +65,9 @@ jobs:
       - name: Push to GHCR
         id: push
         if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           SHORT_SHA="${GITHUB_SHA::12}"
           # Point podman's credential store at the DOCKER config path instead

@@ -20,19 +20,13 @@
 name: CI Meta (zizmor, actionlint, squabbler, KYAML)
 
 on:
+  # Deliberately NO path filters: these jobs are required-check candidates
+  # (docs/CI-CD.adoc R-7), and a path-filtered required check stays
+  # "pending" forever on PRs that touch other paths, dead-locking merge.
+  # The jobs are cheap; they run on everything.
   pull_request:
-    paths:
-      - '.github/**'
-      - 'scripts/ci/**'
-      - '.coderabbit.yaml'
-      - '.zizmor.yml'
   push:
     branches: [main]
-    paths:
-      - '.github/**'
-      - 'scripts/ci/**'
-      - '.coderabbit.yaml'
-      - '.zizmor.yml'
   schedule:
     - cron: '17 5 * * 1'  # Weekly, Monday: upstream pin/graph drift watch
   workflow_dispatch:

@@ -22,7 +22,7 @@ of hyperpolymath/proven-tests-and-benches:
 a file exists unregistered, a registered file is missing, a tier is
 outside the vocabulary, or an actually-proven suite names no proof.
 The counts in this document are the gate's output, not an aspiration:
-91 files (9 / 21 / 61 across the tiers). Inline Rust `#[cfg(test)]`
+93 files (9 / 21 / 63 across the tiers). Inline Rust `#[cfg(test)]`
 modules run under cargo test and are not file-registered.
 
 Any new test file MUST be registered in the same PR, at an honest

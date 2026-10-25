@@ -8,18 +8,18 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: "pages"
   cancel-in-progress: false
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # upload-pages-artifact v5 is a composite (tar + upload-artifact):
+    # it makes no API/OIDC calls, so contents:read suffices here. The
+    # pages/id-token writes live on the deploy job only.
     permissions:
       contents: read
-      pages: write  # upload-pages-artifact publishes the Pages artifact
     container:
       image: ghcr.io/stefan-hoeck/idris2-pack@sha256:f0758996a931fb35d9ecb1de273c4d59dabe2a09b433afc7e357f65a08b7e1ff
     steps:

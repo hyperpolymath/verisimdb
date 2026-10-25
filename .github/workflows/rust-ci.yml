@@ -253,3 +253,13 @@ jobs:
             exit 0
           fi
           cargo mutants --in-diff /tmp/pr.diff --no-shuffle --output mutants-out/
+      - name: Upload mutants report
+        # A missed-mutant failure is only diagnosable from the report;
+        # always upload it when the mutation step ran.
+        if: always() && steps.detect.outputs.relevant == 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: pr-mutants-${{ github.run_id }}
+          path: mutants-out/
+          if-no-files-found: ignore
+          retention-days: 14

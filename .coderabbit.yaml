@@ -83,7 +83,8 @@ reviews:
     - "!elixir-orchestration/mix.lock"
     - "!.verisimdb/**"
     - "!**/*.snap"
-    - "!.github/workflows/actions.lock"
+    # .github/workflows/actions.lock is deliberately NOT excluded: the
+    # workflow path instructions ask the reviewer to verify lock entries.
   path_instructions:
     - path: ".github/workflows/**"
       instructions: >-

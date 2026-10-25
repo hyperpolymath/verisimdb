@@ -59,7 +59,8 @@ pin-resolvability check exists and is itself gated in standards CI.
 
 ....
 verisimdb now vendors scripts/check-ijson-jcs.sh and
-scripts/kyaml-format.sh verbatim (with provenance headers) because
+scripts/kyaml-format.sh verbatim (as scripts/ci/check-ijson-jcs.sh
+and scripts/ci/kyaml-format.sh, with provenance headers) because
 standards offers them only as scripts, so every consumer copies —
 exactly the drift class the estate keeps measuring. Please ship
 `ijson-jcs-reusable.yml` and `kyaml-reusable.yml` workflow_call lanes
@@ -71,7 +72,14 @@ copier) deletes its vendored copies and becomes a thin caller.
 Also: `.github/workflows/ijson-jcs.yml` inside standards hard-codes
 one converted file (.hypatia-baseline.json). Generalise to a
 converted-list file like verisimdb's scripts/ci/ijson-converted.txt
-so the pattern is copyable without editing workflow YAML.
+so the pattern is copyable without editing workflow YAML. And two
+vendored-script nits found by review: kyaml-format.sh's drift message
+hardcodes `scripts/kyaml-format.sh` — vendored copies live elsewhere
+(here: scripts/ci/), so the repair command it prints cannot run there;
+print $0. kyaml-format.sh uses jq but only preflights yq, and
+check-ijson-jcs.sh uses jq + python3 but preflights neither; add
+command -v preflight for every tool so a missing binary is exit 2
+("could not look"), not a confusing mid-run failure.
 
 Acceptance: verisimdb can replace .github/workflows/ijson-jcs.yml +
 scripts/ci/check-*.sh with two thin callers and stay green, including
