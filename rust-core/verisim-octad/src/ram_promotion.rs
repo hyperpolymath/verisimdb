@@ -39,7 +39,7 @@
 //   - On crash: WAL replays, RAM overlay is gone, no data loss
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 /// Hard limit: maximum octads promoted to RAM simultaneously.
@@ -98,7 +98,6 @@ impl Modality {
 /// State of a promoted modality.
 #[derive(Debug, Clone)]
 struct PromotedState {
-    modality: Modality,
     promoted_at: Instant,
     estimated_size_bytes: u64,
     operation_count: u64,
@@ -284,7 +283,6 @@ impl PromotionManager {
         self.promoted.insert(
             modality.clone(),
             PromotedState {
-                modality: modality.clone(),
                 promoted_at: Instant::now(),
                 estimated_size_bytes: estimated_size,
                 operation_count: 0,

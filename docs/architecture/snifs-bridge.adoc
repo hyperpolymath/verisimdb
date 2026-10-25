@@ -231,32 +231,28 @@ upstream's ADR-002, not VeriSimDB's ambition.
 
 === Where the bridge sits relative to `verisim-nif`
 
-`rust-core/verisim-nif` is a Rustler NIF scaffold — an honest stub returning
-`{:error, :not_implemented}` for every operation, tracked in issue #61, and the
-only crate in the workspace with zero tests. The Elixir transport selector is:
+The direct Rustler path is retired. `rust-core/verisim-nif` is an empty `rlib`
+migration marker without native exports or dependencies. `NifBridge` never
+loads a shared library and returns `{:error, :nif_retired}`. Existing settings
+have these migration semantics:
 
 ----
 VERISIM_TRANSPORT=http   # default: HTTP to the verisim-api server
-VERISIM_TRANSPORT=nif    # demand NIF: surfaces {:error, :not_implemented} loudly
-VERISIM_TRANSPORT=auto   # NIF only if OPERATIONAL, else HTTP — today always HTTP
+VERISIM_TRANSPORT=nif    # retired: error; health is :nif_not_operational
+VERISIM_TRANSPORT=auto   # HTTP
 ----
 
-The SNIF bridge is a *fourth* transport, not a replacement for the NIF crate:
+A SNIF would accelerate selected pure computation alongside HTTP, not replace
+database I/O transport. There is no implemented `snif` transport setting.
+The four kernels above are candidates, not an admitted v0 surface. Begin with
+bounded drift scoring only if end-to-end measurements show benefit after host
+dispatch, serialisation, buffer copies and sandbox cost. Upstream Fibonacci
+numbers are not VeriSimDB benchmark evidence.
 
-----
-VERISIM_TRANSPORT=snif   # crash-isolated WASM kernels; host retains all I/O
-----
-
-Two consequences worth stating now:
-
-* A Rustler NIF runs native code *inside* the VM's address space, so a fault in
-  it kills the BEAM. A SNIF does not. If both eventually exist, `snif` is the
-  safer default for the kernels it covers and `nif` remains the path for anything
-  needing BEAM terms or resources.
-* `verisim-nif` being untested and `verisim-snif` being unbuilt are the same gap
-  viewed from two directions: *the in-process transport has never been exercised*.
-  Issue #79 ranks `verisim-nif` as the worst test-density crate in the workspace
-  (0 tests / 135 LOC). Whatever gets built here should not repeat that.
+Any admitted native interface needs a versioned normative Idris2 ABI and pure
+Zig FFI, including lengths, alignment, ownership, cancellation and error tests.
+No conventional NIF fallback is allowed. redb, Tantivy, WAL and network I/O
+remain outside the sandbox. See link:game-estate-readiness.adoc[the readiness audit].
 
 == Sequence
 
@@ -317,13 +313,10 @@ counter-example
   drift monitor scores entities on a schedule; if it scores one entity per call,
   the floor dominates and batching is mandatory rather than optional. That needs
   a measurement of the current call granularity, which needs a running system.
-* *Rust or Zig for the guest?* SNIFs supports both at parity. VeriSimDB's kernels
-  are Rust, so Rust avoids a rewrite; but Zig is where upstream's five crash-mode
-  test surface lives, and `-OReleaseSafe` is a Zig flag with no exact Rust
-  analogue (the Rust equivalent is keeping `overflow-checks` and bounds checks on
-  in a release profile, which this repo currently *disables* — `Cargo.toml` sets
-  `panic = "abort"`, `lto = true`, `codegen-units = 1`). That profile
-  interaction needs checking before a Rust guest is assumed safe.
+* *Which compute implementation is justified?* Rust pure computation must follow
+  the Creusot discipline; all FFI implementation remains Zig, with Idris2 as ABI
+  authority. Ordinary tests do not discharge a Rust refinement proof. Check
+  overflow behaviour, bounds and cancellation on the actual guest build.
 * *Is crash isolation the right reason?* For a database whose value proposition
   is *detecting* divergence, a kernel that silently returns a wrong drift score
   is worse than one that crashes. SNIFs converts crashes into errors, which is the

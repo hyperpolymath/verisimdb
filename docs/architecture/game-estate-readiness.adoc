@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Game-estate readiness: baseline, decision and evidence
+:toc:
+
+Audit date: 2026-10-25. Baseline commit:
+`93d1548c43df8479ca07b5407e4224590cd995a8` (verified against GitHub main).
+This is the M0/M1 review record. It does not certify M2–M6 or public deployment.
+
+== Decision GE-001: keep the boundary optional and internal
+
+VeriSimDB may hold derived authoring representations and provenance, while each
+consumer owns its schema, source packages, reducer, replay and saves. No request
+belongs on a simulation tick, frame-critical path or audio callback. Solo play
+must work from game-owned prepared files with the service absent. UMS remains an
+authoring/compiler tool. No game source or licence is imported by this change.
+
+Keep exactly Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance and
+Spatial. Sparse subjects are normal; temporal history is automatic, not an input
+modality. Start with Graph/Semantic/Document/Provenance plus generated Temporal.
+Spatial needs a typed coordinate/reference model. Vector/Tensor require a use case.
+
+Use the existing HTTP boundary and redb storage abstraction. Retire direct NIF
+loading. Do not admit a SNIF kernel, Dragonfly, LMDB, Cap'n Proto or Bebop without
+measurements. A SNIF is bounded pure compute with no I/O; Idris2 owns any ABI and
+Zig implements any FFI. The external gateway belongs to unified-api-adapter.
+
+The existing Octad write path does not yet meet the requested durable publication
+contract. A later slice must either provide one atomic redb publication record
+containing the selected coherent views/history, with disposable projections, or
+implement genuine recoverable transactions spanning all stores. This decision
+requires tests of interruption and visibility; the present TransactionManager
+name is not evidence. Cross-request `/txn` operations must keep their explicit
+501 response until actually implemented.
+
+== Claims versus implementation
+
+Evidence paths below refer to the audited baseline unless marked changed here.
+
+[cols="2,4,3",options="header"]
+|===
+|Component / claim |Observed implementation |Target / remaining evidence
+|Fixed Octad |`docs/modality-profile.adoc`, `verisim-octad/src/lib.rs` and contract checker enumerate eight slots. Inputs omit Temporal; store writes history. |Preserve; no ninth game modality.
+|Default persistence |`verisim-api/src/lib.rs`: default stores are in memory; `persistent` selects redb-backed stores, Tantivy and WAL. `ARCHITECTURE.adoc` incorrectly called redb the default graph backend. |Persistence opt-in; supported local filesystem; no concurrent native-Windows/WSL sharing of one database.
+|Cross-modal atomicity |`verisim-octad/src/store.rs::create/update/delete` write modalities sequentially; `rollback_create` cleans up in process. `replay_wal` warns about partially persisted writes and rebuilds a status registry. |Crash-atomic publication remains a blocker. Per-store redb transactions are insufficient.
+|Historical inspection |`store.rs::update/at_time`; known issue #31 records incomplete snapshot reconstruction. |Test complete immutable versions, not only latest write deltas.
+|Cross-request transactions |`verisim-api/src/lib.rs` transaction handlers return 501. |Keep explicit failure; single-publication ingestion need not require this API.
+|Storage reads |`verisim-storage/src/redb_backend.rs::get` treats any table-open error as absent. |Distinguish missing table from corruption/I/O before claiming fail-closed recovery.
+|HTTP schema |`OctadRequest` is flattened; `docs/modality-profile.adoc` documents OpenAPI/client nesting mismatches. Unknown input fields can be ignored. |Versioned strict envelope and positive round-trip test before consumer adoption.
+|Authentication |`verisim-api/src/auth.rs` contains API-key/JWT/RBAC middleware. `AppState::new_async` uses disabled defaults; `main.rs` has no credential setup. |Loopback defaults added here; no tenant/public-access claim.
+|Request budgets |HTTP body/timeout/concurrency layers exist; `auth.rs` rate-limiter key map has no global cardinality bound. gRPC policy differs. |Test aggregate budgets, malformed input, cancellation and namespace crossover for every enabled surface.
+|NIF |Baseline Rustler functions were unimplemented; Elixir could load the library. |Retired here: empty crate, no loader/native exports, explicit errors, HTTP/auto preserved.
+|SNIF |`docs/architecture/snifs-bridge.adoc` is design only; no measured VeriSimDB guest. |Candidate: batched bounded drift scoring. No kernel admitted on upstream Fibonacci timings.
+|RAM promotion / caching |`ram_promotion.rs` maintains policy/status/accounting; does not prove a data-moving cache or hot-path benefit. |No new cache. Measure actual reusable authoring queries first.
+|Proofs |`proofs/coq/` and `docs/proof-debt.adoc` describe abstract models/axioms. No Creusot implementation proof was found. |Do not infer Rust correctness from a Coq model or a test count.
+|Unified adapter |Repository README still has `{{PROJECT_NAME}}` template content; no working gateway established by this audit. |Separate owner handoff; no edits to that repository.
+|Initialisation/governance |`REQUIRES_INITIALISATION.adoc` lists unresolved ownership/process items. Mustfile references `SECURITY.md` although repository uses `SECURITY.adoc`, and bans a language used by an existing contract checker. |Owner resolves policy inconsistencies; do not manufacture a pass.
+|===
+
+Paths abbreviated above with crate names live under `rust-core/`.
+No AGENTS, coordination or DEED file was found. The audit read
+`0-AI-MANIFEST.a2ml`, `.claude/CLAUDE.md`, `.machine_readable/6a2/` and relevant
+contractiles/bot directives. VCL is the consonance/admissibility boundary for
+identity transitions; a storage API is not its definition.
+
+Open issues inspected include #299 (modality wording), #296/#295 (CI/dependencies),
+#203/#204 (static review/docs), #113 (proof debt), #86 (SNIF), #84 (mathematical
+research), #79 (tests) and #78 (database gaps). No open PR was returned at audit
+start. These observations are a dated snapshot, not permanent repository facts.
+
+== Baseline CI evidence
+
+All links identify the verified baseline, not this branch's later check results.
+
+[cols="2,3,4",options="header"]
+|===
+|Run |Result |Actual failure
+|https://github.com/hyperpolymath/verisimdb/actions/runs/40176494810[Rust CI]
+|Failed; cargo test, fmt, docs, benchmark compile and fuzz compile passed
+|Clippy unused HashSet and state field; coverage tool not installed; audit check-run publication 403; deny flags tokio unsoundness. Audit also reported lru unsoundness and yanked clipboard-win.
+|https://github.com/hyperpolymath/verisimdb/actions/runs/40176494688[Elixir CI]
+|23 properties, 706 tests, 3 failures, 121 excluded; dependency audit passed
+|All three failures call unsupported `System.cmd(..., input: ...)` on Elixir 1.17. Coverage hits the same failures.
+|https://github.com/hyperpolymath/verisimdb/actions/runs/40176495165[Secret Scanner]
+|Three jobs failed at setup
+|Invalid lockfile action pin. No evidence that scanning ran successfully.
+|https://github.com/hyperpolymath/verisimdb/actions/runs/40176494842[Governance], https://github.com/hyperpolymath/verisimdb/actions/runs/40176494831[Hypatia]
+|Failed before jobs
+|Old reusable-workflow commits did not resolve in the current standards repository. References repaired to inspected current canonical owner/commit.
+|https://github.com/hyperpolymath/verisimdb/actions/runs/40176494860[REUSE], https://github.com/hyperpolymath/verisimdb/actions/runs/40176494663[lock sync], https://github.com/hyperpolymath/verisimdb/actions/runs/40176494817[docs]
+|Passed
+|These are independent of failed language/security gates.
+|https://github.com/hyperpolymath/verisimdb/actions/runs/40176495007[Security Scan], https://github.com/hyperpolymath/verisimdb/actions/runs/40176494989[CodeQL]
+|Passed
+|Scoped static-check outcomes; neither is an implementation proof.
+|===
+
+== Changes and dependency review
+
+* Rust CI: install cargo-llvm-cov explicitly, permit audit check-run publication.
+  No coverage threshold, test or advisory exemption is removed.
+* `ram_promotion.rs`: remove unused import/field; no cache behaviour added.
+  `groove.rs`: replace test-only unnecessary Vec with array.
+* API and orchestration listeners: loopback defaults, CORS off, startup warning.
+  Router regressions cover anonymous protected operations and reader denial of
+  mutations when authentication is explicitly configured.
+* Optional-persistence test setup: conditionally mutable configuration gets a
+  unique directory; no production storage semantics changed.
+* VCL-total gate: supported stdin mechanism, private temporary input, literal
+  executable arguments, bounded stdout/input and a process deadline. Invalid
+  success responses fail closed. Requires trusted Unix executable, POSIX sh and
+  GNU timeout; missing tools fail closed. No payload is logged on exceptions.
+* Direct NIF: retire Rustler and library loader; migration tombstone fails closed.
+* Cargo dependencies: tokio 1.53.0 to 1.53.3; clipboard-win 5.4.1 (yanked) to
+  5.4.3; Tantivy 0.26.1 to 0.27.0 to remove lru 0.16.4. Rustler and its exclusive
+  dependencies removed. Tantivy 0.27 needs Rust 1.88 or newer. Existing persistent
+  indexes require compatibility/rebuild evidence before upgrading a deployment;
+  do not delete the only copy of authored content.
+* Workflow references/lock closure: current canonical standards owner and valid
+  commits; preserve third-party attribution and declared transitive action pins.
+* Documentation: remove claims that default storage is persistent, auth code is
+  absent, or a conventional NIF remains a future option.
+
+Review the exact file/dependency delta with:
+
+[source,shell]
+----
+git diff --stat 93d1548c43df8479ca07b5407e4224590cd995a8
+git diff --text 93d1548c43df8479ca07b5407e4224590cd995a8 -- Cargo.toml Cargo.lock
+----
+
+== Verification ledger
+
+The baseline local workspace test run passed before the final Tantivy upgrade;
+that is not a pass for the upgraded dependency graph. Final command results and
+PR check URLs are recorded in the associated draft PR. Use the lockfile:
+
+[source,shell]
+----
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --no-deps --locked -- -D warnings
+cargo test --workspace --locked --no-fail-fast
+cargo test -p verisim-api --features persistent --locked
+cargo audit
+cargo deny check advisories bans licenses sources
+cd elixir-orchestration
+MIX_ENV=test mix compile --warnings-as-errors
+mix format --check-formatted
+mix test
+----
+
+Local environment: Linux x86_64 container, Rust 1.99.1, Elixir 1.17.3 on OTP 25;
+CI uses OTP 27. Hex registry access failed; local bootstrap fetched the exact
+locked tarballs over verified TLS and checked both lockfile inner/outer digests
+before unpacking. No dependency constraints or checksums were weakened.
+A persistent build first failed with linker undefined-symbol errors after edits
+during compilation; a clean retry is required before attributing this to code.
+
+`bash scripts/check-lock-sync.sh` verifies coverage, no orphan actions, transitive
+closure and exact workflow keys. The official gh-actions-lock v0.4.0 online
+verifier requires a CLI credential unavailable here. Its local verifier reports
+job-level reusable references as stale even though the repository checker counts
+them; neither observation is an online verification pass. GitHub setup remains
+a required independent gate, including lockfiles owned by the called repository.
+
+== Proof obligations and remaining trust
+
+[cols="3,3,3",options="header"]
+|===
+|Obligation |Evidence/discharge |Trusted or outstanding
+|Rust no unsafe in retired bridge |`#![forbid(unsafe_code)]`, no implementation |Compiler/toolchain; not a Creusot theorem
+|Loopback host selection |Ordinary unit test for both defaults |Explicit overrides and deployment network policy
+|VCL-total gate invocation |Adversarial path/payload, malformed output, size and timeout tests |OS, private temp directory semantics, GNU timeout, installed gate; certification claims need gate-owner proof
+|Rust safety-critical core contracts |No Creusot discharge claimed; `cargo creusot` unavailable in audit runtime |Write and check contracts before admitting new publication/version/codec logic; keep proof debt explicit
+|Existing Coq invariants |Abstract models with documented axioms |No checked refinement to Rust. Do not equate model admission with implementation proof
+|Idris2 ABI |Existing `src/abi/`; no ABI changed by this retirement |No Idris2 check claimed; no generated wire added
+|Zig FFI / SNIF |No new FFI or guest admitted |No Zig/SNIF interoperability or overhead result claimed
+|Crash consistency / source integrity |Existing redb/WAL tests cover narrower properties |Cross-modal publication, backup, migration, restart and corruption rejection still block the consumer slice
+|Access control |Configured HTTP middleware regression tests |Credential setup, namespace isolation, gRPC/GraphQL parity, untrusted-client resource budgets
+|===
+
+`idris2`, `zig`, Pons Asinorum and Panic Attack were not found in the initial
+local tool inventory. Existing CI Panic Attack results are scoped observations.
+No new theorem, cross-language interface or comparative benchmark is claimed.
+
+== Consumer contract and owner handoff (proposal; not an implemented endpoint)
+
+The minimum versioned boundary must carry: contract version, consumer-owned
+namespace/source identifier, expected current revision, world/package revisions,
+source bytes and SHA-256 digest, schema identifier/version, selected derived
+views, transformation version, actor and correction authorisation. The service
+must reject unknown versions, conflicting retries, stale revisions, oversized or
+malformed inputs and cross-namespace access. Identical events must be idempotent.
+Successful publication must identify one coherent durable revision and its digest.
+
+Read/history must return the same source identity, revision and digest. Drift is
+reported with expected/observed evidence; it must not rewrite canonical game
+content. Correction is an explicit authorised new version with an audit trail,
+or an explicit rejection. Rebuild derives indexes from preserved authoritative
+inputs/history. A timeout is an unknown publication outcome until resolved by
+idempotency key; clients must not blindly issue a new event.
+
+IDApTIK's scenario semantics and Slavia Zone A's quickening, settling, living-world
+response and place memory stay consumer-owned. Standard Operating Psychopathy's
+needs/resources/infrastructure form a later distinct fixture. No external game
+fixture has yet been imported or certified by this change. A local fixture must
+be labelled synthetic and cannot stand in for game integration acceptance.
+
+Owner gates:
+
+* VeriSimDB: correct publication/recovery and strict wire mapping; durable fixture,
+  replay/idempotency, adversarial auth and resource-budget evidence.
+* Game/Enaction/UMS owners: fixtures with licence/provenance, schema mappings,
+  expected revisions, correction policy, optional prepared-file fallback.
+* unified-api-adapter owner: initialise the service; authentication, namespace
+  authorisation, TLS, budgets/audit; preserve error and idempotency semantics.
+* Verification owner: checked Creusot contracts and Idris2/Zig obligations when an
+  ABI is admitted. No Rust/C FFI alternate specification.
+* Benchmark owner: small/medium/large, cold/warm, p50/p95/p99, failures, hardware,
+  memory/disk/write amplification, startup/shutdown, cancellation/unavailable
+  service; compare source files/redb and actual Octad. Cache tests must include a
+  workload that loses. No speed ranking is justified by this audit.

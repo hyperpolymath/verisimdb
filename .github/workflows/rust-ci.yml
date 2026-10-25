@@ -79,6 +79,9 @@ jobs:
     name: cargo audit
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: rustsec/audit-check@v2.0.0
@@ -118,6 +121,8 @@ jobs:
           toolchain: stable
           components: llvm-tools-preview
       - uses: taiki-e/install-action@v2.87.29
+        with:
+          tool: cargo-llvm-cov
       - name: Generate lcov report
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
       - name: Enforce minimum coverage

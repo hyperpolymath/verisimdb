@@ -100,8 +100,8 @@ machinery around it.
 |The unified entity layer — one entity, eight synchronised representations.
 *Read this first.*
 
-|`verisim-graph` |Graph modality — RDF and property-graph storage. Pure-Rust
-redb default; Oxigraph behind a feature flag (AD-003)
+|`verisim-graph` |Graph modality — RDF and property-graph storage. In-memory
+`SimpleGraphStore` by default; redb and Oxigraph are opt-in backends (AD-003)
 |`verisim-vector` |Vector modality — HNSW similarity search
 |`verisim-tensor` |Tensor modality — multi-dimensional arrays via `ndarray`
 |`verisim-semantic` |Semantic modality — ontology and type system via CBOR proofs
@@ -124,8 +124,8 @@ proximity
 |`verisim-api` |HTTP + gRPC API server. *The largest crate and the least
 tested* — see link:KNOWN-ISSUES.adoc[KNOWN-ISSUES.adoc]
 |`verisim-repl` |Interactive VCL REPL
-|`verisim-nif` |Rustler NIF bridge for in-process calls from Elixir. *Currently
-a stub* — tracked in issue #61
+|`verisim-nif` |Retired direct-NIF transport marker; no Rustler dependency or
+native exports. HTTP remains operational; SNIF kernels require measured benefit.
 |===
 
 === Elixir orchestration (`elixir-orchestration/`)

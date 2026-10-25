@@ -78,7 +78,7 @@ defmodule VeriSim.Query.VCLTGateTest do
       # stronger than what this test previously asserted (an unpredictable
       # `vcltgate_*.json` file at mode 600, removed afterwards), which described
       # the temp-file mechanism rather than the guarantee it existed to provide.
-      # The mechanism is gone: `System.cmd/3`'s `:input` writes to stdin directly.
+      # A fixed shell redirection receives paths only as positional arguments.
       hostile_statement =
         "INSPECT GRAPH FROM HEXAD abc WHERE id = '1' ; rm -rf / | x & `id` $(whoami) > /tmp/pwn"
 
@@ -131,6 +131,81 @@ defmodule VeriSim.Query.VCLTGateTest do
       assert {:error, :gate_failed} == VCLTGate.check("SELECT GRAPH FROM HEXAD abc")
     after
       System.delete_env("VERISIM_VCLT_GATE")
+    end
+  end
+
+  describe "gate protocol and resource budgets" do
+    setup do
+      prior = System.get_env("VERISIM_VCLT_GATE")
+
+      on_exit(fn ->
+        if prior,
+          do: System.put_env("VERISIM_VCLT_GATE", prior),
+          else: System.delete_env("VERISIM_VCLT_GATE")
+      end)
+    end
+
+    @tag :tmp_dir
+    test "malformed and contradictory success responses fail closed", %{tmp_dir: tmp} do
+      stub = Path.join(tmp, "gate-response")
+      System.put_env("VERISIM_VCLT_GATE", stub)
+
+      for response <- [
+            "not json",
+            ~s({"certified_level":-1,"levels":[]}),
+            ~s({"certified_level":6,"levels":[{"status":"fail"}]}),
+            ~s({"certified_level":"6","levels":[]}),
+            ~s({"certified_level":11,"levels":[]})
+          ] do
+        File.write!(stub, "#!/bin/sh\nprintf '%s' " <> shell_quote(response))
+        File.chmod!(stub, 0o755)
+        assert {:error, :gate_failed} == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
+      end
+    end
+
+    @tag :tmp_dir
+    test "executable path metacharacters are literal; private stdin file is removed", %{
+      tmp_dir: tmp
+    } do
+      stub = Path.join(tmp, "gate ' ; $(false)")
+      observation = Path.join(tmp, "input-path")
+
+      File.write!(stub, """
+      #!/bin/sh
+      readlink /proc/$$/fd/0 > #{shell_quote(observation)}
+      test "$(stat -c %a /proc/$$/fd/0 -L)" = 600 || exit 2
+      cat > /dev/null
+      echo '{"certified_level":6,"levels":[]}'
+      """)
+
+      File.chmod!(stub, 0o755)
+      System.put_env("VERISIM_VCLT_GATE", stub)
+      assert :admit == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
+      input = observation |> File.read!() |> String.trim()
+      refute File.exists?(input)
+      refute File.exists?(Path.dirname(input))
+    end
+
+    @tag :tmp_dir
+    test "oversized stdout and input fail closed", %{tmp_dir: tmp} do
+      stub = Path.join(tmp, "gate-large")
+      File.write!(stub, "#!/bin/sh\nhead -c 65537 /dev/zero\n")
+      File.chmod!(stub, 0o755)
+      System.put_env("VERISIM_VCLT_GATE", stub)
+      assert {:error, :gate_failed} == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
+      assert {:error, :gate_failed} == VCLTGate.check(String.duplicate("x", 1_048_577))
+    end
+
+    @tag :tmp_dir
+    test "timeout kills the gate process and returns failure", %{tmp_dir: tmp} do
+      stub = Path.join(tmp, "gate-blocked")
+      pid_file = Path.join(tmp, "gate-pid")
+      File.write!(stub, "#!/bin/sh\necho $$ > " <> shell_quote(pid_file) <> "\nexec sleep 60\n")
+      File.chmod!(stub, 0o755)
+      System.put_env("VERISIM_VCLT_GATE", stub)
+      assert {:error, :gate_failed} == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
+      pid = pid_file |> File.read!() |> String.trim()
+      refute File.exists?("/proc/" <> pid)
     end
   end
 

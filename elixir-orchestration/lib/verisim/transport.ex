@@ -5,12 +5,12 @@ defmodule VeriSim.Transport do
   @moduledoc """
   Transport selection for VeriSimDB Rust core communication.
 
-  Selects between HTTP (verisim-api) and NIF (in-process) transports based on
-  the `VERISIM_TRANSPORT` environment variable:
+  Uses HTTP for database I/O. The legacy NIF setting is retained only to fail
+  closed during migration; it never loads or executes native code:
 
       VERISIM_TRANSPORT=http   # Default: HTTP via VeriSim.RustClient
-      VERISIM_TRANSPORT=nif    # Direct NIF calls via VeriSim.NifBridge
-      VERISIM_TRANSPORT=auto   # NIF if loaded, HTTP fallback
+      VERISIM_TRANSPORT=nif    # Retired: every operation returns an error
+      VERISIM_TRANSPORT=auto   # HTTP (the retired bridge is never available)
 
   ## Usage
 
@@ -18,14 +18,7 @@ defmodule VeriSim.Transport do
   `VeriSim.Transport` instead of `VeriSim.RustClient` directly. The transport
   module delegates to the appropriate backend transparently.
 
-  ## Architecture
-
-      ┌──────────────────────┐
-      │  VeriSim.Transport   │   ← Unified interface
-      ├──────────┬───────────┤
-      │ NifBridge│ RustClient│   ← Backend selection
-      │ (in-proc)│ (HTTP)    │
-      └──────────┴───────────┘
+  A future measured SNIF kernel is pure compute, not a database transport.
   """
 
   require Logger

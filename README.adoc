@@ -485,7 +485,7 @@ cd elixir-orchestration
 iex -S mix
 ----
 
-WARNING: The HTTP API has **no built-in authentication**. In development this is intentional; in any deployment reachable by untrusted clients you must place a gateway (svalinn, nginx, etc.) in front of it. See link:KNOWN-ISSUES.adoc#_29_http_api_has_no_authentication_open[Known Issue #29].
+WARNING: The API contains authentication/RBAC middleware, but the server binary does not configure it. HTTP and gRPC default to loopback; `VERISIM_HOST` is an explicit trusted-interface override. Do not expose them to untrusted clients. Namespace isolation and end-to-end gateway enforcement remain unverified. See link:docs/architecture/game-estate-readiness.adoc[the game-estate readiness audit] and link:KNOWN-ISSUES.adoc[known issues].
 
 === Test
 
@@ -591,7 +591,7 @@ verisimdb/
 │   ├── verisim-planner/       # Cost-based query planner
 │   ├── verisim-repl/          # Interactive VCL REPL
 │   ├── verisim-storage/       # Pluggable storage backend abstraction
-│   ├── verisim-nif/           # Rustler NIF bridge (scaffold; see issue #61)
+│   ├── verisim-nif/           # Retired transport marker; no native exports
 │   ├── verisim-wal/           # Write-ahead log
 │   └── verisim-api/           # HTTP/gRPC/GraphQL API
 ├── elixir-orchestration/      # Elixir/OTP coordination layer

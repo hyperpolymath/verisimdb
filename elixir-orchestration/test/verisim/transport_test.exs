@@ -46,6 +46,11 @@ defmodule VeriSim.TransportTest do
   end
 
   describe "the NIF bridge never fabricates success (regression for silent data loss)" do
+    test "the retired loader refuses native libraries" do
+      assert {:error, :nif_retired} = NifBridge.load_nif()
+      refute NifBridge.loaded?()
+    end
+
     test "every operation returns an error tuple, never fake success" do
       # The previous Rust NIF returned canned success (e.g. delete -> "deleted")
       # having done nothing. After the fail-loudly fix, the compiled NIF and the

@@ -55,7 +55,10 @@ defmodule VeriSim.Application do
       VeriSim.HealthChecker,
 
       # Orchestration HTTP API (telemetry, status endpoints)
-      {Bandit, plug: VeriSim.Api.Router, port: orch_api_port()}
+      {Bandit,
+       plug: VeriSim.Api.Router,
+       ip: Application.get_env(:verisim, :orch_api_ip, {127, 0, 0, 1}),
+       port: orch_api_port()}
     ]
 
     opts = [strategy: :rest_for_one, name: VeriSim.Supervisor, max_restarts: 10, max_seconds: 60]

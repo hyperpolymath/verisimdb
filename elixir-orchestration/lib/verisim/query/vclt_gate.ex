@@ -2,183 +2,144 @@
 # Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 defmodule VeriSim.Query.VCLTGate do
   @moduledoc """
-  VCL-total gate integration (consumer half).
+  Optional VCL-total admissibility gate for epistemic statements.
 
-  When the `VERISIM_VCLT_GATE` environment variable is set to the path of
-  the `vclt-gate` binary (from the vcl-ut repo), every VCL epistemic
-  statement (INSPECT / VERIFY / SELECT) is checked for VCL-total
-  admissibility **before** execution.  Inadmissible statements are rejected
-  with reasons; gate errors fail closed.
+  `VERISIM_VCLT_GATE` selects a trusted local executable. An unset gate returns
+  `:skip`; configured gates fail closed on invocation, protocol or budget errors.
+  The gate receives a schema-version-1 JSON object on stdin. Exit 0 requires a
+  valid certification response; exit 1 rejects; any other status blocks.
 
-  ## Fail-closed policy
-
-  | Gate result   | Action                                   |
-  |---------------|------------------------------------------|
-  | :skip         | Gate not configured — proceed normally   |
-  | :admit        | Gate exit 0 — proceed                    |
-  | {:reject, rs} | Gate exit 1 — caller should return 422   |
-  | {:error, ...} | Gate exit 2 / missing / timeout — block  |
-
-  ## Mutations bypass the gate
-
-  INSERT / UPDATE / DELETE mutations go through the proof-verification path
-  (`VCLTypeChecker`/`verify_multi_proof`) instead.  The gate only runs for
-  read/epistemic statements where VCL-total level safety matters.
-
-  ## Binary protocol
-
-  Standard input: one JSON object, UTF-8, no length prefix.
-  Exit 0: admitted — JSON `{"certified_level": N, "levels": [...]}`
-  Exit 1: rejected — JSON `{"certified_level": -1, "levels": [...]}`
-  Exit 2: internal gate error (treat as gate failure).
-
-  See `vcl-ut/docs/vclt-gate-contract.adoc` for the full spec.
+  Elixir 1.17 has no `System.cmd/3` stdin option. On Unix, a private temporary
+  file supplies stdin through a fixed shell program with positional arguments.
+  Neither executable paths nor payloads are interpolated into shell source.
+  GNU coreutils `timeout` bounds execution to five seconds, killing the process
+  group on expiry. Input is limited to 1 MiB and collected stdout to 64 KiB.
+  Missing `timeout` or `sh` fails closed. This is host process I/O, not a SNIF.
   """
 
   require Logger
 
   @gate_timeout_ms 5_000
+  @max_input_bytes 1_048_576
+  @max_output_bytes 65_536
 
-  @doc """
-  Check a VCL statement against the vclt-gate binary.
-
-  `schema` is an optional map following the OctadSchema JSON encoding
-  defined in `vclt-gate-contract.adoc`.  Pass `%{}` if no schema is
-  known; the gate will operate in schema-free mode (L0–L4 only).
-
-  Returns:
-  - `:skip` — `VERISIM_VCLT_GATE` not set; caller must proceed normally
-  - `:admit` — gate admitted the statement (exit 0)
-  - `{:reject, reasons}` — gate rejected the statement (exit 1); `reasons`
-    is a non-empty list of human-readable strings
-  - `{:error, :gate_failed}` — gate unavailable or timed out; fail closed
-  """
   @spec check(String.t(), map()) ::
           :skip | :admit | {:reject, [String.t()]} | {:error, :gate_failed}
   def check(statement, schema \\ %{}) do
-    case gate_path() do
-      nil -> :skip
+    case System.get_env("VERISIM_VCLT_GATE") do
+      path when path in [nil, ""] -> :skip
       path -> run_gate(path, statement, schema)
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # Private
-  # ---------------------------------------------------------------------------
-
-  defp gate_path do
-    case System.get_env("VERISIM_VCLT_GATE") do
-      nil -> nil
-      "" -> nil
-      path -> path
-    end
-  end
-
   defp run_gate(path, statement, schema) do
-    payload =
-      Jason.encode!(%{
-        "schema_version" => 1,
-        "statement" => statement,
-        "schema" => schema
-      })
+    payload = Jason.encode!(%{schema_version: 1, statement: statement, schema: schema})
 
-    task = Task.async(fn -> invoke_gate(path, payload) end)
+    if byte_size(payload) > @max_input_bytes do
+      {:error, :gate_failed}
+    else
+      directory =
+        Path.join(
+          System.tmp_dir!(),
+          "vcltgate_" <> Base.url_encode64(:crypto.strong_rand_bytes(24))
+        )
 
-    case Task.yield(task, @gate_timeout_ms) do
-      {:ok, result} ->
-        result
+      # mkdir is exclusive. No payload is written until the directory is private.
+      File.mkdir!(directory)
 
-      nil ->
-        Task.shutdown(task, :brutal_kill)
-        Logger.warning("vclt-gate: timed out after #{@gate_timeout_ms}ms — failing closed")
-        {:error, :gate_failed}
+      try do
+        File.chmod!(directory, 0o700)
+        input = Path.join(directory, "input.json")
+        File.write!(input, payload, [:exclusive])
+        File.chmod!(input, 0o600)
+        invoke_gate(path, input)
+      after
+        File.rm_rf(directory)
+      end
     end
+  rescue
+    _ ->
+      # Do not log the exception: encoders and argument errors can include input.
+      Logger.warning("vclt-gate: invocation or encoding failed — failing closed")
+      {:error, :gate_failed}
   end
 
-  defp invoke_gate(path, payload) do
+  defp invoke_gate(path, input) do
+    timeout = System.find_executable("timeout") || raise "GNU timeout is required"
+    shell = System.find_executable("sh") || raise "POSIX shell is required"
+
+    port =
+      Port.open({:spawn_executable, timeout}, [
+        :binary,
+        :exit_status,
+        :use_stdio,
+        :hide,
+        args: [
+          "--signal=KILL",
+          "#{@gate_timeout_ms / 1000}s",
+          shell,
+          "-c",
+          ~S(exec "$1" < "$2"),
+          "vclt-gate",
+          Path.expand(path),
+          input
+        ]
+      ])
+
     try do
-      # No shell, and no temp file.
-      #
-      # This used to be `System.cmd("sh", ["-c", "'#{path}' < '#{tmp}'"])`, which
-      # needed the payload written to an exclusively-created 0o600 file because a
-      # shell redirection can only take a filename, not a stream. That pulled in
-      # `write_secure_payload!/2` (collision retries, `:crypto.strong_rand_bytes`,
-      # chmod-before-write), `shell_quote/1`, and an `after File.rm/1` — roughly
-      # 45 lines of security-sensitive machinery whose only job was to work
-      # around a shell feature we did not need.
-      #
-      # `System.cmd/3`'s `:input` option writes the payload straight to the
-      # child's stdin, so all of that goes away and with it the question of
-      # whether the quoting was correct. It was correct — `shell_quote/1` was a
-      # sound POSIX single-quote escape and neither the statement nor the schema
-      # ever reached the shell — but "correct quoting" is a property that has to
-      # be re-verified every time this function is edited, whereas "no shell" is
-      # a property that cannot regress.
-      #
-      # `path` is argv[0], never a shell word, so `VERISIM_VCLT_GATE` cannot
-      # smuggle arguments or metacharacters either. `System.cmd/3` raises
-      # `ErlangError` when the executable is missing or not runnable; the
-      # `rescue` below turns that into a fail-closed `{:error, :gate_failed}`,
-      # which is the documented behaviour for an unavailable gate.
-      {output, exit_code} = System.cmd(path, [], input: payload, stderr_to_stdout: false)
-
-      handle_gate_result(IO.iodata_to_binary(output), exit_code)
-    rescue
-      e ->
-        Logger.warning("vclt-gate: invocation error: #{Exception.message(e)} — failing closed")
-        {:error, :gate_failed}
+      collect(port, [], 0, System.monotonic_time(:millisecond) + @gate_timeout_ms + 500)
+    after
+      if Port.info(port), do: Port.close(port)
     end
   end
 
-  # `write_secure_payload!/2` and `shell_quote/1` were deleted here on 2026-09-27.
-  # They existed solely to feed a `sh -c` redirection a filename; with
-  # `System.cmd/3`'s `:input` the payload goes to stdin directly. Removing them is
-  # the point of the change: less security-sensitive code to keep correct.
-  # The test that asserted their observable behaviour (an unpredictable
-  # `vcltgate_*.json` file at mode 600, removed afterwards) has been replaced by
-  # one that asserts the underlying property instead — that shell metacharacters
-  # in the statement and schema arrive on stdin verbatim, unparsed.
+  defp collect(port, chunks, size, deadline) do
+    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+    receive do
+      {^port, {:data, data}} ->
+        if size + byte_size(data) > @max_output_bytes do
+          {:error, :gate_failed}
+        else
+          collect(port, [data | chunks], size + byte_size(data), deadline)
+        end
+
+      {^port, {:exit_status, code}} ->
+        handle_gate_result(chunks |> Enum.reverse() |> IO.iodata_to_binary(), code)
+    after
+      remaining -> {:error, :gate_failed}
+    end
+  end
 
   defp handle_gate_result(output, 0) do
     case Jason.decode(output) do
-      {:ok, %{"certified_level" => level}} ->
-        Logger.debug("vclt-gate: admitted at level #{level}")
-        :admit
+      {:ok, %{"certified_level" => level, "levels" => levels}}
+      when is_integer(level) and level >= 0 and level <= 10 and is_list(levels) ->
+        if Enum.all?(levels, &(is_map(&1) and &1["status"] != "fail")),
+          do: :admit,
+          else: {:error, :gate_failed}
 
       _ ->
-        Logger.debug("vclt-gate: exit 0 (admitted, no level detail)")
-        :admit
+        {:error, :gate_failed}
     end
   end
 
   defp handle_gate_result(output, 1) do
-    reasons = extract_reasons(output)
-    Logger.info("vclt-gate: rejected — #{Enum.join(reasons, "; ")}")
-    {:reject, reasons}
+    reasons =
+      case Jason.decode(output) do
+        {:ok, %{"levels" => levels}} when is_list(levels) ->
+          for %{"status" => "fail", "name" => name, "level" => level} = result <- levels,
+              is_binary(name) and is_integer(level) do
+            reason = if is_binary(result["reason"]), do: result["reason"], else: "rejected"
+            "#{name} (L#{level}): #{reason}"
+          end
+
+        _ ->
+          []
+      end
+
+    {:reject, if(reasons == [], do: ["inadmissible (no detail)"], else: reasons)}
   end
 
-  defp handle_gate_result(_output, code) do
-    Logger.warning("vclt-gate: exit #{code} — failing closed")
-    {:error, :gate_failed}
-  end
-
-  defp extract_reasons(output) do
-    case Jason.decode(output) do
-      {:ok, %{"levels" => levels}} when is_list(levels) ->
-        failed =
-          levels
-          |> Enum.filter(fn l -> l["status"] == "fail" end)
-          |> Enum.map(fn l ->
-            "#{l["name"]} (L#{l["level"]}): #{l["reason"] || "rejected"}"
-          end)
-
-        if failed == [], do: ["inadmissible (no detail)"], else: failed
-
-      {:ok, %{"error" => msg}} ->
-        ["#{msg}"]
-
-      _ ->
-        ["inadmissible (gate response unparseable: #{String.slice(output, 0, 100)})"]
-    end
-  end
+  defp handle_gate_result(_output, _code), do: {:error, :gate_failed}
 end

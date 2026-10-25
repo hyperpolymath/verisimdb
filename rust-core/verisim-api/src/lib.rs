@@ -205,7 +205,7 @@ impl Default for ApiConfig {
             host: "[::1]".to_string(),
             port: 8080,
             grpc_port: 50051,
-            enable_cors: true,
+            enable_cors: false,
             version_prefix: "/api/v1".to_string(),
             vector_dimension: 384,
             persistence_dir: None,
@@ -2514,16 +2514,89 @@ mod tests {
         // When the `persistent` feature is enabled, each test gets a unique temp directory
         // to avoid redb lock contention between parallel tests.
         #[cfg(feature = "persistent")]
-        {
+        let config = {
+            let mut config = config;
             use std::sync::atomic::{AtomicU64, Ordering};
             static COUNTER: AtomicU64 = AtomicU64::new(0);
             let id = COUNTER.fetch_add(1, Ordering::Relaxed);
             let tmp =
                 std::env::temp_dir().join(format!("verisimdb-test-{}-{}", std::process::id(), id,));
             config.persistence_dir = Some(tmp.to_string_lossy().into_owned());
-        }
+            config
+        };
 
         AppState::new_async(config).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn configured_auth_blocks_anonymous_reads_writes_deletes_and_repairs() {
+        let mut state = create_test_state().await;
+        state.auth = auth::AuthState::new(auth::AuthConfig {
+            enabled: true,
+            allow_public_health: false,
+            ..Default::default()
+        });
+        let app = mount_with_prefix(build_router(state), "/api/v1");
+        for (method, path) in [
+            ("GET", "/octads/subject"),
+            ("POST", "/octads"),
+            ("PUT", "/octads/subject"),
+            ("DELETE", "/octads/subject"),
+            ("POST", "/normalizer/trigger/subject"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(format!("/api/v1{path}"))
+                        .header("content-type", "application/json")
+                        .body(Body::from("{}"))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::UNAUTHORIZED,
+                "{method} {path}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn reader_key_cannot_write_delete_or_normalize() {
+        let mut state = create_test_state().await;
+        state.auth = auth::AuthState::new(auth::AuthConfig {
+            enabled: true,
+            ..Default::default()
+        });
+        let key = format!("reader-fixture-{}", std::process::id());
+        state
+            .auth
+            .key_registry
+            .register(&key, "test reader", auth::ClientRole::Reader);
+        let app = mount_with_prefix(build_router(state), "/api/v1");
+        for (method, path) in [
+            ("POST", "/octads"),
+            ("DELETE", "/octads/subject"),
+            ("POST", "/normalizer/trigger/subject"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(format!("/api/v1{path}"))
+                        .header("content-type", "application/json")
+                        .header("x-api-key", &key)
+                        .body(Body::from("{}"))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {path}");
+        }
     }
 
     #[tokio::test]

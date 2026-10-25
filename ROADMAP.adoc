@@ -94,10 +94,13 @@ modalities or fail completely.
 
 *Criticality: HIGH* | Effort: Large | Trait: `+StorageBackend+`
 
-Currently in-memory only. Need pluggable backends.
+`verisim-storage` now provides memory and redb backends. The API's `persistent`
+feature uses persistent modality stores and a WAL. Cross-modal crash atomicity,
+coherent snapshots and migrations still need evidence; individual redb commits
+do not establish these properties.
 
 * `+StorageBackend+` trait with get/put/delete/scan
-* Backends: Memory (current), RocksDB, SQLite, LMDB
+* Reuse Memory/redb; admit another backend only against a measured requirement
 * Per-modality backend configuration
 * Migration tooling between backends
 
