@@ -21,7 +21,7 @@ workflows:
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/ci-meta.yml':
         - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-squabbler@14f853fde902ab2d7631070d87a9dc9122e01013'
+        - 'hyperpolymath/cicd-squabbler@b854d17abc0dce296719a349ebe856ff945cf03e'
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
         - 'github/codeql-action@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee'
@@ -190,9 +190,9 @@ dependencies:
         commit: 'sha1-884713a6c30a92e5e8544c39945cd7cb630abcd1'
         owner_id: 1342004
         repo_id: 400046858
-    'hyperpolymath/cicd-squabbler@14f853fde902ab2d7631070d87a9dc9122e01013':
-        ref: '14f853fde902ab2d7631070d87a9dc9122e01013'
-        commit: 'sha1-14f853fde902ab2d7631070d87a9dc9122e01013'
+    'hyperpolymath/cicd-squabbler@b854d17abc0dce296719a349ebe856ff945cf03e':
+        ref: 'v0.1.0'
+        commit: 'sha1-b854d17abc0dce296719a349ebe856ff945cf03e'
         owner_id: 6759885
         repo_id: 1284026967
     'hyperpolymath/panic-attack@b5530834a839734d1d181bfe6edb0d43d4233cf4':
@@ -242,7 +242,7 @@ dependencies:
         owner_id: 25397242
         repo_id: 523199201
     'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
-        ref: 'd1527c8f67ef9af357290475d4af4b0fab8f12e0'
+        ref: 'v2.9.3'
         commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
         owner_id: 580492
         repo_id: 298565987
@@ -252,7 +252,7 @@ dependencies:
         owner_id: 43724913
         repo_id: 442947557
     'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555':
-        ref: 'e83874834305fe9a4a2997156cb26c5de65a8555'
+        ref: 'v0.10.0'
         commit: 'sha1-e83874834305fe9a4a2997156cb26c5de65a8555'
         owner_id: 135788
         repo_id: 208510314

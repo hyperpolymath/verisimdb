@@ -62,7 +62,13 @@ jobs:
       - name: zizmor (Actions security audit)
         run: zizmor --config .zizmor.yml .github/workflows/
       - name: actionlint (workflow + shell audit)
-        run: actionlint -color
+        run: |
+          set -uo pipefail
+          actionlint -format '{{json .}}' > /tmp/actionlint.json || true
+          jq -r '.[] | "::error file=\(.filepath),line=\(.line),col=\(.column)::actionlint [\(.kind)]: \(.message)"' /tmp/actionlint.json || true
+          count="$(jq 'length' /tmp/actionlint.json)"
+          echo "actionlint findings: $count"
+          [ "$count" -eq 0 ]
 
   squabble-chains:
     name: cicd-squabbler chains
@@ -76,7 +82,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Cross-repo CI dependency graph (read-only)
-        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@14f853fde902ab2d7631070d87a9dc9122e01013
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@b854d17abc0dce296719a349ebe856ff945cf03e # v0.1.0
         with:
           args: |
             chains
