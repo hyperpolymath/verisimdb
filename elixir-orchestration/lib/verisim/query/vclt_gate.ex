@@ -106,7 +106,25 @@ defmodule VeriSim.Query.VCLTGate do
     try do
       collect(port, [], 0, System.monotonic_time(:millisecond) + @gate_timeout_ms + 500)
     after
-      if Port.info(port), do: Port.close(port)
+      close_port(port)
+    end
+  end
+
+  defp close_port(port) do
+    try do
+      Port.close(port)
+    rescue
+      ArgumentError -> :ok
+    end
+
+    drain_port_messages(port)
+  end
+
+  defp drain_port_messages(port) do
+    receive do
+      {^port, _message} -> drain_port_messages(port)
+    after
+      0 -> :ok
     end
   end
 

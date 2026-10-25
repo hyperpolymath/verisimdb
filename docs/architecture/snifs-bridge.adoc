@@ -271,12 +271,11 @@ contact with SNIFs' scope
 below
 
 |2
-|Spike: one kernel end-to-end. *Recommended: vector distance*, because upstream
-publishes a directly comparable `sum_f32` buffer-round-trip measurement to check
-the result against
+|Spike: bounded drift scoring end-to-end, subject to the measurement gate above
 |1–2 days
-|Success criterion is a p50 near upstream's 15 µs and a caller that survives a
-deliberately trapping guest
+|Success requires measured end-to-end benefit over host execution, including
+dispatch, serialisation, buffer copies and sandbox cost, plus a caller that
+survives a deliberately trapping guest
 
 |3
 |Define the marshalling codec for the four v0 kernels
@@ -287,10 +286,10 @@ not queries. Use a flat binary layout and reserve the wire codec for VCL-shaped
 calls if they ever cross
 
 |4
-|Second kernel: drift scoring. Third: plan costing
+|Second kernel: plan costing. Third: vector distance
 |—
-|Drift is the differentiating feature and the one whose correctness matters most;
-costing is the one #84 has a theorem waiting for
+|Costing is the one #84 has a theorem waiting for; vector distance follows only
+with measurements justifying its boundary cost
 
 |5
 |Publish `verisim.wasm` per release; publish the SNIF wrapper as a hex package

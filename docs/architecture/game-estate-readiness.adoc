@@ -251,12 +251,19 @@ No new theorem, cross-language interface or comparative benchmark is claimed.
 == Consumer contract and owner handoff (proposal; not an implemented endpoint)
 
 The minimum versioned boundary must carry: contract version, consumer-owned
-namespace/source identifier, expected current revision, world/package revisions,
-source bytes and SHA-256 digest, schema identifier/version, selected derived
+namespace/source identifier, a required durable idempotency key, expected current
+revision, world/package revisions, source bytes and SHA-256 digest, schema
+identifier/version, selected derived
 views, transformation version, actor and correction authorisation. The service
 must reject unknown versions, conflicting retries, stale revisions, oversized or
 malformed inputs and cross-namespace access. Identical events must be idempotent.
 Successful publication must identify one coherent durable revision and its digest.
+The consumer supplies a key scoped to its namespace and stable across retries of
+the same event; source identity and revision do not implicitly serve as the key.
+The service must store the key and its request identity atomically with the
+coherent publication record, returning that recorded outcome for identical
+retries and rejecting reuse with different inputs. After an unknown outcome,
+clients must reconcile using the same key before issuing a new event.
 
 Read/history must return the same source identity, revision and digest. Drift is
 reported with expected/observed evidence; it must not rewrite canonical game

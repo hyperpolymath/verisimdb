@@ -44,7 +44,15 @@ defmodule VeriSim.Query.VCLTGateTest do
       File.chmod!(stub, 0o755)
       System.put_env("VERISIM_VCLT_GATE", stub)
 
-      assert :admit == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc LIMIT 1")
+      send(self(), :unrelated_message)
+
+      for _ <- 1..25 do
+        assert :admit == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc LIMIT 1")
+      end
+
+      assert_receive :unrelated_message
+      refute_receive {_port, {:data, _data}}
+      refute_receive {_port, {:exit_status, _status}}
     after
       System.delete_env("VERISIM_VCLT_GATE")
     end
@@ -161,19 +169,22 @@ defmodule VeriSim.Query.VCLTGateTest do
     } do
       stub = Path.join(tmp, "gate ' ; $(false)")
       observation = Path.join(tmp, "input-path")
+      staged = Path.join(tmp, "staged")
 
       File.write!(stub, """
       #!/bin/sh
       test "$1" = --input || exit 2
       printf '%s' "$2" > #{shell_quote(observation)}
-      test "$(stat -c %a "$2")" = 600 || exit 2
-      cat "$2" > /dev/null
+      test -f "$2" && test -r "$2" || exit 2
+      cp -Rp "$(dirname "$2")" #{shell_quote(staged)} || exit 2
       echo '{"schema_version":1,"admissible":true,"requested_level":6,"certified_level":6,"levels":[]}'
       """)
 
       File.chmod!(stub, 0o755)
       System.put_env("VERISIM_VCLT_GATE", stub)
       assert :admit == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
+      assert Bitwise.band(File.stat!(staged).mode, 0o777) == 0o700
+      assert Bitwise.band(File.stat!(Path.join(staged, "input.json")).mode, 0o777) == 0o600
       input = observation |> File.read!() |> String.trim()
       refute File.exists?(input)
       refute File.exists?(Path.dirname(input))
@@ -186,6 +197,8 @@ defmodule VeriSim.Query.VCLTGateTest do
       File.chmod!(stub, 0o755)
       System.put_env("VERISIM_VCLT_GATE", stub)
       assert {:error, :gate_failed} == VCLTGate.check("INSPECT GRAPH FROM HEXAD abc")
+      refute_receive {_port, {:data, _data}}
+      refute_receive {_port, {:exit_status, _status}}
       assert {:error, :gate_failed} == VCLTGate.check(String.duplicate("x", 1_048_577))
     end
 
