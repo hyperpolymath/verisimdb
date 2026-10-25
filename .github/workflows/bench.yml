@@ -40,14 +40,17 @@ jobs:
       - name: Run modality benchmarks
         run: |
           set -euo pipefail
+          # criterion's exit reflects the compare verdict; this lane is
+          # report-only (R-4), so record it and continue to the artifacts.
+          rc=0
           if [ -d benches/baseline ]; then
-            cargo bench --bench modality_benchmarks -- --baseline committed 2>&1 | tee bench-out.txt || true
-            cp -r target/criterion bench-results-criterion
+            cargo bench --bench modality_benchmarks -- --baseline committed 2>&1 | tee bench-out.txt || rc=$?
           else
-            cargo bench --bench modality_benchmarks -- --save-baseline committed 2>&1 | tee bench-out.txt
-            mkdir -p bench-results-criterion
-            cp -r target/criterion bench-results-criterion/ || true
+            cargo bench --bench modality_benchmarks -- --save-baseline committed 2>&1 | tee bench-out.txt || rc=$?
           fi
+          echo "criterion exit: $rc (report-only lane)"
+          mkdir -p bench-results-criterion
+          cp -r target/criterion bench-results-criterion/
           { echo "## criterion"; echo; echo '```'; tail -n 60 bench-out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7.0.2
         if: always()

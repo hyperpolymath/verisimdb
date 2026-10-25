@@ -45,13 +45,17 @@ jobs:
       - name: Run mutation tests
         run: |
           set -euo pipefail
+          # Report-only until the baseline exists (docs/CI-CD.adoc R-3):
+          # the exit code is recorded and surfaced, never silently eaten.
+          rc=0
           cargo mutants \
             -p verisim-drift -p verisim-normalizer -p verisim-spatial \
             -p verisim-provenance -p verisim-semantic -p verisim-octad \
-            --no-shuffle --output mutants-out/ || true
+            --no-shuffle --output mutants-out/ || rc=$?
+          echo "cargo-mutants exit: $rc (report-only lane; missed mutants are the artifact's story)"
           if [ -f mutants-out/mutants.out/outcomes.json ]; then
             jq -r '"mutants: \(.total_mutants) total, \(.caught) caught, \(.missed) missed, \(.timeout) timeout"' \
-              mutants-out/mutants.out/outcomes.json >> "$GITHUB_STEP_SUMMARY" || true
+              mutants-out/mutants.out/outcomes.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v7.0.2
         if: always()

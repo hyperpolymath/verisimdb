@@ -64,8 +64,12 @@ jobs:
       - name: actionlint (workflow + shell audit)
         run: |
           set -uo pipefail
-          actionlint -format '{{json .}}' > /tmp/actionlint.json || true
-          jq -r '.[] | "::error file=\(.filepath),line=\(.line),col=\(.column)::actionlint [\(.kind)]: \(.message)"' /tmp/actionlint.json || true
+          # The gate is the findings count below; actionlint also exits 1
+          # when it finds things, and its JSON is the evidence either way.
+          if actionlint -format '{{json .}}' > /tmp/actionlint.json; then
+            echo "actionlint: clean"
+          fi
+          jq -r '.[] | "::error file=\(.filepath),line=\(.line),col=\(.column)::actionlint [\(.kind)]: \(.message)"' /tmp/actionlint.json
           count="$(jq 'length' /tmp/actionlint.json)"
           echo "actionlint findings: $count"
           [ "$count" -eq 0 ]

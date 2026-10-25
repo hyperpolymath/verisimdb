@@ -14,18 +14,29 @@ ____
 ....
 Foundational CI fix in standards, evidence from verisimdb (2026-10-25):
 
-1. STALE/ORPHANED PINS: three standards commit SHAs that estate callers
-   pin (8f31a5a4…, cc58c0cb…, 8750b94a…) return 422 "No commit found"
-   from the GitHub API in both hyperpolymath/standards and
-   metadatastician/standards, so every caller workflow pinning them is
-   startup_failure with zero jobs (verisimdb Governance, Hypatia,
-   Scorecard were dead this way). Please: (a) publish a canonical
-   "current vetted standards SHA" in a machine-readable place callers
-   can poll, (b) add a standards-side CI check that samples known
-   caller pins across the estate and fails when a pinned commit stops
-   resolving (history rewrite/transfer detector), (c) document the
-   transfer/rewrite event that orphaned these SHAs so callers can
-   distinguish "bump deliberately" from "your pin no longer exists".
+1. OWNER TRANSFER fallout (measured 2026-10-25 on verisimdb PR #319):
+   hyperpolymath/standards was transferred to metadatastician/standards
+   (same repo id 1116521501, owner_id 6759885 -> 297579217). Three
+   independent breakages follow for EVERY estate caller:
+   (a) Actions does not follow transfers for reusable `uses:` — callers
+   must name metadatastician/standards. (b) The actions.lock records
+   every caller holds name owner_id 6759885; GitHub lockfile
+   verification compares owner ids and rejects the pin ("invalid
+   lockfile pin"), refusing to load the calling workflow at all —
+   zero jobs, no annotation. (c) Three older pinned SHAs
+   (8f31a5a4…, cc58c0cb…, 8750b94a…) return 422 in BOTH owners, i.e.
+   history was rewritten as well as transferred. And (d) once a caller
+   does migrate, your own Allowlist Preflight rejects it:
+   allowed-actions.json has no metadatastician/* pattern (8 GAP lines
+   on verisimdb). A caller is currently dead if it migrates and dead
+   if it doesn't. Please: add metadatastician patterns to the
+   allowlist; canonicalise the `repository: hyperpolymath/standards`
+   internal checkouts inside governance-reusable.yml (they work only
+   via git redirect); publish a machine-readable "current vetted
+   standards SHA + canonical owner"; add a standards-side CI check
+   that samples estate caller pins and fails when a pinned commit or
+   owner stops resolving; and write the transfer ADR so the next
+   transfer is a playbook, not an outage.
 
 2. GOVERNANCE ALLOWLIST vs TRANSFERRED OWNER (from verisimdb PR #318):
    governance-reusable's language/owner allowlist rejects the
@@ -282,4 +293,32 @@ Rebase note: the CI overhaul changed actions.lock, all standards
 pins, elixir-ci detect blocks (now scripts/ci/detect-changes.sh),
 and rust-ci (coverage tool + two jobs). Rebase early; regenerate
 actions.lock rather than hand-merging it.
+....
+
+
+== P-K9 — hyperpolymath/k9-ecosystem + standards 1-formats/k9: the missing Nickel libs
+
+....
+verisimdb adopted the k9-conformance lane and repaired its corpus the
+way standards' own MIGRATION-1058 did (K9! sentinels, resolving
+imports via ../_base.ncl pedigree_schema, capability grants, claimed
+signature blocks, templates renamed *.k9.ncl.in). One file cannot be
+repaired locally: connectors/test-infra/deploy.k9.ncl imports
+"../../standards/self-validating/pedigree.ncl" and ".../leash.ncl" —
+that layout exists in no current repo (checked standards svc/k9 and
+k9-ecosystem at HEAD; k9-ecosystem's own examples/deploy.k9.ncl has
+the same relative-import shape). It sits in verisimdb's
+k9-contract-debt.txt (count: 1) awaiting a decision:
+
+1. Give pedigree.ncl/leash.ncl a canonical, versioned home
+   (k9-ecosystem root? standards 1-formats/k9/lib/?) and a vendoring
+   story for consumers (copy at a pin, like the contractiles corpus),
+   OR declare the let-import form legacy in K9-CONTRACT-SPEC and show
+   the self-contained pedigree component form as the migration.
+2. Publish the template convention (*.k9.ncl.in) in the spec/README
+   so the next repo does not rediscover it from standards' debt
+   ledger header.
+
+Acceptance: verisimdb fixes deploy.k9.ncl's imports against the
+canonical libs, adds the K9! envelope, and empties its debt ledger.
 ....
