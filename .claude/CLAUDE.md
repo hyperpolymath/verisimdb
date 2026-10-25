@@ -8,7 +8,20 @@ VeriSimDB (Veridical Simulacrum Database) is a cross-system **identity-consonanc
 
 ## Machine-Readable Artefacts
 
-`.machine_readable/` contains a2ml/Nickel estate spec artefacts:
+The estate data-format gate route is **kyq**, limited to **TOML, Dhall,
+KYAML and I-JSON/JCS**. Preserve TOML/Dhall; migrate YAML/YML content to KYAML
+and JSON variants through kyq using the actual **hyperpolymath/ijson-jcs**
+repository. kyX owns wider projection. See metadatastician/standards#1341
+for the canonical routing correction and current implementation boundary;
+kyq's blocked build/validator stubs are not passing conformance evidence.
+
+A2ML is retired. The inventory below records legacy files awaiting migration;
+never create or extend them. Repo facts belong in a single root chora DEED,
+contracts use the K9 Nickel contract, and root coordination.k9 follows the
+standards coordination ABNF. Do not claim this repository's legacy metadata
+has already migrated or substitute generic YAML validation for those contracts.
+
+`.machine_readable/` currently contains legacy A2ML and Nickel artefacts:
 - `6a2/` — L1 specs: `STATE.a2ml`, `META.a2ml`, `ECOSYSTEM.a2ml`, `PLAYBOOK.a2ml`, `AGENTIC.a2ml`, `NEUROSYM.a2ml`, `0-AI-MANIFEST.a2ml`
 - `contractiles/` — per-repo contracts: `must/`, `trust/`, `intend/`, `adjust/`, `dust/`, `bust/`
 - `bot_directives/` — per-bot directives (echidnabot, hypatia, finishbot, …)

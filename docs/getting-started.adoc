@@ -43,7 +43,7 @@ repair it.
 │    ├── QueryRouter     (distributes VCL queries)     │
 │    ├── SchemaRegistry  (type system coordination)    │
 │    └── Federation      (heterogeneous peer queries)  │
-│              ↕ HTTP / NIF                            │
+│              ↕ HTTP                                  │
 ├──────────────────────────────────────────────────────┤
 │  Rust Core Engine                                    │
 │    ├── 8 modality stores (graph, vector, tensor...)  │
@@ -440,21 +440,25 @@ SELECT * FROM FEDERATION /* DRIFT POLICY REPAIR
 | Spatial | R-tree | GeoJSON index | PostGIS | geo_shape
 |===
 
-== NIF Transport (Same-Node Deployment)
+== HTTP Transport (Including Same-Node Deployment)
 
-For Elixir applications running on the same node as the Rust core,
-the NIF transport bypasses HTTP entirely for 10-100x lower latency:
+The conventional NIF transport has been retired. Use HTTP even when the
+Elixir application and Rust core run on the same node:
 
 [source,bash]
 ----
-# Enable NIF transport
-export VERISIM_TRANSPORT=nif    # Direct NIF calls
-# or
-export VERISIM_TRANSPORT=auto   # NIF if available, HTTP fallback
+export VERISIM_TRANSPORT=http
+export VERISIM_RUST_CORE_URL=http://localhost:8080/api/v1
 ----
 
-The NIF bridge is loaded automatically from `priv/native/libverisim_nif.so`.
-All operations use the same API -- only the transport layer changes.
+HTTP is the default; `VERISIM_TRANSPORT=auto` also uses HTTP. An explicit
+`VERISIM_TRANSPORT=nif` request fails closed with `:nif_retired`. No native
+library is loaded, including an old `priv/native/libverisim_nif.so` artifact.
+Remove that transport setting from existing deployments before upgrading.
+
+Keep database and network I/O host-side. Future SNIF compute work is a
+separate measured kernel with an Idris2-owned ABI and Zig FFI; it is not a
+replacement database transport. No NIF latency advantage is claimed.
 
 == Drift Detection Deep Dive
 
