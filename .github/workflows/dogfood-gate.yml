@@ -72,7 +72,8 @@ jobs:
           Copy one from [rsr-template-repo](https://github.com/hyperpolymath/rsr-template-repo).
           EOF
           else
-            echo "## A2ML Validation" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Scanned **${A2ML_COUNT}** manifest file(s) (.deed, or legacy .a2ml). See step output for details." >> "$GITHUB_STEP_SUMMARY"
+            { echo "## A2ML Validation"
+              echo ""
+              echo "Scanned **${A2ML_COUNT}** manifest file(s) (.deed, or legacy .a2ml). See step output for details."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi

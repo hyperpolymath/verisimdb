@@ -21,7 +21,7 @@ workflows:
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/ci-meta.yml':
         - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-squabbler@b854d17abc0dce296719a349ebe856ff945cf03e'
+        - 'hyperpolymath/cicd-squabbler@14f853fde902ab2d7631070d87a9dc9122e01013'
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
         - 'github/codeql-action@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee'
@@ -48,20 +48,20 @@ workflows:
         - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
     '.github/workflows/governance.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/hypatia-scan.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/ijson-jcs.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/instant-sync.yml':
         - 'peter-evans/repository-dispatch@v4.0.1'
     '.github/workflows/k9-deed-conformance.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/label-triage.yml': []
     '.github/workflows/labels.yml': []
     '.github/workflows/lock-sync-gate.yml': []
     '.github/workflows/mirror.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/nightly.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.2'
@@ -83,13 +83,13 @@ workflows:
         - 'rustsec/audit-check@v2.0.0'
         - 'taiki-e/install-action@v2.87.29'
     '.github/workflows/scorecard.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/secret-scanner.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/security-scan.yml':
         - 'hyperpolymath/panic-attack@b5530834a839734d1d181bfe6edb0d43d4233cf4'
     '.github/workflows/spark-theatre-gate.yml':
-        - 'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d'
+        - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
 dependencies:
     'actions/attest-build-provenance@v4.2.2':
         ref: 'v4.2.2'
@@ -190,9 +190,9 @@ dependencies:
         commit: 'sha1-884713a6c30a92e5e8544c39945cd7cb630abcd1'
         owner_id: 1342004
         repo_id: 400046858
-    'hyperpolymath/cicd-squabbler@b854d17abc0dce296719a349ebe856ff945cf03e':
-        ref: 'v0.1.0'
-        commit: 'sha1-b854d17abc0dce296719a349ebe856ff945cf03e'
+    'hyperpolymath/cicd-squabbler@14f853fde902ab2d7631070d87a9dc9122e01013':
+        ref: 'main'
+        commit: 'sha1-14f853fde902ab2d7631070d87a9dc9122e01013'
         owner_id: 6759885
         repo_id: 1284026967
     'hyperpolymath/panic-attack@b5530834a839734d1d181bfe6edb0d43d4233cf4':
@@ -204,10 +204,10 @@ dependencies:
             - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
             - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
             - 'Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0'
-    'hyperpolymath/standards@8e48b1caade08a552646adeab66558ac43b4360d':
+    'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d':
         ref: '8e48b1caade08a552646adeab66558ac43b4360d'
         commit: 'sha1-8e48b1caade08a552646adeab66558ac43b4360d'
-        owner_id: 6759885
+        owner_id: 297579217
         repo_id: 1116521501
         uses:
             - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'

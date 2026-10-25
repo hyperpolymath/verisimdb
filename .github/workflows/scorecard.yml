@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   scorecard:
-    uses: hyperpolymath/standards/.github/workflows/scorecard-reusable.yml@8e48b1caade08a552646adeab66558ac43b4360d
+    uses: metadatastician/standards/.github/workflows/scorecard-reusable.yml@8e48b1caade08a552646adeab66558ac43b4360d
     # The reusable requires all four grants ON THE CALLING JOB: a job-level
     # permissions block REPLACES the workflow-level one, and `actions: read`
     # was missing here, which errors Scorecard's Packaging check.

@@ -17,11 +17,16 @@ ____
   document — reaches green by deleting a check, renaming it away,
   adding `continue-on-error`, or admin-merging past it.
 . *Thin callers, pinned reusables.* Estate gates live in
-  hyperpolymath/standards and are called at *one* standards commit
-  across every caller in this repo (pin skew across callers was a real
-  failure class here: five different standards SHAs, three of them
-  non-existent commits, which is why Governance/Hypatia/Scorecard were
-  `startup_failure` with zero jobs).
+  metadatastician/standards (transferred from hyperpolymath — Actions
+  does not follow owner transfers for reusable `uses:`, and the
+  lockfile's `owner_id` must name the *current* owner (297579217) or
+  GitHub's lockfile verification rejects the pin and refuses to load
+  every calling workflow; both failure modes were live here) and are
+  called at *one* standards commit across every caller in this repo
+  (pin skew across callers was a real failure class here: five
+  different standards SHAs, three of them non-existent commits, which
+  is why Governance/Hypatia/Scorecard were `startup_failure` with zero
+  jobs).
 . *The lockfile is load-bearing.* `.github/workflows/actions.lock`
   (gh actions-lock) + `scripts/check-lock-sync.sh` (3 clauses: locked,
   no orphans, transitively closed). Any `uses:` change without a lock

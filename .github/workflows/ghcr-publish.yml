@@ -53,7 +53,7 @@ jobs:
         run: |
           podman run -d --name verisim-smoke -p 8080:8080 \
             -e VERISIM_ENABLE_IPV4=true "$IMAGE:latest"
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8080/health >/dev/null && break
             sleep 2
           done
