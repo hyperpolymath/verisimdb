@@ -452,8 +452,10 @@ export VERISIM_RUST_CORE_URL=http://localhost:8080/api/v1
 ----
 
 HTTP is the default; `VERISIM_TRANSPORT=auto` also uses HTTP. An explicit
-`VERISIM_TRANSPORT=nif` request fails closed with `:nif_retired`. No native
-library is loaded, including an old `priv/native/libverisim_nif.so` artifact.
+`VERISIM_TRANSPORT=nif` request fails closed: retired bridge operations return
+`{:error, :nif_retired}`, while the health check reports
+`{:error, :nif_not_operational}`. No native library is loaded, including an old
+`priv/native/libverisim_nif.so` artifact.
 Remove that transport setting from existing deployments before upgrading.
 
 Keep database and network I/O host-side. Future SNIF compute work is a
