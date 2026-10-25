@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 name: OSSF Scorecard
 
@@ -18,8 +16,12 @@ permissions:
 
 jobs:
   scorecard:
-    uses: hyperpolymath/standards/.github/workflows/scorecard-reusable.yml@8750b94ac1bbe8c51ad13fe106669b13478f0b62
+    uses: hyperpolymath/standards/.github/workflows/scorecard-reusable.yml@8e48b1caade08a552646adeab66558ac43b4360d
+    # The reusable requires all four grants ON THE CALLING JOB: a job-level
+    # permissions block REPLACES the workflow-level one, and `actions: read`
+    # was missing here, which errors Scorecard's Packaging check.
     permissions:
+      actions: read
       contents: read
       security-events: write
       id-token: write

@@ -1,0 +1,77 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# Nightly deep lanes — the checks too slow for every PR, run on a schedule
+# so their signal exists *before* someone needs it:
+#   * full cargo-mutants on the core-invariant crates (TESTING.adoc: ≥80%
+#     mutation score target on drift/normalizer/spatial/provenance/
+#     semantic/octad; PRs get the in-diff lane in rust-ci.yml),
+#   * cargo-hack feature-powerset check (feature combinations that a
+#     default-features build never compiles are where bit-rot hides).
+# Mutants keeps its historical soft landing (report artifact, score in the
+# summary) because the baseline score is not yet established; once two
+# consecutive weekly runs agree, promote to a hard floor per docs/CI-CD.adoc.
+name: Nightly (mutants + feature powerset)
+
+on:
+  schedule:
+    - cron: '31 2 * * 0'  # Weekly, Sunday night
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mutants-full:
+    name: cargo-mutants (core invariant crates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2.87.29
+        with:
+          tool: cargo-mutants
+      - name: Run mutation tests
+        run: |
+          set -euo pipefail
+          cargo mutants \
+            -p verisim-drift -p verisim-normalizer -p verisim-spatial \
+            -p verisim-provenance -p verisim-semantic -p verisim-octad \
+            --no-shuffle --output mutants-out/ || true
+          if [ -f mutants-out/mutants.out/outcomes.json ]; then
+            jq -r '"mutants: \(.total_mutants) total, \(.caught) caught, \(.missed) missed, \(.timeout) timeout"' \
+              mutants-out/mutants.out/outcomes.json >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: mutants-report-full
+          path: mutants-out/
+
+  feature-powerset:
+    name: cargo-hack feature powerset
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2.87.29
+        with:
+          tool: cargo-hack
+      - name: Check every feature combination compiles
+        run: cargo hack check --workspace --feature-powerset --no-dev-deps

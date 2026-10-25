@@ -1,0 +1,160 @@
+# SPDX-License-Identifier: MPL-2.0
+# CodeRabbit configuration — until this file existed, reviews ran with no
+# repository configuration applied (observed on PR #318). Keep the estate
+# invariants below in `path_instructions` terse and factual: they are the
+# rules a reviewer (human or bot) most often needs and least often knows.
+# KYAML conversion is sequenced with the rest of the repo (scripts/ci/
+# kyaml-converted.txt); CodeRabbit parses any YAML dialect subset.
+language: en-GB
+tone_instructions: >-
+  Be precise and evidence-first. Flag claims that outrun their proof,
+  tests that cannot fail, and gates weakened to reach green. Never ask
+  for a threshold, coverage floor, or security check to be relaxed.
+early_access: false
+enable_free_tier: true
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  auto_title_placeholder: "@coderabbitai"
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  sequence_diagrams: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  suggested_reviewers: false
+  in_progress_fortune: false
+  abort_on_close: true
+  disable_cache: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    ignore_title_keywords: []
+    labels: []
+    drafts: false
+    base_branches: []
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+  pre_merge_checks:
+    docstrings:
+      mode: warning
+      threshold: 80
+    title:
+      mode: warning
+      requirements: >-
+        Conventional-commits style scope where it fits (feat/fix/ci/docs/
+        chore). The title must state what changes, not that CI now passes.
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+  tools:
+    shellcheck:
+      enabled: true
+    ruff:
+      enabled: false
+    markdownlint:
+      enabled: false
+    yamllint:
+      enabled: true
+    biome:
+      enabled: false
+    hadolint:
+      enabled: true
+    swiftlint:
+      enabled: false
+    phpstan:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    languagetool:
+      enabled: true
+    actionlint:
+      enabled: true
+  path_filters:
+    - "!Cargo.lock"
+    - "!elixir-orchestration/mix.lock"
+    - "!.verisimdb/**"
+    - "!**/*.snap"
+    - "!.github/workflows/actions.lock"
+  path_instructions:
+    - path: ".github/workflows/**"
+      instructions: >-
+        Estate CI rules: (1) no ${{ }} expansion inside run: bodies — pass
+        context through env:. (2) actions/checkout must set
+        persist-credentials: false unless the job pushes. (3) Any new or
+        changed uses: ref must be added to .github/workflows/actions.lock
+        under that workflow's own path in the same PR, or GitHub refuses
+        the run at startup. (4) hyperpolymath/standards and panic-attack
+        reusable pins are full SHAs, bumped deliberately and in lockstep
+        across callers. (5) Never propose secrets: inherit, secrets are
+        passed explicitly. (6) A required check must report on every PR:
+        prefer job-level pass-through (scripts/ci/detect-changes.sh) over
+        paths: filters. (7) Squabble is not bypass: never suggest removing
+        a check, continue-on-error, or admin merge to reach green.
+    - path: "rust-core/**"
+      instructions: >-
+        Rust core: no unwrap/expect in library paths without a recorded
+        invariant; clippy -D warnings and rustfmt are hard gates; public
+        functions need a doctest or a test. Cargo.lock changes need
+        cargo audit + cargo deny to stay green; do not propose adding a
+        deny.toml ignore without an advisory reference and expiry reason.
+    - path: "elixir-orchestration/**"
+      instructions: >-
+        Elixir: mix format + compile --warnings-as-errors are gates.
+        Ports/subprocess code must be bounded (timeout, output cap) and
+        fail closed; Port.close can raise on an already-closed port —
+        check cleanup paths tolerate that and drain the mailbox.
+    - path: "verification/**"
+      instructions: >-
+        Provenance tiers are evidence claims (actually-proven requires a
+        named proof artefact). Any new test/bench file anywhere in the
+        repo must be registered in verification/test-registry.json in the
+        same PR or scripts/ci/test-evidence.sh fails.
+    - path: "**/*.json"
+      instructions: >-
+        JSON is I-JSON (RFC 7493) + JCS (RFC 8785) canonical via
+        hyperpolymath/ijson-jcs. Files in scripts/ci/ijson-converted.txt
+        are blocking; propose `ijson-jcs fix <file>`, never hand-format.
+    - path: "**/*.{yml,yaml}"
+      instructions: >-
+        YAML migrates to KYAML (standards YAML-POLICY Y-3). Files in
+        scripts/ci/kyaml-converted.txt must stay canonical KYAML;
+        propose `bash scripts/ci/kyaml-format.sh <file>`.
+    - path: "scripts/**"
+      instructions: >-
+        Shell must be shellcheck-clean, validate untrusted input, and use
+        no secrets beyond ${VAR:-} env defaults. Vendored scripts under
+        scripts/ci/ are fixed upstream in hyperpolymath/standards first.
+chat:
+  auto_reply: true
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  jira:
+    usage: auto
+  linear:
+    usage: auto
+  pull_requests:
+    scope: auto
+code_generation:
+  docstrings:
+    language: en-GB
+    path_instructions: []
+  unit_tests:
+    path_instructions:
+      - path: "**"
+        instructions: >-
+          Generated tests must be able to fail: assert on behaviour, not
+          on the mock; register new test files in
+          verification/test-registry.json with an honest tier.

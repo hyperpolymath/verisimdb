@@ -1,0 +1,47 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# K9 + DEED conformance — thin callers of the standards reusables
+# (standards#837 DEED lane, standards#1058 / ruling D173 K9 lane). The
+# validators run at THIS call's pinned standards commit, so the grammar
+# enforced here is exactly the reviewed one; bump the pin deliberately in
+# lockstep with the other standards callers.
+#
+# No path filters: conformance must REPORT on every PR (a path-filtered
+# required check deadlocks PRs that miss the filter). The reusables are
+# cheap when nothing relevant changed, and require-files makes a
+# zero-file run a failure rather than a vacuous pass — this repo has both
+# .k9.ncl contracts (.machine_readable/, connectors/) and a repo deed
+# (verisimdb_chora.deed), so zero files would mean the scan lost the tree.
+name: K9 + DEED conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  k9:
+    name: K9 conformance
+    uses: hyperpolymath/standards/.github/workflows/k9-conformance.yml@8e48b1caade08a552646adeab66558ac43b4360d
+    permissions:
+      contents: read
+      pull-requests: read
+    with:
+      require-files: true
+      grid-author: github-actions[bot]
+
+  deed:
+    name: DEED conformance
+    uses: hyperpolymath/standards/.github/workflows/deed-conformance.yml@8e48b1caade08a552646adeab66558ac43b4360d
+    permissions:
+      contents: read
+    with:
+      require-files: true

@@ -1,0 +1,132 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# Deep Recon — pons-asinorum (structural/dataflow/protocol) + panic-attack
+# (security/resilience) scanning this repo, on PRs and weekly.
+#
+# Division of labour (pons ADR-0004): pons finds dead work,
+# self-contradiction, unsafe value flows and broken operation-order
+# contracts; panic-attack's assail finds security/resilience bug signatures.
+# Hypatia (hypatia-scan.yml) remains the estate governance layer above both.
+#
+# Gating honesty: pons gates at --fail-on error (its non-speculative error
+# tier); a zero-file scan exits 2 and fails. panic-attack gates via the
+# same severity-threshold mechanism its reusable uses, at critical for this
+# direct lane (findings at high and below are reported in the artifact and
+# triaged through audits/assail-classifications.a2ml — ratcheting to `high`
+# is sequenced in docs/CI-CD.adoc once the baseline is classification-clean).
+# Both tools are built from pinned commits: bump deliberately.
+name: Deep Recon (pons-asinorum + panic-attack)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 4 * * 2'  # Weekly, Tuesday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PONS_REF: 51b8920f541782ceb9465ea3f0d33c96104fc1fb
+  PANIC_ATTACK_REF: b5530834a839734d1d181bfe6edb0d43d4233cf4
+
+jobs:
+  pons:
+    name: pons-asinorum scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write  # SARIF upload to code scanning
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+      - name: Cache pons build
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            /tmp/pons/target
+          key: pons-${{ env.PONS_REF }}-${{ runner.os }}
+      - name: Build pons at the pinned commit
+        env:
+          REF: ${{ env.PONS_REF }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/hyperpolymath/pons-asinorum /tmp/pons
+          git -C /tmp/pons fetch -q --depth 1 origin "$REF"
+          git -C /tmp/pons checkout -q "$REF"
+          cargo build --release --locked --manifest-path /tmp/pons/Cargo.toml -p pons-cli
+      - name: Scan (SARIF)
+        run: |
+          set -euo pipefail
+          /tmp/pons/target/release/pons scan . --format sarif --no-speculative > pons.sarif
+          /tmp/pons/target/release/pons scan . --format json --no-speculative > pons.json
+      - name: Gate (non-speculative errors fail; zero-file scans exit 2)
+        run: /tmp/pons/target/release/pons scan . --fail-on error --no-speculative
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.38.0 (4.38.1 blocked estate-wide; nexia-list#100)
+        with:
+          sarif_file: pons.sarif
+          category: pons-asinorum
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: pons-report
+          path: |
+            pons.sarif
+            pons.json
+
+  panic-attack:
+    name: panic-attack assail
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+      - name: Cache panic-attack build
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            /tmp/pa/target
+          key: panic-attack-${{ env.PANIC_ATTACK_REF }}-${{ runner.os }}
+      - name: Build panic-attack at the pinned commit
+        env:
+          REF: ${{ env.PANIC_ATTACK_REF }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/hyperpolymath/panic-attack /tmp/pa
+          git -C /tmp/pa fetch -q --depth 1 origin "$REF"
+          git -C /tmp/pa checkout -q "$REF"
+          cargo build --release --locked --features http --manifest-path /tmp/pa/Cargo.toml
+          echo "/tmp/pa/target/release" >> "$GITHUB_PATH"
+      - name: Assail
+        run: panic-attack assail . --output assail.json
+      - name: Gate on critical findings (classifications honoured upstream)
+        run: |
+          set -euo pipefail
+          critical=$(jq '[.findings[]? | select(.severity == "critical" or .severity == "Critical")] | length' assail.json)
+          echo "critical findings: $critical (full report in the assail-report artifact)"
+          jq -r '.findings[]? | select(.severity == "critical" or .severity == "Critical") | "  - \(.id // .rule // "?"): \(.message // .description // "")"' assail.json || true
+          [ "$critical" -eq 0 ]
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: assail-report
+          path: assail.json

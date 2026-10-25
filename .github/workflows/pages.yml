@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 name: GitHub Pages (Ddraig SSG)
 on:
@@ -19,14 +17,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write  # upload-pages-artifact publishes the Pages artifact
     container:
       image: ghcr.io/stefan-hoeck/idris2-pack@sha256:f0758996a931fb35d9ecb1de273c4d59dabe2a09b433afc7e357f65a08b7e1ff
     steps:
       - name: Checkout Site
         uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: Checkout Ddraig SSG
         uses: actions/checkout@v7.0.1
         with:
+          persist-credentials: false
           repository: hyperpolymath/ddraig-ssg
           path: .ddraig-ssg
       - name: Compile Ddraig
@@ -46,6 +50,9 @@ jobs:
         with:
           path: '_site'
   deploy:
+    permissions:
+      pages: write
+      id-token: write  # deploy-pages mints its OIDC token here, not in build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
