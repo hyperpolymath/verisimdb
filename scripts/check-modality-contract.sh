@@ -24,7 +24,13 @@ annotation() {
     }
     END { if (count != 1) exit 2 }
   ' "$root/$doc") || fail "$doc: missing or duplicate modality-contract: $1"
-  jq -cn --arg value "$value" '$value | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)) | unique'
+  jq -cn --arg value "$value" '
+    def trim: gsub("^\\s+|\\s+$"; "");
+    $value | split(",")
+    | if length != (map(trim) | unique | length)
+      then error("duplicate annotation entry")
+      else map(trim) | map(select(length > 0)) | unique
+      end'
 }
 fields() {
   local value

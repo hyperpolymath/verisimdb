@@ -16,7 +16,8 @@ cargo run --manifest-path "$scratch/Cargo.toml" -p verisim-document --example in
 if [[ "${BASELINE_CONTROL:-0}" == 1 ]]; then
   # Same assertion on the old release distinguishes an existing identity bug
   # from an upgrade regression. A failure deliberately propagates to the caller.
-  cargo run --manifest-path "$scratch/Cargo.toml" -p verisim-document --example index_upgrade_probe --locked -- read "$scratch/index"
+  cp -a "$scratch/index" "$scratch/control-index"
+  cargo run --manifest-path "$scratch/Cargo.toml" -p verisim-document --example index_upgrade_probe --locked -- read "$scratch/control-index"
 fi
 cargo run --manifest-path "$root/Cargo.toml" -p verisim-document --example index_upgrade_probe --locked -- read "$scratch/index"
 echo 'PASS: Tantivy 0.26.1 stored id/title/body and search are readable and deletable after upgrade'

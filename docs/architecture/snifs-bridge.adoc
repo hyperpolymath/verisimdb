@@ -245,9 +245,10 @@ VERISIM_TRANSPORT=auto   # HTTP
 A SNIF would accelerate selected pure computation alongside HTTP, not replace
 database I/O transport. There is no implemented `snif` transport setting.
 The four kernels above are candidates, not an admitted v0 surface. Begin with
-bounded drift scoring only if end-to-end measurements show benefit after host
-dispatch, serialisation, buffer copies and sandbox cost. Upstream Fibonacci
-numbers are not VeriSimDB benchmark evidence.
+a bounded drift scoring spike to establish the end-to-end measurement gate.
+Admit the kernel only if measurements show benefit over host execution after
+dispatch, serialisation, buffer copies, sandbox cost and guest-trap handling.
+Upstream Fibonacci numbers are not VeriSimDB benchmark evidence.
 
 Any admitted native interface needs a versioned normative Idris2 ABI and pure
 Zig FFI, including lengths, alignment, ownership, cancellation and error tests.
@@ -271,11 +272,11 @@ contact with SNIFs' scope
 below
 
 |2
-|Spike: bounded drift scoring end-to-end, subject to the measurement gate above
+|Spike: bounded drift scoring end-to-end to establish the measurement gate above
 |1–2 days
-|Success requires measured end-to-end benefit over host execution, including
-dispatch, serialisation, buffer copies and sandbox cost, plus a caller that
-survives a deliberately trapping guest
+|Kernel admission requires measured end-to-end benefit over host execution,
+including dispatch, serialisation, buffer copies, sandbox cost and guest-trap
+handling, plus a caller that survives a deliberately trapping guest
 
 |3
 |Define the marshalling codec for the four v0 kernels
