@@ -1,14 +1,14 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 name: ClusterFuzzLite PR fuzzing
 on:
   pull_request:
     branches: [main]
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  actions: read
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +16,12 @@ concurrency:
 
 jobs:
   pr-fuzzing:
+    # security-events: ClusterFuzzLite uploads crash findings as SARIF
+    # when configured; granted at job level, never workflow level.
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:

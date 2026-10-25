@@ -1,0 +1,63 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# I-JSON + JCS conformance (estate JSON policy D306): every .json/.jsonl is
+# I-JSON (RFC 7493) valid and JCS (RFC 8785) canonical. The estate tool is
+# hyperpolymath/ijson-jcs — never hand-format JSON (`ijson-jcs fix <file>`).
+#
+# Two lanes, per the standards adoption pattern:
+#   * report-only: the whole repo is scanned and measured; never fails.
+#     (.verisimdb/ octad snapshots are generated data: they appear in the
+#     report so their drift is visible, but the fix belongs to the
+#     generator, not to a formatting commit — see docs/CI-CD.adoc.)
+#   * blocking: files in scripts/ci/ijson-converted.txt must stay canonical.
+name: ijson-jcs conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IJSON_JCS_REF: 2c880594c8b1f823a7ab2a8a830c894975a1792e
+
+jobs:
+  ijson-jcs:
+    name: Report non-canonical JSON (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install ijson-jcs at the pinned commit
+        env:
+          REF: ${{ env.IJSON_JCS_REF }}
+        run: cargo install --git https://github.com/hyperpolymath/ijson-jcs --rev "$REF" --locked ijson-jcs
+      - name: Repo-wide scan (report-only)
+        run: bash scripts/ci/check-ijson-jcs.sh .
+
+  converted-stay-canonical:
+    name: Converted JSON stays canonical
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install ijson-jcs at the pinned commit
+        env:
+          REF: ${{ env.IJSON_JCS_REF }}
+        run: cargo install --git https://github.com/hyperpolymath/ijson-jcs --rev "$REF" --locked ijson-jcs
+      - name: Enforce the converted list
+        run: |
+          set -euo pipefail
+          mapfile -t FILES < <(grep -v '^[[:space:]]*\(#\|$\)' scripts/ci/ijson-converted.txt)
+          bash scripts/ci/check-ijson-jcs.sh --enforce "${FILES[@]}"

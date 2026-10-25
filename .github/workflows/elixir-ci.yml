@@ -1,7 +1,5 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 # Elixir CI for the orchestration layer: compile, format check, test, audit.
 name: elixir-ci
 
@@ -46,24 +44,17 @@ jobs:
             otp: "27"
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: Detect relevant changes
         id: detect
         working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          PATTERN='^elixir-orchestration/'
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
-            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
-              echo "relevant=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
-            fi
-          else
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-          fi
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: bash scripts/ci/detect-changes.sh '^elixir-orchestration/'
       - if: steps.detect.outputs.relevant == 'true'
         uses: erlef/setup-beam@v1.24.1
         with:
@@ -98,24 +89,17 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: Detect relevant changes
         id: detect
         working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          PATTERN='^elixir-orchestration/'
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
-            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
-              echo "relevant=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
-            fi
-          else
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-          fi
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: bash scripts/ci/detect-changes.sh '^elixir-orchestration/'
       - if: steps.detect.outputs.relevant == 'true'
         uses: erlef/setup-beam@v1.24.1
         with:
@@ -142,24 +126,17 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: Detect relevant changes
         id: detect
         working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          PATTERN='^elixir-orchestration/'
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
-            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
-              echo "relevant=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
-            fi
-          else
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-          fi
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: bash scripts/ci/detect-changes.sh '^elixir-orchestration/'
       - if: steps.detect.outputs.relevant == 'true'
         uses: erlef/setup-beam@v1.24.1
         with:
@@ -191,24 +168,17 @@ jobs:
         working-directory: elixir-orchestration
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: Detect relevant changes
         id: detect
         working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          PATTERN='^elixir-orchestration/'
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
-            if printf '%s\n' "$FILES" | grep -qE "$PATTERN"; then
-              echo "relevant=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "relevant=false" >> "$GITHUB_OUTPUT"; echo "No elixir-orchestration changes — pass-through (required-check shim)."
-            fi
-          else
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-          fi
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: bash scripts/ci/detect-changes.sh '^elixir-orchestration/'
       - if: steps.detect.outputs.relevant == 'true'
         uses: erlef/setup-beam@v1.24.1
         with:

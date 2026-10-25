@@ -1,0 +1,332 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+= Upstream prompts — changes other repos need (from the 2026-10-25 verisimdb CI overhaul)
+:toc: left
+
+____
+Each prompt is self-contained and copy-paste ready for a session in that
+repo. They are ordered by how much of verisimdb's (and the estate's) CI
+they unblock. Nothing here asks an upstream to weaken a gate.
+____
+
+== P-STD-1 — hyperpolymath/standards: dead pins + owner allowlist + UUID governance
+
+....
+Foundational CI fix in standards, evidence from verisimdb (2026-10-25):
+
+1. OWNER TRANSFER fallout (measured 2026-10-25 on verisimdb PR #319):
+   hyperpolymath/standards was transferred to metadatastician/standards
+   (same repo id 1116521501, owner_id 6759885 -> 297579217). Three
+   independent breakages follow for EVERY estate caller:
+   (a) Actions does not follow transfers for reusable `uses:` — callers
+   must name metadatastician/standards. (b) The actions.lock records
+   every caller holds name owner_id 6759885; GitHub lockfile
+   verification compares owner ids and rejects the pin ("invalid
+   lockfile pin"), refusing to load the calling workflow at all —
+   zero jobs, no annotation. (c) Three older pinned SHAs
+   (8f31a5a4…, cc58c0cb…, 8750b94a…) return 422 in BOTH owners, i.e.
+   history was rewritten as well as transferred. And (d) once a caller
+   does migrate, your own Allowlist Preflight rejects it:
+   allowed-actions.json has no metadatastician/* pattern (8 GAP lines
+   on verisimdb). A caller is currently dead if it migrates and dead
+   if it doesn't. Please: add metadatastician patterns to the
+   allowlist; canonicalise the `repository: hyperpolymath/standards`
+   internal checkouts inside governance-reusable.yml (they work only
+   via git redirect); publish a machine-readable "current vetted
+   standards SHA + canonical owner"; add a standards-side CI check
+   that samples estate caller pins and fails when a pinned commit or
+   owner stops resolving; and write the transfer ADR so the next
+   transfer is a playbook, not an outage.
+
+2. GOVERNANCE ALLOWLIST vs TRANSFERRED OWNER (from verisimdb PR #318):
+   governance-reusable's language/owner allowlist rejects the
+   transferred `metadatastician/standards` owner. Ratify which owner(s)
+   are canonical post-transfer and make the allowlist data, not prose,
+   with the transfer recorded.
+
+3. UUID-v8 JOBS: two governance jobs reject existing non-v8
+   identifiers estate-wide (e.g. verisimdb OctadId is UUIDv4 by design
+   today). Ship the ratified migration story as a standards ADR +
+   reusable input (report-only mode with an expiry), or every consumer
+   stays red-or-exempt forever.
+
+Acceptance: a canary caller (verisimdb) pinned to the published vetted
+SHA goes green on governance + hypatia lanes with no exemptions; the
+pin-resolvability check exists and is itself gated in standards CI.
+....
+
+== P-STD-2 — hyperpolymath/standards: reusable KYAML + I-JSON/JCS lanes
+
+....
+verisimdb now vendors scripts/check-ijson-jcs.sh and
+scripts/kyaml-format.sh verbatim (as scripts/ci/check-ijson-jcs.sh
+and scripts/ci/kyaml-format.sh, with provenance headers) because
+standards offers them only as scripts, so every consumer copies —
+exactly the drift class the estate keeps measuring. Please ship
+`ijson-jcs-reusable.yml` and `kyaml-reusable.yml` workflow_call lanes
+in the deed/k9 style: validator at the caller's pinned standards
+commit (job.workflow_sha), inputs for converted-list path, report-only
+toggle, and the ijson-jcs tool pin. Then verisimdb (and every other
+copier) deletes its vendored copies and becomes a thin caller.
+
+Also: `.github/workflows/ijson-jcs.yml` inside standards hard-codes
+one converted file (.hypatia-baseline.json). Generalise to a
+converted-list file like verisimdb's scripts/ci/ijson-converted.txt
+so the pattern is copyable without editing workflow YAML. And two
+vendored-script nits found by review: kyaml-format.sh's drift message
+hardcodes `scripts/kyaml-format.sh` — vendored copies live elsewhere
+(here: scripts/ci/), so the repair command it prints cannot run there;
+print $0. kyaml-format.sh uses jq but only preflights yq, and
+check-ijson-jcs.sh uses jq + python3 but preflights neither; add
+command -v preflight for every tool so a missing binary is exit 2
+("could not look"), not a confusing mid-run failure.
+
+Acceptance: verisimdb can replace .github/workflows/ijson-jcs.yml +
+scripts/ci/check-*.sh with two thin callers and stay green, including
+the exit-2 "gate could not look" behaviour.
+....
+
+== P-SQUAB — hyperpolymath/cicd-squabbler: consumable fight lane + fresher release
+
+....
+verisimdb consumes `squabble chains` via
+.github/actions/squabble@14f853f… — the attested-binary composite is
+excellent. Gaps hit while adopting:
+
+1. The composite installs release v0.1.0 (source b854d17…) while main
+   is months ahead (chains --follow, #100 rulesets+classic protection,
+   #15 actions-policy attribution). Please cut v0.1.1 (or document the
+   release cadence) so consumers get the #15/#100 classification, and
+   bump SQUABBLE_TAG/SHA256/SOURCE_DIGEST in install.sh on main.
+2. Ship a `squabble-fight` reusable workflow (propose-mode only,
+   artifacts: the fight report JSON + a PR comment/check summary), so
+   estate repos get per-PR red classification (self-win | escalate |
+   assign-owner) without each hand-rolling gh plumbing. Apply-mode
+   stays out of the reusable until the other self-wins land.
+3. `chains` JSON: add a stable schema version field + SARIF-ish/JSON
+   summary that Hypatia could ingest (dead upstream = a finding with
+   an owner, not just a log line).
+
+Acceptance: verisimdb bumps the composite pin and gains #100/#15
+attribution; a fight-propose reusable exists and dogfoods on
+cicd-squabbler itself.
+....
+
+== P-PTB — hyperpolymath/proven-tests-and-benches: consumer template + action
+
+....
+verisimdb is now a framework consumer (verification/proven-tests/,
+an .ipkg depending on proven-tests, Idris2 installed via your
+scripts/install-idris2.sh, Chez-versioned cache key copied from your
+ci.yml). Adoption took reverse-engineering TypeSafeTests. Please:
+
+1. Ship `docs/CONSUMING.adoc` + a minimal `examples/consumer/` .ipkg
+   (one provisionally-proven suite, Main.idr with the exit-code idiom)
+   that builds against an installed proven-tests from a *different*
+   directory — your own suites build in-tree, which hides the
+   installed-package path a consumer actually takes. Gate it in CI
+   in a temp dir so it cannot rot in-tree.
+2. Ship a composite action (attested-install style like
+   cicd-squabbler's) or a reusable workflow for "install Idris2 +
+   framework at pin, build and run a consumer ipkg", with the Chez
+   cache key handled inside, so consumers stop copying ci.yml stanzas.
+3. The legacy constructors (provisionalTest etc.) carry FixtureDebt
+   "B2-LEGACY-SUITE" — consumers following TypeSafeTests inherit that
+   debt label. Provide a non-legacy consumer constructor that takes a
+   FixtureObligation, or document that consumers should classify
+   directly; today the worked examples teach the debt path.
+4. Ratify or retire the 17th category (TypeSafeTest vs the estate's
+   16, DEBT S-4): verisimdb's evidence registry uses its own category
+   vocabulary partly because the standard one is ambiguous here.
+
+Acceptance: a fresh repo can adopt the framework from CONSUMING.adoc
+alone, in under an hour, without reading TypeSafeTests.
+....
+
+== P-PONS — hyperpolymath/pons-asinorum: releases + a consumable scan lane
+
+....
+verisimdb builds pons from source at a pinned commit in CI
+(pons scan --format sarif, --fail-on error). It works but every
+consumer pays a full workspace build. Please:
+
+1. Cut versioned releases with attested binaries (the
+   cicd-squabbler release.yml pattern: sha256 + build provenance),
+   at least x86_64-linux-musl, so consumers install instead of build.
+2. Ship a composite action or reusable workflow: inputs path,
+   fail-on, no-speculative, config; steps build/install, scan JSON +
+   SARIF, upload-sarif, artifacts. Dogfood it on pons itself.
+3. Consider a `--output <file>` flag: today SARIF/JSON go to stdout,
+   which forces `>` redirection and makes "scan could not run" vs
+   "empty report" one shell mistake apart. (Exit 2 on zero files is
+   good — keep it, and document the full exit-code table in the man
+   page/README top section.)
+4. Publish the baseline/suppression story for large polyglot repos
+   (verisimdb: Rust+Elixir+Idris+shell): pons.toml examples per
+   language with required-language coverage, so first adoption on a
+   big tree is triageable rather than a findings flood.
+
+Acceptance: verisimdb's deep-recon pons job drops its cargo build,
+keeps identical gating, and runs in <5 min warm.
+....
+
+== P-PANIC — hyperpolymath/panic-attack: scan-and-report hardening
+
+....
+verisimdb pins scan-and-report.yml@b553083… and also runs assail
+directly. Issues in the reusable itself (estate blast radius):
+
+1. `panic-attack assail ${{ inputs.repo_path }} --output ...` puts a
+   workflow_call input inside a run: body (template injection shape,
+   and contrary to the estate env:-only rule your own bridge-gate
+   exemplar documents). Move it to env:.
+2. `cargo install --git … --branch main` inside the reusable means the
+   scanner binary is *unpinned* even when the caller pins the workflow
+   to a SHA — the caller's pin reviews the YAML, not the tool. Install
+   at the reusable's own commit (job.workflow_sha) with --locked.
+3. Releases are stale (v1.0.1, 2026-02) while main moves weekly;
+   either cadence releases or document "pin by commit" as the
+   supported consumption (verisimdb does the latter everywhere).
+4. The dependabot bump PR against verisimdb (#312, 8c2f198→6933654)
+   was superseded by a manual bump to b553083 in a full CI overhaul —
+   a CHANGELOG "reusable contract" section (inputs/secrets/exit
+   semantics per commit range) would let dependabot PRs be assessed
+   without diffing the workflow.
+
+Acceptance: scan-and-report at a new pin installs panic-attack at that
+same commit, no ${{ }} in run:, and verisimdb re-pins cleanly.
+....
+
+== P-IJSON — hyperpolymath/ijson-jcs: releases + standards tracking
+
+....
+Your README is admirably honest: the standards-tracking mechanism
+"is not yet installed here", kyq is not yet an operational gate, and
+there are no releases (consumers cargo-install at a rev — verisimdb
+pins 2c88059…). Priorities from a consumer:
+
+1. Cut v0.1.0 with attested binaries (or at least crates.io + a
+   tagged rev consumers can pin by name). `cargo install --git --rev`
+   in every consumer CI is minutes per run, estate-wide.
+2. Install the standards-tracking loop your README describes: a
+   scheduled workflow that polls metadatastician/standards
+   JSON-POLICY fixtures, opens a tested update PR against lib+CLI
+   tests, and records the tracked standards SHA in-repo (machine
+   readable), so "which policy does this binary enforce" is a lookup.
+3. A `--version` that prints the tracked standards SHA + RFC fixture
+   suite version would let consumer CIs assert policy identity, not
+   just binary identity.
+
+Acceptance: verisimdb installs a released binary in seconds and can
+assert `ijson-jcs` policy provenance in its CI summary.
+....
+
+== P-KYQ — metadatastician/kyq (+ KYAML in standards): the gate interface
+
+....
+Estate policy says kyq is "the intended repository gate interface"
+for TOML/Dhall/KYAML/I-JSON-JCS, and also that kyq does not yet
+compile on AffineScript 0.1.1. Until it lands, consumers (verisimdb
+included) wire yq + ijson-jcs directly — fine, but the interface
+should stabilise *before* the implementation swaps:
+
+1. Publish the kyq gate CLI contract (subcommands, exit codes,
+   JSON verdict schema) as a standards doc, with the current
+   yq/ijson-jcs shell implementations as the reference backend, so
+   repos can code to the contract now and swap binaries later.
+2. KYAML in workflows (standards Y-3 step 6): verisimdb's
+   elixir-ci.yml and ghcr-publish.yml are good torture tests (long
+   run: bodies, heredocs, ${{ }} braces vs KYAML flow braces). Add
+   them (or equivalents) to the yaml-comment-proof corpus — if the
+   proof covers those, step 6 is mechanical estate-wide.
+
+Acceptance: a written kyq contract + corpus entries for workflow-
+shaped YAML; verisimdb's check-kyaml.sh becomes a contract caller.
+....
+
+== P-HYP — hyperpolymath/hypatia: baseline ergonomics for consumers
+
+....
+verisimdb has .hypatia-ignore but no .hypatia-baseline.json, so
+hypatia-scan's block-on-high and governance's baseline-strict cannot
+ratchet on. Please ship: (1) a `hypatia baseline init` that writes a
+fully-dated baseline from a current scan (every entry expires_at =
+today + owner-chosen TTL, so strict mode is adoptable day one), and
+(2) ingest for pons SARIF + squabble chains JSON so structural and
+CI-graph findings join the same confidence-gated queue as assail
+findings instead of living in separate artifacts.
+
+Acceptance: verisimdb runs baseline init, commits the result, flips
+baseline-strict + block-on-high in one PR.
+....
+
+== P-318 — verisimdb PR #318 (codex/game-estate-baseline): disposition of review + blockers
+
+....
+Continue PR #318 on its own branch; do not merge until its own
+acceptance criteria are met (it correctly says so). Work items:
+
+CodeRabbit (5 comments; 1 fixed by the CI-overhaul PR — rebase and
+drop it):
+1. [FIXED UPSTREAM in CI overhaul] secret-scanner.yml inheritance:
+   the overhaul re-pins to a standards reusable needing no inherit.
+2. vclt_gate.ex collect/4: tolerate Port.close raising ArgumentError
+   on an already-closed port; drain queued port messages; preserve
+   the gate result.
+3. vclt_gate_test.exs ~175: remove /proc dependence (portable file
+   checks; PID liveness assert) while keeping the :admit expectation
+   and the must-fail-if-alive property.
+4. game-estate-readiness.adoc ~188: make the durable idempotency key
+   an explicit required field of the versioned boundary (or define
+   source-identity+revision AS the key), stored atomically with the
+   coherent publication record.
+5. snifs-bridge.adoc ~247: reconcile Step 2/Step 4 ordering with the
+   narrative sequence (bounded drift scoring first).
+
+Blocking reproducer (preserve, then fix properly):
+- tantivy document identity: IDs are tokenised TEXT but deletion uses
+  an exact term, so deleted docs stay searchable (fails on 0.26.1 and
+  0.27.0). Fix with an exact-identity field + existing-index
+  migration + update-uniqueness + restart tests. Also: persistent
+  open drops Document fields/metadata — cover with a reopen test.
+  Register new tests in verification/test-registry.json (CI gate).
+
+Governance blockers needing owner decisions (see P-STD-1): the
+metadatastician owner allowlist rejection and non-v8 UUID jobs —
+do not paper over with exemptions or cosmetic UUID churn; OctadId
+migration is its own ADR. Exqlite native dependency: decide the
+SNIF-only claim scope for the BEAM graph explicitly.
+
+Rebase note: the CI overhaul changed actions.lock, all standards
+pins, elixir-ci detect blocks (now scripts/ci/detect-changes.sh),
+and rust-ci (coverage tool + two jobs). Rebase early; regenerate
+actions.lock rather than hand-merging it.
+....
+
+
+== P-K9 — hyperpolymath/k9-ecosystem + standards 1-formats/k9: the missing Nickel libs
+
+....
+verisimdb adopted the k9-conformance lane and repaired its corpus the
+way standards' own MIGRATION-1058 did (K9! sentinels, resolving
+imports via ../_base.ncl pedigree_schema, capability grants, claimed
+signature blocks, templates renamed *.k9.ncl.in). One file cannot be
+repaired locally: connectors/test-infra/deploy.k9.ncl imports
+"../../standards/self-validating/pedigree.ncl" and ".../leash.ncl" —
+that layout exists in no current repo (checked standards svc/k9 and
+k9-ecosystem at HEAD; k9-ecosystem's own examples/deploy.k9.ncl has
+the same relative-import shape). It sits in verisimdb's
+k9-contract-debt.txt (count: 1) awaiting a decision:
+
+1. Give pedigree.ncl/leash.ncl a canonical, versioned home
+   (k9-ecosystem root? standards 1-formats/k9/lib/?) and a vendoring
+   story for consumers (copy at a pin, like the contractiles corpus),
+   OR declare the let-import form legacy in K9-CONTRACT-SPEC and show
+   the self-contained pedigree component form as the migration.
+2. Publish the template convention (*.k9.ncl.in) in the spec/README
+   so the next repo does not rediscover it from standards' debt
+   ledger header.
+
+Acceptance: verisimdb fixes deploy.k9.ncl's imports against the
+canonical libs, adds the K9! envelope, and empties its debt ledger.
+....

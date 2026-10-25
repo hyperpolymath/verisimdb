@@ -1,0 +1,260 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+= VeriSimDB CI/CD — architecture, gates, and ratchets
+:toc: left
+:toclevels: 3
+
+____
+Last foundational overhaul: 2026-10-25. This document is the map; the
+workflows are the territory. Where they disagree, the workflow wins and
+this file is the bug.
+____
+
+== Principles
+
+. *Squabble ≠ bypass* (hyperpolymath/cicd-squabbler): green means a
+  required check actually ran and passed. Nobody — human, bot, or this
+  document — reaches green by deleting a check, renaming it away,
+  adding `continue-on-error`, or admin-merging past it.
+. *Thin callers, pinned reusables.* Estate gates live in
+  metadatastician/standards (transferred from hyperpolymath — Actions
+  does not follow owner transfers for reusable `uses:`, and the
+  lockfile's `owner_id` must name the *current* owner (297579217) or
+  GitHub's lockfile verification rejects the pin and refuses to load
+  every calling workflow; both failure modes were live here) and are
+  called at *one* standards commit across every caller in this repo
+  (pin skew across callers was a real failure class here: five
+  different standards SHAs, three of them non-existent commits, which
+  is why Governance/Hypatia/Scorecard were `startup_failure` with zero
+  jobs).
+. *The lockfile is load-bearing.* `.github/workflows/actions.lock`
+  (gh actions-lock) + `scripts/check-lock-sync.sh` (3 clauses: locked,
+  no orphans, transitively closed). Any `uses:` change without a lock
+  update in the same commit can silence the whole repo's CI.
+. *No `${{ }}` in `run:` bodies.* Context goes through `env:`.
+  `actions/checkout` sets `persist-credentials: false` unless the job
+  pushes. Permissions are least-privilege per job; secrets are passed
+  explicitly, never `secrets: inherit`.
+. *Required checks must always report.* Path-filtered required checks
+  deadlock PRs; use `scripts/ci/detect-changes.sh` pass-throughs.
+. *A gate that cannot look must not pass.* Missing tool = exit 2,
+  never a silent green (see the vendored standards checkers).
+. *Evidence is derived, not declared* (proven-tests-and-benches):
+  `verification/test-registry.json` grades every test/bench/fuzz/proof
+  file into tiers, and `scripts/ci/test-evidence.sh` fails when the
+  registry and the tree disagree.
+
+== Lane map
+
+[width="100%",cols="22%,28%,18%,32%",options="header"]
+|===
+|Workflow |What it gates |Trigger |Notes
+
+|rust-ci.yml
+|fmt, clippy -D warnings, cargo test, doc, audit, deny, bench compile,
+ llvm-cov ≥60%, fuzz compile, test-evidence, mutants (in-diff, PR)
+|push/PR
+|Coverage installs `cargo-llvm-cov` explicitly (it previously installed
+ nothing — the job could not pass). Full mutants live in nightly.yml.
+
+|elixir-ci.yml
+|format, compile --warnings-as-errors, mix test, coveralls ≥60%,
+ benchee script parse, hex.audit
+|push/PR (pass-through)
+|Change detection is one shared script, called 4×, not 4 copies.
+
+|build-validation.yml
+|Fast cargo check + mix compile smoke
+|push/PR
+|Kept deliberately: it is a long-standing reported check name; the deep
+ lanes are rust-ci/elixir-ci.
+
+|ci-meta.yml
+|*The CI auditing itself*: zizmor, actionlint, `squabble chains`
+ (cross-repo CI graph; cycles/dead upstreams block), KYAML
+|PR/push on CI paths + weekly
+|Baseline at adoption: zizmor 84 findings → 0 under `.zizmor.yml`
+ (ref-pin policy: pinning is the lockfile's job; branch pins banned).
+
+|deep-recon.yml
+|pons-asinorum scan (SARIF→code scanning, `--fail-on error`) +
+ panic-attack `assail` (critical gates)
+|PR/push + weekly
+|Tools built from pinned commits. Findings triage:
+ `audits/assail-classifications.a2ml`.
+
+|proven-tests.yml
+|Evidence-registry gate + Idris2 suites in `verification/proven-tests/`
+ against proven-tests-and-benches at a pin
+|verification paths + weekly
+|Model-tier evidence only; Coq (formal/) is the actually-proven tier.
+
+|k9-deed-conformance.yml
+|standards K9 + DEED reusables, `require-files: true`
+|PR/push
+|`verisimdb_chora.deed` + 9 `.k9.ncl` contracts are real files, so a
+ zero-file run is a lost tree, not a pass.
+
+|ijson-jcs.yml
+|I-JSON (RFC 7493) + JCS (RFC 8785) via hyperpolymath/ijson-jcs
+|PR/push
+|Report-only repo scan + blocking `scripts/ci/ijson-converted.txt`.
+
+|hypatia-scan.yml / governance.yml / secret-scanner.yml /
+ spark-theatre-gate.yml / scorecard.yml / mirror.yml
+|Estate governance, secrets, SPARK theatre, OSSF Scorecard, forge mirror
+|various
+|All at the single standards pin. Secret scanner: `contents: read`
+ only, no inherit (standards#1108 §6b). Scorecard grants all four
+ permissions on the *calling job*.
+
+|security-scan.yml
+|panic-attack scan-and-report → verisimdb-data, `fail_on_severity:
+ critical`
+|push main + weekly
+|Previously reported success regardless of findings for its whole life.
+
+|bridge-gate.yml
+|Dependabot/Renovate PRs: nix-bump ban (B3) + reachable-unmitigable-CVE
+ ban (B1) via panic-attack Patch-Bridge
+|dependency PRs
+|panic-attack now built at a pinned commit, in lockstep with
+ security-scan.yml.
+
+|bench.yml
+|criterion (all 8 modalities) + benchee execute; artifacts + summary
+|weekly/dispatch
+|No hard perf gate on shared runners (variance); see ratchets.
+
+|nightly.yml
+|Full cargo-mutants (6 core crates) + cargo-hack feature powerset
+|weekly/dispatch
+|Mutants score reporting first; hard floor after baseline (ratchets).
+
+|fuzz.yml + cflite_pr/batch
+|Fuzz harnesses compile (stable) + ClusterFuzzLite execution
+|fuzz paths, PR, weekly
+|fuzz.yml was `|| true` + continue-on-error: a gate that could not
+ fail. It can now.
+
+|codeql.yml, coq-build.yml, doc-consonance.yml, dogfood-gate.yml,
+ reuse.yml, lock-sync-gate.yml, labels/label-triage, pages.yml,
+ ghcr-publish.yml, instant-sync.yml
+|CodeQL, Coq oracle + axiom guard, docs, dogfood formats, REUSE 3.3,
+ lock sync, labels, Pages, GHCR image + attestation, forge sync
+|various
+|coq-build carries the actually-proven tier. ghcr-publish: registry
+ credentials via env, attestation binds the pushed digest.
+|===
+
+== Formats: KYAML and I-JSON/JCS
+
+* *YAML → KYAML* (standards YAML-POLICY Y-3, ruling D280). The rewriter
+  of record is `yq -p yaml -o kyaml '.'` via the vendored
+  `scripts/ci/kyaml-format.sh`. `scripts/ci/check-kyaml.sh` runs a
+  report-only scan of every YAML file (the migration surface, always
+  measured) and a *blocking* check on `scripts/ci/kyaml-converted.txt`.
+  Convert with `bash scripts/ci/kyaml-format.sh <file>` and list the
+  file in the same commit. Workflow files convert last (standards step
+  6): their long `run:` bodies are the comment-preservation hard case,
+  and a bad conversion is a `startup_failure`, not a style nit.
+* *JSON → I-JSON/JCS* (ruling D306) via hyperpolymath/ijson-jcs:
+  `ijson-jcs fix <file>`, never hand-format. Blocking list:
+  `scripts/ci/ijson-converted.txt`. `.verisimdb/` octad snapshots are
+  generated data: visible in the report-only scan, fixed at the
+  generator (self-ingest) rather than by formatting commits —
+  converting them file-by-file would fight the next ingest.
+
+== Testing framework (proven-tests-and-benches discipline)
+
+Three tiers, closed vocabulary, enforced by
+`scripts/ci/test-evidence.sh` against `verification/test-registry.json`
+(itself I-JSON/JCS canonical and blocking):
+
+* *actually-proven* — Coq development in `formal/` (9 files), compiled
+  with an assumptions guard by coq-build.yml. The registry requires a
+  named proof artefact for this tier.
+* *provisionally-proven* — property suites (proptest, stream_data),
+  snapshot contract (insta), fuzz harnesses, shell gates with positive
+  controls, and the Idris2 model suites (`verification/proven-tests/`,
+  run by proven-tests.yml against the framework at its pin).
+* *unproven* — ordinary unit/integration tests and benchmarks (61
+  files). Counts are *derived* by the gate from the tree; the numbers
+  in TESTING.adoc must match the gate's summary or TESTING.adoc is the
+  bug. Inline Rust `#[cfg(test)]` modules are counted by cargo, not by
+  the file-level registry.
+
+Benchmarks: criterion + benchee compile-gate on PRs, execute weekly
+(bench.yml) with artifacts; baselines, once committed under
+`benches/baseline/`, are compared but not yet hard-gated (ratchet R-4).
+
+== Ratchets (sequenced, owner-visible)
+
+[cols="6%,44%,50%",options="header"]
+|===
+|ID |Ratchet |Promotion condition
+
+|R-1
+|panic-attack gates `critical` → `high` (deep-recon + security-scan)
+|assail baseline classification-clean at high for 2 consecutive weekly runs
+
+|R-2
+|Coverage floors 60% → 70% → 80% (Rust + Elixir)
+|each step: floor met for a full month on main without exclusions growing
+
+|R-3
+|Full mutants: report-only → hard floor (≥80% core crates, TESTING.adoc)
+|two consecutive weekly scores within 2 points establish the baseline
+
+|R-4
+|Benchmark hard regression gate (e.g. >10% vs committed baseline)
+|stable non-shared runner; shared-runner variance measured first
+
+|R-5
+|KYAML: `.github/workflows/*.yml` conversion (standards step 6)
+|kyaml-format comment-preservation proven on this repo's longest
+ `run:` bodies (elixir-ci, ghcr-publish) in a scratch branch with green CI
+
+|R-6
+|Hypatia `block-on-high: true`
+|`.hypatia-baseline.json` exists with every acknowledgement dated
+ (`expires_at`), then `baseline-strict: true` on governance
+
+|R-7
+|Make the new lanes *required* status checks
+|owner action in the branch ruleset (this cannot be done from YAML):
+ add `zizmor + actionlint`, `cicd-squabbler chains`, `KYAML conformance`,
+ `pons-asinorum scan`, `panic-attack assail`, `K9 conformance`,
+ `DEED conformance`, `Converted JSON stays canonical`,
+ `test evidence (proven-tests registry)` once each has 5 green main runs
+|===
+
+== Required-checks & rulesets (owner actions)
+
+YAML cannot add its own checks to a ruleset. Current rulesets:
+Immutable-Tags, Require-Signed-Commits, Secret-Scan-Floor. Recommended,
+in order: (1) confirm the existing required contexts still name checks
+this repo emits (squabble `chains`/`fight` will say so), (2) add the
+R-7 contexts, (3) set Actions permissions posture to
+`allowed_actions=all` with `sha_pinning_required=true` KEPT (estate
+posture of record), since the lockfile now actually supports it.
+
+== Bots and apps on PRs
+
+* *CodeRabbit* — `.coderabbit.yaml` (path instructions encode the
+  estate rules above; generated files filtered). PR #318's five
+  CodeRabbit comments are dispositioned in docs/UPSTREAM-PROMPTS.adoc
+  (P-318): one (secret inheritance) is fixed here, four belong to that
+  branch's code.
+* *Dependabot* — `.github/dependabot.yml`: grouped, lock-aware.
+  PR #312's panic-attack bump is superseded by this pin set (a newer
+  commit of the same reusable, locked transitively).
+* *Hypatia / gitbot-fleet* — consume the SARIF/JSON this repo now emits
+  from CodeQL, Scorecard, Hypatia and pons (code scanning), plus
+  assail/pons artifacts.
+
+== Local parity
+
+`just ci-meta` runs zizmor + actionlint + lock-sync + test-evidence +
+KYAML/I-JSON converted checks with the same pins as CI. If it is green
+locally and red in CI, the delta is environmental — record it here.

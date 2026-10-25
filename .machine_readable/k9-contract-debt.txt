@@ -1,0 +1,25 @@
+# .machine_readable/k9-contract-debt.txt — SHRINK-ONLY ledger of grandfathered
+# K9 files (1-formats/k9/tools/CONFORMANCE-REPORTING.adoc).
+#
+# One repo-relative path per line. '#' comments and blanks ignored.
+# The k9-conformance lane fails a PR that adds an entry without a
+# `Ratchet-exception: .machine_readable/k9-contract-debt.txt — <why>`
+# declaration, fails a ledgered path that now conforms (stale exemption —
+# fixing a file must shrink this ledger in the same change), and fails any
+# non-conforming path not listed here (new debt cannot appear silently).
+#
+# Baseline 2026-10-25, produced by:
+#   standards 1-formats/k9/tools/k9-validate.sh <every tracked *.k9.ncl>
+# Count: 1. The same run confirmed 5 of 6 tracked files conforming after the
+# standards-canonical repairs (K9! sentinels, resolving imports, capability
+# grants, signature blocks; templates renamed *.k9.ncl.in — a template is not
+# a component and is never loaded).
+#
+# connectors/test-infra/deploy.k9.ncl — imports pedigree.ncl/leash.ncl from a
+# `../../standards/self-validating/` layout that exists in no current repo
+# (checked: metadatastician/standards svc/k9, hyperpolymath/k9-ecosystem).
+# It cannot be made conforming by local edits without inventing the missing
+# Nickel libraries; the canonical home for them is an upstream decision
+# (docs/UPSTREAM-PROMPTS.adoc P-K9). When that lands, fix the imports, add
+# the K9! envelope, and delete this line in the same change.
+connectors/test-infra/deploy.k9.ncl

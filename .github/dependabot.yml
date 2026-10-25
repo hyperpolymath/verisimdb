@@ -1,37 +1,59 @@
 # SPDX-License-Identifier: MPL-2.0
-# Dependabot configuration for RSR-compliant repositories
-# Covers common ecosystems - remove unused ones for your project
+# Dependabot configuration for RSR-compliant repositories.
+#
+# Lockfile contract (the reason this file is grouped the way it is):
+# Dependabot rewrites uses: refs in workflow YAML but cannot touch
+# .github/workflows/actions.lock, and a desynced lock makes GitHub refuse
+# runs at startup. Grouped single-PRs plus the Lock Sync Gate keep that
+# failure visible and bisectable; never widen open-pull-requests-limit
+# for github-actions without re-checking the lock workflow.
 
 version: 2
 updates:
-  # GitHub Actions - always include
+  # GitHub Actions — one grouped PR, lock regenerated in the same change.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     groups:
       actions:
         patterns:
           - "*"
     open-pull-requests-limit: 2
-
-  # Rust/Cargo
     ignore:
-      # HOLD: github/codeql-action at v4.38.0 (SHA-pinned). v4.38.1 fails
-      # GitHub workflow-startup validation estate-wide (nexia-list#100;
-      # SHA-form re-bump bypassed versions-scoped ignores - see
-      # nexia-list#101/#104). Hold until upstream clears 4.38.1 or a
-      # newer release verifies green; revisit deliberately.
+      # HOLD: github/codeql-action at v4.38.0 (SHA-pinned in codeql.yml and
+      # deep-recon.yml). v4.38.1 fails workflow-startup validation
+      # estate-wide (nexia-list#100; the SHA-form re-bump bypassed
+      # version-scoped ignores — nexia-list#101/#104). Hold until upstream
+      # clears 4.38.1 or a newer release verifies green; revisit deliberately.
       - dependency-name: "github/codeql-action"
 
+  # Rust/Cargo — the workspace. Patch/minor grouped weekly; majors get
+  # their own PRs (bridge-gate.yml triages majors and CVE reachability).
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
-    open-pull-requests-limit: 0
+      interval: "weekly"
+    groups:
+      cargo-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 5
+
+  # Fuzz workspaces are separate manifests outside the root workspace.
+  - package-ecosystem: "cargo"
+    directory: "/fuzz"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+  - package-ecosystem: "cargo"
+    directory: "/rust-core/fuzz"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
 
   # Elixir/Mix
   - package-ecosystem: "mix"

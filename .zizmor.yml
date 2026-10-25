@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MPL-2.0
+# zizmor policy for this repo (.github/workflows/ci-meta.yml runs it).
+#
+# unpinned-uses is set to ref-pin, not hash-pin, ON PURPOSE: this estate
+# pins actions in .github/workflows/actions.lock (gh actions-lock), with
+# the Lock Sync Gate proving YAML <-> lock agreement in both directions
+# plus transitive closure, and branch pins (@main) remain forbidden.
+# Writing bare SHAs in the YAML is contrary to that mechanism (the estate
+# measured startup refusals from lock desync, not from tag refs). Job-level
+# reusable-workflow refs to hyperpolymath/standards and panic-attack ARE
+# written as full SHAs and locked the same way.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": ref-pin

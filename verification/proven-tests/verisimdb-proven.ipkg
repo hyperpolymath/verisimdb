@@ -1,0 +1,14 @@
+package verisimdb-proven
+
+version = 0.1.0
+sourcedir = "src"
+
+main = VeriSimTests.Main
+executable = "verisimdb-proven-tests"
+
+depends = proven-tests
+
+modules = VeriSimTests.OctadTests,
+          VeriSimTests.DriftTests,
+          VeriSimTests.ProvenanceTests,
+          VeriSimTests.Main

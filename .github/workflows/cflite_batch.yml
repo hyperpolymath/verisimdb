@@ -1,17 +1,23 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# This workflow is managed by gh actions-lock.
 name: ClusterFuzzLite batch fuzzing
 on:
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   batch-fuzzing:
+    # security-events: ClusterFuzzLite uploads crash findings as SARIF
+    # when configured; granted at job level, never workflow level.
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
