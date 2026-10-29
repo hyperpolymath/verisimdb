@@ -25,7 +25,7 @@
       "type": "string",
       "description": "Human-readable error message providing context about what went wrong. Suitable for display in developer tools and logs. Should not contain sensitive information.",
       "examples": [
-        "Entity not found: 550e8400-e29b-41d4-a716-446655440000",
+        "Entity not found: 550e8400-e29b-81d4-a716-446655440000",
         "Tensor shape [3, 4] does not match data length 15 (expected 12)",
         "Provenance chain corrupted for entity abc-123: record 5 parent_hash mismatch"
       ]
@@ -43,7 +43,7 @@
       "additionalProperties": true,
       "examples": [
         {
-          "entity_id": "550e8400-e29b-41d4-a716-446655440000",
+          "entity_id": "550e8400-e29b-81d4-a716-446655440000",
           "modality": "vector",
           "expected_dimension": 384,
           "actual_dimension": 256
