@@ -38,7 +38,7 @@ jobs:
     #
     # Pin includes canonical .affine language detection and preserves
     # JSON.parseExn coverage after the ReScript-to-AffineScript migration.
-    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@b5530834a839734d1d181bfe6edb0d43d4233cf4 # main 2026-10-25
+    uses: hyperpolymath/panic-attack/.github/workflows/scan-and-report.yml@b22bed4f8c6dce82fde639aa0dab9ce79d1006f5 # main 2026-10-25
     with:
       # This lane reported success regardless of findings for its whole life
       # (the reusable's default is 'none' for backwards compatibility).
