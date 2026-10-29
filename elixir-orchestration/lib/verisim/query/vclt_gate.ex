@@ -27,7 +27,9 @@ defmodule VeriSim.Query.VCLTGate do
 
   ## Binary protocol
 
-  Standard input: one JSON object, UTF-8, no length prefix.
+  Invocation: `vclt-gate --input <path>`, where the file holds one JSON
+  object, UTF-8, no length prefix. The file lives in a private 0o700
+  directory created for the call and removed afterwards.
   Exit 0: admitted — JSON `{"certified_level": N, "levels": [...]}`
   Exit 1: rejected — JSON `{"certified_level": -1, "levels": [...]}`
   Exit 2: internal gate error (treat as gate failure).
@@ -82,7 +84,24 @@ defmodule VeriSim.Query.VCLTGate do
         "schema" => schema
       })
 
-    task = Task.async(fn -> invoke_gate(path, payload) end)
+    case write_request(payload) do
+      {:ok, dir, request} ->
+        # The caller owns the request file, not the task: a timed-out task is
+        # brutally killed, so cleanup inside it would never run.
+        try do
+          await_gate(path, request)
+        after
+          File.rm_rf(dir)
+        end
+
+      {:error, reason} ->
+        Logger.warning("vclt-gate: cannot write request (#{inspect(reason)}) — failing closed")
+        {:error, :gate_failed}
+    end
+  end
+
+  defp await_gate(path, request) do
+    task = Task.async(fn -> invoke_gate(path, request) end)
 
     case Task.yield(task, @gate_timeout_ms) do
       {:ok, result} ->
@@ -95,49 +114,65 @@ defmodule VeriSim.Query.VCLTGate do
     end
   end
 
-  defp invoke_gate(path, payload) do
-    try do
-      # No shell, and no temp file.
-      #
-      # This used to be `System.cmd("sh", ["-c", "'#{path}' < '#{tmp}'"])`, which
-      # needed the payload written to an exclusively-created 0o600 file because a
-      # shell redirection can only take a filename, not a stream. That pulled in
-      # `write_secure_payload!/2` (collision retries, `:crypto.strong_rand_bytes`,
-      # chmod-before-write), `shell_quote/1`, and an `after File.rm/1` — roughly
-      # 45 lines of security-sensitive machinery whose only job was to work
-      # around a shell feature we did not need.
-      #
-      # `System.cmd/3`'s `:input` option writes the payload straight to the
-      # child's stdin, so all of that goes away and with it the question of
-      # whether the quoting was correct. It was correct — `shell_quote/1` was a
-      # sound POSIX single-quote escape and neither the statement nor the schema
-      # ever reached the shell — but "correct quoting" is a property that has to
-      # be re-verified every time this function is edited, whereas "no shell" is
-      # a property that cannot regress.
-      #
-      # `path` is argv[0], never a shell word, so `VERISIM_VCLT_GATE` cannot
-      # smuggle arguments or metacharacters either. `System.cmd/3` raises
-      # `ErlangError` when the executable is missing or not runnable; the
-      # `rescue` below turns that into a fail-closed `{:error, :gate_failed}`,
-      # which is the documented behaviour for an unavailable gate.
-      {output, exit_code} = System.cmd(path, [], input: payload, stderr_to_stdout: false)
+  # The request goes in a file because `System.cmd/3` cannot write a child's
+  # stdin (it has no `:input` option, and an Erlang port cannot half-close
+  # stdin to signal EOF), so the gate's `--input <path>` transport is the one
+  # this side can use (vcl-ut `docs/vclt-gate-contract.adoc` §"Transport").
+  #
+  # The file sits in a fresh directory that `mkdir` creates exclusively and
+  # that is narrowed to 0o700 before the payload exists. Erlang cannot open a
+  # file with a mode, so a file created directly in the shared temp directory
+  # would be readable under the umask until a `chmod`, and a reader that
+  # opened it in that window would keep its descriptor. A directory has no
+  # such window: its mode is checked on every lookup inside it.
+  defp write_request(payload, attempts \\ 3)
 
-      handle_gate_result(IO.iodata_to_binary(output), exit_code)
+  defp write_request(_payload, 0), do: {:error, :no_unique_name}
+
+  defp write_request(payload, attempts) do
+    name = "vclt-gate-" <> Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
+    dir = Path.join(System.tmp_dir!(), name)
+    request = Path.join(dir, "request.json")
+
+    case File.mkdir(dir) do
+      :ok ->
+        with :ok <- File.chmod(dir, 0o700),
+             :ok <- File.write(request, payload, [:exclusive]),
+             :ok <- File.chmod(request, 0o600) do
+          {:ok, dir, request}
+        else
+          {:error, reason} ->
+            File.rm_rf(dir)
+            {:error, reason}
+        end
+
+      {:error, :eexist} ->
+        write_request(payload, attempts - 1)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  rescue
+    # `System.tmp_dir!/0` raises when no temp directory is writable.
+    e -> {:error, Exception.message(e)}
+  end
+
+  defp invoke_gate(path, request) do
+    try do
+      # No shell: `path` is the executable and `--input` and `request` are
+      # argv entries, never shell words, so neither `VERISIM_VCLT_GATE` nor the
+      # statement can smuggle metacharacters. `System.cmd/3` raises
+      # `ErlangError` when the executable is missing or not runnable; the
+      # `rescue` turns that into the documented fail-closed result.
+      {output, exit_code} = System.cmd(path, ["--input", request], stderr_to_stdout: false)
+
+      handle_gate_result(output, exit_code)
     rescue
       e ->
         Logger.warning("vclt-gate: invocation error: #{Exception.message(e)} — failing closed")
         {:error, :gate_failed}
     end
   end
-
-  # `write_secure_payload!/2` and `shell_quote/1` were deleted here on 2026-09-27.
-  # They existed solely to feed a `sh -c` redirection a filename; with
-  # `System.cmd/3`'s `:input` the payload goes to stdin directly. Removing them is
-  # the point of the change: less security-sensitive code to keep correct.
-  # The test that asserted their observable behaviour (an unpredictable
-  # `vcltgate_*.json` file at mode 600, removed afterwards) has been replaced by
-  # one that asserts the underlying property instead — that shell metacharacters
-  # in the statement and schema arrive on stdin verbatim, unparsed.
 
   defp handle_gate_result(output, 0) do
     case Jason.decode(output) do
