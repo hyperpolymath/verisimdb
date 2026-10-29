@@ -2703,14 +2703,17 @@ mod tests {
             "document": {"title": "Keep", "body": "Must not be discarded"}
         });
 
-        let response = app.oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/octads")
-                .header("content-type", "application/json")
-                .body(Body::from(nested.to_string()))
-                .unwrap(),
-        ).await.unwrap();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(nested.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
@@ -2719,14 +2722,17 @@ mod tests {
     async fn test_reject_body_without_title_instead_of_silently_dropping_it() {
         let state = create_test_state().await;
         let app = build_router(state);
-        let response = app.oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/octads")
-                .header("content-type", "application/json")
-                .body(Body::from(r#"{"body":"A document without a title"}"#))
-                .unwrap(),
-        ).await.unwrap();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"body":"A document without a title"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
