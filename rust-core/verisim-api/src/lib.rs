@@ -671,7 +671,11 @@ impl AppState {
             match octad_store_inner.replay_wal(&wal_dir).await {
                 Ok(0) => info!("WAL replay: clean start (no entries to replay)"),
                 Ok(n) => info!(recovered = n, "WAL replay: recovered {} entities", n),
-                Err(e) => tracing::warn!("WAL replay failed (non-fatal): {e}"),
+                Err(e) => {
+                    return Err(ApiError::Internal(format!(
+                        "WAL recovery refused: {e}. Persistent state requires reconciliation before serving requests"
+                    )));
+                }
             }
         }
 
