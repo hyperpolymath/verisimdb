@@ -11,7 +11,7 @@
       "type": "string",
       "description": "Unique entity identifier (UUID v4). Serves as the canonical key across all modality stores.",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^.+$",
-      "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+      "examples": ["550e8400-e29b-81d4-a716-446655440000"]
     },
     "status": {
       "$ref": "octad-status.json",

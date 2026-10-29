@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 name = "VeriSimDBClient"
-uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+uuid = "a1b2c3d4-e5f6-8890-abcd-ef1234567890"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 version = "0.1.0"
 
