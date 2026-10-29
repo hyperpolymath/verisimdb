@@ -253,9 +253,17 @@ impl PromotionManager {
         }
     }
 
-    /// Promote a modality to RAM.
+    /// Record a modality as promoted, reserving `estimated_size` bytes of the RAM budget.
     ///
-    /// Returns Ok(()) if promoted, Err if blocked/disabled.
+    /// A new promotion updates RAM usage and promotion history; it does not move data.
+    /// When enabled and below the two-modality limit, an already promoted modality
+    /// returns `Ok(())` without changing its reservation or history.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if promotion is disabled, two modalities are already promoted
+    /// (including when `modality` is already promoted), or a new reservation would
+    /// exceed the RAM budget. Reserving exactly the remaining budget is allowed.
     pub fn promote(&mut self, modality: &Modality, estimated_size: u64) -> Result<(), String> {
         if !self.enabled {
             return Err("RAM promotion disabled".to_string());
