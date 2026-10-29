@@ -204,7 +204,7 @@ mapfile -t commands < <(awk '
 expected=(
     "bash tests/doc-consonance-gate.sh"
     "bash scripts/check-doc-links.sh"
-    "python3 scripts/check-modality-contract.py"
+    "bash scripts/check-modality-contract.sh"
     "bash tests/modality-contract-gate.sh"
     "bash tests/assail-classifications-gate.sh"
 )
