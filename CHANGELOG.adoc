@@ -9,6 +9,12 @@ All notable changes to VeriSimDB are documented here. This project uses https://
 
 == [Unreleased]
 
+=== Fixed — VCL-total gate always failed closed (2026-10-27)
+
+- *`VeriSim.Query.VCLTGate` never reached the gate*: it called `System.cmd/3` with `input:`, an option `System.cmd/3` does not have, so every call raised `invalid option :input` and the `rescue` returned `{:error, :gate_failed}`. Admissible statements were blocked whenever `VERISIM_VCLT_GATE` was set. The three stub-wiring tests that expect `:admit`/`:reject` were red for that reason.
+- The request now goes over the gate's `--input <path>` transport (vcl-ut#125, contract §"Transport"): `vclt-gate --input <file>`, still with no shell. The file is written to a directory that `mkdir` creates exclusively and narrows to 0o700 before the payload exists, created with `:exclusive` at 0o600, and removed by the caller even when the gate errors or times out.
+- Tests assert the argv shape, the file and directory modes during the call, removal afterwards (also on exit 2), and that shell metacharacters in the statement and schema arrive verbatim. `:crypto` (used for the directory name) is now declared in `extra_applications`.
+
 === Changed — Foundational CI/CD overhaul (2026-10-25)
 
 Full architecture in `docs/CI-CD.adoc`; upstream asks in `docs/UPSTREAM-PROMPTS.adoc`. No production code changes; no gate weakened.
