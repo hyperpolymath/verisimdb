@@ -4,14 +4,14 @@
 // Crash recovery integration tests for VeriSimDB Phase 1.4.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::path::Path;
+use std::sync::Arc;
 
 use verisim_document::TantivyDocumentStore;
 use verisim_graph::SimpleGraphStore;
 use verisim_octad::{
-    InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadInput, OctadSnapshot, OctadStore,
-    OctadSpatialInput, OctadId,
+    InMemoryOctadStore, OctadConfig, OctadDocumentInput, OctadId, OctadInput, OctadSnapshot,
+    OctadSpatialInput, OctadStore,
 };
 use verisim_semantic::InMemorySemanticStore;
 use verisim_temporal::InMemoryVersionStore;
@@ -166,17 +166,24 @@ async fn empty_wal_clean_start() {
     assert_eq!(n, 0);
 }
 
-fn append_uncommitted(wal: &Path, id: &OctadId, operation: verisim_wal::WalOperation, payload: Vec<u8>) {
+fn append_uncommitted(
+    wal: &Path,
+    id: &OctadId,
+    operation: verisim_wal::WalOperation,
+    payload: Vec<u8>,
+) {
     use verisim_wal::{WalEntry, WalModality, WalWriter};
     let mut writer = WalWriter::open(wal, verisim_wal::SyncMode::Fsync).unwrap();
-    writer.append(WalEntry {
-        sequence: 0,
-        timestamp: chrono::Utc::now(),
-        operation,
-        modality: WalModality::All,
-        entity_id: id.as_str().to_owned(),
-        payload,
-    }).unwrap();
+    writer
+        .append(WalEntry {
+            sequence: 0,
+            timestamp: chrono::Utc::now(),
+            operation,
+            modality: WalModality::All,
+            entity_id: id.as_str().to_owned(),
+            payload,
+        })
+        .unwrap();
 }
 
 #[tokio::test]
@@ -192,8 +199,10 @@ async fn interrupted_delete_after_committed_insert_refuses_recovery() {
     let restarted = create_store(wal.to_str().unwrap());
     let error = restarted.replay_wal(&wal).await.unwrap_err();
     assert!(error.to_string().contains("uncommitted WAL"), "{error}");
-    assert!(restarted.status(&id).await.unwrap().is_none(),
-            "failed recovery must not publish a reconstructed registry");
+    assert!(
+        restarted.status(&id).await.unwrap().is_none(),
+        "failed recovery must not publish a reconstructed registry"
+    );
 }
 
 #[tokio::test]
@@ -202,19 +211,30 @@ async fn interrupted_update_after_committed_insert_refuses_recovery() {
     let wal = dir.path().join("wal");
     let id = {
         let store = create_store(wal.to_str().unwrap());
-        store.create(doc("Original", "Original body")).await.unwrap().id
+        store
+            .create(doc("Original", "Original body"))
+            .await
+            .unwrap()
+            .id
     };
 
-    let pending = OctadInput { spatial: Some(OctadSpatialInput {
-        latitude: 51.5,
-        longitude: -0.12,
-        altitude: None,
-        geometry_type: None,
-        srid: None,
-        properties: HashMap::new(),
-    }), ..Default::default() };
-    append_uncommitted(&wal, &id, verisim_wal::WalOperation::Update,
-                       serde_json::to_vec(&pending).unwrap());
+    let pending = OctadInput {
+        spatial: Some(OctadSpatialInput {
+            latitude: 51.5,
+            longitude: -0.12,
+            altitude: None,
+            geometry_type: None,
+            srid: None,
+            properties: HashMap::new(),
+        }),
+        ..Default::default()
+    };
+    append_uncommitted(
+        &wal,
+        &id,
+        verisim_wal::WalOperation::Update,
+        serde_json::to_vec(&pending).unwrap(),
+    );
 
     let restarted = create_store(wal.to_str().unwrap());
     let error = restarted.replay_wal(&wal).await.unwrap_err();
@@ -228,15 +248,21 @@ async fn committed_update_replays_version_and_accumulated_modality_presence() {
     let wal = dir.path().join("wal");
     let id = {
         let store = create_store(wal.to_str().unwrap());
-        let entity = store.create(doc("Original", "Original body")).await.unwrap();
-        let update = OctadInput { spatial: Some(OctadSpatialInput {
-            latitude: 51.5,
-            longitude: -0.12,
-            altitude: None,
-            geometry_type: None,
-            srid: None,
-            properties: HashMap::new(),
-        }), ..Default::default() };
+        let entity = store
+            .create(doc("Original", "Original body"))
+            .await
+            .unwrap();
+        let update = OctadInput {
+            spatial: Some(OctadSpatialInput {
+                latitude: 51.5,
+                longitude: -0.12,
+                altitude: None,
+                geometry_type: None,
+                srid: None,
+                properties: HashMap::new(),
+            }),
+            ..Default::default()
+        };
         store.update(&entity.id, update).await.unwrap();
         entity.id
     };
