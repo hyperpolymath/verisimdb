@@ -270,6 +270,7 @@ pub struct HealthResponse {
 
 /// Octad create/update request
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OctadRequest {
     /// Document title
     pub title: Option<String>,
@@ -322,6 +323,16 @@ pub struct SpatialRequest {
 }
 
 impl OctadRequest {
+    /// Refuse payloads that would silently lose a supplied field.
+    fn validate(&self) -> Result<(), ApiError> {
+        if self.body.is_some() && self.title.is_none() {
+            return Err(ApiError::BadRequest(
+                "body requires title; omitting it would discard document content".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Convert to OctadInput
     fn to_octad_input(&self) -> OctadInput {
         let mut input = OctadInput::default();
@@ -1051,6 +1062,7 @@ async fn create_octad_handler(
     State(state): State<AppState>,
     Json(request): Json<OctadRequest>,
 ) -> Result<(StatusCode, Json<OctadResponse>), ApiError> {
+    request.validate()?;
     let input = request.to_octad_input();
 
     let octad = state
@@ -1095,6 +1107,7 @@ async fn update_octad_handler(
 ) -> Result<Json<OctadResponse>, ApiError> {
     validate_octad_id(&id)?;
     let octad_id = OctadId::new(&id);
+    request.validate()?;
     let input = request.to_octad_input();
 
     // The pre-update modality set is the schema baseline: an update that
