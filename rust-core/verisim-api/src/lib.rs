@@ -850,16 +850,17 @@ pub fn build_router(state: AppState) -> Router {
             "/mv_prover_success_by_class",
             get(proof_attempts::success_by_class_handler),
         )
-        // Authentication middleware layer
-        .layer(axum_middleware::from_fn_with_state(
-            auth_state,
-            auth::auth_middleware,
-        ))
         .with_state(state.clone())
         // GraphQL endpoint
         .merge(graphql::graphql_router(state))
         // Federation endpoints (separate state)
         .merge(federation_routes)
+        // Apply authorization to the complete router, including merged
+        // GraphQL and federation routes (not only the initial REST routes).
+        .layer(axum_middleware::from_fn_with_state(
+            auth_state,
+            auth::auth_middleware,
+        ))
 }
 
 /// Mount the API router at both the root and under `version_prefix`.
@@ -2534,6 +2535,56 @@ mod tests {
         }
 
         AppState::new_async(config).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_auth_covers_merged_graphql_and_federation_routes() {
+        let mut state = create_test_state().await;
+        state.auth = auth::AuthState::new(auth::AuthConfig {
+            enabled: true,
+            allow_public_health: true,
+            ..Default::default()
+        });
+        state.auth.key_registry.register("writer-key", "test writer", auth::ClientRole::Writer);
+        let app = build_router(state);
+
+        // This GraphQL mutation must never reach its handler without auth.
+        let mutation = serde_json::json!({
+            "query": "mutation { deleteOctad(id: \"missing\") }"
+        }).to_string();
+        let response = app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/graphql")
+                .header("content-type", "application/json")
+                .body(Body::from(mutation.clone()))
+                .unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // The federation router was previously merged after auth middleware.
+        let response = app.clone().oneshot(
+            Request::builder().uri("/federation/peers").body(Body::empty()).unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Valid writer credentials pass the middleware and reach GraphQL.
+        let response = app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/graphql")
+                .header("content-type", "application/json")
+                .header("x-api-key", "writer-key")
+                .body(Body::from(mutation))
+                .unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // The public health exception remains narrowly available.
+        let response = app.oneshot(
+            Request::builder().uri("/health").body(Body::empty()).unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
