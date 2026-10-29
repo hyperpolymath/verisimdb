@@ -536,11 +536,17 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create new application state with default configuration (async version).
+    /// Create application state using the supplied configuration.
     ///
-    /// With the `persistent` feature enabled, reads `VERISIM_PERSISTENCE_DIR`
-    /// to determine where to store data on disk. Defaults to `/var/lib/verisimdb`
-    /// if the variable is unset.
+    /// With the `persistent` feature enabled, uses `config.persistence_dir`,
+    /// then `VERISIM_PERSISTENCE_DIR`, then `/var/lib/verisimdb` for storage.
+    /// Opens the persistent stores and rebuilds the status registry from the WAL.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ApiError::Internal` if store initialisation, persistence directory
+    /// creation, WAL initialisation or WAL recovery fails. Recovery errors abort
+    /// initialisation; partially persisted modality data requires reconciliation.
     pub async fn new_async(config: ApiConfig) -> Result<Self, ApiError> {
         let octad_config = OctadConfig {
             vector_dimension: config.vector_dimension,
@@ -682,7 +688,11 @@ impl AppState {
             match octad_store_inner.replay_wal(&wal_dir).await {
                 Ok(0) => info!("WAL replay: clean start (no entries to replay)"),
                 Ok(n) => info!(recovered = n, "WAL replay: recovered {} entities", n),
-                Err(e) => tracing::warn!("WAL replay failed (non-fatal): {e}"),
+                Err(e) => {
+                    return Err(ApiError::Internal(format!(
+                        "WAL recovery refused: {e}. Persistent state requires reconciliation before serving requests"
+                    )));
+                }
             }
         }
 
