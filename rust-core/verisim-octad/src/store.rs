@@ -246,21 +246,26 @@ where
 
         // Per-entity pending operations are paired with their own COMMITTED
         // marker in WAL order; global empty checkpoints do not commit writes.
-        let mut pending: HashMap<String, (WalOperation, Vec<u8>, DateTime<Utc>)> =
-            HashMap::new();
+        let mut pending: HashMap<String, (WalOperation, Vec<u8>, DateTime<Utc>)> = HashMap::new();
         let mut reconstructed: HashMap<String, OctadStatus> = HashMap::new();
         let mut committed_count = 0usize;
 
-        for entry in reader.replay_all().map_err(|error| OctadError::ModalityError {
-            modality: "wal".to_string(),
-            message: format!("WAL replay failed: {error}"),
-        })? {
+        for entry in reader
+            .replay_all()
+            .map_err(|error| OctadError::ModalityError {
+                modality: "wal".to_string(),
+                message: format!("WAL replay failed: {error}"),
+            })?
+        {
             match entry.operation {
                 WalOperation::Insert | WalOperation::Update | WalOperation::Delete => {
-                    if pending.insert(
-                        entry.entity_id.clone(),
-                        (entry.operation, entry.payload, entry.timestamp),
-                    ).is_some() {
+                    if pending
+                        .insert(
+                            entry.entity_id.clone(),
+                            (entry.operation, entry.payload, entry.timestamp),
+                        )
+                        .is_some()
+                    {
                         return Err(OctadError::ConsistencyViolation(format!(
                             "Overlapping WAL intents for entity {} — cannot pair commits safely",
                             entry.entity_id
@@ -277,12 +282,13 @@ where
                         })?;
                     match operation {
                         WalOperation::Insert => {
-                            let input: OctadInput = serde_json::from_slice(&payload).map_err(|e| {
-                                OctadError::ConsistencyViolation(format!(
-                                    "Invalid committed insert for entity {}: {e}",
-                                    entry.entity_id
-                                ))
-                            })?;
+                            let input: OctadInput =
+                                serde_json::from_slice(&payload).map_err(|e| {
+                                    OctadError::ConsistencyViolation(format!(
+                                        "Invalid committed insert for entity {}: {e}",
+                                        entry.entity_id
+                                    ))
+                                })?;
                             let status = OctadStatus {
                                 id: OctadId::from(entry.entity_id.clone()),
                                 created_at: started_at,
@@ -290,7 +296,10 @@ where
                                 version: 1,
                                 modality_status: presence_from_input(&input),
                             };
-                            if reconstructed.insert(entry.entity_id.clone(), status).is_some() {
+                            if reconstructed
+                                .insert(entry.entity_id.clone(), status)
+                                .is_some()
+                            {
                                 return Err(OctadError::ConsistencyViolation(format!(
                                     "Duplicate WAL insertion for live entity {}",
                                     entry.entity_id
@@ -298,18 +307,20 @@ where
                             }
                         }
                         WalOperation::Update => {
-                            let input: OctadInput = serde_json::from_slice(&payload).map_err(|e| {
-                                OctadError::ConsistencyViolation(format!(
-                                    "Invalid committed update for entity {}: {e}",
-                                    entry.entity_id
-                                ))
-                            })?;
-                            let status = reconstructed.get_mut(&entry.entity_id).ok_or_else(|| {
-                                OctadError::ConsistencyViolation(format!(
-                                    "WAL update without existing entity {}",
-                                    entry.entity_id
-                                ))
-                            })?;
+                            let input: OctadInput =
+                                serde_json::from_slice(&payload).map_err(|e| {
+                                    OctadError::ConsistencyViolation(format!(
+                                        "Invalid committed update for entity {}: {e}",
+                                        entry.entity_id
+                                    ))
+                                })?;
+                            let status =
+                                reconstructed.get_mut(&entry.entity_id).ok_or_else(|| {
+                                    OctadError::ConsistencyViolation(format!(
+                                        "WAL update without existing entity {}",
+                                        entry.entity_id
+                                    ))
+                                })?;
                             extend_presence(
                                 &mut status.modality_status,
                                 &presence_from_input(&input),
@@ -330,7 +341,9 @@ where
                                 )));
                             }
                         }
-                        WalOperation::Checkpoint => unreachable!("pending operations are mutations"),
+                        WalOperation::Checkpoint => {
+                            unreachable!("pending operations are mutations")
+                        }
                     }
                     committed_count += 1;
                 }
