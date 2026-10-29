@@ -5,6 +5,11 @@
 :toclevels: 3
 :icons: font
 
+NOTE: The modality-contract checker has since moved from Python to Bash and
+`jq` as `scripts/check-modality-contract.sh` to satisfy the estate language
+policy. The session evidence below describes the original Python checker;
+the Reproduce commands use its current replacement.
+
 [.lead]
 A complete handover of the issue #299 session, so the next person does not have
 to reconstruct it from a pull-request diff and a conversation. It states what
@@ -461,7 +466,7 @@ ever wanted (§7).
 ----
 bash tests/doc-consonance-gate.sh
 bash scripts/check-doc-links.sh
-python3 scripts/check-modality-contract.py
+bash scripts/check-modality-contract.sh
 bash tests/modality-contract-gate.sh
 bash tests/assail-classifications-gate.sh
 ----
