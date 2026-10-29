@@ -264,7 +264,7 @@ uuid = 8*hex_digit , '-' , 4*hex_digit , '-' , 4*hex_digit , '-' ,
        4*hex_digit , '-' , 12*hex_digit ;
 ----
 
-Standard RFC 4122 format. Example: `550e8400-e29b-41d4-a716-446655440000`.
+Standard RFC 4122 format. Example: `550e8400-e29b-81d4-a716-446655440000`.
 
 ==== Timestamp Literals
 
@@ -790,7 +790,7 @@ Query a specific octad by UUID:
 
 [source,vcl]
 ----
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 ----
 
 Type: stem:[\text{Octad}(\text{UUID})]
@@ -1373,7 +1373,7 @@ INSERT HEXAD WITH
 INSERT HEXAD WITH
   DOCUMENT(title = "Follow-Up Study", year = 2026),
   VECTOR([0.5, 0.3, 0.2, 0.8]),
-  GRAPH(CITES, 550e8400-e29b-41d4-a716-446655440000)
+  GRAPH(CITES, 550e8400-e29b-81d4-a716-446655440000)
 
 -- Verified insert with proof
 INSERT HEXAD WITH
@@ -1402,11 +1402,11 @@ set_assignment = field_ref , '=' , literal ;
 [source,vcl]
 ----
 -- Simple field update
-UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+UPDATE HEXAD 550e8400-e29b-81d4-a716-446655440000
 SET DOCUMENT.title = "Corrected Title", DOCUMENT.severity = 5
 
 -- Verified update with proof
-UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+UPDATE HEXAD 550e8400-e29b-81d4-a716-446655440000
 SET DOCUMENT.status = "retracted",
     DOCUMENT.retraction_reason = "Data fabrication"
 PROOF ACCESS(EditAccessContract)
@@ -1430,10 +1430,10 @@ delete_mutation = 'DELETE' , 'HEXAD' , uuid , [proof_clause] ;
 [source,vcl]
 ----
 -- Simple deletion
-DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
 
 -- Verified deletion with proof
-DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF ACCESS(AdminAccessContract)
   AND PROVENANCE(DeletionAuditContract)
 ----
@@ -1660,7 +1660,7 @@ VCL does not have explicit JOIN syntax. Instead, cross-modal querying is implici
 [source,vcl]
 ----
 SELECT GRAPH, VECTOR, DOCUMENT
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 WHERE (h)-[:CITES]->(target)
   AND h.embedding SIMILAR TO [0.1, 0.2, 0.3] WITHIN 0.8
   AND FULLTEXT CONTAINS "neural networks"

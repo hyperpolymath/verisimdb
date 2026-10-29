@@ -17,14 +17,14 @@ This document provides **63 comprehensive examples** of VCL queries and mutation
 [source,vcl]
 ----
 SELECT *
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 ----
 
 **Dependent-Type** (with proof):
 [source,vcl]
 ----
 SELECT *
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF EXISTENCE(ExistenceContract)
 ----
 
@@ -34,7 +34,7 @@ PROOF EXISTENCE(ExistenceContract)
 [source,vcl]
 ----
 SELECT GRAPH
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 WHERE (h)-[:CITES]->(target)
 ----
 
@@ -42,7 +42,7 @@ WHERE (h)-[:CITES]->(target)
 [source,vcl]
 ----
 SELECT VECTOR
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3, 0.4]
 ----
 
@@ -50,7 +50,7 @@ WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3, 0.4]
 [source,vcl]
 ----
 SELECT GRAPH, VECTOR, SEMANTIC
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF INTEGRITY(DataIntegrityContract)
 ----
 
@@ -85,7 +85,7 @@ LIMIT 100
 [source,vcl]
 ----
 SELECT GRAPH
-FROM HEXAD abc12345-0000-0000-0000-000000000000
+FROM HEXAD abc12345-0000-8000-8000-000000000000
 WHERE (h)-[:CO_AUTHOR]-(colleague)
   AND (colleague)-[:AFFILIATED_WITH]->(institution)
   AND institution.country == "USA"
@@ -307,7 +307,7 @@ SELECT GRAPH, VECTOR, DOCUMENT
 FROM FEDERATION /research-db/* WITH DRIFT REPAIR
 WHERE h.embedding SIMILAR TO [0.1, 0.2, ...] WITHIN 0.85
   AND (h)-[:CITES]->(target_paper)
-  AND target_paper.uuid == "123e4567-e89b-12d3-a456-426614174000"
+  AND target_paper.uuid == "123e4567-e89b-82d3-a456-426614174000"
   AND FULLTEXT CONTAINS "neural-symbolic integration"
   AND SATISFIES CitationContract
 PROOF CITATION(NeurosymbolicContract)
@@ -744,7 +744,7 @@ LIMIT 100;
 [source,vcl]
 ----
 SELECT DOCUMENT.name, DOCUMENT.severity
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 ----
 
 **Mixed modalities and column projections:**
@@ -862,7 +862,7 @@ guarantee — the ZKP witnesses include the aggregate computation, ensuring veri
 [source,vcl]
 ----
 SELECT *
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF EXISTENCE(ExistenceContract) AND INTEGRITY(DataIntegrityContract)
 ----
 
@@ -906,7 +906,7 @@ LIMIT 50
 [source,vcl]
 ----
 SELECT DOCUMENT, GRAPH
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 WHERE DOCUMENT.severity > GRAPH.centrality
 ----
 
@@ -998,7 +998,7 @@ The octad ID is auto-generated and returned in the result.
 INSERT HEXAD WITH
   DOCUMENT(title = "Follow-Up Study", year = 2026),
   VECTOR([0.5, 0.3, 0.2, 0.8]),
-  GRAPH(CITES, 550e8400-e29b-41d4-a716-446655440000)
+  GRAPH(CITES, 550e8400-e29b-81d4-a716-446655440000)
 ----
 
 Creates a octad with document content, embedding, and a graph edge
@@ -1024,7 +1024,7 @@ insert is verified and auditable.
 **Update specific fields:**
 [source,vcl]
 ----
-UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+UPDATE HEXAD 550e8400-e29b-81d4-a716-446655440000
 SET DOCUMENT.title = "Corrected Title", DOCUMENT.severity = 5
 ----
 
@@ -1036,7 +1036,7 @@ Drift detection will fire if the change creates cross-modal inconsistency.
 **Update with access proof:**
 [source,vcl]
 ----
-UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+UPDATE HEXAD 550e8400-e29b-81d4-a716-446655440000
 SET DOCUMENT.status = "retracted", DOCUMENT.retraction_reason = "Data fabrication"
 PROOF ACCESS(EditAccessContract) AND PROVENANCE(RetractionContract)
 ----
@@ -1049,7 +1049,7 @@ of the retraction in the audit trail.
 **Simple deletion:**
 [source,vcl]
 ----
-DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
 ----
 
 Removes the octad and all its modality data. This operation is logged
@@ -1060,7 +1060,7 @@ in verisim-temporal for auditability.
 **Delete with access and provenance proof:**
 [source,vcl]
 ----
-DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF ACCESS(AdminAccessContract) AND PROVENANCE(DeletionAuditContract)
 ----
 
