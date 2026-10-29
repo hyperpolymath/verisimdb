@@ -200,12 +200,32 @@ where
     ///
     /// This is an index rebuild, not a general transaction redo/undo engine.
     /// The WAL must retain complete history until a durable snapshot exists.
+    /// Call during startup, after loading persistent modality stores and before
+    /// accepting writes. `wal_dir` identifies the directory of WAL segments to read.
+    ///
+    /// Returns the number of live entities in the rebuilt registry, excluding
+    /// committed deletions. A missing WAL directory returns zero without changing
+    /// the registry. Otherwise, successful validation replaces the entire registry
+    /// and writes a checkpoint if this store has WAL enabled. Updates retain the
+    /// creation time, increment the version and accumulate modality presence.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OctadError::ConsistencyViolation` for overlapping or uncommitted
+    /// intents, commits without intents, invalid committed insert/update payloads,
+    /// duplicate live inserts, updates/deletes of absent entities or version overflow.
+    /// Returns `OctadError::ModalityError` for WAL reader or checkpoint failures.
+    /// Reader and validation failures leave the registry unchanged; checkpoint
+    /// failures occur after its replacement. The WAL reader skips corrupt or
+    /// unreadable entries and ignores truncated tails rather than returning errors
+    /// for them; validation applies to the entries it yields.
     pub async fn replay_wal(
         &self,
         wal_dir: impl AsRef<std::path::Path>,
     ) -> Result<usize, OctadError> {
         use verisim_wal::WalReader;
 
+        /// Derive modality presence from supplied fields, always including temporal.
         fn presence_from_input(input: &OctadInput) -> ModalityStatus {
             ModalityStatus {
                 graph: input.graph.is_some(),
@@ -219,6 +239,7 @@ where
             }
         }
 
+        /// Add modality presence flags without clearing any existing flags.
         fn extend_presence(existing: &mut ModalityStatus, added: &ModalityStatus) {
             existing.graph |= added.graph;
             existing.vector |= added.vector;
