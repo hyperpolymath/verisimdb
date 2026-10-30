@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Blocked on: contents:write grants for the two data repos
+:revdate: 2026-10-30
+
+The filing's "PERMISSIONS / INSTALLS: contents:write on both data repos" was
+not in effect in this session. Write access is restricted to
+`hyperpolymath/verisimdb` (this repo) only; every other org repo rejects
+writes with 403 ("Resource not accessible by integration" on the refs API,
+"Permission … denied" on git push), including `hyperpolymath/verisimdb-data`
+and `hyperpolymath/julia-ecosystem`. Verified 2026-10-30 by attempting a
+no-op ref create on each of: julia-ecosystem, verisimdb-data, gv-clade-index,
+standards, JuliaPackageSpitter.jl — all 403; verisimdb succeeded.
+
+== Prepared, ready to push once the grants land
+
+* `/home/user/verisimdb-data` branch `fix/rename-juliapackagespitter-scan-key`
+  (2 commits on `origin/main` tip):
+----
+git -C /home/user/verisimdb-data push -u origin fix/rename-juliapackagespitter-scan-key
+gh pr create --repo hyperpolymath/verisimdb-data \
+  --head fix/rename-juliapackagespitter-scan-key \
+  --title "scan: add JuliaPackageSpitter.jl key (renamed from JuliaPackage-Reuse-Audit.jl) — additive" \
+  --body-file /home/user/verisimdb/audits/rename-juliapackagespitter/PR-verisimdb-data.md
+----
+* `/home/user/julia-ecosystem` branch `fix/rename-juliapackagespitter-mirror-key`
+  (2 commits on `origin/main` tip):
+----
+git -C /home/user/julia-ecosystem push -u origin fix/rename-juliapackagespitter-mirror-key
+gh pr create --repo hyperpolymath/julia-ecosystem \
+  --head fix/rename-juliapackagespitter-mirror-key \
+  --title "packages: add JuliaPackageSpitter.jl mirror (renamed from JuliaPackage-Reuse-Audit.jl) — additive" \
+  --body-file /home/user/verisimdb/audits/rename-juliapackagespitter/PR-julia-ecosystem.md
+----
+
+Also requested (read): `hyperpolymath/.git-private-farm` — to verify the
+instant-sync propagation gitbots' handling of the renamed repo name.

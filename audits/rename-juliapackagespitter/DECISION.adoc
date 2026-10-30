@@ -1,0 +1,175 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Decision — rename JuliaPackage-Reuse-Audit.jl → JuliaPackageSpitter.jl: additive alias, not a rename
+Jonathan D.A. Jewell
+:revdate: 2026-10-30
+
+The standalone repository `hyperpolymath/JuliaPackage-Reuse-Audit.jl` was
+renamed `JuliaPackageSpitter.jl` (decision recorded 2026-10-04 in the
+standalone repo's `docs/decisions/0002-reconcile-repository-and-package-name.adoc`).
+Two data stores still key on the retired name:
+
+* `julia-ecosystem`: `packages/JuliaPackage-Reuse-Audit.jl/**` — mirrored copy.
+* `verisimdb-data`: `scans/JuliaPackage-Reuse-Audit.jl.json` — scan record
+  (plus its `index.json` entry).
+
+== Decision
+
+**Additive alias in both stores.** Keep the old key byte-for-byte, add the
+new key, record the relationship explicitly. No historical record is
+rewritten or deleted; nothing is renamed in place.
+
+Implemented (branches ready, pending `contents:write` grants on both data
+repos — see `BLOCKED-ON.adoc` in this directory):
+
+* `verisimdb-data` branch `fix/rename-juliapackagespitter-scan-key`
+  (2 commits, house two-commit pattern: scan first, then `regen-index.sh`):
+  **adds** `scans/JuliaPackageSpitter.jl.json` — the last scan re-keyed
+  under the new name with explicit `renamed_from` / `renamed_at` /
+  `rename_decision` / `note` provenance fields — and regenerates
+  `index.json` (553 entries, both names present). Old scan file,
+  `patterns/registry.json`, `outcomes/`, `dispatch/` untouched.
+* `julia-ecosystem` branch `fix/rename-juliapackagespitter-mirror-key`
+  (2 commits): **adds** `packages/JuliaPackageSpitter.jl/` — a snapshot of
+  standalone HEAD `a834b56` (2026-10-22, 193 files, same shape as the other
+  34 full-snapshot package dirs) plus `RENAME-NOTICE.adoc` recording the
+  relationship; live docs (`REGISTRY-SUBMISSIONS.adoc`,
+  `packages/Hyperpolymath.jl/README.adoc`, `EXPLAINME.adoc` evidence line)
+  repointed at the current directory per the PR #27 precedent. Old mirror
+  dir byte-for-byte untouched.
+
+== Why alias (not tombstone, not regenerate)
+
+* **Tombstone / in-place rename — rejected.** Everything that joins on the
+  name breaks: dashboards, time series, "package X changed between scan N
+  and scan N+1", the clade/lineage graphs, and the CLADE.a2ml identity
+  scheme, whose `:repo-uuid` preimage *is* the name
+  (`gv-clade-index:github.com/<owner>/<name>`, profile C, owner ruling
+  D320 — `standards/1-formats/deed/mappings/clade-to-repo-deed.adoc`,
+  `standards/hypatia-rules/clade-identity-coherence.a2ml` HYP-S010). The
+  retired name is also a true historical fact: those scans and that mirror
+  snapshot really were of a repository called
+  `JuliaPackage-Reuse-Audit.jl`. Rewriting them is the same error as
+  deleting a changelog entry. Precedent: the earlier renames
+  `JuliaKids.jl`→`JuliaForChildren.jl` and
+  `InvestigativeJournalist.jl`→`InvestigativeJournalism.jl` already left
+  both keys coexisting in `verisimdb-data` — the store's de-facto
+  behaviour is additive; what it lacked was the explicit relationship,
+  which is exactly what this decision adds.
+* **Regenerate / wait for the next scan — rejected.** Zero records exist
+  under the new name today and no scan of the renamed repository has run
+  since the rename; waiting leaves the new key absent until the next
+  estate rescan, so name-keyed consumers resolve nothing meanwhile.
+* **Alias — chosen**, and not an invented schema: the estate already has a
+  rename convention. The CLADE schema carries `[status] aliases`,
+  `[lineage] previous-names` and `[[status.history]]` entries; the
+  standalone repo's own CLADE states the doctrine verbatim: *"A rename is
+  NOT a phase change — the old prefixed-name goes to aliases[], uuid and
+  phase are untouched."* `standards/0-canon/CANONICAL-NAMES.adoc` (the
+  2026-06-30 mandate) keeps deprecated forms "only in explicit migration
+  inputs, historical records, and the reintroduction guard's positive
+  controls". The scan store has no rename field of its own, so the
+  relationship is recorded on the new record as `renamed_from` /
+  `renamed_at` / `rename_decision` — the ticket-endorsed shape — and in
+  `RENAME-NOTICE.adoc` in the monorepo.
+
+== Current estate-wide occurrence counts (re-run 2026-10-30 — do not trust the filing's numbers)
+
+Query (GitHub code search, files matching, one count per file):
+
+----
+gh api "search/code?q=org:hyperpolymath+JuliaPackage-Reuse-Audit.jl"  → total_count = 70
+gh api "search/code?q=org:hyperpolymath+JuliaPackageSpitter"          → total_count = 38
+----
+
+Retired name — 70 files (filing said 81):
+
+|===
+| Repo | Files
+
+| hyperpolymath/JuliaPackageSpitter.jl (standalone, own tree, mid-cleanup) | 41
+| hyperpolymath/julia-ecosystem | 7
+| hyperpolymath/verisimdb-data | 3
+| hyperpolymath/gitbot-fleet | 3
+| hyperpolymath/gv-clade-index | 3
+| hyperpolymath/hypatia | 3
+| hyperpolymath/launch-scaffolder | 3
+| hyperpolymath/panic-attack | 2
+| hyperpolymath/reposystem | 2
+| hyperpolymath/contractiles | 1
+| hyperpolymath/julia-professional-registry | 1
+| hyperpolymath/oikosbot-estate | 1
+|===
+
+New name — 38 files (filing said 27):
+
+|===
+| Repo | Files
+
+| hyperpolymath/JuliaPackageSpitter.jl | 16
+| hyperpolymath/julia-ecosystem | 11
+| hyperpolymath/Hyperpolymath.jl | 4
+| hyperpolymath/mathesis | 4
+| hyperpolymath/julia-professional-registry | 3
+|===
+
+Line-level counts in the two data repos (`grep -rI`, 2026-10-30):
+
+* `verisimdb-data`: 30 lines retired name — `index.json` 1,
+  `scans/JuliaPackage-Reuse-Audit.jl.json` 1 (its `program_path`),
+  `scans/julia-ecosystem.json` 4 (paths in that monorepo scan's
+  `file_statistics`), `outcomes/2026-03.jsonl` 24 (append-only event log);
+  0 lines new name before this decision.
+* `julia-ecosystem`: 14 lines retired name — mirror snapshot
+  `.machine_readable/` 11, `REGISTRY-SUBMISSIONS.adoc` 2,
+  `packages/Hyperpolymath.jl/README.adoc` 1; 18 lines new name (the
+  snapshot's `Project.toml`/`src/` were already named
+  `JuliaPackageSpitter` — only the *repository* was renamed).
+
+All four `verisimdb-data` hits on the retired name are historical
+evidence; all are deliberately left in place.
+
+== Consumers found (evidence for the PR bodies)
+
+* `verisimdb-data`: `ingest.yml` is the scan-record generator — it writes
+  `scans/<repo_name>.json` from the dispatch payload (`repo_name =
+  basename` of the scanned repo, sent by panic-attacker's reusable
+  `scan-and-report.yml`); estate rescan campaigns ("scan: estate rescan
+  (run N)") periodically rewrite `scans/` in full. `index.json` is
+  regenerated byte-identically from `scans/` by `scripts/regen-index.sh`
+  and enforced by the `index-freshness` CI. `patterns/registry.json`
+  joins on name via `repos_affected_list`; `outcomes/*.jsonl` /
+  `dispatch/*.jsonl` are append-only history; `build-site.mjs` and
+  `generate-summaries.jl` read scan fields leniently (extra fields are
+  safe); hypatia reads scans per `INTEGRATION.adoc`.
+* `julia-ecosystem`: `package-drift.yml` derives
+  `github.com/hyperpolymath/<packages/ dir name>.git` from each directory —
+  the rename silently broke that join (it only resolves today because
+  GitHub still redirects the old repo name for git clone, which is
+  ephemeral, not a fix).
+* **The mirror is NOT auto-regenerated.** `packages/JuliaPackage-Reuse-Audit.jl/`
+  git history is owner-authored campaign PRs only (no bot authors); the
+  `mirror.yml` workflows (standalone and `standards/mirror-reusable.yml`)
+  push the standalone to external forges (gitlab/bitbucket/codeberg/…);
+  `instant-sync.yml` dispatches to `hyperpolymath/.git-private-farm`
+  (private — separate grant needed to inspect) for forge propagation;
+  `package-drift.yml` is report-only ("never auto-fixes, never picks a
+  canonical side"). Hand edits to the monorepo are durable — that is how
+  all 34 package directories exist.
+
+== Follow-ups found, out of scope of the two data-repo grants
+
+* `gv-clade-index` (the registry's "one declaration site") still carries
+  the retired name in `worker/data/index.json`, `worker/data/repos.json`,
+  `verisim/seed/repos.a2ml` and has zero hits for the new name.
+* The standalone repo's `CLADE.a2ml` still declares
+  `canonical-name = "JuliaPackage-Reuse-Audit.jl"` with `aliases = []`;
+  per its own doctrine the old prefixed-name belongs in `aliases[]`.
+  Its identity gate (`tests/check-identity.sh`) currently FAILS with 189
+  occurrences of a retired name outside the allowlist — the in-flight
+  ADR 0002 cleanup is the right home for that.
+* `standards/0-canon/CANONICAL-NAMES.adoc` has no deprecated-names row for
+  this rename.
+* `hyperpolymath/.git-private-farm` — private, no read grant in this
+  session; the propagation payload carries the repo name, and GitHub's
+  rename redirect keeps the old-name URL resolving in the meantime.
