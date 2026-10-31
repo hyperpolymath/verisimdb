@@ -1,0 +1,330 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= VeriSimDB: Code-Grounded Identity and Persistence Reconnaissance
+:revdate: 2026-10-29
+:toc: left
+:toclevels: 3
+
+[IMPORTANT]
+====
+Evidence status: source inspection of \`main\` at \`5876bc67e8962e3b276fb0161664e0b3a420a64c\`,
+the linked proof/status documents and live GitHub Actions results, not an
+end-to-end production durability certification. Items marked "CI-tested"
+refer to the identified PR checks; no power-loss or multi-node partition
+experiment was conducted for this reconnaissance.
+====
+
+== 1. Independent purpose and vocabulary
+
+VeriSimDB's research question is whether a lifecycle-managed *consonance
+subject* remains the same subject, and under what authority and evidence, as
+different representations change, disagree and federate. The intended
+guarantee is stronger than "eight columns agree" or "the drift score fell".
+
+The accepted terminology in \`docs/modality-profile.adoc\` and
+\`vcl-ut/docs/decisions/0007-modality-profiles-vs-octad-schema.adoc\` is:
+
+* *Consonance subject*: the lifecycle-managed identity.
+* *Modality set*: the modalities populated for a subject at a time.
+* *Modality profile*: the (normally versioned) supported/enabled selection
+  and its constraints at a declared scope.
+* *Octad*: this implementation's *fixed* eight-slot schema/API, not the
+  generic word for arbitrary-arity subjects.
+
+The current API does not exchange or negotiate profiles. \`OctadInput\`
+supports seven optional payload modalities and a temporal slot populated by
+the coordinator. A subject with only \`{document,temporal}\` is supported;
+this is NOT variable-arity storage. A quandle/knot witness would require a
+new, versioned modality-profile and capability contract, not a reinterpretation
+of \`OctadSchema\`, VCLS v1 or a spare Octad slot.
+
+See \`hyperpolymath/nextgen-databases/verisim-modular-experiment/\` for an
+independent experimental implementation of a smaller core with external
+federable witnesses. Its recorded parity checks are runtime tests, not an
+arbitrary-cardinality production guarantee.
+
+== 2. As-built architecture
+
+[source,text]
+----
+HTTP /api/v1 + legacy root            GraphQL (/graphql)
+           |                                   |
+           +---------------+-------------------+
+                           |  Axum router
+                  verisim-api AppState
+                           |
+           +---------------+---------------+
+           |                               |
+   octad coordinator                 REST VCL interpreter
+   (in-memory registry,             best-effort TypeLL check
+    lock/version manager, WAL)       /vcl/execute
+           |
+     +-----+------+-----+-----+-----+-----+-----+------+
+     |     |      |     |     |     |     |     |      |
+   Graph Vector Tensor Semantic Document Temporal Provenance Spatial
+     |     |      |     |     |     |     |      |
+     +------------ persistent feature ----------+
+              redb, Tantivy, WAL segments
+
+Separate processes/surfaces:
+  Elixir/OTP supervisor -- HTTP RustClient, ETS caches, metadata KRaft,
+                          schema registry, drift monitor, federation resolver
+  Rust federation router -- PSK-registered peers, HTTP query fan-out
+  gRPC :50051          -- distinct Tonic server, not Axum middleware
+  NIF                 -- currently non-operational stubs
+  verisimdb-data      -- independent git-backed scan/dispatch JSON + ABI dogfood
+----
+
+Source: \`Cargo.toml\`; \`rust-core/verisim-api/src/lib.rs\`,
+\`vcl.rs\`, \`grpc.rs\`, \`federation.rs\`;
+\`rust-core/verisim-octad/src/store.rs\`;
+\`elixir-orchestration/lib/verisim/application.ex\`,
+\`rust_client.ex\`, \`nif_bridge.ex\`.
+
+The Elixir KRaft metadata-log process does not establish consensus commits
+across the Rust redb/Tantivy modality stores. The federation query endpoint
+is read fan-out, not a cross-store atomic identity transaction. The
+\`verisimdb-data\` scans are not canonical Octad storage.
+
+== 3. Conceptual E-R and physical data model
+
+[source,text]
+----
+CONSONANCE_SUBJECT [OctadId; status, timestamps, version; in-memory]
+   | 1:N                                  | 0:N
+   +--> VERSION [entity_id, version,     +--> PROVENANCE_RECORD
+   |             snapshot input/time]          [actor, source, event, hash,
+   |                                          parent_hash, timestamp]
+   | 0:1 currently present per modality
+   +--> DOCUMENT [id, title, body, fields] -- Tantivy / document map
+   +--> VECTOR [id, dimension, model, f32[]] -- redb / search cache
+   +--> TENSOR [id, shape, f64[]]         -- redb / compute cache
+   +--> SEMANTIC [id, types, properties]  -- redb / type+proof cache
+   +--> SPATIAL [id, point/geometry, SRID] -- redb / linear scan cache
+   +--> GRAPH_NODE [derived IRI]          -- not a separately durable node row
+          | 0:N GRAPH_EDGE [subject,predicate,object]
+          +--> GRAPH_EDGE -- redb triples, subject/object secondary indexes
+
+WAL_ENTRY [sequence,entity_id,op,modality,payload,timestamp,CRC]
+    -- segments on disk, used to reconstruct in-memory subject registry
+
+FEDERATION_PEER [store_id,endpoint,modalities,trust,PSK hash]
+    -- API process memory, not a foreign-key backed identity replica
+----
+
+This is a conceptual relation map, NOT a claim of an SQL schema or
+referential constraints. Most canonical modality files are separate redb
+databases; documents use Tantivy, and the subject registry itself is
+rebuilt from the WAL when the persistent feature is enabled. A
+cross-modality transaction is NOT a single physical database commit.
+Indexes and in-memory read caches must be distinguished from durable
+identities. See each \`rust-core/verisim-*/src/persistent.rs\` and graph
+\`redb_backend.rs\`.
+
+== 4. Eight-modality implementation/persistence matrix
+
+[cols="1,3,3,3",options="header"]
+|===
+|Modality |Runtime implementation |Persistence with \`verisim-api/persistent\` |Important limit
+
+|Graph |Graph edges; relationship traversal; simple graph and optional RDF backends |redb triples and subject/object indexes |Graph node synthesised from ID; deletion lacks delete-by-entity
+
+|Vector |HNSW in default in-memory mode; embedding search |redb embeddings + rebuilt in-memory brute-force index |Similarity is real; embeddings are supplied or feature-hashed, not necessarily learned by a neural model
+
+|Tensor |Shape-checked f64 arrays, map/reduce |redb + cache |Not a neural network; numeric tensor operations only
+
+|Semantic |Type annotations, properties and proof-blob APIs |redb + caches |Stored proof blob does not by itself certify verifier acceptance or source authority
+
+|Document |Tantivy full-text index/search, stored fields |persistent Tantivy directory + read map |A distinct storage engine; no physical global commit with redb
+
+|Temporal |Version append, history and \`at_time\` |redb version histories + BTreeMap cache |Delta snapshot input omits unchanged prior values; historic reconstruction can be incomplete
+
+|Provenance |Append and verify SHA-256 hash chain |redb chains + cache |Hash continuity != signed authenticity; no immutable external anchor shown
+
+|Spatial |Coordinates, bounding/radius/nearest search |redb records + brute-force cache |Not an R-tree persistent spatial index
+|===
+
+Default \`verisim-api\` feature set is *in-memory*, not persistent.
+The presence bitmap is populated per subject; \`temporal\` is appended on
+every create/update and is absent from \`OctadInput\`. The \`require_complete\`
+setting is declared but not enforced. Presence of all eight does not
+establish independent, mutually agreeing witnesses.
+
+== 5. Actual identity and state transitions
+
+. \`POST /octads\`: API \`OctadRequest\` (flattened) converts to
+  \`OctadInput\`. The coordinator generates an ID and logs intent, locks
+  requested modalities, writes stores sequentially, appends a temporal
+  version, updates the registry, then emits a commit marker.
+. \`PUT /octads/{id}\`: currently *merge/update*, not replace. Omitted
+  modalities remain populated; the temporal snapshot stores the supplied
+  update input, not a complete materialized entity.
+. Drift: \`drift_compute.rs\` inspects actual state where feasible and
+  records aggregate observations best-effort. A component may be
+  \`computable=false\`; missing evidence is not evidence of consonance.
+. Normalisation: the API picks a target, the regeneration engine picks
+  an eligible source by configured ranking and implements limited
+  transformations: graph->document, document->vector via feature hashing,
+  document/vector->tensor. It writes a "normalized" provenance event.
+  Improved score is not a proof of authorised identity-preserving repair.
+. \`DELETE /octads/{id}\`: removes registry entry and attempts vector,
+  document and tensor deletions; leaves graph/semantic and other retained
+  state/history. This is neither a proven tombstone model nor an authorised
+  expungement operation.
+. Federation: register peers with configured PSKs (disabled when absent),
+  then query remote HTTP endpoints and aggregate results. A peer's
+  \`trust_level\` initially equals 1.0, \`drifted=false\` is currently set
+  in mapped results, and this endpoint is not a mutual witness proof.
+. Recovery: pre-PR code mixed historical committed-entity flags with the
+  last operation per entity; later interrupted writes could be reported
+  as committed. PR #333 reconstructs only paired committed transitions
+  and refuses ambiguous recovery. It does not undo partially persisted
+  cross-modal writes or provide a power-loss proof.
+. First-class merge/split, retraction, tombstone and authorised expungement
+  are not demonstrated by the reviewed HTTP lifecycle endpoints. Do not
+  advertise them as implemented on the basis of conceptual papers.
+
+== 6. Evidence-backed discrepancy register
+
+Priority uses potential correctness/data-loss/security impact, not lines
+of code or marketing importance.
+
+[cols="1,1,4,3",options="header"]
+|===
+|ID |Priority |Observed problem |Status / repair
+
+|R01 |P0 |WAL replay could associate old commit with later interrupted intent; startup ignored replay error |Draft PR #333; \`cargo test\` passed, not merged
+
+|R02 |P0 |No global atomic commit over redb, Tantivy, caches, and WAL; rollback leaves some modalities and errors are ignored |Open: transaction-ID and commit/redo/undo design, real crash tests
+
+|R03 |P0 |API and nested JSON-schema mismatch; unknown payload fields silently ignored |Draft PR #334 rejects unsupported fields; versioned contract alignment still open
+
+|R04 |P0 |Auth disabled by default; GraphQL and federation merged outside REST middleware; separate gRPC lacks Axum authorisation |Draft PR #336 covers merged HTTP routes when enabled. Secure configuration and gRPC independent
+
+|R05 |P0 |Deletion does not completely erase or tombstone modality data, graph edges or provenance; no demonstrated expungement authorisation |Open. Do not change data or semantics without owner decision
+
+|R06 |P1 |VCL TypeLL/VCL-UT check is best-effort; a missing validator does not block INSERT/DELETE |Open: versioned enforcement policy and rejection semantics
+
+|R07 |P1 |Normalizer uses static authority ordering and a score objective, not a source-authenticity or evidence-adequacy proof |Open: proposal/review/authority gates and adverse tests
+
+|R08 |P1 |Temporal snapshot is a partial update input; historical projection can omit retained prior modality data |Open: cumulative snapshot or historical replay with tests
+
+|R09 |P1 |Provenance hash chain not externally anchored or signed; actor strings do not certify identity |Open: key/attestation trust model
+
+|R10 |P1 |Federation advertises self-declared modalities, trust starts at 1.0 and query result \`drifted\` is constant false |Open: peer evidence, trust and failure semantics
+
+|R11 |P1 |Elixir metadata consensus is distinct from persistent Rust state; 30-second ETS cache creates freshness questions |Open: consistency/invalidations, end-to-end multi-node tests
+
+|R12 |P1 |No profile negotiation or arbitrary modality cardinality; Octad and VCLS v1 are fixed eight |Explicit versioned new contract only; no implicit API rewrite
+
+|R13 |P2 |Persistent spatial queries use brute force; vector redb index is brute-force despite in-memory HNSW option |Benchmark and index if warranted
+
+|R14 |P2 |NIF bridge stubs non-operational; "adaptive learner" code is not evidence of a trained general-purpose neural layer |Keep diagnostics honest
+
+|R15 |P2 |Conformance tests and Coq abstraction models have different assurance boundaries from runtime crash/integration tests |Trace obligations to executable implementations
+|===
+
+CI hygiene draft PR #335 fixes unrelated strict-Clippy errors so the
+substantive work can be independently verified.
+
+== 7. Formal proof and testing status
+
+[cols="3,4,3",options="header"]
+|===
+|Obligation |Current evidence |Still required
+
+|Fixed slot algebra and projection identity |Coq \`formal/Octad.v\` has closed conditional structural results |Prove/check concrete Rust-API linkage; profile-generalisation separately
+
+|Merge associativity, commutativity, idempotence |Conditional on the conflict resolver having these laws; *not* demonstrated for AutoMerge |Resolver laws, contested authority and independent versions
+
+|WAL replay idempotence |Coq \`formal/WAL.v\` last-op model, *excludes commit markers* |New committed-log machine model; concurrent intents and crash simulation
+
+|Identity preservation across all transitions |Octad ID is structurally carried by many methods |Version IDs, tombstone, merge/split provenance, correlation across peers
+
+|Provenance continuity |Hash-chain verify and Coq abstract proof |Signing, trust roots, actor authority and rewrite resistance
+
+|Normalizer source exclusion and stability |Coq \`formal/Normalizer.v\` contains explicit assumptions for winner selection |Discharge on concrete code and adversarial witness source cases
+
+|VCL admissibility and dependent-type validation |VCL-UT separate checker with fixed v1 schema; HTTP preflight optional |Enforced failure mode, signed proof result, operation/role policy
+
+|Federation noninterference/Byzantine handling |Separate \`nextgen-databases\` runtime tests for selected configurations |Arbitrary-N formal model, authentic peer evidence and actual integration
+
+|Recovery after power loss |In-memory reconstruction tests and persistent per-modality reopen tests |Fault injection after *each* storage write, fsync/ordering assurance
+|===
+
+The repository's \`docs/proof-debt.adoc\` reports 13 declared Coq
+\`Axiom\` instances, zero \`Admitted\` and an assumption-whitelist build gate.
+That is a useful audit inventory, not proof that the Rust implementation
+satisfies every statement. This recon did not run \`coqc\` locally.
+
+== 8. Independent Mathesis proof reuse programme
+
+Mathesis itself is a *catalogue*; canonical proofs remain in their own repos.
+Priority is determined by a *specific transport obligation*, not by theorem
+count.
+
+. *Immediate*: \`residual-evidence-types/Revision.agda\` provides
+  assumption retraction and persistent refutation. Adapt to subject claims
+  revoked after an upstream authority retraction; port and re-check under
+  VeriSimDB assumptions.
+. *Immediate*: \`vcl-ut\` accepted modality-profile ADR and concrete
+  fixed-eight wire schema identify the current interface boundary.
+. *High*: \`echo-types\` (canonical identity, projection and provenance
+  fibres) for explaining what was forgotten in a projection.
+. *High*: \`marches/Marches/Provenance.lean\` for graded path provenance
+  through federation boundaries. Its own cross-repo Echo correspondence
+  is explicitly *assumed*, not already ported.
+. *High*: \`nextgen-databases/verisim-modular-experiment\` for a
+  minimal-core/federation hypothesis and demonstrated runtime parity
+  in limited cases. Its general non-interference proof remains open.
+. *High*: \`januskey\` reversibility/transaction examples for explicitly
+  authorised expungement/undo *specification*; its own proof debt and
+  crash-persistence caveats prevent direct substitution.
+. *Medium*: \`epistemic-types\`, \`trope-checker\` for graded epistemic
+  confidence and evidence/representation fidelity.
+. *Exploratory*: \`quandledb\` as a specialised external witness,
+  \`absolute-zero\` and tropical models for resource/cost limits, not
+  currently a provenance or crash-safety proof.
+
+Proof transplant protocol: identify exact original statement and axioms;
+write a bridge proposition for VeriSimDB's concrete types; check required
+observations/authority/trust assumptions; port and prove; add runtime tests.
+Never infer implementation soundness from a similarly named theorem.
+
+== 9. Prioritised independent engineering programme
+
+P0-a:: Review, pass CI and land #333 after considering old WAL histories,
+  in-flight intents and rollback design. Fail closed is an interim safety
+  measure, not durable atomicity.
+P0-b:: Audit and gate HTTP/gRPC auth, expose secure deployment configuration,
+  test RBAC across GraphQL and every mutation surface. #336 is one part.
+P0-c:: Merge #334 only after clients are audited; publish the truthful
+  versioned flattened request schema (or explicitly introduce nested v2).
+P0-d:: Define deletion vs retraction vs tombstone vs expungement with
+  retention, authorisation and provenance guarantees. Prohibit silent
+  ungoverned destruction.
+P1-a:: Implement a versioned lifecycle transition model, explicit VCL-UT
+  enforcement modes, failure codes and signed evidence policy.
+P1-b:: Repair temporal full-snapshot history and validate through crash
+  boundaries; add multi-process persistent fault injection.
+P1-c:: Require normalisation proposals, recorded source authority,
+  independent evidence assessment, reviewer gates and reversal record.
+P1-d:: Harden federation peer identities, evidence independence,
+  trust/failure states, multi-node partitions and cache semantics.
+P1-e:: Experiment with generic modality profiles *without* breaking
+  existing fixed Octad or VCLS v1 contracts.
+P2:: Benchmark spatial/vector indexing, memory/CPU, diagnostics
+  accessibility, NIF implementation, deployment profiles and footprint.
+
+The priority order is based on system integrity, not any specific
+consumer. Hypatia is one downstream use case.
+
+== 10. Safety and operational release gate
+
+Before a production "persistent, federated identity-consistent" claim,
+require: crash-injection recovery across every modality and WAL stage;
+post-restart byte/identity/history comparisons; observed provenance
+continuity; secure auth on every listener; explicit VCL transition
+admissibility; evidence-aware normalisation; federation downgrade
+handling; and a real profile/version compatibility matrix. No
+destructive migration or automatic expungement is authorised by this
+reconnaissance.
