@@ -39,7 +39,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@v2.87.30
+      - uses: taiki-e/install-action@v2.88.0
         with:
           tool: cargo-mutants
       - name: Run mutation tests
@@ -74,7 +74,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@v2.87.30
+      - uses: taiki-e/install-action@v2.88.0
         with:
           tool: cargo-hack
       - name: Check every feature combination compiles
