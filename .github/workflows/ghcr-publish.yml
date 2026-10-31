@@ -41,7 +41,7 @@ jobs:
       # monitor its outbound egress (audit mode; tighten to block with an
       # allowlist once the endpoint set is observed stable).
       - name: Harden runner (egress audit)
-        uses: step-security/harden-runner@v2.22.2
+        uses: step-security/harden-runner@v2.22.3
         with:
           egress-policy: audit
       - uses: actions/checkout@v7.0.1

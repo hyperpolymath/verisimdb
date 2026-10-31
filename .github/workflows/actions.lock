@@ -21,7 +21,7 @@ workflows:
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/ci-meta.yml':
         - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-squabbler@541ab9bc21a776d55eb46611877521a824d6319c'
+        - 'hyperpolymath/cicd-squabbler@193349090edb29f4ed1ef82142c207e22e1715c9'
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
         - 'github/codeql-action@9b3254085494b55a0f7c4c2b3d2d52cc712ce370'
@@ -47,7 +47,7 @@ workflows:
     '.github/workflows/ghcr-publish.yml':
         - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
-        - 'step-security/harden-runner@v2.22.2'
+        - 'step-security/harden-runner@v2.22.3'
     '.github/workflows/governance.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/hypatia-scan.yml':
@@ -67,7 +67,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
-        - 'taiki-e/install-action@v2.87.30'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/pages.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/deploy-pages@v5.0.1'
@@ -83,7 +83,7 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'rustsec/audit-check@v2.0.0'
-        - 'taiki-e/install-action@v2.87.30'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/scorecard.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/secret-scanner.yml':
@@ -191,9 +191,9 @@ dependencies:
         commit: 'sha1-884713a6c30a92e5e8544c39945cd7cb630abcd1'
         owner_id: 1342004
         repo_id: 400046858
-    'hyperpolymath/cicd-squabbler@541ab9bc21a776d55eb46611877521a824d6319c':
+    'hyperpolymath/cicd-squabbler@193349090edb29f4ed1ef82142c207e22e1715c9':
         ref: 'main'
-        commit: 'sha1-541ab9bc21a776d55eb46611877521a824d6319c'
+        commit: 'sha1-193349090edb29f4ed1ef82142c207e22e1715c9'
         owner_id: 6759885
         repo_id: 1284026967
     'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d':
@@ -233,14 +233,14 @@ dependencies:
         commit: 'sha1-69366f33c96575abad1ee0dba8212993eecbe998'
         owner_id: 25397242
         repo_id: 523199201
-    'step-security/harden-runner@v2.22.2':
-        ref: 'v2.22.2'
-        commit: 'sha1-dc2769abcc0fcfbadfc1df54081c1608579ef6b2'
+    'step-security/harden-runner@v2.22.3':
+        ref: 'v2.22.3'
+        commit: 'sha1-46b06cea07f9e64621fdf066ba77ac6915163d43'
         owner_id: 88700172
         repo_id: 422287306
-    'taiki-e/install-action@v2.87.30':
-        ref: 'v2.87.30'
-        commit: 'sha1-a4d3f3f761dcd95cce1b72cb61cb6d1963438177'
+    'taiki-e/install-action@v2.88.0':
+        ref: 'v2.88.0'
+        commit: 'sha1-86f7a0ffb25f40114606501a311ebcfaf882ea32'
         owner_id: 43724913
         repo_id: 442947557
     'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555':

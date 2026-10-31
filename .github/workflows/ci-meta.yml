@@ -80,7 +80,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Cross-repo CI dependency graph (read-only)
-        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@541ab9bc21a776d55eb46611877521a824d6319c
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@193349090edb29f4ed1ef82142c207e22e1715c9
         with:
           args: |
             chains
