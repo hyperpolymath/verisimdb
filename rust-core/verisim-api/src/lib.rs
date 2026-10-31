@@ -270,6 +270,7 @@ pub struct HealthResponse {
 
 /// Octad create/update request
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OctadRequest {
     /// Document title
     pub title: Option<String>,
@@ -322,6 +323,16 @@ pub struct SpatialRequest {
 }
 
 impl OctadRequest {
+    /// Refuse payloads that would silently lose a supplied field.
+    fn validate(&self) -> Result<(), ApiError> {
+        if self.body.is_some() && self.title.is_none() {
+            return Err(ApiError::BadRequest(
+                "body requires title; omitting it would discard document content".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Convert to OctadInput
     fn to_octad_input(&self) -> OctadInput {
         let mut input = OctadInput::default();
@@ -1061,6 +1072,7 @@ async fn create_octad_handler(
     State(state): State<AppState>,
     Json(request): Json<OctadRequest>,
 ) -> Result<(StatusCode, Json<OctadResponse>), ApiError> {
+    request.validate()?;
     let input = request.to_octad_input();
 
     let octad = state
@@ -1105,6 +1117,7 @@ async fn update_octad_handler(
 ) -> Result<Json<OctadResponse>, ApiError> {
     validate_octad_id(&id)?;
     let octad_id = OctadId::new(&id);
+    request.validate()?;
     let input = request.to_octad_input();
 
     // The pre-update modality set is the schema baseline: an update that
@@ -2690,6 +2703,48 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_reject_nested_schema_payload_instead_of_silently_dropping_it() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+        let nested = serde_json::json!({
+            "document": {"title": "Keep", "body": "Must not be discarded"}
+        });
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(nested.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn test_reject_body_without_title_instead_of_silently_dropping_it() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"body":"A document without a title"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
