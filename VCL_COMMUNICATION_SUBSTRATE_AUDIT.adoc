@@ -1,0 +1,133 @@
+= VeriSimDB + VCL as "mandatory communication substrate" — audit of ECHIDNA / echidnabot / proof-burrower
+:toc:
+:toc-placement!:
+
+== Summary of finding
+
+The claim that "VeriSimDB plus VCL is the mandatory communication substrate for ECHIDNA, echidnabot, and proof-burrower" is *not supported by the source*.
+
+| Entity | Status in this repo | How it actually talks to VeriSimDB | Uses VCL? |
+|--------|---------------------|------------------------------------|-----------|
+| ECHIDNA | External reference only (`echidna/src/rust/verisim_bridge.rs` is cited in comments; not in this tree) | Three proof-attempt endpoints: `POST /api/v1/proof_attempts`, `GET /api/v1/proof_attempts?obligation_id=`, `GET /api/v1/mv_prover_success_by_class?class=` | No — proof-octad persistence (S4 learning loop) only |
+| echidnabot | Bot directive file only (`.machine_readable/bot_directives/echidnabot.a2ml`); policy: allow analysis/fuzzing/proof checks, deny writes | None — not a caller, no client code references it | No |
+| proof-burrower | Absent — zero references anywhere in the repository | None | No |
+
+ECHIDNA is the only one of the three with any actual connectivity, and it is limited to recording and querying proof-attempt rows. It does not send VCL statements and does not consume VCL responses. VeriSimDB plus VCL is therefore not the mandatory substrate for any of the three; the current evidence is point-to-point HTTP for proof persistence (ECHIDNA) and nothing at all (echidnabot, proof-burrower).
+
+== Actual VCL surface — endpoints, adapters, schemas, callers
+
+=== Implemented endpoints
+
+VCL is exposed over HTTP and gRPC. There is no single canonical VCL path: two mounts coexist, and two separate VCL execution paths exist (Rust server-side parser and Elixir bridge/executor).
+
+HTTP (Rust core, `rust-core/verisim-api/src/lib.rs` `build_router`):
+
+* `POST /vcl/execute` — root mount, kept for backwards compatibility (verisim-repl, local tooling). Server-side tokenized VCL parser (`rust-core/verisim-api/src/vcl.rs`).
+* `POST /api/v1/vcl/execute` — prefixed mount, the documented contract (`connectors/shared/openapi/verisim-api-v1.yaml` `/api/v1/vcl/execute`). Same handler.
+
+Supported VCL statements (per `vcl.rs`): `SELECT`, `SEARCH TEXT/VECTOR/RELATED`, `INSERT`, `DELETE`, `SHOW STATUS/DRIFT/NORMALIZER/OCTADS`, `COUNT`, `EXPLAIN`.
+
+Behaviour of note:
+* `validate_with_typell/1` makes a best-effort, non-blocking call to an *external* TypeLL service at `http://localhost:7800/api/v1/check` (env `TYPELL_URL`). If unreachable the query still executes; safety metadata (`safety_level`, `query_path`, `proof_obligations`) is attached when available. Downstream consumers named in the doc comment are PanLL and ECHIDNA, but ECHIDNA does not actually consume this endpoint.
+* Mutations (INSERT/UPDATE/DELETE) bypass the VCLTGate; epistemic statements are gate-checked via `VeriSim.Query.VCLTGate` when `VERISIM_VCLT_GATE` is set.
+
+gRPC (port 50051, tonic, `rust-core/verisim-api/src/grpc.rs`):
+
+* `VeriSimOctad`: create, get, update, delete, search_text, search_vector.
+* `VeriSimPlanner`: optimize_plan, explain_plan, get_config, set_config, get_stats.
+
+There is *no VCL-over-gRPC*, and the proof-attempt endpoints are HTTP-only.
+
+GraphQL:
+
+* `/graphql` — octad, search, drift, normalizer, planner operations (`rust-core/verisim-api/src/graphql.rs`).
+
+Not implemented (referenced by clients, absent from server):
+
+* `POST /api/v1/vcl/explain` — called by both SDK clients (`connectors/clients/rust/src/vcl.rs` `explain_vcl/1`, `connectors/clients/elixir/lib/verisim_client/vcl.ex` `explain/2`) but no route exists in `build_router`.
+* `POST /api/v1/query` WASM proxy behind Cloudflare SDP with `X-VCL-Safe` header — described only in `docs/vcl-architecture.adoc` (planned architecture), not implemented.
+
+=== Implemented adapters / client-side VCL routing
+
+* `rust-core/verisim-api/src/vcl.rs` — server-side VCL execute handler (tokenizer + statement router against the octad store).
+* `rust-core/verisim-repl/` — Interactive VCL REPL client; calls `POST /vcl/execute`.
+* `elixir-orchestration/lib/verisim/query/vcl_bridge.ex` — GenServer bridging to a long-running Deno/Node process running a compiled VCL parser over length-prefixed JSON stdin/stdout, with a built-in Elixir fallback parser. Exposes `parse/2`, `parse_slipstream/2`, `parse_dependent/2`, `parse_mutation/2`, `parse_statement/2`, `typecheck/2`, `parse_and_execute/2`.
+* `elixir-orchestration/lib/verisim/query/vcl_executor.ex` — executes parsed ASTs: slipstream path (no proofs) and VCL-DT path (type-check → execute → verify multi-proof → bundle `VCLProofCertificate`). Routes federation queries via `RustClient.post("/federation/query", …)`. Proof types supported: existence, citation, access, integrity, provenance, consistency, freshness, custom, zkp, proven, sanctify.
+* `elixir-orchestration/lib/verisim/rust_client.ex` — Elixir HTTP client to `http://localhost:8080/api/v1` (octad CRUD, search, drift, normalizer, provenance, spatial). Used by VCLExecutor.
+* `VeriSim.Federation.Adapter` behaviour + 14 adapter modules (all present and implementing `connect/1`, `query/3`, `health_check/1`, `supported_modalities/1`, `translate_results/2`): VeriSimDB, ArangoDB, PostgreSQL, Elasticsearch, MongoDB, Redis, DuckDB, ClickHouse, SurrealDB, SQLite, Neo4j, VectorDB, InfluxDB, ObjectStorage. The VeriSimDB adapter is fully implemented (peer HTTP calls to `/search/vector`, `/search/related/:id`, `/search/text`, `/spatial/search/bounds`, `/octads`).
+* `VeriSim.Federation.Resolver` — GenServer coordinating peer registration, fan-out, and drift-policy aggregation (`:strict`, `:repair`, `:tolerate`, `:latest`).
+
+SDKs / clients:
+
+* `connectors/clients/rust/` — `VeriSimClient`; `vcl.execute_vcl/1` → `POST /api/v1/vcl/execute`; `vcl.explain_vcl/1` → `POST /api/v1/vcl/explain` (endpoint absent).
+* `connectors/clients/elixir/` — `VeriSimClient.Vcl.execute/2` → `/api/v1/vcl/execute`; `explain/2` → `/api/v1/vcl/explain` (endpoint absent).
+
+Callers of VCL (measured from source, not inferred from names):
+
+* `verisim-repl` → `POST /vcl/execute`
+* Rust SDK → `/api/v1/vcl/execute` (+ non-existent `/api/v1/vcl/explain`)
+* Elixir SDK → `/api/v1/vcl/execute` (+ non-existent `/api/v1/vcl/explain`)
+* Elixir `VCLBridge`/`VCLExecutor` → internal AST pipeline; store I/O via `RustClient` → HTTP API; federation via `/federation/query`
+* ECHIDNA (external) → proof-attempt endpoints only, *not* VCL
+* TypeLL (`localhost:7800`) → callee of `validate_with_typell`, best-effort, not a VCL caller
+* echidnabot → no client code, not a caller
+* proof-burrower → absent
+
+=== Schemas / contracts
+
+* `connectors/shared/openapi/verisim-api-v1.yaml` — 17 paths, all under `/api/v1`, includes `/api/v1/vcl/execute`. *Schema drift*: it documents the response as `{results, execution_time_ms, total_count, explain_plan}` with `results` as octad items, but the actual `VclExecuteResponse` is `{success, statement_type, row_count, data, message, safety_level?, query_path?, proof_obligations?}`. The OpenAPI contract does not match the implementation.
+* `connectors/shared/json-schema/` — 10 schemas: octad, octad-input, octad-status, modality, provenance-event, query-params, drift-score, federation-result, error, (plus).
+* `connectors/shared/proto/verisim_federation.proto` — federation proto.
+* `rust-core/verisim-api/src/proto/verisim.rs` — committed prost-generated gRPC types; no hand-authored `.proto` source for the gRPC service in-tree.
+* Proof-attempt schema (ECHIDNA contract) is documented inline in `rust-core/verisim-api/src/proof_attempts.rs` (`ProofAttempt`, `ProverSuccessRow`) and mirrored in tests; not present in `connectors/shared/`.
+
+=== Planned / aspirational (docs only, not in tree)
+
+`docs/vcl-architecture.adoc` describes a dual-path router with a ReScript parser, WASM proxy behind Cloudflare SDP (`/api/v1/query`, `X-VCL-Safe`), Oxigraph/Milvus/Tantivy/Burn stores, a ReScript+Raft registry, and `verisim-temporal` Merkle audit. None of this exists in the current tree: the tree has AffineScript (`src/vcl/`, 11 modules), `verisim-*` Rust stores, HTTP/gRPC/GraphQL API, and Elixir orchestration. The doc is a target architecture, not a description of implemented behaviour.
+
+=== Discrepancies found during the audit
+
+1. Two VCL mounts (`/vcl/execute` and `/api/v1/vcl/execute`) serve the same handler; root mounting is retained for backwards compatibility with verisim-repl.
+2. `/api/v1/vcl/explain` is implemented in both SDK clients but absent from the server.
+3. OpenAPI response schema for `/api/v1/vcl/execute` does not match the actual `VclExecuteResponse` shape.
+4. SDK docs advertise `DRIFT CHECK`, `NORMALIZE`, `FEDERATE` VCL statements; the actual parser supports SELECT/SEARCH/INSERT/DELETE/SHOW/COUNT/EXPLAIN only.
+5. `docs/vcl-architecture.adoc` describes components (ReScript, Oxigraph, Milvus, WASM endpoint) that are not implemented; it should not be used as evidence of runtime behaviour.
+
+== If central routing is normative: proposals
+
+`docs/vcl-architecture.adoc` and the federation resolver treat central routing as normative (every VCL statement funnels through a router; federation fans out through adapters under drift policies). If that is the intended design, the following closes the gap between the claim and reality without inferring connectivity from repository names:
+
+=== 1. Backend-specific adapters (implement, don't assume)
+
+Introduce a VCL adapter behaviour that translates a VCL statement into each backend's native language, mirroring the existing `VeriSim.Federation.Adapter` pattern:
+
+* `VeriSim.Vcl.Adapter` behaviour: `prepare/2` (VCL string → backend plan), `execute/3`, `explain/2`, `supported_statements/1`.
+* VeriSimDB backend adapter → `POST /api/v1/vcl/execute` (existing).
+* Postgres adapter → recursive CTE / pgvector SQL translation.
+* ArangoDB adapter → AQL translation.
+* Neo4j adapter → Cypher translation.
+* Elasticsearch adapter → DSL translation.
+* Object-storage adapter → S3 SELECT / metadata scan.
+
+Each adapter is registered behind the central router; no backend is addressed point-to-point by a consumer. Consumers address the router only.
+
+=== 2. Executable no-point-to-point tests
+
+These tests enforce that ECHIDNA, echidnabot, and proof-burrower do *not* communicate directly, and that all VCL traffic passes through the central router:
+
+* `test_no_echidna_vcl_endpoint/0` — assert ECHIDNA's only reachable VeriSimDB endpoints are the three proof-attempt routes; assert no VCL statement from ECHIDNA reaches `/api/v1/vcl/execute` (use the recorded `ProofAttempt` shape from `proof_attempts.rs` as the contract, not the VCL shape).
+* `test_echidnabot_not_a_caller/0` — assert no module in the tree references `echidnabot` outside `.machine_readable/bot_directives/` and `.well-known/ai.txt`; assert it opens no TCP/HTTP/gRPC connection to VeriSimDB.
+* `test_proof_burrower_absent/0` — assert zero references to `proof-burrower`/`proof_burrower` in the tree (currently true; treat as a regression guard if the name is ever introduced).
+* `test_vcl_all_traffic_through_router/0` — spin the API server, send a VCL statement via `verisim-repl` and via both SDKs, assert every call hits `/vcl/execute` or `/api/v1/vcl/execute` and none hits a backend directly.
+* `test_vcl_explain_endpoint_or_remove_clients/0` — either implement `POST /api/v1/vcl/explain` to match the SDKs, or remove `explain_vcl`/`explain/2` from the Rust and Elixir clients so clients stop calling a phantom endpoint.
+* `test_openapi_matches_vcl_response/0` — contract test comparing the OpenAPI `/api/v1/vcl/execute` response schema against the actual `VclExecuteResponse` serialization; fail on drift.
+* `test_typell_unreachable_still_executes/0` — with `TYPELL_URL` pointing to a dead port, assert a VCL `SELECT` still executes and returns `success: true` with `safety_level: null` (best-effort gate, not a hard failure).
+* `test_federation_adapter_round_trip/0` per adapter — each of the 14 adapters executes a canonical modality query against a mock/real backend and returns `federation_result()`-shaped data.
+
+=== 3. Evidence standard going forward
+
+Do not infer connectivity from repository names (e.g. `echidna` appearing in `prover_used` strings, A2ML `@recommendation(prover="echidna")`, or test fixtures). Accept connectivity only when demonstrated by:
+* an in-tree caller module opening a client connection to a VeriSimDB endpoint, or
+* an externally documented request/response contract (as ECHIDNA's `verisim_bridge` is documented in `proof_attempts.rs` comments) that is exercised in a test.
+
+Current state of the claim: **rejected**. ECHIDNA persists proof octads over plain HTTP; echidnabot is a policy file; proof-burrower does not exist in this repository. VeriSimDB + VCL is not the mandatory communication substrate for any of them.
