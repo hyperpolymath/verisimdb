@@ -274,7 +274,9 @@ jobs:
           # The Print Assumptions output must exist and be non-empty: an absent
           # or empty file is a broken pipeline, not a clean whitelist.
           test -s Recovery.out
-          AXIOMS=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Recovery.out | sort -u)
+          # Names may be printed qualified (e.g. Classical_Prop.classic): admit
+          # dots and primes so a qualified axiom cannot hide behind an allowed one.
+          AXIOMS=$(awk "/^[A-Za-z_][A-Za-z0-9_.']* :/ {print \$1}" Recovery.out | sort -u)
           test -n "$AXIOMS"
           # grep exits 1 when every axiom is whitelisted (the good case) and 2 on
           # error; tolerate exactly status 1 so a real failure still fails the step.

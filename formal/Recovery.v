@@ -55,8 +55,11 @@
 
     [conflict] abstracts the pairwise-drift decision of
     verisim-drift (a boolean on two values); [nconflicts] counts ORDERED
-    pairs of present modalities whose values conflict, so a single
-    conflicting pair counts twice. That is fine for a termination measure
+    pairs of present modalities whose values conflict, so a distinct pair
+    counts twice when [conflict] holds in both directions and once when it
+    holds in only one ([conflict] is not assumed symmetric; the
+    [fill_can_raise_conflicts] counter-model is symmetric, hence 0 -> 2).
+    Either way it is a sound termination measure
     and keeps the definition free of a modality order. The winner is an
     abstract selector, exactly as in [Normalizer.v]; [winner_some] is the
     one property the termination argument needs (it replaces

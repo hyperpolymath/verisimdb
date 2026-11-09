@@ -140,10 +140,14 @@ check-octad: octad
             echo "OK(Octad): O-series (cardinality, present-totality, projection) + R1-R3 merge algebra"; \
           fi; }
 
+# Names may be printed qualified (e.g. Classical_Prop.classic), so the
+# extraction admits dots and primes; an empty output or an empty axiom list
+# is a broken pipeline and fails, as in coq-build.yml.
 check-recovery: recovery
-    @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Recovery.out \
-      | sort -u \
-      | grep -vE '^(mval|ident|functional_extensionality_dep)$' \
+    @test -s Recovery.out || { echo "ERROR(Recovery): Recovery.out missing or empty"; exit 1; }
+    @awk "/^[A-Za-z_][A-Za-z0-9_.']* :/ {print \$1}" Recovery.out | sort -u > Recovery.axioms
+    @test -s Recovery.axioms || { echo "ERROR(Recovery): no assumptions parsed from Recovery.out"; exit 1; }
+    @grep -vxE 'mval|ident|functional_extensionality_dep' Recovery.axioms \
       | { if read -r line; then \
             echo "ERROR(Recovery): unexpected axiom: $line"; cat; exit 1; \
           else \
@@ -152,4 +156,4 @@ check-recovery: recovery
 
 # Remove all build artefacts.
 clean:
-    rm -f *.vo *.vos *.vok *.glob .*.aux *.out
+    rm -f *.vo *.vos *.vok *.glob .*.aux *.out *.axioms
