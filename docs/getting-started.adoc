@@ -194,7 +194,7 @@ Response:
 [source,json]
 ----
 {
-  "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "id": "a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d",
   "status": "created",
   "modalities": {
     "document": true,
@@ -213,14 +213,14 @@ Response:
 
 [source,bash]
 ----
-curl http://localhost:8080/api/v1/octads/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+curl http://localhost:8080/api/v1/octads/a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d
 ----
 
 === Step 3: Check Drift Status
 
 [source,bash]
 ----
-curl http://localhost:8080/api/v1/drift/entity/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+curl http://localhost:8080/api/v1/drift/entity/a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d
 ----
 
 Response:
@@ -228,7 +228,7 @@ Response:
 [source,json]
 ----
 {
-  "entity_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "entity_id": "a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d",
   "graph": 0.0,
   "vector": 0.0,
   "tensor": 0.0,
@@ -252,14 +252,14 @@ updating the document:
 [source,bash]
 ----
 # Update ONLY the vector embedding (not the document text)
-curl -X PUT http://localhost:8080/api/v1/octads/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d \
+curl -X PUT http://localhost:8080/api/v1/octads/a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d \
   -H "Content-Type: application/json" \
   -d '{
     "embedding": [0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99]
   }'
 
 # Check drift again
-curl http://localhost:8080/api/v1/drift/entity/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+curl http://localhost:8080/api/v1/drift/entity/a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d
 ----
 
 Response:
@@ -267,7 +267,7 @@ Response:
 [source,json]
 ----
 {
-  "entity_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "entity_id": "a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d",
   "vector": 0.87,
   "document": 0.0,
   "overall": 0.43,
@@ -282,7 +282,7 @@ detected that the embedding no longer corresponds to the text.
 
 [source,bash]
 ----
-curl -X POST http://localhost:8080/api/v1/normalizer/trigger/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+curl -X POST http://localhost:8080/api/v1/normalizer/trigger/a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d
 ----
 
 VeriSimDB identifies the document as the authoritative modality and
@@ -300,7 +300,7 @@ understands modalities and drift.
 [source,sql]
 ----
 -- Get all modalities for an entity
-SELECT * FROM HEXAD 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
+SELECT * FROM HEXAD 'a1b2c3d4-e5f6-8a7b-8c9d-0e1f2a3b4c5d'
 
 -- Get specific modalities
 SELECT GRAPH.*, DOCUMENT.*, VECTOR.* FROM HEXAD 'entity-id'

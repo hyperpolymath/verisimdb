@@ -874,7 +874,7 @@ mod tests {
 
     #[test]
     fn test_capability_matching() {
-        let peer_consumes = vec!["octad-storage".to_string(), "unknown-cap".to_string()];
+        let peer_consumes = ["octad-storage".to_string(), "unknown-cap".to_string()];
 
         let matched: Vec<String> = peer_consumes
             .iter()

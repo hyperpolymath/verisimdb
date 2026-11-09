@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Verified Downstream Handover: Hypatia / VeriSimDB
+:revdate: 2026-10-29
+
+Scope: **only confirmed interfaces, incompatibilities, changed
+assumptions and PR links**. This is not a VeriSimDB roadmap and does not
+prescribe Hypatia's architecture.
+
+* The current Rust HTTP API is mounted at both the root and, by
+  default, \`/api/v1\`. \`POST /octads\` accepts flattened fields such as
+  \`title\`, \`body\`, \`embedding\`, \`types\`, \`relationships\`, \`tensor\`,
+  \`spatial\`, \`provenance\`, \`metadata\`; it does not accept the nested
+  \`OctadInput\` shape as authored in the shared JSON Schema.
+  *Relevant change:* https://github.com/hyperpolymath/verisimdb/pull/334.
+* The *fixed* implementation has eight slots, but any one subject may
+  populate fewer. Temporal is created on write; the runtime does not
+  negotiate modality profiles or support ninth/custom modalities.
+  The accepted generic term is **modality profile**, distinct from
+  *modality set* (present witnesses) and *consonance subject* (identity).
+  See \`docs/modality-profile.adoc\` and VCL-UT ADR 0007.
+* \`/vcl/execute\` is a restricted Rust interpreter. TypeLL VCL-UT
+  preflight is best-effort: validator unavailability does *not* block
+  INSERT/DELETE. Neither proof carrying nor transition admissibility
+  may be assumed without an explicit upstream contract change.
+* Drift reports include per-component \`computable\` status. A lower
+  drift score or auto-regeneration result is not proof of identity
+  equivalence or legitimate source authority.
+* Persistent feature enables per-modality redb/Tantivy stores and WAL;
+  it does not demonstrate atomic cross-modal crash recovery. WAL
+  status-rebuild error is non-fatal on \`main\`, proposed fail-closed
+  behavior is https://github.com/hyperpolymath/verisimdb/pull/333.
+* DELETE currently removes visible status and some modality content,
+  but is not a fully specified tombstone, retraction, or authorised
+  expungement. No consumer should interpret 204 as complete physical
+  erasure or retroactive provenance removal.
+* Federation in Rust is peer registration plus HTTP search/list fan-out,
+  not a proof of independent witnesses or a distributed identity
+  transaction. Peer trust is initially 1.0 and result drift flag is
+  populated as false. Do not treat it as an independently validated
+  consonance result.
+* GraphQL/federation route authentication is under proposed repair in
+  https://github.com/hyperpolymath/verisimdb/pull/336. The default
+  AuthState is disabled, and gRPC is separate from the Axum middleware.
+* \`hyperpolymath/verisimdb-data\` is a distinct git-backed scan/dispatch
+  JSON dataset and ABI dogfood repository, not an interchangeable
+  VeriSimDB persistent-modal store. Historical Hypatia scan integration
+  documents there do not prove the live Rust API is integrated.
+
+Use \`docs/consumer-interface-contract-v1-observed.adoc\` for
+operation-level details. All proposed PRs are draft and must not be
+considered deployed, released or merged until verified.

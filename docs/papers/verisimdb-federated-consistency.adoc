@@ -455,7 +455,7 @@ Multiple proofs can be composed in a single query:
 [source,vcl]
 ----
 SELECT *
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF INTEGRITY(DataIntegrityContract)
   AND PROVENANCE(FullLineageContract)
 ----

@@ -17,7 +17,7 @@ this document and the code/schema disagree, the code/schema win and this documen
 has a bug.
 
 // The two annotations below are read by
-// scripts/check-modality-contract.py (via tests/modality-contract-gate.sh).
+// scripts/check-modality-contract.sh (via tests/modality-contract-gate.sh).
 // They are the machine-checkable half of this document: the doc cannot drift
 // away from connectors/shared/json-schema/ and the Rust core without CI saying
 // so. Keep the exact `// modality-contract:` prefix.

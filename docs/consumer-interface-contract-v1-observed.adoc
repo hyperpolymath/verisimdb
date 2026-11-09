@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= VeriSimDB Consumer Interface Contract — Observed v1 Boundary
+:revdate: 2026-10-29
+:toc: left
+
+[IMPORTANT]
+====
+This is a **source-derived description of current behavior**, not an
+advertisement of cross-modal serializability, federation authenticity,
+verified proof-carrying transitions or arbitrary modality cardinality.
+It must be checked against each release and against the deployed feature
+set. Do not infer guarantees from the OpenAPI schema alone.
+====
+
+== Endpoint and versioning
+
+* HTTP Axum API listens on \`ApiConfig.host:port\` (defaults \`[::1]:8080\`).
+  \`mount_with_prefix\` exposes the routes both at the legacy root and at
+  \`/api/v1\`; the prefix is configurable.
+* GraphQL: \`POST /graphql\` and \`GET /graphiql\`; gRPC Tonic service on
+  separate configurable port, default 50051. Authentication of gRPC is
+  not established by the HTTP middleware.
+* OTP orchestration is a separate service (Bandit port default 4080);
+  its RustClient defaults to \`http://localhost:8080/api/v1\`.
+* Neither the current JSON schema URLs nor Octad payloads carry a
+  negotiable modality-profile version. \`OctadSchema\` / VCLS v1 in
+  VCL-UT are fixed eight-slot contracts; generic profiles are proposed
+  terminology/architecture, NOT implemented wire capability.
+
+== Supported core HTTP operations
+
+[cols="3,3,4",options="header"]
+|===
+|Route |Current semantics |Important guarantee boundary
+|\`POST /octads\` |Create subject, server-generated ID, 201 |Flattened payload accepted by runtime, *not* the nested published OctadInput schema; default storage is in-memory
+|\`GET /octads/{id}\` |Read current subject, 200 or 404 |Results may be incomplete if a modality store is inconsistent
+|\`PUT /octads/{id}\` |Merge supplied fields into existing subject, 200 or 404 |Not a replace; omissions retain earlier modalities
+|\`DELETE /octads/{id}\` |Remove subject from visible registry, 204 or 404 |Does not prove tombstone, total physical deletion or expungement
+|\`GET /octads\` |Pagination |No cross-witness snapshot isolation guarantee demonstrated
+|\`GET /search/text\` |Tantivy full text |Index and physical modality must be checked for freshness
+|\`POST /search/vector\` |Similarity |Returns embedding search, not meaning equivalence
+|\`GET /search/related/{id}\` |Graph traversal |Graph edges may outlive deleted registry rows
+|\`GET /drift/entity/{id}\` |Per-entity score and computability flags |Score not an identity or authority proof
+|\`POST /normalizer/trigger/{id}\` |Regeneration of selected modality |Side effects and ranked authority; not a guaranteed safe proof-preserving repair
+|\`GET /provenance/{id}\`, \`/verify\` |Hash-chain retrieval and verification |No external signed root or certified actor identity
+|\`POST /provenance/{id}/record\` |Append provenance event |Caller-provided actor text must not be treated as attestation
+|\`POST /vcl/execute\` |Subset SELECT, SEARCH, INSERT, DELETE, SHOW, COUNT, EXPLAIN |TypeLL/VCL-UT request is best-effort and never blocks an action if unavailable
+|\`POST /federation/query\` |HTTP query fan-out to registered peers |Not atomic identity federation or independent witness verification
+|===
+
+Other endpoints exist for planners, transactions, proofs, spatial searches,
+and learning-loop attempts; their presence must not be read as a
+distributed transaction or proof-validity guarantee. Inspect the relevant
+handler, feature flags, and caller-specific contract.
+
+== Observed payload example
+
+The Rust HTTP \`OctadRequest\` is *flattened*:
+
+[source,json]
+----
+{
+  "title": "Witness example",
+  "body": "Document content",
+  "embedding": [0.1, 0.2, 0.3],
+  "types": ["https://schema.org/Thing"],
+  "relationships": [["related_to", "other-subject-id"]],
+  "metadata": {"source_label": "unverified"}
+}
+----
+
+The embedding length must match the configured dimension (default 384);
+the three-dimensional example needs a development server configured to
+dimension 3. Omit \`embedding\` for a dimension-independent example.
+
+\`graph\`, \`document\`, \`vector\` nested root keys from
+\`connectors/shared/json-schema/octad-input.json\` are **not** runtime
+HTTP request fields. On the base revision, serde ignores them, silently
+losing their values. Proposed PR #334 rejects such payloads instead.
+Consumers should not depend on either behavior until the versioned
+contract inconsistency is resolved.
+
+== Errors and failure states
+
+[cols="1,4",options="header"]
+|===
+|Status |Observed meaning
+|400 |Explicit \`ApiError::BadRequest\` / syntactic failures
+|401 |Authentication middleware enabled, credentials absent/invalid
+|403 |RBAC authorization denial, or federation registration without configured PSK
+|404 |Unknown subject or endpoint
+|413 |Oversized request body, under body-limit middleware
+|422 |Axum JSON deserialization rejection (including unknown input keys after proposed PR #334)
+|429 |Auth rate limiter (when enabled)
+|500 |Store/serialization/runtime error; generic client message for \`ApiError::Internal\`
+|501 |Explicit \`ApiError::NotImplemented\`
+|503 or startup failure |Do not assume readiness; persistent WAL replay failure is non-fatal on \`main\`, proposed PR #333 makes it fatal before listener start
+|===
+
+No stable machine-readable distinction currently exists for all:
+identity-conflict, stale witness, untrusted source, rejected VCL
+transition, unauthorised expungement, recovery-required, and
+federation uncertainty. These must be added in a versioned contract,
+with explicit refusal/error responses rather than fabricated success.
+
+== Guarantees that are *not* established
+
+* No mandatory persistent store: compile \`verisim-api\` with feature
+  \`persistent\` and configure an actual writable persistence directory
+  to enable on-disk modality stores and WAL.
+* No atomic all-or-nothing durable commit across every redb file and
+  Tantivy, nor proven crash-safe index recovery.
+* No signed source authority, independent witness attestation, or
+  conflict-resolution legitimacy guarantee.
+* No mandatory VCL-UT admission gate before mutations.
+* No general merge/split/retraction/tombstone/approved-expungement API
+  semantics in the reviewed v1 lifecycle.
+* No arbitrary-arity profiles, custom modality plugin negotiation or
+  quandle payload on the current Octad wire contract.
+* No verified neural embedding computation: supplied embeddings and
+  deterministic feature hashes are supported; this does not imply a
+  trained neural model.
+* No claim that \`verisimdb-data\` JSON snapshots are canonical subject
+  storage or a persistent replica.
+
+== Changes under review
+
+* PR #333: committed-intent WAL replay, fail closed on ambiguity.
+* PR #334: refuse silently dropped Octad JSON fields.
+* PR #335: unrelated strict-Clippy baseline fixes.
+* PR #336: apply HTTP authentication middleware after GraphQL/federation
+  merge (when authentication is configured).
+
+None is a released guarantee until merged, tested and versioned.

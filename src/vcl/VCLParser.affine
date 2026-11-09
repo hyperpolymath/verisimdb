@@ -1170,7 +1170,7 @@ switch parseSlipstream(slipstreamQuery) {
 // Dependent-struct query
 fn dependentQuery = `
   SELECT GRAPH, VECTOR
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3] WITHIN 0.9
     AND FULLTEXT CONTAINS "climate change"
   PROOF CITATION(CitationContract)

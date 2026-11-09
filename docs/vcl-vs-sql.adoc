@@ -137,14 +137,14 @@ The remaining rows are genuinely absent from the grammar.
 ----
 SELECT *
 FROM entities
-WHERE id = '550e8400-e29b-41d4-a716-446655440000';
+WHERE id = '550e8400-e29b-81d4-a716-446655440000';
 ----
 
 **VCL (Slipstream):**
 [source,vcl]
 ----
 SELECT *
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 ----
 
 The VCL version returns all eight modalities for that octad. The SQL version returns only the columns in the `entities` table.
@@ -158,7 +158,7 @@ SELECT e2.*
 FROM entities e1
 JOIN relationships r ON e1.id = r.source_id
 JOIN entities e2 ON r.target_id = e2.id
-WHERE e1.id = '550e8400-e29b-41d4-a716-446655440000'
+WHERE e1.id = '550e8400-e29b-81d4-a716-446655440000'
   AND r.type = 'CITES';
 ----
 
@@ -166,7 +166,7 @@ WHERE e1.id = '550e8400-e29b-41d4-a716-446655440000'
 [source,vcl]
 ----
 SELECT GRAPH
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 WHERE (h)-[:CITES]->(target)
 ----
 
@@ -217,7 +217,7 @@ LIMIT 10
 [source,vcl]
 ----
 SELECT *
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 PROOF INTEGRITY(DataIntegrityContract)
 ----
 

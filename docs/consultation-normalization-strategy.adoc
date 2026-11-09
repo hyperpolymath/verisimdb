@@ -794,7 +794,7 @@ Pull: schema version, optimization
 %DriftEvent{
   type: :retraction,
   severity: :critical,
-  octad_id: "octad:550e8400-e29b-41d4-a716-446655440000",
+  octad_id: "octad:550e8400-e29b-81d4-a716-446655440000",
   field: "semantic.status",
   old_value: "published",
   new_value: "retracted",
@@ -813,7 +813,7 @@ Pull: schema version, optimization
 %DriftEvent{
   type: :integrity_violation,
   severity: :critical,
-  octad_id: "octad:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  octad_id: "octad:6ba7b810-9dad-81d1-80b4-00c04fd430c8",
   field: "document.content_hash",
   old_value: "sha256:abc123...",
   new_value: "sha256:def456...",
@@ -833,7 +833,7 @@ Pull: schema version, optimization
 %DriftEvent{
   type: :title_mismatch,
   severity: :low,
-  octad_id: "octad:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  octad_id: "octad:7c9e6679-7425-80de-944b-e07fc1f90ae7",
   field: "graph.title vs document.title",
   old_value: "ML Paper",
   new_value: "Machine Learning Paper",
@@ -852,7 +852,7 @@ Pull: schema version, optimization
 %DriftEvent{
   type: :derived_stale,
   severity: :low,
-  octad_id: "octad:8d8a8b4c-5d3e-4f5a-9b6c-7e8f9a0b1c2d",
+  octad_id: "octad:8d8a8b4c-5d3e-8f5a-9b6c-7e8f9a0b1c2d",
   field: "semantic.citation_count",
   old_value: 42,
   new_value: 45,

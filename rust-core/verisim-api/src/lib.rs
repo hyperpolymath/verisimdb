@@ -270,6 +270,7 @@ pub struct HealthResponse {
 
 /// Octad create/update request
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OctadRequest {
     /// Document title
     pub title: Option<String>,
@@ -322,6 +323,16 @@ pub struct SpatialRequest {
 }
 
 impl OctadRequest {
+    /// Refuse payloads that would silently lose a supplied field.
+    fn validate(&self) -> Result<(), ApiError> {
+        if self.body.is_some() && self.title.is_none() {
+            return Err(ApiError::BadRequest(
+                "body requires title; omitting it would discard document content".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Convert to OctadInput
     fn to_octad_input(&self) -> OctadInput {
         let mut input = OctadInput::default();
@@ -525,11 +536,17 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create new application state with default configuration (async version).
+    /// Create application state using the supplied configuration.
     ///
-    /// With the `persistent` feature enabled, reads `VERISIM_PERSISTENCE_DIR`
-    /// to determine where to store data on disk. Defaults to `/var/lib/verisimdb`
-    /// if the variable is unset.
+    /// With the `persistent` feature enabled, uses `config.persistence_dir`,
+    /// then `VERISIM_PERSISTENCE_DIR`, then `/var/lib/verisimdb` for storage.
+    /// Opens the persistent stores and rebuilds the status registry from the WAL.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ApiError::Internal` if store initialisation, persistence directory
+    /// creation, WAL initialisation or WAL recovery fails. Recovery errors abort
+    /// initialisation; partially persisted modality data requires reconciliation.
     pub async fn new_async(config: ApiConfig) -> Result<Self, ApiError> {
         let octad_config = OctadConfig {
             vector_dimension: config.vector_dimension,
@@ -671,7 +688,11 @@ impl AppState {
             match octad_store_inner.replay_wal(&wal_dir).await {
                 Ok(0) => info!("WAL replay: clean start (no entries to replay)"),
                 Ok(n) => info!(recovered = n, "WAL replay: recovered {} entities", n),
-                Err(e) => tracing::warn!("WAL replay failed (non-fatal): {e}"),
+                Err(e) => {
+                    return Err(ApiError::Internal(format!(
+                        "WAL recovery refused: {e}. Persistent state requires reconciliation before serving requests"
+                    )));
+                }
             }
         }
 
@@ -840,16 +861,17 @@ pub fn build_router(state: AppState) -> Router {
             "/mv_prover_success_by_class",
             get(proof_attempts::success_by_class_handler),
         )
-        // Authentication middleware layer
-        .layer(axum_middleware::from_fn_with_state(
-            auth_state,
-            auth::auth_middleware,
-        ))
         .with_state(state.clone())
         // GraphQL endpoint
         .merge(graphql::graphql_router(state))
         // Federation endpoints (separate state)
         .merge(federation_routes)
+        // Apply authorization to the complete router, including merged
+        // GraphQL and federation routes (not only the initial REST routes).
+        .layer(axum_middleware::from_fn_with_state(
+            auth_state,
+            auth::auth_middleware,
+        ))
 }
 
 /// Mount the API router at both the root and under `version_prefix`.
@@ -1051,6 +1073,7 @@ async fn create_octad_handler(
     State(state): State<AppState>,
     Json(request): Json<OctadRequest>,
 ) -> Result<(StatusCode, Json<OctadResponse>), ApiError> {
+    request.validate()?;
     let input = request.to_octad_input();
 
     let octad = state
@@ -1095,6 +1118,7 @@ async fn update_octad_handler(
 ) -> Result<Json<OctadResponse>, ApiError> {
     validate_octad_id(&id)?;
     let octad_id = OctadId::new(&id);
+    request.validate()?;
     let input = request.to_octad_input();
 
     // The pre-update modality set is the schema baseline: an update that
@@ -2527,6 +2551,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_auth_covers_merged_graphql_and_federation_routes() {
+        let mut state = create_test_state().await;
+        state.auth = auth::AuthState::new(auth::AuthConfig {
+            enabled: true,
+            allow_public_health: true,
+            ..Default::default()
+        });
+        state.auth.key_registry.register("writer-key", "test writer", auth::ClientRole::Writer);
+        let app = build_router(state);
+
+        // This GraphQL mutation must never reach its handler without auth.
+        let mutation = serde_json::json!({
+            "query": "mutation { deleteOctad(id: \"missing\") }"
+        }).to_string();
+        let response = app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/graphql")
+                .header("content-type", "application/json")
+                .body(Body::from(mutation.clone()))
+                .unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // The federation router was previously merged after auth middleware.
+        let response = app.clone().oneshot(
+            Request::builder().uri("/federation/peers").body(Body::empty()).unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Valid writer credentials pass the middleware and reach GraphQL.
+        let response = app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/graphql")
+                .header("content-type", "application/json")
+                .header("x-api-key", "writer-key")
+                .body(Body::from(mutation))
+                .unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // The public health exception remains narrowly available.
+        let response = app.oneshot(
+            Request::builder().uri("/health").body(Body::empty()).unwrap(),
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn test_health_endpoint() {
         let state = create_test_state().await;
         let app = build_router(state);
@@ -2680,6 +2754,48 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_reject_nested_schema_payload_instead_of_silently_dropping_it() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+        let nested = serde_json::json!({
+            "document": {"title": "Keep", "body": "Must not be discarded"}
+        });
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(nested.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn test_reject_body_without_title_instead_of_silently_dropping_it() {
+        let state = create_test_state().await;
+        let app = build_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/octads")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"body":"A document without a title"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

@@ -32,7 +32,7 @@ Js.Console.log("\n=== VCL Parser Tests ===\n")
 // Test 1: Simple hexad query
 fn test1 = `
   SELECT *
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 `
 
 assertOk(parseSlipstream(test1), "Test 1: Simple hexad query")
@@ -58,7 +58,7 @@ assertOk(parseSlipstream(test3), "Test 3: Full-text search with LIMIT")
 // Test 4: Vector similarity query
 fn test4 = `
   SELECT VECTOR
-  FROM HEXAD abc12345-0000-0000-0000-000000000000
+  FROM HEXAD abc12345-0000-8000-8000-000000000000
   WHERE h.embedding SIMILAR TO [0.1, 0.2, 0.3] WITHIN 0.9
 `
 
@@ -77,7 +77,7 @@ assertOk(parseSlipstream(test5), "Test 5: Multiple modalities with pagination")
 // Test 6: Dependent-struct query (should have PROOF)
 fn test6 = `
   SELECT GRAPH
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE FULLTEXT CONTAINS "climate change"
   PROOF CITATION(CitationContract)
 `
@@ -87,7 +87,7 @@ assertOk(parseDependentType(test6), "Test 6: Dependent-struct with PROOF")
 // Test 7: Slipstream with PROOF (should fail)
 fn test7 = `
   SELECT *
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   PROOF EXISTENCE(ExistenceContract)
 `
 
@@ -96,7 +96,7 @@ assertError(parseSlipstream(test7), "Test 7: Slipstream rejects PROOF clause")
 // Test 8: Dependent-struct without PROOF (should fail)
 fn test8 = `
   SELECT GRAPH
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 `
 
 assertError(parseDependentType(test8), "Test 8: Dependent-struct requires PROOF")
@@ -134,7 +134,7 @@ assertOk(parseDependentType(test11), "Test 11: Complex dependent-struct query")
 // Test 12: All modalities
 fn test12 = `
   SELECT *
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   LIMIT 10
 `
 
@@ -151,13 +151,13 @@ fn test13 = `
 assertOk(parseSlipstream(test13), "Test 13: Store-specific query")
 
 // Test 14: PROOF with different structs
-fn test14a = `SELECT * FROM HEXAD 550e8400-e29b-41d4-a716-446655440000 PROOF EXISTENCE(ExistenceContract)`
+fn test14a = `SELECT * FROM HEXAD 550e8400-e29b-81d4-a716-446655440000 PROOF EXISTENCE(ExistenceContract)`
 assertOk(parseDependentType(test14a), "Test 14a: EXISTENCE proof")
 
-fn test14b = `SELECT * FROM HEXAD 550e8400-e29b-41d4-a716-446655440000 PROOF ACCESS(AccessContract)`
+fn test14b = `SELECT * FROM HEXAD 550e8400-e29b-81d4-a716-446655440000 PROOF ACCESS(AccessContract)`
 assertOk(parseDependentType(test14b), "Test 14b: ACCESS proof")
 
-fn test14c = `SELECT * FROM HEXAD 550e8400-e29b-41d4-a716-446655440000 PROOF PROVENANCE(ProvenanceContract)`
+fn test14c = `SELECT * FROM HEXAD 550e8400-e29b-81d4-a716-446655440000 PROOF PROVENANCE(ProvenanceContract)`
 assertOk(parseDependentType(test14c), "Test 14c: PROVENANCE proof")
 
 // Test 15: Invalid UUID (should fail)
@@ -229,7 +229,7 @@ assertOk(parseSlipstream(test20), "Test 20: ORDER BY default ASC direction")
 // Test 21: Column projection (DOCUMENT.name, DOCUMENT.severity)
 fn test21 = `
   SELECT DOCUMENT.name, DOCUMENT.severity
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
 `
 
 assertOk(parseSlipstream(test21), "Test 21: Column projection within modality")
@@ -361,7 +361,7 @@ Js.Console.log("\n=== Multi-Proof Tests ===\n")
 // Test 33: Multi-proof composition (AND separated)
 fn test33 = `
   SELECT GRAPH, SEMANTIC
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   PROOF EXISTENCE(ExistenceContract) AND INTEGRITY(IntegrityContract)
 `
 
@@ -397,7 +397,7 @@ Js.Console.log("\n=== Cross-Modal Condition Tests ===\n")
 // Test 36: DRIFT condition
 fn test36 = `
   SELECT VECTOR, DOCUMENT
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
 `
 
@@ -406,7 +406,7 @@ assertOk(parseSlipstream(test36), "Test 36: DRIFT(VECTOR, DOCUMENT) condition")
 // Test 37: CONSISTENT condition
 fn test37 = `
   SELECT VECTOR, SEMANTIC
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE CONSISTENT(VECTOR, SEMANTIC) USING COSINE
 `
 
@@ -415,7 +415,7 @@ assertOk(parseSlipstream(test37), "Test 37: CONSISTENT(VECTOR, SEMANTIC) USING C
 // Test 38: EXISTS condition
 fn test38 = `
   SELECT *
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE VECTOR EXISTS
 `
 
@@ -424,7 +424,7 @@ assertOk(parseSlipstream(test38), "Test 38: VECTOR EXISTS condition")
 // Test 39: NOT EXISTS condition
 fn test39 = `
   SELECT *
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE TENSOR NOT EXISTS
 `
 
@@ -433,7 +433,7 @@ assertOk(parseSlipstream(test39), "Test 39: TENSOR NOT EXISTS condition")
 // Test 40: Cross-modal field compare
 fn test40 = `
   SELECT DOCUMENT, GRAPH
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   WHERE DOCUMENT.severity > GRAPH.centrality
 `
 
@@ -452,7 +452,7 @@ assertOk(parseMutation(test41), "Test 41: INSERT HEXAD with DOCUMENT and VECTOR"
 
 // Test 42: UPDATE mutation
 fn test42 = `
-  UPDATE HEXAD 550e8400-e29b-41d4-a716-446655440000
+  UPDATE HEXAD 550e8400-e29b-81d4-a716-446655440000
   SET DOCUMENT.title = "Updated Title", DOCUMENT.severity = 5
 `
 
@@ -460,7 +460,7 @@ assertOk(parseMutation(test42), "Test 42: UPDATE HEXAD with SET")
 
 // Test 43: DELETE mutation
 fn test43 = `
-  DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+  DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
 `
 
 assertOk(parseMutation(test43), "Test 43: DELETE HEXAD")
@@ -476,7 +476,7 @@ assertOk(parseMutation(test44), "Test 44: INSERT with PROOF clause")
 
 // Test 45: DELETE with multi-proof
 fn test45 = `
-  DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+  DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
   PROOF ACCESS(AccessContract) AND PROVENANCE(AuditContract)
 `
 
@@ -487,7 +487,7 @@ Js.Console.log("\n=== Statement Tests ===\n")
 // Test 46: parseStatement with query
 fn test46 = `
   SELECT GRAPH
-  FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+  FROM HEXAD 550e8400-e29b-81d4-a716-446655440000
   LIMIT 10
 `
 
@@ -495,7 +495,7 @@ assertOk(parseStatement(test46), "Test 46: parseStatement dispatches to query")
 
 // Test 47: parseStatement with mutation
 fn test47 = `
-  DELETE HEXAD 550e8400-e29b-41d4-a716-446655440000
+  DELETE HEXAD 550e8400-e29b-81d4-a716-446655440000
 `
 
 assertOk(parseStatement(test47), "Test 47: parseStatement dispatches to mutation")
