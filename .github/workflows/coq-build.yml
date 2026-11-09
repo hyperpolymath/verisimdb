@@ -275,10 +275,10 @@ jobs:
             | sort -u \
             | grep -vE '^(mval|ident|functional_extensionality_dep)$' || true)
           if [ -n "$UNEXPECTED" ]; then
-            echo "ERROR(Recovery): unexpected axiom(s) in Print Assumptions:"
-            echo "$UNEXPECTED"
-            echo "---"
-            cat Recovery.out
+            echo "ERROR(Recovery): unexpected axiom(s) in Print Assumptions:" >&2
+            echo "$UNEXPECTED" >&2
+            echo "---" >&2
+            cat Recovery.out >&2
             exit 1
           fi
           echo "OK(Recovery): squeakwell R2/R3/R4/R9/R10 recovery kernel whitelisted"
