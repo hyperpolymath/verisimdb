@@ -271,9 +271,15 @@ jobs:
           # Same whitelist as Octad.v: mval, ident (Parameters) + functional_extensionality_dep.
           # Every oracle, conflict test and winner selector is a Section variable
           # discharged into the theorem statements.
-          UNEXPECTED=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Recovery.out \
-            | sort -u \
-            | grep -vE '^(mval|ident|functional_extensionality_dep)$' || true)
+          # The Print Assumptions output must exist and be non-empty: an absent
+          # or empty file is a broken pipeline, not a clean whitelist.
+          test -s Recovery.out
+          AXIOMS=$(awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Recovery.out | sort -u)
+          test -n "$AXIOMS"
+          # grep exits 1 when every axiom is whitelisted (the good case) and 2 on
+          # error; tolerate exactly status 1 so a real failure still fails the step.
+          UNEXPECTED=$(printf '%s\n' "$AXIOMS" \
+            | grep -vxE 'mval|ident|functional_extensionality_dep' || test "$?" -eq 1)
           if [ -n "$UNEXPECTED" ]; then
             echo "ERROR(Recovery): unexpected axiom(s) in Print Assumptions:" >&2
             echo "$UNEXPECTED" >&2
