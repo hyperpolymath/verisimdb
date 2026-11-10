@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner wal normalizer vcl planner-semantic octad
+all: provenance drift transaction planner wal normalizer vcl planner-semantic octad recovery
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -43,11 +43,14 @@ planner-semantic: planner
 octad:
     {{COQC}} -q Octad.v > Octad.out
 
+recovery: octad
+    {{COQC}} -q Recovery.v > Recovery.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic check-octad
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic check-octad check-recovery
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -137,6 +140,20 @@ check-octad: octad
             echo "OK(Octad): O-series (cardinality, present-totality, projection) + R1-R3 merge algebra"; \
           fi; }
 
+# Names may be printed qualified (e.g. Classical_Prop.classic), so the
+# extraction admits dots and primes; an empty output or an empty axiom list
+# is a broken pipeline and fails, as in coq-build.yml.
+check-recovery: recovery
+    @test -s Recovery.out || { echo "ERROR(Recovery): Recovery.out missing or empty"; exit 1; }
+    @awk "/^[A-Za-z_][A-Za-z0-9_.']* :/ {print \$1}" Recovery.out | sort -u > Recovery.axioms
+    @test -s Recovery.axioms || { echo "ERROR(Recovery): no assumptions parsed from Recovery.out"; exit 1; }
+    @grep -vxE 'mval|ident|functional_extensionality_dep' Recovery.axioms \
+      | { if read -r line; then \
+            echo "ERROR(Recovery): unexpected axiom: $line"; cat; exit 1; \
+          else \
+            echo "OK(Recovery): squeakwell R2/R3/R4/R9/R10 over Octad.v, same whitelist as Octad"; \
+          fi; }
+
 # Remove all build artefacts.
 clean:
-    rm -f *.vo *.vos *.vok *.glob .*.aux *.out
+    rm -f *.vo *.vos *.vok *.glob .*.aux *.out *.axioms

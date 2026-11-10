@@ -100,6 +100,12 @@ jobs:
           set -euo pipefail
           coqc -q Octad.v | tee Octad.out
 
+      - name: Compile Recovery.v (squeakwell recovery kernel over Octad.v)
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Recovery.v | tee Recovery.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -257,3 +263,30 @@ jobs:
             exit 1
           fi
           echo "OK(Octad): O-series + R1-R3 modality algebra whitelisted"
+
+      - name: Verify Recovery assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Same whitelist as Octad.v: mval, ident (Parameters) + functional_extensionality_dep.
+          # Every oracle, conflict test and winner selector is a Section variable
+          # discharged into the theorem statements.
+          # The Print Assumptions output must exist and be non-empty: an absent
+          # or empty file is a broken pipeline, not a clean whitelist.
+          test -s Recovery.out
+          # Names may be printed qualified (e.g. Classical_Prop.classic): admit
+          # dots and primes so a qualified axiom cannot hide behind an allowed one.
+          AXIOMS=$(awk "/^[A-Za-z_][A-Za-z0-9_.']* :/ {print \$1}" Recovery.out | sort -u)
+          test -n "$AXIOMS"
+          # grep exits 1 when every axiom is whitelisted (the good case) and 2 on
+          # error; tolerate exactly status 1 so a real failure still fails the step.
+          UNEXPECTED=$(printf '%s\n' "$AXIOMS" \
+            | grep -vxE 'mval|ident|functional_extensionality_dep' || test "$?" -eq 1)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "ERROR(Recovery): unexpected axiom(s) in Print Assumptions:" >&2
+            echo "$UNEXPECTED" >&2
+            echo "---" >&2
+            cat Recovery.out >&2
+            exit 1
+          fi
+          echo "OK(Recovery): squeakwell R2/R3/R4/R9/R10 recovery kernel whitelisted"
