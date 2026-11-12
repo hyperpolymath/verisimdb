@@ -21,10 +21,10 @@ workflows:
         - 'google/clusterfuzzlite@v1'
     '.github/workflows/ci-meta.yml':
         - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-squabbler@541ab9bc21a776d55eb46611877521a824d6319c'
+        - 'hyperpolymath/cicd-squabbler@d04055f4a26c4a0a5fa4f5149d40f0c42aeac274'
     '.github/workflows/codeql.yml':
         - 'actions/checkout@v7.0.1'
-        - 'github/codeql-action@9b3254085494b55a0f7c4c2b3d2d52cc712ce370'
+        - 'github/codeql-action@33d7b85da1a04171e211befe2c739303b9a4c066'
     '.github/workflows/coq-build.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/deep-recon.yml':
@@ -32,7 +32,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
-        - 'github/codeql-action@9b3254085494b55a0f7c4c2b3d2d52cc712ce370'
+        - 'github/codeql-action@33d7b85da1a04171e211befe2c739303b9a4c066'
     '.github/workflows/doc-consonance.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/dogfood-gate.yml':
@@ -47,7 +47,7 @@ workflows:
     '.github/workflows/ghcr-publish.yml':
         - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
-        - 'step-security/harden-runner@v2.22.2'
+        - 'step-security/harden-runner@v2.22.4'
     '.github/workflows/governance.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/hypatia-scan.yml':
@@ -67,7 +67,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
-        - 'taiki-e/install-action@v2.87.30'
+        - 'taiki-e/install-action@v2.90.3'
     '.github/workflows/pages.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/deploy-pages@v5.0.1'
@@ -83,13 +83,12 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'rustsec/audit-check@v2.0.0'
-        - 'taiki-e/install-action@v2.87.30'
+        - 'taiki-e/install-action@v2.90.3'
     '.github/workflows/scorecard.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/secret-scanner.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
-    '.github/workflows/security-scan.yml':
-        - 'hyperpolymath/panic-attack@b22bed4f8c6dce82fde639aa0dab9ce79d1006f5'
+    '.github/workflows/security-scan.yml': []
     '.github/workflows/spark-theatre-gate.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
 dependencies:
@@ -177,9 +176,9 @@ dependencies:
         commit: 'sha1-54075bcc5e249e4758d363f27d099f55d843f124'
         owner_id: 47606891
         repo_id: 331103973
-    'github/codeql-action@9b3254085494b55a0f7c4c2b3d2d52cc712ce370':
-        ref: 'v4.39.1'
-        commit: 'sha1-9b3254085494b55a0f7c4c2b3d2d52cc712ce370'
+    'github/codeql-action@33d7b85da1a04171e211befe2c739303b9a4c066':
+        ref: 'v4.39.3'
+        commit: 'sha1-33d7b85da1a04171e211befe2c739303b9a4c066'
         owner_id: 9919
         repo_id: 259445878
     'github/codeql-action@b96794f015dfd88f77b49b1c93e0fa7110f94c63':
@@ -192,20 +191,11 @@ dependencies:
         commit: 'sha1-884713a6c30a92e5e8544c39945cd7cb630abcd1'
         owner_id: 1342004
         repo_id: 400046858
-    'hyperpolymath/cicd-squabbler@541ab9bc21a776d55eb46611877521a824d6319c':
+    'hyperpolymath/cicd-squabbler@d04055f4a26c4a0a5fa4f5149d40f0c42aeac274':
         ref: 'main'
-        commit: 'sha1-541ab9bc21a776d55eb46611877521a824d6319c'
+        commit: 'sha1-d04055f4a26c4a0a5fa4f5149d40f0c42aeac274'
         owner_id: 6759885
         repo_id: 1284026967
-    'hyperpolymath/panic-attack@b22bed4f8c6dce82fde639aa0dab9ce79d1006f5':
-        ref: 'b22bed4f8c6dce82fde639aa0dab9ce79d1006f5'
-        commit: 'sha1-b22bed4f8c6dce82fde639aa0dab9ce79d1006f5'
-        owner_id: 6759885
-        repo_id: 1152434997
-        uses:
-            - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-            - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
-            - 'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0'
     'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d':
         ref: '8e48b1caade08a552646adeab66558ac43b4360d'
         commit: 'sha1-8e48b1caade08a552646adeab66558ac43b4360d'
@@ -243,19 +233,14 @@ dependencies:
         commit: 'sha1-69366f33c96575abad1ee0dba8212993eecbe998'
         owner_id: 25397242
         repo_id: 523199201
-    'step-security/harden-runner@v2.22.2':
-        ref: 'v2.22.2'
-        commit: 'sha1-dc2769abcc0fcfbadfc1df54081c1608579ef6b2'
+    'step-security/harden-runner@v2.22.4':
+        ref: 'v2.22.4'
+        commit: 'sha1-1d88384fd173af6ecb012dfd0264a306b711241a'
         owner_id: 88700172
         repo_id: 422287306
-    'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
-        ref: 'v2.9.3'
-        commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
-        owner_id: 580492
-        repo_id: 298565987
-    'taiki-e/install-action@v2.87.30':
-        ref: 'v2.87.30'
-        commit: 'sha1-a4d3f3f761dcd95cce1b72cb61cb6d1963438177'
+    'taiki-e/install-action@v2.90.3':
+        ref: 'v2.90.3'
+        commit: 'sha1-cfdb7ed4ccc7c7dce37759eae89dc5674b469b39'
         owner_id: 43724913
         repo_id: 442947557
     'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555':
