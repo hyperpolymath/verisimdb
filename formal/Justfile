@@ -140,20 +140,17 @@ check-octad: octad
             echo "OK(Octad): O-series (cardinality, present-totality, projection) + R1-R3 merge algebra"; \
           fi; }
 
-# Names may be printed qualified (e.g. Classical_Prop.classic), so the
-# extraction admits dots and primes; an empty output or an empty axiom list
-# is a broken pipeline and fails, as in coq-build.yml.
-check-recovery: recovery
-    @test -s Recovery.out || { echo "ERROR(Recovery): Recovery.out missing or empty"; exit 1; }
-    @awk "/^[A-Za-z_][A-Za-z0-9_.']* :/ {print \$1}" Recovery.out | sort -u > Recovery.axioms
-    @test -s Recovery.axioms || { echo "ERROR(Recovery): no assumptions parsed from Recovery.out"; exit 1; }
-    @grep -vxE 'mval|ident|functional_extensionality_dep' Recovery.axioms \
-      | { if read -r line; then \
-            echo "ERROR(Recovery): unexpected axiom: $line"; cat; exit 1; \
-          else \
-            echo "OK(Recovery): squeakwell R2/R3/R4/R9/R10 over Octad.v, same whitelist as Octad"; \
-          fi; }
+# Fail-closed guard shared with coq-build.yml (see check-assumptions.sh):
+# any non-space assumption name is read, so qualified, primed and non-ASCII
+# axioms are all caught; unparsed lines and empty output fail.
+check-recovery: recovery check-guard
+    @sh check-assumptions.sh Recovery Recovery.out 'mval|ident|functional_extensionality_dep'
+
+# Self-test of the fail-closed guard used by check-recovery (fixtures cover
+# qualified, primed and non-ASCII axiom names and unparsed records).
+check-guard:
+    @sh check-assumptions-test.sh
 
 # Remove all build artefacts.
 clean:
-    rm -f *.vo *.vos *.vok *.glob .*.aux *.out *.axioms
+    rm -f *.vo *.vos *.vok *.glob .*.aux *.out
