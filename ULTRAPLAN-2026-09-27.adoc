@@ -263,9 +263,6 @@ disposition *policy* is recorded in part 4.4 rather than 74 invented rationales
 |P4 SPDX headers on ~12 docs
 |✅ 800/800 files carry copyright and licence info
 
-|P5 `docs/security-lessons.lgt` double-stamp
-|✅ Covered by the `**/*.lgt` aggregate in `REUSE.toml`
-
 |Coq proof-debt (Q1 axiom + refinement link)
 |⏸ *Open, toolchain-blocked.* `formal/` holds 9 modules and `coq-build.yml`'s
 per-module assumptions whitelist is intact. Cannot run `coqc` here
