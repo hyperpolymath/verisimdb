@@ -72,6 +72,14 @@ expect axioms-header-no-records fail <<'EOF'
 Axioms:
 EOF
 
+# Non-empty files that parse to no names and carry no closed-theorem line.
+printf ' \n' | expect whitespace-only fail
+
+expect indented-text-only fail <<'EOF'
+  mval : Type
+  some continuation text
+EOF
+
 if [ "$fails" -ne 0 ]; then
     echo "$fails guard self-test(s) failed" >&2
     exit 1

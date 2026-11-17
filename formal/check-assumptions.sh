@@ -16,7 +16,9 @@
 #   3. reads assumption names as any run of non-space, non-colon characters,
 #      so qualified (Classical_Prop.classic), primed and non-ASCII names are
 #      all caught, not only [A-Za-z_][A-Za-z0-9_]*;
-#   4. fails on any name that ALLOWED_ERE does not match exactly.
+#   4. fails on any name that ALLOWED_ERE does not match exactly;
+#   5. passes an empty name set only on an exact "Closed under the global
+#      context" line, so blank or indented-only output is not a pass.
 #
 # POSIX sh and POSIX awk only (mawk is the Ubuntu default and is enough).
 
@@ -52,10 +54,18 @@ fi
 names=$(awk -v rec="$record" '$0 ~ rec { print $1 }' "$out" | sort -u)
 
 # An empty name set is legitimate only when every theorem is closed under the
-# global context; otherwise nothing was parsed and that is a failure.
-if [ -z "$names" ] && grep -qx 'Axioms:' "$out"; then
-    echo "ERROR($label): 'Axioms:' present but no assumption parsed from $out" >&2
-    exit 1
+# global context. It must therefore come with positive evidence, an exact
+# "Closed under the global context" line, and with no "Axioms:" header: a
+# file holding only blank or indented text parses to no names and must fail.
+if [ -z "$names" ]; then
+    if grep -qx 'Axioms:' "$out"; then
+        echo "ERROR($label): 'Axioms:' present but no assumption parsed from $out" >&2
+        exit 1
+    fi
+    if ! grep -qx 'Closed under the global context' "$out"; then
+        echo "ERROR($label): no assumption record and no 'Closed under the global context' line in $out" >&2
+        exit 1
+    fi
 fi
 
 # grep -vx exits 1 when every name is allowed (the good case) and 2 on error;
