@@ -775,12 +775,26 @@ mod tests {
         let octad = create_test_octad();
         let event = DriftEvent::new(DriftType::SemanticVectorDrift, 0.5, "Test drift");
 
+        let before = normalizer.status().await;
+        assert_eq!(before.completed_count, 0);
+        assert!(before.last_normalization.is_none());
+        let started = Timestamp::now();
+
         let result = normalizer.handle_drift(&octad, &event).await.unwrap();
         assert!(result.is_some());
         let result = result.unwrap();
         assert!(result.success);
         assert!(!result.changes.is_empty());
         assert!(result.changes[0].new_value.contains("Test Document"));
+
+        let after = normalizer.status().await;
+        assert_eq!(after.completed_count, 1);
+        assert_eq!(after.failure_count, 0);
+        assert_eq!(after.active_count, 0);
+        let at = after
+            .last_normalization
+            .expect("a successful run records its time");
+        assert!(at >= started && at <= Timestamp::now());
     }
 
     #[tokio::test]

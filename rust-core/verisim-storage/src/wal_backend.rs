@@ -140,3 +140,63 @@ impl<B: StorageBackend> StorageBackend for WalBackend<B> {
         self.inner.approximate_size().await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::InMemoryBackend;
+    use verisim_wal::{SyncMode, WalReader};
+
+    #[tokio::test]
+    async fn every_mutation_is_logged_before_it_is_applied() {
+        let dir = tempfile::tempdir().unwrap();
+        let writer = WalWriter::open(dir.path(), SyncMode::Fsync).unwrap();
+        let backend = WalBackend::new(
+            InMemoryBackend::new(),
+            Arc::new(Mutex::new(writer)),
+            WalModality::Document,
+        );
+
+        let before = Timestamp::now();
+        backend.put(b"doc-1", b"{\"v\":1}").await.unwrap();
+        assert!(backend.delete(b"doc-1").await.unwrap());
+        backend
+            .batch_put(&[(b"doc-2".as_slice(), b"a".as_slice()), (b"doc-3", b"b")])
+            .await
+            .unwrap();
+        backend.flush().await.unwrap();
+        let after = Timestamp::now();
+
+        assert!(backend.get(b"doc-1").await.unwrap().is_none());
+        assert_eq!(backend.get(b"doc-2").await.unwrap(), Some(b"a".to_vec()));
+
+        let entries: Vec<WalEntry> = WalReader::open(dir.path())
+            .unwrap()
+            .replay_all()
+            .unwrap()
+            .collect();
+        let summary: Vec<(WalOperation, &str, &[u8])> = entries
+            .iter()
+            .map(|e| (e.operation, e.entity_id.as_str(), e.payload.as_slice()))
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                (WalOperation::Update, "doc-1", b"{\"v\":1}".as_slice()),
+                (WalOperation::Delete, "doc-1", b"".as_slice()),
+                (WalOperation::Update, "doc-2", b"a".as_slice()),
+                (WalOperation::Update, "doc-3", b"b".as_slice()),
+            ]
+        );
+        for e in &entries {
+            assert_eq!(e.modality, WalModality::Document);
+            // The WAL stores Unix milliseconds.
+            let ms = e.timestamp.unix_millis();
+            assert!(
+                (before.unix_millis()..=after.unix_millis()).contains(&ms),
+                "{:?} outside [{before:?}, {after:?}]",
+                e.timestamp
+            );
+        }
+    }
+}

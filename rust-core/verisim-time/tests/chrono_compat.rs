@@ -117,14 +117,28 @@ fn arithmetic_matches_signed_duration_semantics() {
 }
 
 /// Any instant in the supported range.
+/// Unix nanoseconds of -9999-01-01T00:00:00Z and 9999-12-31T23:59:59.999999999Z,
+/// the representable range. Literal on purpose: deriving them through
+/// `unix_nanos` would let a broken `unix_nanos` shrink the strategy to one
+/// point and every law below pass vacuously.
+const MIN_NANOS: i128 = -377_705_116_800_000_000_000;
+const MAX_NANOS: i128 = 253_402_300_799_999_999_999;
+
+#[test]
+fn range_bounds_are_the_representable_extremes() {
+    let min = Timestamp::from_unix_nanos(MIN_NANOS).unwrap();
+    let max = Timestamp::from_unix_nanos(MAX_NANOS).unwrap();
+    assert_eq!(min.to_rfc3339(), "-9999-01-01T00:00:00+00:00");
+    assert_eq!(max.to_rfc3339(), "9999-12-31T23:59:59.999999999+00:00");
+    assert_eq!(min.unix_nanos(), MIN_NANOS);
+    assert_eq!(max.unix_nanos(), MAX_NANOS);
+    assert!(Timestamp::from_unix_nanos(MIN_NANOS - 1).is_none());
+    assert!(Timestamp::from_unix_nanos(MAX_NANOS + 1).is_none());
+}
+
+/// Any instant in the supported range.
 fn any_timestamp() -> impl Strategy<Value = Timestamp> {
-    let min = Timestamp::parse_rfc3339("-9999-01-01T00:00:00Z")
-        .unwrap()
-        .unix_nanos();
-    let max = Timestamp::parse_rfc3339("9999-12-31T23:59:59.999999999Z")
-        .unwrap()
-        .unix_nanos();
-    (min..=max).prop_map(|n| Timestamp::from_unix_nanos(n).unwrap())
+    (MIN_NANOS..=MAX_NANOS).prop_map(|n| Timestamp::from_unix_nanos(n).unwrap())
 }
 
 proptest! {

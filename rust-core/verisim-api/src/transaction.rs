@@ -320,8 +320,14 @@ impl TransactionManager {
 
     /// Clean up completed transactions older than the timeout.
     pub async fn cleanup_expired(&self) -> usize {
+        self.cleanup_expired_at(Timestamp::now()).await
+    }
+
+    /// [`Self::cleanup_expired`] against an explicit clock reading, so the
+    /// timeout boundary can be tested exactly. A transaction expires once
+    /// strictly more than `timeout_seconds` have passed.
+    async fn cleanup_expired_at(&self, now: Timestamp) -> usize {
         let mut txns = self.transactions.write().await;
-        let now = Timestamp::now();
         let timeout = verisim_time::TimeDelta::seconds(self.config.timeout_seconds as i64);
 
         let expired_ids: Vec<TransactionId> = txns
@@ -457,6 +463,62 @@ mod tests {
         let _t2 = mgr.begin().await.unwrap();
         let result = mgr.begin().await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_expired_boundary_is_exclusive() {
+        let mgr = TransactionManager::new(TransactionConfig {
+            max_concurrent: 8,
+            timeout_seconds: 60,
+        });
+        let t0 = Timestamp::from_unix_seconds(1_794_994_200).unwrap();
+        let active = mgr.begin().await.unwrap();
+        let committed = mgr.begin().await.unwrap();
+        mgr.commit(&committed).await.unwrap();
+        let unparseable = mgr.begin().await.unwrap();
+        {
+            let mut txns = mgr.transactions.write().await;
+            txns.get_mut(&active).unwrap().started_at = t0.to_rfc3339();
+            let c = txns.get_mut(&committed).unwrap();
+            // Only completed_at counts for a finished transaction.
+            c.started_at = "1970-01-01T00:00:00+00:00".to_string();
+            c.completed_at = Some(t0.to_rfc3339());
+            txns.get_mut(&unparseable).unwrap().started_at = "not a timestamp".to_string();
+        }
+        let timeout = verisim_time::TimeDelta::seconds(60);
+        let one_ns = verisim_time::TimeDelta::nanoseconds(1);
+
+        assert_eq!(mgr.cleanup_expired_at(t0).await, 0);
+        assert_eq!(
+            mgr.cleanup_expired_at(t0 + timeout).await,
+            0,
+            "exactly at the timeout nothing has expired"
+        );
+        assert_eq!(mgr.transactions.read().await.len(), 3);
+
+        assert_eq!(mgr.cleanup_expired_at(t0 + timeout + one_ns).await, 2);
+        let left = mgr.transactions.read().await;
+        assert_eq!(left.len(), 1, "the unparseable transaction is kept");
+        assert!(left.contains_key(&unparseable));
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_expired_uses_the_clock() {
+        let mgr = TransactionManager::new(TransactionConfig {
+            max_concurrent: 8,
+            timeout_seconds: 60,
+        });
+        let fresh = mgr.begin().await.unwrap();
+        let stale = mgr.begin().await.unwrap();
+        mgr.transactions
+            .write()
+            .await
+            .get_mut(&stale)
+            .unwrap()
+            .started_at = "2000-01-01T00:00:00Z".to_string();
+        assert_eq!(mgr.cleanup_expired().await, 1);
+        assert!(mgr.status(&fresh).await.is_ok());
+        assert!(mgr.status(&stale).await.is_err());
     }
 
     #[tokio::test]

@@ -507,15 +507,18 @@ impl PlanCache {
     ///
     /// Returns the number of entries evicted.
     pub async fn evict_expired(&self) -> usize {
-        let now = Timestamp::now();
-        let ttl = verisim_time::TimeDelta::seconds(self.config.ttl_seconds as i64);
+        self.evict_expired_at(Timestamp::now()).await
+    }
 
+    /// [`Self::evict_expired`] against an explicit clock reading, so the TTL
+    /// boundary can be tested exactly.
+    async fn evict_expired_at(&self, now: Timestamp) -> usize {
         let mut stmts = self.statements.write().await;
         let mut fps = self.fingerprints.write().await;
 
         let expired_ids: Vec<PreparedId> = stmts
             .iter()
-            .filter(|(_, stmt)| now - stmt.created_at > ttl)
+            .filter(|(_, stmt)| self.is_expired_at(stmt, now))
             .map(|(id, _)| id.clone())
             .collect();
 
@@ -588,7 +591,12 @@ impl PlanCache {
 
     /// Check whether a prepared statement has exceeded its TTL.
     fn is_expired(&self, stmt: &PreparedStatement) -> bool {
-        let now = Timestamp::now();
+        self.is_expired_at(stmt, Timestamp::now())
+    }
+
+    /// An entry expires once strictly more than `ttl_seconds` have passed
+    /// since it was prepared; at exactly the TTL it is still live.
+    fn is_expired_at(&self, stmt: &PreparedStatement, now: Timestamp) -> bool {
         let ttl = verisim_time::TimeDelta::seconds(self.config.ttl_seconds as i64);
         now - stmt.created_at > ttl
     }
@@ -942,6 +950,37 @@ mod tests {
 
         let stats = cache.stats_async().await;
         assert_eq!(stats.total_entries, 0);
+    }
+
+    #[tokio::test]
+    async fn test_ttl_boundary_is_exclusive() {
+        let config = CacheConfig {
+            ttl_seconds: 60,
+            ..CacheConfig::default()
+        };
+        let cache = PlanCache::new(config);
+        let id = cache
+            .prepare("SEARCH graph WHERE type = $t", sample_logical_plan())
+            .await;
+        let stmt = cache.statements.read().await.get(&id).cloned().unwrap();
+        let ttl = verisim_time::TimeDelta::seconds(60);
+        let one_ns = verisim_time::TimeDelta::nanoseconds(1);
+
+        assert!(!cache.is_expired_at(&stmt, stmt.created_at));
+        assert!(!cache.is_expired_at(&stmt, stmt.created_at + ttl - one_ns));
+        assert!(
+            !cache.is_expired_at(&stmt, stmt.created_at + ttl),
+            "exactly at the TTL the entry is still live"
+        );
+        assert!(cache.is_expired_at(&stmt, stmt.created_at + ttl + one_ns));
+
+        assert_eq!(cache.evict_expired_at(stmt.created_at + ttl).await, 0);
+        assert_eq!(cache.stats_async().await.total_entries, 1);
+        assert_eq!(
+            cache.evict_expired_at(stmt.created_at + ttl + one_ns).await,
+            1
+        );
+        assert_eq!(cache.stats_async().await.total_entries, 0);
     }
 
     // -- Test 9: Evict LRU when over limit --

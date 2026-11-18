@@ -455,6 +455,79 @@ fn spatial_component(octad: &Octad, calculator: &DriftCalculator) -> (f64, bool,
 mod tests {
     use super::*;
 
+    /// A fresh API state, as `lib.rs`'s own test helper builds it.
+    async fn test_store() -> crate::AppState {
+        #[allow(unused_mut)]
+        let mut config = crate::ApiConfig::default();
+        #[cfg(feature = "persistent")]
+        {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let tmp = std::env::temp_dir().join(format!(
+                "verisimdb-drift-test-{}-{}",
+                std::process::id(),
+                id
+            ));
+            config.persistence_dir = Some(tmp.to_string_lossy().into_owned());
+        }
+        crate::AppState::new_async(config).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn temporal_component_measures_version_history() {
+        use verisim_octad::{OctadInput, OctadStore};
+        let state = test_store().await;
+        let store = &state.octad_store;
+        let calculator = DriftCalculator::default();
+
+        let missing = temporal_component(store, "no-such-entity", &calculator).await;
+        assert_eq!(
+            missing,
+            (0.0, false, "not measured: no version history".to_string())
+        );
+
+        let octad = store.create(OctadInput::default()).await.unwrap();
+        let (score, computable, detail) = temporal_component(store, &octad.id.0, &calculator).await;
+        assert!(computable);
+        assert_eq!(detail, "1 versions inspected");
+        assert!((0.0..=1.0).contains(&score), "{score}");
+    }
+
+    #[tokio::test]
+    async fn provenance_component_measures_the_chain() {
+        let state = test_store().await;
+        let store = &state.octad_store;
+        let calculator = DriftCalculator::default();
+
+        let missing = provenance_component(store, "no-such-entity", &calculator).await;
+        assert_eq!(
+            missing,
+            (
+                0.0,
+                false,
+                "not measured: no provenance events recorded".to_string()
+            )
+        );
+
+        store
+            .provenance_store()
+            .record_event(
+                "prov-entity",
+                verisim_provenance::ProvenanceEventType::Created,
+                "test",
+                None,
+                "created for the drift test",
+            )
+            .await
+            .unwrap();
+        let (score, computable, detail) =
+            provenance_component(store, "prov-entity", &calculator).await;
+        assert!(computable);
+        assert_eq!(detail, "chain length 1, integrity verified");
+        assert!((0.0..=1.0).contains(&score), "{score}");
+    }
+
     fn octad_with(document: bool, tensor_mismatch: Option<bool>) -> Octad {
         use std::collections::HashMap;
         use verisim_document::Document;

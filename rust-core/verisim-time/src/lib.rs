@@ -408,4 +408,125 @@ mod tests {
         assert_eq!(e.to_string(), "1970-01-01 00:00:00 UTC");
         assert_eq!(Timestamp::default(), e);
     }
+
+    fn at_nanos(n: i128) -> Timestamp {
+        Timestamp::from_unix_nanos(n).unwrap()
+    }
+
+    #[test]
+    fn now_reads_the_system_clock() {
+        let sys = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let now = Timestamp::now();
+        assert!((now.unix_seconds() - sys).abs() <= 5, "{now:?} vs {sys}");
+        assert!(now > Timestamp::UNIX_EPOCH);
+    }
+
+    #[test]
+    fn unix_accessors_floor_towards_negative_infinity() {
+        let t = at_nanos(1_500_000_123);
+        assert_eq!(t.unix_seconds(), 1);
+        assert_eq!(t.unix_millis(), 1_500);
+        assert_eq!(t.unix_nanos(), 1_500_000_123);
+        let before = at_nanos(-1);
+        assert_eq!(before.unix_seconds(), -1);
+        assert_eq!(before.unix_millis(), -1);
+        assert_eq!(before.unix_nanos(), -1);
+        assert_eq!(at_nanos(-2_000_000_000).unix_seconds(), -2);
+    }
+
+    #[test]
+    fn constructors_round_trip_and_reject_out_of_range() {
+        let s = Timestamp::from_unix_seconds(1_794_994_200).unwrap();
+        assert_eq!(s.to_rfc3339(), "2026-11-18T09:30:00+00:00");
+        assert_eq!(s.unix_seconds(), 1_794_994_200);
+        assert_eq!(
+            Timestamp::from_unix_seconds(-1).unwrap().unix_nanos(),
+            -1_000_000_000
+        );
+        assert!(Timestamp::from_unix_seconds(i64::MAX).is_none());
+        assert!(Timestamp::from_unix_seconds(i64::MIN).is_none());
+        assert_eq!(
+            Timestamp::from_unix_millis(-1).unwrap().unix_nanos(),
+            -1_000_000
+        );
+        assert!(Timestamp::from_unix_millis(i64::MAX).is_none());
+    }
+
+    #[test]
+    fn checked_arithmetic() {
+        let t = at_nanos(1_000_000_000);
+        let half = TimeDelta::milliseconds(500);
+        assert_eq!(t.checked_add(half).unwrap().unix_millis(), 1_500);
+        assert_eq!(t.checked_sub(half).unwrap().unix_millis(), 500);
+        assert_eq!(
+            t.checked_sub(TimeDelta::seconds(2)).unwrap().unix_seconds(),
+            -1
+        );
+        let max = Timestamp::parse_rfc3339("9999-12-31T23:59:59.999999999Z").unwrap();
+        let min = Timestamp::parse_rfc3339("-9999-01-01T00:00:00Z").unwrap();
+        assert!(max.checked_add(TimeDelta::nanoseconds(1)).is_none());
+        assert!(min.checked_sub(TimeDelta::nanoseconds(1)).is_none());
+        assert_eq!(
+            min.checked_add(TimeDelta::nanoseconds(1)).unwrap() - min,
+            TimeDelta::nanoseconds(1)
+        );
+    }
+
+    #[test]
+    fn compound_assignment() {
+        let mut t = at_nanos(0);
+        t += TimeDelta::seconds(3);
+        assert_eq!(t.unix_seconds(), 3);
+        t -= TimeDelta::milliseconds(500);
+        assert_eq!(t.unix_millis(), 2_500);
+        t -= TimeDelta::seconds(3);
+        assert_eq!(t.unix_millis(), -500);
+    }
+
+    #[test]
+    fn conversions_with_utc_date_time() {
+        let dt = UtcDateTime::UNIX_EPOCH + TimeDelta::seconds(90);
+        let ts = Timestamp::from(dt);
+        assert_eq!(ts.unix_seconds(), 90);
+        assert_eq!(ts.into_inner(), dt);
+        assert_eq!(UtcDateTime::from(ts), dt);
+    }
+
+    #[test]
+    fn deserialize_rejects_non_strings_with_the_expected_message() {
+        let err = serde_json::from_str::<Timestamp>("1794994200").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("an RFC 3339 formatted date and time string"),
+            "{msg}"
+        );
+    }
+
+    #[test]
+    fn parse_errors_describe_their_cause() {
+        use std::error::Error as _;
+
+        let syntax = Timestamp::parse_rfc3339("2026-11-18").unwrap_err();
+        assert!(syntax
+            .to_string()
+            .starts_with("invalid RFC 3339 timestamp: "));
+        assert!(syntax.source().is_some());
+
+        let year = Timestamp::parse_rfc3339("-12-01-01T00:00:00Z").unwrap_err();
+        assert_eq!(
+            year.to_string(),
+            "invalid RFC 3339 timestamp: malformed signed year"
+        );
+        assert!(year.source().is_none());
+
+        let range = Timestamp::parse_rfc3339("+10000-01-01T00:00:00Z").unwrap_err();
+        assert_eq!(
+            range.to_string(),
+            "invalid RFC 3339 timestamp: year outside -9999..=9999"
+        );
+        assert!(range.source().is_none());
+    }
 }
