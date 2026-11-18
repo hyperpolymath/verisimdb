@@ -23,8 +23,10 @@
 //! | [`fmt::Display`]                    | `2026-11-18 09:30:00.250 UTC`   |
 //!
 //! Years outside `0000..=9999` are written with an explicit sign and at least
-//! four digits (`-0001`), as chrono did. The `time` crate's default range is
-//! `-9999..=9999`.
+//! four digits (`-0001`, `+10000`), as chrono did. The representable range is
+//! [`Timestamp::MIN`]`..=`[`Timestamp::MAX`], years `-999999..=999999` (the
+//! `time` crate's `large-dates` range), which contains chrono's
+//! `-262143..=262142`: every value chrono could write reads back.
 //!
 //! # Parsing
 //!
@@ -35,12 +37,16 @@
 //! wrote. Differences from chrono's parser, none of which can arise from a
 //! `Utc::now()` value:
 //!
-//! * years outside `-9999..=9999` are rejected (they are not representable);
-//!   signed years inside it (`-0001-…`, ISO 8601 expanded form, which chrono
-//!   wrote and read) are accepted, so every value this crate writes reads
-//!   back;
-//! * a leap second `23:59:60` is read as `23:59:59.999999999` rather than
-//!   chrono's leap-second representation.
+//! * years outside `-999999..=999999` are rejected (they are not
+//!   representable); signed years inside it (`-0001-…`, `+10000-…`, ISO 8601
+//!   expanded form, which chrono wrote and read) are accepted;
+//! * a leap second (`…:60`) is rejected. `time` cannot represent one, and
+//!   reading it as `…:59.999999999` would silently change the value, and with
+//!   it any hash computed over its text (provenance records). Rejecting it
+//!   makes the loss visible instead.
+//!
+//! A string whose offset moves it outside the representable range after
+//! normalisation to UTC is an error, never a panic.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -73,6 +79,12 @@ pub struct Timestamp(UtcDateTime);
 impl Timestamp {
     /// 1970-01-01T00:00:00Z.
     pub const UNIX_EPOCH: Self = Self(UtcDateTime::UNIX_EPOCH);
+
+    /// The earliest representable instant, -999999-01-01T00:00:00Z.
+    pub const MIN: Self = Self(UtcDateTime::MIN);
+
+    /// The latest representable instant, 999999-12-31T23:59:59.999999999Z.
+    pub const MAX: Self = Self(UtcDateTime::MAX);
 
     /// The current time, from the system clock.
     #[must_use]
@@ -131,9 +143,20 @@ impl Timestamp {
     }
 
     fn parse_four_digit_year(s: &str) -> Result<Self, ParseError> {
-        OffsetDateTime::parse(s, &Rfc3339)
-            .map(|dt| Self(dt.to_utc()))
-            .map_err(|e| ParseError(ParseErrorKind::Syntax(e)))
+        let dt = OffsetDateTime::parse(s, &Rfc3339)
+            .map_err(|e| ParseError(ParseErrorKind::Syntax(e)))?;
+        // The grammar fixes the layout `YYYY-MM-DD?HH:MM:SS`, so a string that
+        // parsed has its seconds at bytes 17..19. `time` reads `60` as the
+        // last nanosecond of :59; refuse instead of altering the value.
+        if s.as_bytes().get(17..19) == Some(b"60".as_slice()) {
+            return Err(ParseError(ParseErrorKind::LeapSecond));
+        }
+        // A valid local time can still leave the range once its offset is
+        // removed (9999-12-31T23:59:59-00:01 is in year 10000 UTC under the
+        // default range); `to_utc` would panic there.
+        dt.checked_to_utc()
+            .map(Self)
+            .ok_or(ParseError(ParseErrorKind::OutOfRange))
     }
 
     /// Years outside `0000..=9999` are written in ISO 8601 expanded form
@@ -144,7 +167,9 @@ impl Timestamp {
     /// leap days and month lengths all come out exactly as for the real year.
     fn parse_expanded_year(s: &str) -> Result<Self, ParseError> {
         const DAYS_PER_400_YEARS: i64 = 146_097;
-        const MAX_YEAR: i64 = 9999; // the `time` crate's default range
+        // Beyond this the instant cannot exist; the exact edge is left to
+        // `checked_add` below, which also accounts for the offset.
+        let max_year = i64::from(UtcDateTime::MAX.year());
         let bad_year = || ParseError(ParseErrorKind::Year);
 
         let (negative, rest) = (s.starts_with('-'), &s[1..]);
@@ -156,7 +181,7 @@ impl Timestamp {
         }
         let magnitude: i64 = rest[..digits].parse().map_err(|_| bad_year())?;
         let year = if negative { -magnitude } else { magnitude };
-        if year.abs() > MAX_YEAR {
+        if year.abs() > max_year {
             return Err(ParseError(ParseErrorKind::OutOfRange));
         }
         let proxy = 2000 + year.rem_euclid(400);
@@ -364,8 +389,10 @@ enum ParseErrorKind {
     Syntax(time::error::Parse),
     /// A signed (expanded) year that is not a sign and 4–18 digits.
     Year,
-    /// Well formed, but outside the representable years `-9999..=9999`.
+    /// Well formed, but outside the representable range.
     OutOfRange,
+    /// A leap second (`:60`), which cannot be represented.
+    LeapSecond,
 }
 
 impl fmt::Display for ParseError {
@@ -374,7 +401,10 @@ impl fmt::Display for ParseError {
         match &self.0 {
             ParseErrorKind::Syntax(e) => write!(f, "{e}"),
             ParseErrorKind::Year => f.write_str("malformed signed year"),
-            ParseErrorKind::OutOfRange => f.write_str("year outside -9999..=9999"),
+            ParseErrorKind::OutOfRange => {
+                f.write_str("outside the representable range (years -999999..=999999)")
+            }
+            ParseErrorKind::LeapSecond => f.write_str("leap second (:60) cannot be represented"),
         }
     }
 }
@@ -465,8 +495,7 @@ mod tests {
             t.checked_sub(TimeDelta::seconds(2)).unwrap().unix_seconds(),
             -1
         );
-        let max = Timestamp::parse_rfc3339("9999-12-31T23:59:59.999999999Z").unwrap();
-        let min = Timestamp::parse_rfc3339("-9999-01-01T00:00:00Z").unwrap();
+        let (max, min) = (Timestamp::MAX, Timestamp::MIN);
         assert!(max.checked_add(TimeDelta::nanoseconds(1)).is_none());
         assert!(min.checked_sub(TimeDelta::nanoseconds(1)).is_none());
         assert_eq!(
@@ -522,11 +551,18 @@ mod tests {
         );
         assert!(year.source().is_none());
 
-        let range = Timestamp::parse_rfc3339("+10000-01-01T00:00:00Z").unwrap_err();
+        let range = Timestamp::parse_rfc3339("+1000000-01-01T00:00:00Z").unwrap_err();
         assert_eq!(
             range.to_string(),
-            "invalid RFC 3339 timestamp: year outside -9999..=9999"
+            "invalid RFC 3339 timestamp: outside the representable range (years -999999..=999999)"
         );
         assert!(range.source().is_none());
+
+        let leap = Timestamp::parse_rfc3339("2016-12-31T23:59:60Z").unwrap_err();
+        assert_eq!(
+            leap.to_string(),
+            "invalid RFC 3339 timestamp: leap second (:60) cannot be represented"
+        );
+        assert!(leap.source().is_none());
     }
 }

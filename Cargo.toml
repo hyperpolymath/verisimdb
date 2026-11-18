@@ -59,7 +59,9 @@ tantivy = { version = "0.27", default-features = false, features = ["mmap", "lz4
 # chrono unmaintained); it was already in the tree via tantivy. Workspace crates
 # use it only through `verisim-time`, which keeps chrono's serialized formats.
 # >= 0.3.47: `UtcDateTime`, and the fix for RUSTSEC-2026-0009.
-time = { version = "0.3.47", default-features = false, features = ["std", "parsing"] }
+# `large-dates` (years -999999..=999999) covers chrono's whole range
+# (-262143..=262142), so every timestamp chrono could have written reads back.
+time = { version = "0.3.47", default-features = false, features = ["std", "parsing", "large-dates"] }
 verisim-time = { path = "rust-core/verisim-time" }
 
 # API and networking

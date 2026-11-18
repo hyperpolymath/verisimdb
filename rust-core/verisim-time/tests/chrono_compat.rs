@@ -46,7 +46,7 @@ fn golden() -> Vec<Golden<'static>> {
             }
         })
         .collect();
-    assert_eq!(rows.len(), 17, "fixture lost rows");
+    assert_eq!(rows.len(), 21, "fixture lost rows");
     rows
 }
 
@@ -93,15 +93,40 @@ fn rejects_what_it_cannot_represent() {
     for bad in [
         "",
         "2026-11-18",
-        "2026-11-18T09:30:00",    // no offset
-        "2026-02-30T00:00:00Z",   // no such day
-        "+10000-01-01T00:00:00Z", // year out of range
-        "-123-01-01T00:00:00Z",   // expanded year needs 4+ digits
+        "2026-11-18T09:30:00",          // no offset
+        "2026-02-30T00:00:00Z",         // no such day
+        "+1000000-01-01T00:00:00Z",     // year out of range
+        "+999999-12-31T23:59:59-00:01", // leaves the range only in UTC
+        "-999999-01-01T00:00:00+00:01", // same, at the other end
+        "2016-12-31T23:59:60Z",         // leap second
+        "2016-12-31 23:59:60.5+00:00",  // leap second, other spelling
+        "-123-01-01T00:00:00Z",         // expanded year needs 4+ digits
         "-",
         "2026-11-18T09:30:00Z trailing",
     ] {
         assert!(Timestamp::parse_rfc3339(bad).is_err(), "accepted {bad:?}");
         assert!(serde_json::from_str::<Timestamp>(&format!("{bad:?}")).is_err());
+    }
+}
+
+/// chrono wrote and read expanded years up to ±262143; all of them read back.
+#[test]
+fn chrono_era_expanded_years_read_back() {
+    for (text, rfc) in [
+        ("+10000-01-01T00:00:00Z", "+10000-01-01T00:00:00+00:00"),
+        (
+            "+262142-12-31T23:59:59.999999999Z",
+            "+262142-12-31T23:59:59.999999999+00:00",
+        ),
+        ("-262143-01-01T00:00:00Z", "-262143-01-01T00:00:00+00:00"),
+        // A four-digit local time that is in year 10000 once the offset is
+        // removed: valid, and never a panic.
+        ("9999-12-31T23:59:59-00:01", "+10000-01-01T00:00:59+00:00"),
+    ] {
+        let ts = Timestamp::parse_rfc3339(text).unwrap_or_else(|e| panic!("{text}: {e}"));
+        assert_eq!(ts.to_rfc3339(), rfc, "{text}");
+        let json = serde_json::to_string(&ts).unwrap();
+        assert_eq!(serde_json::from_str::<Timestamp>(&json).unwrap(), ts);
     }
 }
 
@@ -117,19 +142,21 @@ fn arithmetic_matches_signed_duration_semantics() {
 }
 
 /// Any instant in the supported range.
-/// Unix nanoseconds of -9999-01-01T00:00:00Z and 9999-12-31T23:59:59.999999999Z,
-/// the representable range. Literal on purpose: deriving them through
+/// Unix nanoseconds of -999999-01-01T00:00:00Z and
+/// 999999-12-31T23:59:59.999999999Z, the representable range (`time` with
+/// `large-dates`), computed independently with the days-from-civil algorithm. Literal on purpose: deriving them through
 /// `unix_nanos` would let a broken `unix_nanos` shrink the strategy to one
 /// point and every law below pass vacuously.
-const MIN_NANOS: i128 = -377_705_116_800_000_000_000;
-const MAX_NANOS: i128 = 253_402_300_799_999_999_999;
+const MIN_NANOS: i128 = -31_619_087_596_800_000_000_000;
+const MAX_NANOS: i128 = 31_494_784_780_799_999_999_999;
 
 #[test]
 fn range_bounds_are_the_representable_extremes() {
     let min = Timestamp::from_unix_nanos(MIN_NANOS).unwrap();
     let max = Timestamp::from_unix_nanos(MAX_NANOS).unwrap();
-    assert_eq!(min.to_rfc3339(), "-9999-01-01T00:00:00+00:00");
-    assert_eq!(max.to_rfc3339(), "9999-12-31T23:59:59.999999999+00:00");
+    assert_eq!(min.to_rfc3339(), "-999999-01-01T00:00:00+00:00");
+    assert_eq!(max.to_rfc3339(), "+999999-12-31T23:59:59.999999999+00:00");
+    assert_eq!((min, max), (Timestamp::MIN, Timestamp::MAX));
     assert_eq!(min.unix_nanos(), MIN_NANOS);
     assert_eq!(max.unix_nanos(), MAX_NANOS);
     assert!(Timestamp::from_unix_nanos(MIN_NANOS - 1).is_none());
