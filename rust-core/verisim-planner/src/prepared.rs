@@ -953,6 +953,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_lookups_honour_the_ttl() {
+        let cache = PlanCache::new(CacheConfig {
+            ttl_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let id = cache
+            .prepare("SEARCH graph WHERE type = $t", sample_logical_plan())
+            .await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        assert!(cache.get(&id).await.is_none(), "an expired entry must miss");
+        let err = cache
+            .execute_prepared(&id, &HashMap::new())
+            .await
+            .expect_err("an expired entry must not execute");
+        assert!(matches!(err, CacheError::Expired(_)), "{err:?}");
+
+        let live = PlanCache::new(CacheConfig::default());
+        let id = live
+            .prepare("SEARCH graph WHERE type = $t", sample_logical_plan())
+            .await;
+        assert!(live.get(&id).await.is_some());
+    }
+
+    #[tokio::test]
     async fn test_ttl_boundary_is_exclusive() {
         let config = CacheConfig {
             ttl_seconds: 60,

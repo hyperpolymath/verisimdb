@@ -93,9 +93,13 @@ fn rejects_what_it_cannot_represent() {
     for bad in [
         "",
         "2026-11-18",
-        "2026-11-18T09:30:00",          // no offset
-        "2026-02-30T00:00:00Z",         // no such day
-        "+1000000-01-01T00:00:00Z",     // year out of range
+        "2026-11-18T09:30:00",      // no offset
+        "2026-02-30T00:00:00Z",     // no such day
+        "+1000000-01-01T00:00:00Z", // year out of range
+        // 18-digit years: the range check must stop these before the
+        // 400-year-cycle arithmetic, which would overflow.
+        "+999999999999999999-01-01T00:00:00Z",
+        "-999999999999999999-01-01T00:00:00Z",
         "+999999-12-31T23:59:59-00:01", // leaves the range only in UTC
         "-999999-01-01T00:00:00+00:01", // same, at the other end
         "2016-12-31T23:59:60Z",         // leap second
@@ -119,6 +123,12 @@ fn chrono_era_expanded_years_read_back() {
             "+262142-12-31T23:59:59.999999999+00:00",
         ),
         ("-262143-01-01T00:00:00Z", "-262143-01-01T00:00:00+00:00"),
+        // The representable extremes themselves.
+        (
+            "+999999-12-31T23:59:59.999999999Z",
+            "+999999-12-31T23:59:59.999999999+00:00",
+        ),
+        ("-999999-01-01T00:00:00Z", "-999999-01-01T00:00:00+00:00"),
         // A four-digit local time that is in year 10000 once the offset is
         // removed: valid, and never a panic.
         ("9999-12-31T23:59:59-00:01", "+10000-01-01T00:00:59+00:00"),
