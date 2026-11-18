@@ -170,10 +170,7 @@ impl Timestamp {
     /// (chrono's `to_rfc3339()`).
     #[must_use]
     pub fn to_rfc3339(&self) -> String {
-        let mut out = String::with_capacity(32);
-        self.write_iso(&mut out, 'T', "+00:00")
-            .expect("writing to a String cannot fail");
-        out
+        self.iso('T', "+00:00").to_string()
     }
 
     /// `self + delta`, or `None` on overflow.
@@ -194,10 +191,28 @@ impl Timestamp {
         self.0
     }
 
-    /// Shared writer for every text form: date, `sep`, time, AutoSi fraction,
-    /// `suffix`.
-    fn write_iso<W: fmt::Write + ?Sized>(&self, w: &mut W, sep: char, suffix: &str) -> fmt::Result {
-        let dt = self.0;
+    /// Every text form is this adapter with a different separator and
+    /// suffix, so they cannot drift apart.
+    const fn iso(&self, sep: char, suffix: &'static str) -> Iso<'_> {
+        Iso {
+            ts: self,
+            sep,
+            suffix,
+        }
+    }
+}
+
+/// [`fmt::Display`] adapter for one text form: date, `sep`, time, AutoSi
+/// fraction, `suffix`.
+struct Iso<'a> {
+    ts: &'a Timestamp,
+    sep: char,
+    suffix: &'static str,
+}
+
+impl fmt::Display for Iso<'_> {
+    fn fmt(&self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (dt, sep) = (self.ts.0, self.sep);
         let year = dt.year();
         if (0..=9999).contains(&year) {
             write!(w, "{year:04}")?;
@@ -214,7 +229,7 @@ impl Timestamp {
             dt.second()
         )?;
         write_fraction(w, dt.nanosecond())?;
-        w.write_str(suffix)
+        w.write_str(self.suffix)
     }
 }
 
@@ -255,14 +270,14 @@ impl fmt::Display for Timestamp {
     /// `2026-11-18 09:30:00.250 UTC`, as chrono's `Display` for
     /// `DateTime<Utc>`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.write_iso(f, ' ', " UTC")
+        fmt::Display::fmt(&self.iso(' ', " UTC"), f)
     }
 }
 
 impl fmt::Debug for Timestamp {
     /// `2026-11-18T09:30:00.250Z`, as chrono's `Debug` for `DateTime<Utc>`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.write_iso(f, 'T', "Z")
+        fmt::Display::fmt(&self.iso('T', "Z"), f)
     }
 }
 
@@ -278,13 +293,7 @@ impl Serialize for Timestamp {
     /// A string such as `2026-11-18T09:30:00.250Z`, in every serde format
     /// (chrono serialized `DateTime<Utc>` the same way).
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        struct Iso<'a>(&'a Timestamp);
-        impl fmt::Display for Iso<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.0.write_iso(f, 'T', "Z")
-            }
-        }
-        serializer.collect_str(&Iso(self))
+        serializer.collect_str(&self.iso('T', "Z"))
     }
 }
 

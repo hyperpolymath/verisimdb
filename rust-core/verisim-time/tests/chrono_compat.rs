@@ -3,10 +3,10 @@
 
 //! Compatibility with the formats chrono 0.4 wrote before the migration.
 //!
-//! The golden vectors below were produced by chrono 0.4.45 itself
-//! (`serde_json::to_string`, `to_rfc3339()`, `to_string()`,
-//! `timestamp_millis()` on `DateTime<Utc>`), so they pin chrono's behaviour
-//! now that chrono is no longer a dependency. The migration was also checked
+//! The golden vectors in `fixtures/chrono-0.4.45-golden.tsv` were produced by
+//! chrono 0.4.45 itself (`serde_json::to_string`, `to_rfc3339()`,
+//! `to_string()`, `timestamp_millis()` on `DateTime<Utc>`), so they pin
+//! chrono's behaviour now that chrono is no longer a dependency. The migration was also checked
 //! against chrono directly on 2,000,000 random instants across years
 //! -9999..=9999 (all text forms, millisecond and nanosecond conversions,
 //! parsing in both directions, ordering and arithmetic) with no mismatch.
@@ -14,182 +14,61 @@
 use proptest::prelude::*;
 use verisim_time::{TimeDelta, Timestamp};
 
-struct Golden {
-    name: &'static str,
+/// One row of `fixtures/chrono-0.4.45-golden.tsv`.
+struct Golden<'a> {
+    name: &'a str,
     unix_nanos: i128,
-    serde: &'static str,
-    rfc3339: &'static str,
-    display: &'static str,
+    /// What serde wrote, without the JSON quotes (also chrono's `Debug`).
+    serde: &'a str,
+    rfc3339: &'a str,
+    display: &'a str,
     unix_millis: i64,
 }
 
-#[rustfmt::skip]
-const GOLDEN: &[Golden] = &[
-    Golden {
-        name: "unix epoch",
-        unix_nanos: 0,
-        serde: "\"1970-01-01T00:00:00Z\"",
-        rfc3339: "1970-01-01T00:00:00+00:00",
-        display: "1970-01-01 00:00:00 UTC",
-        unix_millis: 0,
-    },
-    Golden {
-        name: "one nanosecond",
-        unix_nanos: 1,
-        serde: "\"1970-01-01T00:00:00.000000001Z\"",
-        rfc3339: "1970-01-01T00:00:00.000000001+00:00",
-        display: "1970-01-01 00:00:00.000000001 UTC",
-        unix_millis: 0,
-    },
-    Golden {
-        name: "one microsecond",
-        unix_nanos: 1000,
-        serde: "\"1970-01-01T00:00:00.000001Z\"",
-        rfc3339: "1970-01-01T00:00:00.000001+00:00",
-        display: "1970-01-01 00:00:00.000001 UTC",
-        unix_millis: 0,
-    },
-    Golden {
-        name: "one millisecond",
-        unix_nanos: 1000000,
-        serde: "\"1970-01-01T00:00:00.001Z\"",
-        rfc3339: "1970-01-01T00:00:00.001+00:00",
-        display: "1970-01-01 00:00:00.001 UTC",
-        unix_millis: 1,
-    },
-    Golden {
-        name: "one nanosecond before epoch",
-        unix_nanos: -1,
-        serde: "\"1969-12-31T23:59:59.999999999Z\"",
-        rfc3339: "1969-12-31T23:59:59.999999999+00:00",
-        display: "1969-12-31 23:59:59.999999999 UTC",
-        unix_millis: -1,
-    },
-    Golden {
-        name: "1.5 s",
-        unix_nanos: 1500000000,
-        serde: "\"1970-01-01T00:00:01.500Z\"",
-        rfc3339: "1970-01-01T00:00:01.500+00:00",
-        display: "1970-01-01 00:00:01.500 UTC",
-        unix_millis: 1500,
-    },
-    Golden {
-        name: "realistic ms (WAL-era)",
-        unix_nanos: 1763458200250000000,
-        serde: "\"2025-11-18T09:30:00.250Z\"",
-        rfc3339: "2025-11-18T09:30:00.250+00:00",
-        display: "2025-11-18 09:30:00.250 UTC",
-        unix_millis: 1763458200250,
-    },
-    Golden {
-        name: "realistic us",
-        unix_nanos: 1763458200250123000,
-        serde: "\"2025-11-18T09:30:00.250123Z\"",
-        rfc3339: "2025-11-18T09:30:00.250123+00:00",
-        display: "2025-11-18 09:30:00.250123 UTC",
-        unix_millis: 1763458200250,
-    },
-    Golden {
-        name: "realistic ns",
-        unix_nanos: 1763458200250123456,
-        serde: "\"2025-11-18T09:30:00.250123456Z\"",
-        rfc3339: "2025-11-18T09:30:00.250123456+00:00",
-        display: "2025-11-18 09:30:00.250123456 UTC",
-        unix_millis: 1763458200250,
-    },
-    Golden {
-        name: "ns with trailing zero",
-        unix_nanos: 1763458200100000010,
-        serde: "\"2025-11-18T09:30:00.100000010Z\"",
-        rfc3339: "2025-11-18T09:30:00.100000010+00:00",
-        display: "2025-11-18 09:30:00.100000010 UTC",
-        unix_millis: 1763458200100,
-    },
-    Golden {
-        name: "leap day 2024-02-29",
-        unix_nanos: 1709164800000000000,
-        serde: "\"2024-02-29T00:00:00Z\"",
-        rfc3339: "2024-02-29T00:00:00+00:00",
-        display: "2024-02-29 00:00:00 UTC",
-        unix_millis: 1709164800000,
-    },
-    Golden {
-        name: "leap day 2000-02-29",
-        unix_nanos: 951782400000000000,
-        serde: "\"2000-02-29T00:00:00Z\"",
-        rfc3339: "2000-02-29T00:00:00+00:00",
-        display: "2000-02-29 00:00:00 UTC",
-        unix_millis: 951782400000,
-    },
-    Golden {
-        name: "1900-03-01 (not a leap year)",
-        unix_nanos: -2203891200000000000,
-        serde: "\"1900-03-01T00:00:00Z\"",
-        rfc3339: "1900-03-01T00:00:00+00:00",
-        display: "1900-03-01 00:00:00 UTC",
-        unix_millis: -2203891200000,
-    },
-    Golden {
-        name: "year 0",
-        unix_nanos: -62167219200000000000,
-        serde: "\"0000-01-01T00:00:00Z\"",
-        rfc3339: "0000-01-01T00:00:00+00:00",
-        display: "0000-01-01 00:00:00 UTC",
-        unix_millis: -62167219200000,
-    },
-    Golden {
-        name: "year -1 (expanded form)",
-        unix_nanos: -62198755200000000000,
-        serde: "\"-0001-01-01T00:00:00Z\"",
-        rfc3339: "-0001-01-01T00:00:00+00:00",
-        display: "-0001-01-01 00:00:00 UTC",
-        unix_millis: -62198755200000,
-    },
-    Golden {
-        name: "year 9999 last ns",
-        unix_nanos: 253402300799999999999,
-        serde: "\"9999-12-31T23:59:59.999999999Z\"",
-        rfc3339: "9999-12-31T23:59:59.999999999+00:00",
-        display: "9999-12-31 23:59:59.999999999 UTC",
-        unix_millis: 253402300799999,
-    },
-    Golden {
-        name: "year -9999 first instant",
-        unix_nanos: -377705116800000000000,
-        serde: "\"-9999-01-01T00:00:00Z\"",
-        rfc3339: "-9999-01-01T00:00:00+00:00",
-        display: "-9999-01-01 00:00:00 UTC",
-        unix_millis: -377705116800000,
-    },
-];
+/// Output of chrono 0.4.45 itself, kept as data so it is plainly not
+/// hand-written.
+const GOLDEN_TSV: &str = include_str!("fixtures/chrono-0.4.45-golden.tsv");
+
+fn golden() -> Vec<Golden<'static>> {
+    let rows: Vec<Golden<'static>> = GOLDEN_TSV
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(|l| {
+            let c: Vec<&str> = l.split('\t').collect();
+            assert_eq!(c.len(), 6, "malformed fixture row: {l:?}");
+            Golden {
+                name: c[0],
+                unix_nanos: c[1].parse().unwrap(),
+                serde: c[2],
+                rfc3339: c[3],
+                display: c[4],
+                unix_millis: c[5].parse().unwrap(),
+            }
+        })
+        .collect();
+    assert_eq!(rows.len(), 17, "fixture lost rows");
+    rows
+}
 
 #[test]
 fn golden_vectors_match_chrono_output() {
-    for g in GOLDEN {
+    for g in golden() {
         let ts = Timestamp::from_unix_nanos(g.unix_nanos).expect(g.name);
-        assert_eq!(
-            serde_json::to_string(&ts).unwrap(),
-            g.serde,
-            "serde: {}",
-            g.name
-        );
+        let json = serde_json::to_string(&ts).unwrap();
+        assert_eq!(json, format!("\"{}\"", g.serde), "serde: {}", g.name);
         assert_eq!(ts.to_rfc3339(), g.rfc3339, "to_rfc3339: {}", g.name);
         assert_eq!(ts.to_string(), g.display, "Display: {}", g.name);
-        assert_eq!(
-            format!("{ts:?}"),
-            g.serde.trim_matches('"'),
-            "Debug: {}",
-            g.name
-        );
+        assert_eq!(format!("{ts:?}"), g.serde, "Debug: {}", g.name);
         assert_eq!(ts.unix_millis(), g.unix_millis, "unix_millis: {}", g.name);
     }
 }
 
 #[test]
 fn golden_vectors_read_back() {
-    for g in GOLDEN {
+    for g in golden() {
         let want = Timestamp::from_unix_nanos(g.unix_nanos).unwrap();
-        let from_serde: Timestamp = serde_json::from_str(g.serde).unwrap();
+        let json = format!("\"{}\"", g.serde);
+        let from_serde: Timestamp = serde_json::from_str(&json).unwrap();
         assert_eq!(from_serde, want, "serde: {}", g.name);
         assert_eq!(
             Timestamp::parse_rfc3339(g.rfc3339).unwrap(),
