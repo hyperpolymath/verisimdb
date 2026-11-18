@@ -21,12 +21,12 @@ pub mod conflict;
 pub mod regeneration;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
+use verisim_time::Timestamp;
 
 use verisim_drift::{DriftDetector, DriftEvent, DriftType};
 use verisim_octad::{Octad, OctadId, OctadStore};
@@ -61,7 +61,7 @@ pub struct NormalizationResult {
     /// Duration of normalization
     pub duration_ms: u64,
     /// When normalization completed
-    pub completed_at: DateTime<Utc>,
+    pub completed_at: Timestamp,
 }
 
 /// Types of normalization
@@ -150,7 +150,7 @@ pub struct NormalizerStatus {
     /// Total failures
     pub failure_count: u64,
     /// Last normalization time
-    pub last_normalization: Option<DateTime<Utc>>,
+    pub last_normalization: Option<Timestamp>,
 }
 
 /// The main normalizer engine
@@ -237,7 +237,7 @@ impl Normalizer {
             match &result {
                 Ok(_) => {
                     status.completed_count += 1;
-                    status.last_normalization = Some(Utc::now());
+                    status.last_normalization = Some(Timestamp::now());
                 }
                 Err(_) => {
                     status.failure_count += 1;
@@ -347,7 +347,7 @@ impl NormalizationStrategy for SemanticVectorStrategy {
             success: true,
             changes,
             duration_ms,
-            completed_at: Utc::now(),
+            completed_at: Timestamp::now(),
         })
     }
 }
@@ -431,7 +431,7 @@ impl NormalizationStrategy for GraphDocumentStrategy {
             success: true,
             changes,
             duration_ms,
-            completed_at: Utc::now(),
+            completed_at: Timestamp::now(),
         })
     }
 }
@@ -512,7 +512,7 @@ impl NormalizationStrategy for TensorRegenerationStrategy {
             success: true,
             changes,
             duration_ms,
-            completed_at: Utc::now(),
+            completed_at: Timestamp::now(),
         })
     }
 }
@@ -596,7 +596,7 @@ impl NormalizationStrategy for TemporalRepairStrategy {
             success: true,
             changes,
             duration_ms,
-            completed_at: Utc::now(),
+            completed_at: Timestamp::now(),
         })
     }
 }
@@ -677,7 +677,7 @@ impl NormalizationStrategy for QualityReconciliationStrategy {
             success: !any_failure,
             changes: all_changes,
             duration_ms,
-            completed_at: Utc::now(),
+            completed_at: Timestamp::now(),
         })
     }
 }
@@ -716,8 +716,8 @@ mod tests {
             id: OctadId::new("test-1"),
             status: OctadStatus {
                 id: OctadId::new("test-1"),
-                created_at: Utc::now(),
-                modified_at: Utc::now(),
+                created_at: Timestamp::now(),
+                modified_at: Timestamp::now(),
                 version: 1,
                 modality_status: ModalityStatus::default(),
             },
@@ -741,8 +741,8 @@ mod tests {
             id: OctadId::new("empty-1"),
             status: OctadStatus {
                 id: OctadId::new("empty-1"),
-                created_at: Utc::now(),
-                modified_at: Utc::now(),
+                created_at: Timestamp::now(),
+                modified_at: Timestamp::now(),
                 version: 1,
                 modality_status: ModalityStatus::default(),
             },
@@ -775,12 +775,26 @@ mod tests {
         let octad = create_test_octad();
         let event = DriftEvent::new(DriftType::SemanticVectorDrift, 0.5, "Test drift");
 
+        let before = normalizer.status().await;
+        assert_eq!(before.completed_count, 0);
+        assert!(before.last_normalization.is_none());
+        let started = Timestamp::now();
+
         let result = normalizer.handle_drift(&octad, &event).await.unwrap();
         assert!(result.is_some());
         let result = result.unwrap();
         assert!(result.success);
         assert!(!result.changes.is_empty());
         assert!(result.changes[0].new_value.contains("Test Document"));
+
+        let after = normalizer.status().await;
+        assert_eq!(after.completed_count, 1);
+        assert_eq!(after.failure_count, 0);
+        assert_eq!(after.active_count, 0);
+        let at = after
+            .last_normalization
+            .expect("a successful run records its time");
+        assert!(at >= started && at <= Timestamp::now());
     }
 
     #[tokio::test]

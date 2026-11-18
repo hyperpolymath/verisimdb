@@ -12,8 +12,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
 use tracing::{debug, info};
+use verisim_time::Timestamp;
 
 use crate::entry::{WalEntry, WalModality, WalOperation};
 use crate::error::{WalError, WalResult};
@@ -192,7 +192,7 @@ impl WalWriter {
     pub fn checkpoint(&mut self) -> WalResult<u64> {
         let entry = WalEntry {
             sequence: 0, // Will be overwritten by append().
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             operation: WalOperation::Checkpoint,
             modality: WalModality::All,
             entity_id: String::new(),
@@ -345,7 +345,7 @@ mod tests {
     fn test_entry(modality: WalModality) -> WalEntry {
         WalEntry {
             sequence: 0,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             operation: WalOperation::Insert,
             modality,
             entity_id: "test-entity".to_string(),

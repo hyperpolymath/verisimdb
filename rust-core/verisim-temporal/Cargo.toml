@@ -10,7 +10,7 @@ license.workspace = true
 publish = false  # workspace-internal; path deps cannot be published to crates.io
 
 [dependencies]
-chrono.workspace = true
+verisim-time.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

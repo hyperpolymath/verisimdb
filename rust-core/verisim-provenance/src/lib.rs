@@ -20,7 +20,6 @@
 #[cfg(feature = "redb-backend")]
 pub mod persistent;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 #[cfg(feature = "redb-backend")]
 pub use persistent::*;
 use serde::{Deserialize, Serialize};
@@ -30,6 +29,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::{debug, instrument};
+use verisim_time::Timestamp;
 
 /// Provenance-specific errors
 #[derive(Error, Debug)]
@@ -104,7 +104,7 @@ pub struct ProvenanceRecord {
     /// Who or what caused this event (user ID, system component, bot name)
     pub actor: String,
     /// When this event occurred
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// Optional source identifier (URL, file path, upstream entity ID)
     pub source: Option<String>,
     /// Human-readable description of the event
@@ -122,7 +122,7 @@ impl ProvenanceRecord {
     pub fn compute_hash(
         event_type: &ProvenanceEventType,
         actor: &str,
-        timestamp: &DateTime<Utc>,
+        timestamp: &Timestamp,
         source: &Option<String>,
         description: &str,
         parent_hash: &str,
@@ -151,7 +151,7 @@ impl ProvenanceRecord {
         let actor = actor.into();
         let description = description.into();
         let parent_hash = parent_hash.into();
-        let timestamp = Utc::now();
+        let timestamp = Timestamp::now();
 
         let content_hash = Self::compute_hash(
             &event_type,

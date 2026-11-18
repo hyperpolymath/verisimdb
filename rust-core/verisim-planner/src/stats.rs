@@ -3,8 +3,8 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use verisim_time::Timestamp;
 
 use crate::Modality;
 
@@ -22,7 +22,7 @@ pub struct StoreStatistics {
     /// Total number of queries executed.
     pub query_count: u64,
     /// When statistics were last updated.
-    pub last_updated: DateTime<Utc>,
+    pub last_updated: Timestamp,
 }
 
 impl StoreStatistics {
@@ -34,7 +34,7 @@ impl StoreStatistics {
             avg_latency_ms: 0.0,
             avg_rows_returned: 0,
             query_count: 0,
-            last_updated: Utc::now(),
+            last_updated: Timestamp::now(),
         }
     }
 }
@@ -86,14 +86,14 @@ impl StatisticsCollector {
                 (0.1 * rows_returned as f64 + 0.9 * entry.avg_rows_returned as f64) as u64;
         }
 
-        entry.last_updated = Utc::now();
+        entry.last_updated = Timestamp::now();
     }
 
     /// Update the total row count for a modality.
     pub fn update_row_count(&mut self, modality: Modality, total_rows: u64) {
         if let Some(entry) = self.stats.get_mut(&modality) {
             entry.total_rows = total_rows;
-            entry.last_updated = Utc::now();
+            entry.last_updated = Timestamp::now();
         }
     }
 }

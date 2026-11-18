@@ -1291,7 +1291,7 @@ pub struct EntityDriftResponse {
     pub status: String,
     /// Per-modality drift components measured for THIS entity.
     pub components: Vec<drift_compute::DriftComponent>,
-    pub computed_at: chrono::DateTime<chrono::Utc>,
+    pub computed_at: verisim_time::Timestamp,
 }
 
 /// Entity drift handler — measure drift for a single entity on demand
@@ -1589,7 +1589,7 @@ async fn store_query_handler(
         builder = builder.with_proof_obligations(obligations);
     }
 
-    builder = builder.with_metadata("stored_at", chrono::Utc::now().to_rfc3339());
+    builder = builder.with_metadata("stored_at", verisim_time::Timestamp::now().to_rfc3339());
 
     let (_query_id, input) = builder.build();
 
@@ -1701,9 +1701,10 @@ async fn optimize_query_handler(
         }),
         ..OctadInput::default()
     };
-    update_input
-        .metadata
-        .insert("optimized_at".to_string(), chrono::Utc::now().to_rfc3339());
+    update_input.metadata.insert(
+        "optimized_at".to_string(),
+        verisim_time::Timestamp::now().to_rfc3339(),
+    );
 
     let updated = state
         .octad_store
@@ -1746,11 +1747,11 @@ async fn query_explain_analyze_handler(
         .optimize(&request.plan)
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let plan_id = format!("analyze-{}", chrono::Utc::now().timestamp_millis());
+    let plan_id = format!("analyze-{}", verisim_time::Timestamp::now().unix_millis());
     let mut profiler = Profiler::new(&plan_id, &physical);
 
     // Record simulated or default step timings
-    let now = chrono::Utc::now();
+    let now = verisim_time::Timestamp::now();
     for (i, step) in physical.steps.iter().enumerate() {
         let actual_ms = request
             .simulated_timings
