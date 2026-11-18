@@ -101,7 +101,7 @@ verisimdb
 ├── tantivy (document store — full-text indexing)
 ├── burn (tensor compute — ML inference)
 ├── ndarray (tensor operations)
-├── chrono (temporal versioning)
+├── time (UTC timestamps, via verisim-time)
 ├── cbor (semantic proof blobs)
 ├── axum (HTTP API framework)
 ├── tokio (async runtime)

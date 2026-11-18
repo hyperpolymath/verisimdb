@@ -23,7 +23,7 @@ link:audits/assail-classifications.a2ml[`audits/assail-classifications.a2ml`].
 |Last triage |2026-09-27, against HEAD `681d635`
 |Live (unresolved, unmitigated) |*0*
 |Deferred with reason |*2* (one upstream blocker, both non-default features)
-|Closed |*8* (1 GHSA + 5 RUSTSEC + 2 superseded)
+|Closed |*9* (1 GHSA + 6 RUSTSEC + 2 superseded)
 |===
 
 == Deferred (with reason)
@@ -83,6 +83,34 @@ but it does mean a future re-triage has to update three places. Worth
 consolidating when the deferral is next touched.
 
 == Closed
+
+=== RUSTSEC-2026-0543 — `chrono` unmaintained, informational (closed 2026-11-18)
+
+*Advisory:* informational "unmaintained" notice for `chrono`
+(chronotope/chrono#1768). No vulnerability was reported and no patched release
+exists; the advisory recommends `jiff` or `time`. Severity: none (unmaintained).
+Exposure: loss of upstream maintenance for the crate behind every timestamp in
+the workspace, ten crates directly.
+
+*Closed by:* dependency removal. The workspace now uses `time` 0.3.47 (MIT OR
+Apache-2.0, already in `Cargo.lock` through `tantivy`, so no new crate entered
+the tree) through a new workspace crate, `rust-core/verisim-time`. Its
+`Timestamp` type writes the same bytes chrono did, which matters because
+`verisim-provenance` hashes `to_rfc3339()` output into its chain and the WAL and
+temporal store persist timestamps. `cargo tree -i chrono --workspace` matches
+nothing and `Cargo.lock` has no `chrono` entry. A dated `deny.toml` ignore for
+this advisory (opened 2026-11-17 by owner decision) is therefore unnecessary.
+
+*Evidence:* chrono-generated golden vectors in
+`rust-core/verisim-time/tests/chrono_compat.rs`; pre-migration fixtures for the
+WAL (binary and JSON), the temporal store (including a redb file opened by the
+new code) and a provenance chain in each crate's `tests/chrono_era_compat.rs`;
+and a 2,000,000-instant differential run against chrono 0.4.45 with no
+mismatch.
+
+*Not covered:* `debugger/` and `connectors/clients/rust/` are separate Cargo
+projects outside this workspace and still declare `chrono`. They are not part
+of the workspace `cargo deny` run.
 
 === GHSA-4w2j-m93h-cj5j — `quinn-proto`, high, remote memory exhaustion (closed 2026-09-27)
 
