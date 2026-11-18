@@ -11,7 +11,7 @@ publish = false  # workspace-internal; path deps cannot be published to crates.i
 
 [dependencies]
 serde.workspace = true
-chrono.workspace = true
+verisim-time.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 async-trait.workspace = true

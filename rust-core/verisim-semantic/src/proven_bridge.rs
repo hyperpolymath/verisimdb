@@ -153,7 +153,7 @@ pub fn verify_proven_certificate(cert: &ProvenCertificate) -> Result<bool, Seman
     }
 
     // Verify timestamp is parseable
-    chrono::DateTime::parse_from_rfc3339(&cert.timestamp)
+    verisim_time::Timestamp::parse_rfc3339(&cert.timestamp)
         .map_err(|e| SemanticError::InvalidProof(format!("Invalid timestamp: {}", e)))?;
 
     Ok(cert.valid)
@@ -193,7 +193,7 @@ pub fn create_certificate(
         proof_term,
         valid,
         message,
-        timestamp: chrono::Utc::now().to_rfc3339(),
+        timestamp: verisim_time::Timestamp::now().to_rfc3339(),
         signature,
     }
 }

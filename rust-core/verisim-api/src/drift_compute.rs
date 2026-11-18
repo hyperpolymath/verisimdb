@@ -10,7 +10,6 @@
 //! with `computable: false` and are NOT recorded into the detector, so the
 //! moving averages only ever reflect real measurements.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -20,6 +19,7 @@ use verisim_graph::{GraphObject, GraphStore};
 use verisim_octad::Octad;
 use verisim_provenance::ProvenanceStore;
 use verisim_temporal::TemporalStore;
+use verisim_time::Timestamp;
 
 use crate::ConcreteOctadStore;
 
@@ -48,7 +48,7 @@ pub struct EntityDriftReport {
     pub overall_score: f64,
     pub primary_drift_type: String,
     pub components: Vec<DriftComponent>,
-    pub computed_at: DateTime<Utc>,
+    pub computed_at: Timestamp,
 }
 
 struct ComponentScores {
@@ -155,7 +155,7 @@ pub async fn compute_entity_drift(
             component(DriftType::ProvenanceDrift, scores.provenance),
             component(DriftType::SpatialDrift, scores.spatial),
         ],
-        computed_at: Utc::now(),
+        computed_at: Timestamp::now(),
     }
 }
 
@@ -295,7 +295,10 @@ async fn temporal_component(
         return (0.0, false, "not measured: no version history".to_string());
     }
 
-    let timestamps: Vec<i64> = versions.iter().map(|v| v.timestamp.timestamp()).collect();
+    let timestamps: Vec<i64> = versions
+        .iter()
+        .map(|v| v.timestamp.unix_seconds())
+        .collect();
     let hashes: Vec<u64> = versions
         .iter()
         .map(|v| {
@@ -387,7 +390,7 @@ async fn provenance_component(
 
     let seconds_since_last = chain
         .latest()
-        .map(|record| (Utc::now() - record.timestamp).num_seconds().max(0) as u64);
+        .map(|record| (Timestamp::now() - record.timestamp).whole_seconds().max(0) as u64);
 
     let score = calculator.provenance_drift(
         chain_valid,
@@ -462,8 +465,8 @@ mod tests {
             id: OctadId::new("test-entity"),
             status: OctadStatus {
                 id: OctadId::new("test-entity"),
-                created_at: Utc::now(),
-                modified_at: Utc::now(),
+                created_at: Timestamp::now(),
+                modified_at: Timestamp::now(),
                 version: 1,
                 modality_status: ModalityStatus::default(),
             },

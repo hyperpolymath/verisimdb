@@ -325,7 +325,7 @@ async fn register_peer(
         endpoint: request.endpoint,
         modalities: request.modalities,
         trust_level: 1.0,
-        last_seen: Some(chrono::Utc::now().to_rfc3339()),
+        last_seen: Some(verisim_time::Timestamp::now().to_rfc3339()),
         response_time_ms: None,
         secret_hash,
     };
@@ -361,7 +361,7 @@ async fn heartbeat(
     })?;
 
     if let Some(peer) = peers.get_mut(&request.store_id) {
-        peer.last_seen = Some(chrono::Utc::now().to_rfc3339());
+        peer.last_seen = Some(verisim_time::Timestamp::now().to_rfc3339());
         Ok(StatusCode::OK)
     } else {
         Ok(StatusCode::NOT_FOUND)

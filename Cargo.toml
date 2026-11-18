@@ -21,6 +21,7 @@ members = [
     "rust-core/verisim-repl",
     "rust-core/verisim-wal",
     "rust-core/verisim-storage",
+    "rust-core/verisim-time",
     "rust-core/verisim-nif",
     "benches",
 ]
@@ -54,8 +55,12 @@ ciborium = "0.2"  # CBOR for proof blobs
 # Document modality (LZ4 compression — pure Rust via lz4_flex, no zstd C library)
 tantivy = { version = "0.27", default-features = false, features = ["mmap", "lz4-compression"] }
 
-# Temporal modality
-chrono = { version = "0.4", features = ["serde"] }
+# Temporal modality — UTC timestamps. `time` replaced chrono (RUSTSEC-2026-0543,
+# chrono unmaintained); it was already in the tree via tantivy. Workspace crates
+# use it only through `verisim-time`, which keeps chrono's serialized formats.
+# >= 0.3.47: `UtcDateTime`, and the fix for RUSTSEC-2026-0009.
+time = { version = "0.3.47", default-features = false, features = ["std", "parsing"] }
+verisim-time = { path = "rust-core/verisim-time" }
 
 # API and networking
 axum = "0.8"

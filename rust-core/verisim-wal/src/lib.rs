@@ -34,7 +34,7 @@
 //!
 //! ```no_run
 //! use verisim_wal::{WalWriter, WalReader, WalEntry, WalOperation, WalModality, SyncMode};
-//! use chrono::Utc;
+//! use verisim_time::Timestamp;
 //!
 //! // Open a WAL for writing.
 //! let mut writer = WalWriter::open("/tmp/verisim-wal", SyncMode::Fsync).unwrap();
@@ -42,7 +42,7 @@
 //! // Append an entry.
 //! let entry = WalEntry {
 //!     sequence: 0, // assigned by the writer
-//!     timestamp: Utc::now(),
+//!     timestamp: Timestamp::now(),
 //!     operation: WalOperation::Insert,
 //!     modality: WalModality::Graph,
 //!     entity_id: "entity-123".to_string(),

@@ -17,11 +17,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+use verisim_time::Timestamp;
 
 /// Unique identifier for a transaction.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -30,9 +30,10 @@ pub struct TransactionId(String);
 impl TransactionId {
     /// Generate a new unique transaction ID.
     pub fn new() -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut hasher = Sha256::new();
-        hasher.update(now.timestamp_nanos_opt().unwrap_or(0).to_le_bytes());
+        // i64 nanoseconds, as before (0 outside 1677..2262, as chrono did).
+        hasher.update(i64::try_from(now.unix_nanos()).unwrap_or(0).to_le_bytes());
         hasher.update(std::process::id().to_le_bytes());
         let hash = hasher.finalize();
         Self(hex::encode(&hash[..16]))
@@ -216,7 +217,7 @@ impl TransactionManager {
             id: id.clone(),
             state: TransactionState::Active,
             operations: Vec::new(),
-            started_at: Utc::now().to_rfc3339(),
+            started_at: Timestamp::now().to_rfc3339(),
             completed_at: None,
         };
 
@@ -266,7 +267,7 @@ impl TransactionManager {
         match txn.state {
             TransactionState::Active => {
                 txn.state = TransactionState::Committed;
-                txn.completed_at = Some(Utc::now().to_rfc3339());
+                txn.completed_at = Some(Timestamp::now().to_rfc3339());
                 let ops = txn.operations.clone();
                 info!(txn_id = %txn_id, ops = ops.len(), "Transaction committed");
                 Ok(ops)
@@ -292,7 +293,7 @@ impl TransactionManager {
                 let discarded = txn.operations.len();
                 txn.operations.clear();
                 txn.state = TransactionState::RolledBack;
-                txn.completed_at = Some(Utc::now().to_rfc3339());
+                txn.completed_at = Some(Timestamp::now().to_rfc3339());
                 warn!(txn_id = %txn_id, discarded = discarded, "Transaction rolled back");
                 Ok(discarded)
             }
@@ -320,8 +321,8 @@ impl TransactionManager {
     /// Clean up completed transactions older than the timeout.
     pub async fn cleanup_expired(&self) -> usize {
         let mut txns = self.transactions.write().await;
-        let now = Utc::now();
-        let timeout = chrono::Duration::seconds(self.config.timeout_seconds as i64);
+        let now = Timestamp::now();
+        let timeout = verisim_time::TimeDelta::seconds(self.config.timeout_seconds as i64);
 
         let expired_ids: Vec<TransactionId> = txns
             .iter()
@@ -329,15 +330,15 @@ impl TransactionManager {
                 if txn.state != TransactionState::Active {
                     // Already completed — clean up after timeout
                     if let Some(ref completed) = txn.completed_at {
-                        if let Ok(completed_at) = chrono::DateTime::parse_from_rfc3339(completed) {
-                            return now.signed_duration_since(completed_at) > timeout;
+                        if let Ok(completed_at) = Timestamp::parse_rfc3339(completed) {
+                            return now - completed_at > timeout;
                         }
                     }
                     false
                 } else {
                     // Active but expired — auto-rollback candidate
-                    if let Ok(started) = chrono::DateTime::parse_from_rfc3339(&txn.started_at) {
-                        now.signed_duration_since(started) > timeout
+                    if let Ok(started) = Timestamp::parse_rfc3339(&txn.started_at) {
+                        now - started > timeout
                     } else {
                         false
                     }
@@ -374,7 +375,7 @@ mod tests {
                 entity_id: "hex-001".to_string(),
                 operation: OperationType::Create,
                 payload: b"{}".to_vec(),
-                timestamp: Utc::now().to_rfc3339(),
+                timestamp: Timestamp::now().to_rfc3339(),
             },
         )
         .await
@@ -403,7 +404,7 @@ mod tests {
                 entity_id: "hex-002".to_string(),
                 operation: OperationType::Update,
                 payload: b"{}".to_vec(),
-                timestamp: Utc::now().to_rfc3339(),
+                timestamp: Timestamp::now().to_rfc3339(),
             },
         )
         .await
@@ -438,7 +439,7 @@ mod tests {
                     entity_id: "hex-003".to_string(),
                     operation: OperationType::Delete,
                     payload: b"{}".to_vec(),
-                    timestamp: Utc::now().to_rfc3339(),
+                    timestamp: Timestamp::now().to_rfc3339(),
                 },
             )
             .await;

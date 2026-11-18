@@ -22,10 +22,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
+use verisim_time::Timestamp;
 
 use crate::plan::{LogicalPlan, PhysicalPlan};
 
@@ -109,9 +109,9 @@ pub struct PreparedStatement {
     /// Optionally cached optimized physical plan.
     pub cached_physical_plan: Option<PhysicalPlan>,
     /// Timestamp when this statement was first prepared.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// Timestamp of the most recent access (prepare or execute).
-    pub last_used: DateTime<Utc>,
+    pub last_used: Timestamp,
     /// Number of times this statement has been executed.
     pub use_count: u64,
     /// Rolling average execution time in milliseconds.
@@ -274,14 +274,14 @@ impl PlanCache {
                 // Update last_used on existing entry.
                 let mut stmts = self.statements.write().await;
                 if let Some(stmt) = stmts.get_mut(&id) {
-                    stmt.last_used = Utc::now();
+                    stmt.last_used = Timestamp::now();
                 }
                 self.generation.fetch_add(1, Ordering::Relaxed);
                 return id;
             }
         }
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let param_names = Self::extract_parameters(query);
 
         let stmt = PreparedStatement {
@@ -376,7 +376,7 @@ impl PlanCache {
 
         // Update usage statistics.
         stmt.use_count += 1;
-        stmt.last_used = Utc::now();
+        stmt.last_used = Timestamp::now();
 
         self.hit_count.fetch_add(1, Ordering::Relaxed);
         self.generation.fetch_add(1, Ordering::Relaxed);
@@ -507,15 +507,15 @@ impl PlanCache {
     ///
     /// Returns the number of entries evicted.
     pub async fn evict_expired(&self) -> usize {
-        let now = Utc::now();
-        let ttl = chrono::Duration::seconds(self.config.ttl_seconds as i64);
+        let now = Timestamp::now();
+        let ttl = verisim_time::TimeDelta::seconds(self.config.ttl_seconds as i64);
 
         let mut stmts = self.statements.write().await;
         let mut fps = self.fingerprints.write().await;
 
         let expired_ids: Vec<PreparedId> = stmts
             .iter()
-            .filter(|(_, stmt)| now.signed_duration_since(stmt.created_at) > ttl)
+            .filter(|(_, stmt)| now - stmt.created_at > ttl)
             .map(|(id, _)| id.clone())
             .collect();
 
@@ -588,9 +588,9 @@ impl PlanCache {
 
     /// Check whether a prepared statement has exceeded its TTL.
     fn is_expired(&self, stmt: &PreparedStatement) -> bool {
-        let now = Utc::now();
-        let ttl = chrono::Duration::seconds(self.config.ttl_seconds as i64);
-        now.signed_duration_since(stmt.created_at) > ttl
+        let now = Timestamp::now();
+        let ttl = verisim_time::TimeDelta::seconds(self.config.ttl_seconds as i64);
+        now - stmt.created_at > ttl
     }
 
     /// Normalize a query string for fingerprinting.

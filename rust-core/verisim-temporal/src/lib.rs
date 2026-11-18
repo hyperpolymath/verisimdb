@@ -12,11 +12,11 @@ pub use persistent::*;
 pub mod diff;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
+use verisim_time::Timestamp;
 
 /// Temporal modality errors
 #[derive(Error, Debug)]
@@ -43,7 +43,7 @@ pub struct Version<T> {
     /// Version number (monotonically increasing)
     pub version: u64,
     /// When this version was created
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// The data at this version
     pub data: T,
     /// Who/what created this version
@@ -57,7 +57,7 @@ impl<T> Version<T> {
     pub fn new(version: u64, data: T, author: impl Into<String>) -> Self {
         Self {
             version,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             data,
             author: author.into(),
             message: None,
@@ -75,7 +75,7 @@ impl<T> Version<T> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimePoint<T> {
     /// Timestamp
-    pub time: DateTime<Utc>,
+    pub time: Timestamp,
     /// Value at this time
     pub value: T,
     /// Optional labels/tags
@@ -84,7 +84,7 @@ pub struct TimePoint<T> {
 
 impl<T> TimePoint<T> {
     /// Create a new time point
-    pub fn new(time: DateTime<Utc>, value: T) -> Self {
+    pub fn new(time: Timestamp, value: T) -> Self {
         Self {
             time,
             value,
@@ -94,7 +94,7 @@ impl<T> TimePoint<T> {
 
     /// Create with current time
     pub fn now(value: T) -> Self {
-        Self::new(Utc::now(), value)
+        Self::new(Timestamp::now(), value)
     }
 
     /// Add a label
@@ -108,14 +108,14 @@ impl<T> TimePoint<T> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeRange {
     /// Start time (inclusive)
-    pub start: DateTime<Utc>,
+    pub start: Timestamp,
     /// End time (exclusive)
-    pub end: DateTime<Utc>,
+    pub end: Timestamp,
 }
 
 impl TimeRange {
     /// Create a time range
-    pub fn new(start: DateTime<Utc>, end: DateTime<Utc>) -> Result<Self, TemporalError> {
+    pub fn new(start: Timestamp, end: Timestamp) -> Result<Self, TemporalError> {
         if start >= end {
             return Err(TemporalError::InvalidTimeRange(
                 "start must be before end".to_string(),
@@ -125,8 +125,8 @@ impl TimeRange {
     }
 
     /// Last N duration from now
-    pub fn last(duration: chrono::Duration) -> Self {
-        let now = Utc::now();
+    pub fn last(duration: verisim_time::TimeDelta) -> Self {
+        let now = Timestamp::now();
         Self {
             start: now - duration,
             end: now,
@@ -134,7 +134,7 @@ impl TimeRange {
     }
 
     /// Check if a timestamp is within the range
-    pub fn contains(&self, time: &DateTime<Utc>) -> bool {
+    pub fn contains(&self, time: &Timestamp) -> bool {
         *time >= self.start && *time < self.end
     }
 }
@@ -169,7 +169,7 @@ pub trait TemporalStore: Send + Sync {
     async fn at_time(
         &self,
         entity_id: &str,
-        time: DateTime<Utc>,
+        time: Timestamp,
     ) -> Result<Option<Version<Self::Data>>, TemporalError>;
 
     /// Get all versions in a time range
@@ -212,8 +212,8 @@ pub trait TemporalStore: Send + Sync {
     async fn diff_time(
         &self,
         entity_id: &str,
-        t1: DateTime<Utc>,
-        t2: DateTime<Utc>,
+        t1: Timestamp,
+        t2: Timestamp,
     ) -> Result<diff::Diff<Self::Data>, TemporalError>
     where
         Self::Data: PartialEq,
@@ -310,7 +310,7 @@ impl<T: Clone + Send + Sync + 'static> TemporalStore for InMemoryVersionStore<T>
     async fn at_time(
         &self,
         entity_id: &str,
-        time: DateTime<Utc>,
+        time: Timestamp,
     ) -> Result<Option<Version<Self::Data>>, TemporalError> {
         let store = self
             .versions

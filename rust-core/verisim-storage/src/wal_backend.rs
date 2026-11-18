@@ -8,9 +8,9 @@
 // backend.
 
 use async_trait::async_trait;
-use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use verisim_time::Timestamp;
 
 use crate::backend::StorageBackend;
 use crate::error::StorageError;
@@ -58,7 +58,7 @@ impl<B: StorageBackend> WalBackend<B> {
     ) -> Result<(), StorageError> {
         let entry = WalEntry {
             sequence: 0, // Assigned by writer
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             operation,
             modality: self.modality,
             entity_id: String::from_utf8_lossy(key).to_string(),

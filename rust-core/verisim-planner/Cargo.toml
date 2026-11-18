@@ -12,7 +12,7 @@ publish = false  # workspace-internal; path deps cannot be published to crates.i
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-chrono.workspace = true
+verisim-time.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
