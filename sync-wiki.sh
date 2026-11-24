@@ -173,7 +173,7 @@ slug() {
     echo "${out}-${base}"
 }
 
-# Walk docs/, copying every .md / .adoc / .ebnf / .lgt / .tex file.  Skip
+# Walk docs/, copying every .md / .adoc / .ebnf / .tex file.  Skip
 # binaries (.pdf, .html) — they live in-repo but aren't wiki-friendly;
 # we link to them from the wiki landing page instead.
 while IFS= read -r src; do
@@ -183,7 +183,7 @@ while IFS= read -r src; do
     echo "  wrote $slugged"
 done < <(
     cd "$REPO_ROOT"
-    find docs -type f \( -name '*.md' -o -name '*.adoc' -o -name '*.ebnf' -o -name '*.lgt' -o -name '*.tex' \) \
+    find docs -type f \( -name '*.md' -o -name '*.adoc' -o -name '*.ebnf' -o -name '*.tex' \) \
         -not -path 'docs/.well-known/*' \
         | sort
 )
