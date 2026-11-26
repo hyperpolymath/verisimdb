@@ -88,7 +88,8 @@ workflows:
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
     '.github/workflows/secret-scanner.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
-    '.github/workflows/security-scan.yml': []
+    '.github/workflows/security-scan.yml':
+        - 'hyperpolymath/panic-attack@b22bed4f8c6dce82fde639aa0dab9ce79d1006f5'
     '.github/workflows/spark-theatre-gate.yml':
         - 'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d'
 dependencies:
@@ -196,6 +197,15 @@ dependencies:
         commit: 'sha1-541ab9bc21a776d55eb46611877521a824d6319c'
         owner_id: 6759885
         repo_id: 1284026967
+    'hyperpolymath/panic-attack@b22bed4f8c6dce82fde639aa0dab9ce79d1006f5':
+        ref: 'b22bed4f8c6dce82fde639aa0dab9ce79d1006f5'
+        commit: 'sha1-b22bed4f8c6dce82fde639aa0dab9ce79d1006f5'
+        owner_id: 6759885
+        repo_id: 1152434997
+        uses:
+            - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+            - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
+            - 'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0'
     'metadatastician/standards@8e48b1caade08a552646adeab66558ac43b4360d':
         ref: '8e48b1caade08a552646adeab66558ac43b4360d'
         commit: 'sha1-8e48b1caade08a552646adeab66558ac43b4360d'
@@ -238,6 +248,11 @@ dependencies:
         commit: 'sha1-dc2769abcc0fcfbadfc1df54081c1608579ef6b2'
         owner_id: 88700172
         repo_id: 422287306
+    'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
+        ref: 'v2.9.3'
+        commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
+        owner_id: 580492
+        repo_id: 298565987
     'taiki-e/install-action@v2.87.30':
         ref: 'v2.87.30'
         commit: 'sha1-a4d3f3f761dcd95cce1b72cb61cb6d1963438177'

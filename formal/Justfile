@@ -12,7 +12,7 @@
 COQC := "coqc"
 
 # Compile every proof module.
-all: provenance drift transaction planner wal normalizer vcl planner-semantic octad
+all: provenance drift transaction planner wal normalizer vcl planner-semantic octad recovery
 
 # --- Per-module compile recipes -------------------------------------------
 
@@ -43,11 +43,14 @@ planner-semantic: planner
 octad:
     {{COQC}} -q Octad.v > Octad.out
 
+recovery: octad
+    {{COQC}} -q Recovery.v > Recovery.out
+
 # --- Whitelist guards -----------------------------------------------------
 # Each module declares its own set of Parameters/Axioms; the guard greps
 # Print Assumptions output for any name outside that module's whitelist.
 
-check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic check-octad
+check-assumptions: check-provenance check-drift check-transaction check-planner check-wal check-normalizer check-vcl check-planner-semantic check-octad check-recovery
 
 check-provenance: provenance
     @awk '/^[A-Za-z_][A-Za-z0-9_]* :/ {print $1}' Provenance.out \
@@ -136,6 +139,17 @@ check-octad: octad
           else \
             echo "OK(Octad): O-series (cardinality, present-totality, projection) + R1-R3 merge algebra"; \
           fi; }
+
+# Fail-closed guard shared with coq-build.yml (see check-assumptions.sh):
+# any non-space assumption name is read, so qualified, primed and non-ASCII
+# axioms are all caught; unparsed lines and empty output fail.
+check-recovery: recovery check-guard
+    @sh check-assumptions.sh Recovery Recovery.out 'mval|ident|functional_extensionality_dep'
+
+# Self-test of the fail-closed guard used by check-recovery (fixtures cover
+# qualified, primed and non-ASCII axiom names and unparsed records).
+check-guard:
+    @sh check-assumptions-test.sh
 
 # Remove all build artefacts.
 clean:

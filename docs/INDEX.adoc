@@ -197,8 +197,6 @@ Error taxonomy
 — Supervision, retry, circuit breakers
 * link:safety-theory-applied.adoc[docs/safety-theory-applied.adoc] —
 Safety theory grounding
-* link:security-lessons.lgt[docs/security-lessons.lgt] — Security
-retrospective (Logtalk)
 * link:caching-strategy.adoc[docs/caching-strategy.adoc] — Cache
 invalidation strategy
 * link:cache-sharing-strategy.adoc[docs/cache-sharing-strategy.adoc] —
