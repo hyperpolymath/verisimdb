@@ -2558,45 +2558,70 @@ mod tests {
             allow_public_health: true,
             ..Default::default()
         });
-        state.auth.key_registry.register("writer-key", "test writer", auth::ClientRole::Writer);
+        state
+            .auth
+            .key_registry
+            .register("writer-key", "test writer", auth::ClientRole::Writer);
         let app = build_router(state);
 
         // This GraphQL mutation must never reach its handler without auth.
         let mutation = serde_json::json!({
             "query": "mutation { deleteOctad(id: \"missing\") }"
-        }).to_string();
-        let response = app.clone().oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/graphql")
-                .header("content-type", "application/json")
-                .body(Body::from(mutation.clone()))
-                .unwrap(),
-        ).await.unwrap();
+        })
+        .to_string();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/graphql")
+                    .header("content-type", "application/json")
+                    .body(Body::from(mutation.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
         // The federation router was previously merged after auth middleware.
-        let response = app.clone().oneshot(
-            Request::builder().uri("/federation/peers").body(Body::empty()).unwrap(),
-        ).await.unwrap();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/federation/peers")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
         // Valid writer credentials pass the middleware and reach GraphQL.
-        let response = app.clone().oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/graphql")
-                .header("content-type", "application/json")
-                .header("x-api-key", "writer-key")
-                .body(Body::from(mutation))
-                .unwrap(),
-        ).await.unwrap();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/graphql")
+                    .header("content-type", "application/json")
+                    .header("x-api-key", "writer-key")
+                    .body(Body::from(mutation))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
         // The public health exception remains narrowly available.
-        let response = app.oneshot(
-            Request::builder().uri("/health").body(Body::empty()).unwrap(),
-        ).await.unwrap();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
     }
 

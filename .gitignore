@@ -104,7 +104,6 @@ rust-core/fuzz/target/
 .claude/
 # Local export and build outputs
 /exports/*.json
-/exports/*.lgt
 composer/*.beam
 composer/build/
 # RSR-compliant .gitignore

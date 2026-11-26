@@ -39,6 +39,18 @@ ignore = [
     # REMOVE WHEN: oxigraph publishes a release requiring quick-xml >= 0.41.
     "RUSTSEC-2026-0194",  # quadratic duplicate-attribute check
     "RUSTSEC-2026-0195",  # unbounded namespace-declaration allocation
+
+    # chrono 0.4.45 — informational "unmaintained" advisory (dated 2026-09-14;
+    # chronotope/chrono#1768). No patched version exists, and no
+    # vulnerability is reported: this records loss of maintenance, not a known
+    # defect. chrono is a direct dependency of ten workspace crates
+    # (verisim-api, -drift, -normalizer, -octad, -planner, -provenance,
+    # -semantic, -storage, -temporal, -wal), so migrating to `jiff` or `time`
+    # is a workspace-wide change, out of scope for this entry.
+    # Ignored 2026-11-17 by owner decision. REVIEW BY: 2027-02-17, or sooner if
+    # a vulnerability advisory is filed against chrono.
+    # REMOVE WHEN: the workspace no longer depends on chrono.
+    "RUSTSEC-2026-0543",  # chrono is unmaintained
 ]
 
 [licenses]

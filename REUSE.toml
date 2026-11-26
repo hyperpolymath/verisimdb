@@ -21,7 +21,6 @@ path = [
   "**/*.bib",
   "**/*.ebnf",
   "**/*.pdf",
-  "**/*.lgt",
   "spec/**",
   "verification/**",
 ]
