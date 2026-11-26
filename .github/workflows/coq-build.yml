@@ -100,6 +100,12 @@ jobs:
           set -euo pipefail
           coqc -q Octad.v | tee Octad.out
 
+      - name: Compile Recovery.v (squeakwell recovery kernel over Octad.v)
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          coqc -q Recovery.v | tee Recovery.out
+
       - name: Verify Provenance assumptions whitelist
         working-directory: formal
         run: |
@@ -257,3 +263,20 @@ jobs:
             exit 1
           fi
           echo "OK(Octad): O-series + R1-R3 modality algebra whitelisted"
+
+      - name: Self-test the Recovery assumption guard
+        working-directory: formal
+        run: sh check-assumptions-test.sh
+
+      - name: Verify Recovery assumptions whitelist
+        working-directory: formal
+        run: |
+          set -euo pipefail
+          # Same whitelist as Octad.v: mval, ident (Parameters) + functional_extensionality_dep.
+          # Every oracle, conflict test and winner selector is a Section variable
+          # discharged into the theorem statements. The guard is shared with the
+          # Justfile and fails closed: missing or empty output, unparsed lines,
+          # and any assumption name (qualified, primed or non-ASCII) outside the
+          # whitelist all fail the step.
+          sh check-assumptions.sh Recovery Recovery.out 'mval|ident|functional_extensionality_dep'
+          echo "OK(Recovery): squeakwell R2/R3/R4/R9/R10 recovery kernel whitelisted"
