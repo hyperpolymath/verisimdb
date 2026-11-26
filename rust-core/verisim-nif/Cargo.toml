@@ -12,6 +12,11 @@ publish = false  # workspace-internal; path deps cannot be published to crates.i
 [lib]
 name = "verisim_nif"
 crate-type = ["cdylib"]
+# NIF symbols (enif_*) only resolve inside the BEAM, so a Rust test binary
+# cannot link. There are no Rust-side tests; the NIF is exercised from Elixir.
+test = false
+doctest = false
+bench = false
 
 [dependencies]
 # Rustler provides the Elixir NIF interface
