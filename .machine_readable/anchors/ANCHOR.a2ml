@@ -52,7 +52,7 @@ semantic-authority:
 
 # ─── Implementation Policy ──────────────────────────────────────────────────
 implementation-policy:
-  allowed: ["Rust", "Elixir", "ReScript", "VQL", "Idris2", "Zig", "Coq", "Just", "AsciiDoc"]
+  allowed: ["Rust", "Elixir", "AffineScript", "VQL", "Idris2", "Zig", "Coq", "Just", "AsciiDoc"]
   forbidden: ["Python", "Go", "Node.js"]
   notes: >
     Rust core (modality stores), Elixir/OTP orchestration, ReScript VQL parser.

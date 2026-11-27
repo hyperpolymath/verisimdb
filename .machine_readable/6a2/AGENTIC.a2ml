@@ -18,7 +18,7 @@
        (proofs . "MUST check via Print Assumptions; cross-document with echo-types if L3 obligation")))
 
     (constraints
-      ((languages-allowed . ("Rust" "Elixir" "ReScript" "Coq" "Idris2"))
+      ((languages-allowed . ("Rust" "Elixir" "AffineScript" "Coq" "Idris2"))
        (languages-banned . ("TypeScript" "Go" "Python" "Node.js" "Makefile"))
        (container-runtime . "Podman > Docker")
        (source-hosting-preference . "GitLab > GitHub")
