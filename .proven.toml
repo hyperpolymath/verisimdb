@@ -4,8 +4,9 @@
 schema = "proven/manifest/v1"
 
 # ---- Rust core (workspace) ----
+# verisim-nif is excluded: an explicit --lib overrides its `test = false`, and enif_* symbols only link inside the BEAM (exercised from Elixir).
 [categories.unit.rust]
-command = "OPENSSL_NO_VENDOR=1 cargo test --workspace --lib --bins --locked"
+command = "OPENSSL_NO_VENDOR=1 cargo test --workspace --exclude verisim-nif --lib --bins --locked"
 [categories.build.rust]
 command = "OPENSSL_NO_VENDOR=1 cargo build --workspace --locked"
 [categories.smoke.rust.waiver]
