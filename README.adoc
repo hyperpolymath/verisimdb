@@ -278,7 +278,7 @@ Each entity in VeriSimDB can have representations across eight modalities. Drift
 
 |**Temporal**
 |Version history and time-series
-|In-memory (chrono)
+|In-memory (`time`, via `verisim-time`)
 
 |**Provenance**
 |Origin tracking and transformation chain

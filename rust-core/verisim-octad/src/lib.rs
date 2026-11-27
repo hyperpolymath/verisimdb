@@ -9,10 +9,10 @@
 
 #![forbid(unsafe_code)]
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
+use verisim_time::Timestamp;
 
 // Re-export modality types — all eight modalities
 pub use verisim_document::{Document, DocumentStore};
@@ -116,9 +116,9 @@ pub struct OctadStatus {
     /// Entity ID
     pub id: OctadId,
     /// When the entity was created
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// When last modified
-    pub modified_at: DateTime<Utc>,
+    pub modified_at: Timestamp,
     /// Current version
     pub version: u64,
     /// Status per modality
@@ -349,8 +349,7 @@ pub trait OctadStore: Send + Sync {
     async fn query_related(&self, id: &OctadId, predicate: &str) -> Result<Vec<Octad>, OctadError>;
 
     /// Get version at a specific point in time
-    async fn at_time(&self, id: &OctadId, time: DateTime<Utc>)
-        -> Result<Option<Octad>, OctadError>;
+    async fn at_time(&self, id: &OctadId, time: Timestamp) -> Result<Option<Octad>, OctadError>;
 
     /// List octads with pagination
     async fn list(&self, limit: usize, offset: usize) -> Result<Vec<Octad>, OctadError>;

@@ -9,9 +9,9 @@
 //! - **Semantic**: proof obligations as typed annotations
 //! - **Temporal**: query execution history (when run, what results)
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use verisim_time::Timestamp;
 
 use crate::{
     OctadDocumentInput, OctadGraphInput, OctadId, OctadInput, OctadSemanticInput, OctadTensorInput,
@@ -22,7 +22,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryExecution {
     /// When the query was executed
-    pub executed_at: DateTime<Utc>,
+    pub executed_at: Timestamp,
     /// Duration in milliseconds
     pub duration_ms: u64,
     /// Number of results returned
@@ -196,7 +196,7 @@ mod tests {
             .with_cost_vector(vec![1.0, 0.5, 0.3])
             .with_proof_obligations(vec!["verisim:DriftQuery".to_string()])
             .with_execution(QueryExecution {
-                executed_at: Utc::now(),
+                executed_at: Timestamp::now(),
                 duration_ms: 42,
                 result_count: 5,
                 estimated_cost: 1.8,

@@ -17,11 +17,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+use verisim_time::Timestamp;
 
 /// Unique identifier for a transaction.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -30,9 +30,10 @@ pub struct TransactionId(String);
 impl TransactionId {
     /// Generate a new unique transaction ID.
     pub fn new() -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut hasher = Sha256::new();
-        hasher.update(now.timestamp_nanos_opt().unwrap_or(0).to_le_bytes());
+        // i64 nanoseconds, as before (0 outside 1677..2262, as chrono did).
+        hasher.update(i64::try_from(now.unix_nanos()).unwrap_or(0).to_le_bytes());
         hasher.update(std::process::id().to_le_bytes());
         let hash = hasher.finalize();
         Self(hex::encode(&hash[..16]))
@@ -216,7 +217,7 @@ impl TransactionManager {
             id: id.clone(),
             state: TransactionState::Active,
             operations: Vec::new(),
-            started_at: Utc::now().to_rfc3339(),
+            started_at: Timestamp::now().to_rfc3339(),
             completed_at: None,
         };
 
@@ -266,7 +267,7 @@ impl TransactionManager {
         match txn.state {
             TransactionState::Active => {
                 txn.state = TransactionState::Committed;
-                txn.completed_at = Some(Utc::now().to_rfc3339());
+                txn.completed_at = Some(Timestamp::now().to_rfc3339());
                 let ops = txn.operations.clone();
                 info!(txn_id = %txn_id, ops = ops.len(), "Transaction committed");
                 Ok(ops)
@@ -292,7 +293,7 @@ impl TransactionManager {
                 let discarded = txn.operations.len();
                 txn.operations.clear();
                 txn.state = TransactionState::RolledBack;
-                txn.completed_at = Some(Utc::now().to_rfc3339());
+                txn.completed_at = Some(Timestamp::now().to_rfc3339());
                 warn!(txn_id = %txn_id, discarded = discarded, "Transaction rolled back");
                 Ok(discarded)
             }
@@ -319,9 +320,15 @@ impl TransactionManager {
 
     /// Clean up completed transactions older than the timeout.
     pub async fn cleanup_expired(&self) -> usize {
+        self.cleanup_expired_at(Timestamp::now()).await
+    }
+
+    /// [`Self::cleanup_expired`] against an explicit clock reading, so the
+    /// timeout boundary can be tested exactly. A transaction expires once
+    /// strictly more than `timeout_seconds` have passed.
+    async fn cleanup_expired_at(&self, now: Timestamp) -> usize {
         let mut txns = self.transactions.write().await;
-        let now = Utc::now();
-        let timeout = chrono::Duration::seconds(self.config.timeout_seconds as i64);
+        let timeout = verisim_time::TimeDelta::seconds(self.config.timeout_seconds as i64);
 
         let expired_ids: Vec<TransactionId> = txns
             .iter()
@@ -329,15 +336,15 @@ impl TransactionManager {
                 if txn.state != TransactionState::Active {
                     // Already completed — clean up after timeout
                     if let Some(ref completed) = txn.completed_at {
-                        if let Ok(completed_at) = chrono::DateTime::parse_from_rfc3339(completed) {
-                            return now.signed_duration_since(completed_at) > timeout;
+                        if let Ok(completed_at) = Timestamp::parse_rfc3339(completed) {
+                            return now - completed_at > timeout;
                         }
                     }
                     false
                 } else {
                     // Active but expired — auto-rollback candidate
-                    if let Ok(started) = chrono::DateTime::parse_from_rfc3339(&txn.started_at) {
-                        now.signed_duration_since(started) > timeout
+                    if let Ok(started) = Timestamp::parse_rfc3339(&txn.started_at) {
+                        now - started > timeout
                     } else {
                         false
                     }
@@ -374,7 +381,7 @@ mod tests {
                 entity_id: "hex-001".to_string(),
                 operation: OperationType::Create,
                 payload: b"{}".to_vec(),
-                timestamp: Utc::now().to_rfc3339(),
+                timestamp: Timestamp::now().to_rfc3339(),
             },
         )
         .await
@@ -403,7 +410,7 @@ mod tests {
                 entity_id: "hex-002".to_string(),
                 operation: OperationType::Update,
                 payload: b"{}".to_vec(),
-                timestamp: Utc::now().to_rfc3339(),
+                timestamp: Timestamp::now().to_rfc3339(),
             },
         )
         .await
@@ -438,7 +445,7 @@ mod tests {
                     entity_id: "hex-003".to_string(),
                     operation: OperationType::Delete,
                     payload: b"{}".to_vec(),
-                    timestamp: Utc::now().to_rfc3339(),
+                    timestamp: Timestamp::now().to_rfc3339(),
                 },
             )
             .await;
@@ -456,6 +463,62 @@ mod tests {
         let _t2 = mgr.begin().await.unwrap();
         let result = mgr.begin().await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_expired_boundary_is_exclusive() {
+        let mgr = TransactionManager::new(TransactionConfig {
+            max_concurrent: 8,
+            timeout_seconds: 60,
+        });
+        let t0 = Timestamp::from_unix_seconds(1_794_994_200).unwrap();
+        let active = mgr.begin().await.unwrap();
+        let committed = mgr.begin().await.unwrap();
+        mgr.commit(&committed).await.unwrap();
+        let unparseable = mgr.begin().await.unwrap();
+        {
+            let mut txns = mgr.transactions.write().await;
+            txns.get_mut(&active).unwrap().started_at = t0.to_rfc3339();
+            let c = txns.get_mut(&committed).unwrap();
+            // Only completed_at counts for a finished transaction.
+            c.started_at = "1970-01-01T00:00:00+00:00".to_string();
+            c.completed_at = Some(t0.to_rfc3339());
+            txns.get_mut(&unparseable).unwrap().started_at = "not a timestamp".to_string();
+        }
+        let timeout = verisim_time::TimeDelta::seconds(60);
+        let one_ns = verisim_time::TimeDelta::nanoseconds(1);
+
+        assert_eq!(mgr.cleanup_expired_at(t0).await, 0);
+        assert_eq!(
+            mgr.cleanup_expired_at(t0 + timeout).await,
+            0,
+            "exactly at the timeout nothing has expired"
+        );
+        assert_eq!(mgr.transactions.read().await.len(), 3);
+
+        assert_eq!(mgr.cleanup_expired_at(t0 + timeout + one_ns).await, 2);
+        let left = mgr.transactions.read().await;
+        assert_eq!(left.len(), 1, "the unparseable transaction is kept");
+        assert!(left.contains_key(&unparseable));
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_expired_uses_the_clock() {
+        let mgr = TransactionManager::new(TransactionConfig {
+            max_concurrent: 8,
+            timeout_seconds: 60,
+        });
+        let fresh = mgr.begin().await.unwrap();
+        let stale = mgr.begin().await.unwrap();
+        mgr.transactions
+            .write()
+            .await
+            .get_mut(&stale)
+            .unwrap()
+            .started_at = "2000-01-01T00:00:00Z".to_string();
+        assert_eq!(mgr.cleanup_expired().await, 1);
+        assert!(mgr.status(&fresh).await.is_ok());
+        assert!(mgr.status(&stale).await.is_err());
     }
 
     #[tokio::test]

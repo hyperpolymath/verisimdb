@@ -149,7 +149,7 @@ pub struct Provenance {
 impl Default for Provenance {
     fn default() -> Self {
         Self {
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: verisim_time::Timestamp::now().to_rfc3339(),
             created_by: "system".to_string(),
             source: None,
             confidence: 1.0,
@@ -190,7 +190,7 @@ impl ProofBlob {
             claim: claim.into(),
             proof_type,
             data,
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: verisim_time::Timestamp::now().to_rfc3339(),
         }
     }
 

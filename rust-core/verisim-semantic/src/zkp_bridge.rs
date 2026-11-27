@@ -189,7 +189,7 @@ fn generate_public_proof(request: &ZkpProofRequest) -> Result<ZkpProof, CircuitE
         commitment: None,
         merkle_root: None,
         circuit_result: None,
-        generated_at: chrono::Utc::now().to_rfc3339(),
+        generated_at: verisim_time::Timestamp::now().to_rfc3339(),
     })
 }
 
@@ -235,7 +235,7 @@ fn generate_private_proof(request: &ZkpProofRequest) -> Result<ZkpProof, Circuit
         commitment: Some(commitment.commitment),
         merkle_root: root,
         circuit_result: None,
-        generated_at: chrono::Utc::now().to_rfc3339(),
+        generated_at: verisim_time::Timestamp::now().to_rfc3339(),
     })
 }
 
@@ -293,7 +293,7 @@ fn generate_zk_proof(request: &ZkpProofRequest) -> Result<ZkpProof, CircuitError
         commitment: Some(commitment.commitment),
         merkle_root: root,
         circuit_result: None,
-        generated_at: chrono::Utc::now().to_rfc3339(),
+        generated_at: verisim_time::Timestamp::now().to_rfc3339(),
     })
 }
 

@@ -325,7 +325,7 @@ async fn register_peer(
         endpoint: request.endpoint,
         modalities: request.modalities,
         trust_level: 1.0,
-        last_seen: Some(chrono::Utc::now().to_rfc3339()),
+        last_seen: Some(verisim_time::Timestamp::now().to_rfc3339()),
         response_time_ms: None,
         secret_hash,
     };
@@ -361,7 +361,7 @@ async fn heartbeat(
     })?;
 
     if let Some(peer) = peers.get_mut(&request.store_id) {
-        peer.last_seen = Some(chrono::Utc::now().to_rfc3339());
+        peer.last_seen = Some(verisim_time::Timestamp::now().to_rfc3339());
         Ok(StatusCode::OK)
     } else {
         Ok(StatusCode::NOT_FOUND)
@@ -672,6 +672,75 @@ mod tests {
         let state = FederationState::new("self".to_string(), "http://localhost:8080".to_string());
         // Without VERISIM_FEDERATION_KEYS, registration should be disabled
         assert!(!state.registration_enabled());
+    }
+
+    #[tokio::test]
+    async fn test_heartbeat_refreshes_last_seen() {
+        let state = FederationState::new("self".to_string(), "http://localhost:8080".to_string());
+        state.peers.write().unwrap().insert(
+            "peer-1".to_string(),
+            PeerStore {
+                store_id: "peer-1".to_string(),
+                endpoint: "http://peer-1:8080".to_string(),
+                modalities: vec![],
+                trust_level: 1.0,
+                last_seen: None,
+                response_time_ms: None,
+                secret_hash: Some(sha256_hex("psk-1")),
+            },
+        );
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Federation-PSK", "psk-1".parse().unwrap());
+        let before = verisim_time::Timestamp::now();
+
+        let status = heartbeat(
+            State(state.clone()),
+            headers,
+            Json(HeartbeatRequest {
+                store_id: "peer-1".to_string(),
+                drift_scores: HashMap::new(),
+            }),
+        )
+        .await;
+
+        assert_eq!(status, Ok(StatusCode::OK));
+        let last_seen = state.peers.read().unwrap()["peer-1"]
+            .last_seen
+            .clone()
+            .expect("heartbeat must record last_seen");
+        let seen = verisim_time::Timestamp::parse_rfc3339(&last_seen).unwrap();
+        assert!(seen >= before, "{last_seen}");
+        assert!(last_seen.ends_with("+00:00"), "{last_seen}");
+    }
+
+    #[tokio::test]
+    async fn test_heartbeat_rejects_a_wrong_key() {
+        let state = FederationState::new("self".to_string(), "http://localhost:8080".to_string());
+        state.peers.write().unwrap().insert(
+            "peer-1".to_string(),
+            PeerStore {
+                store_id: "peer-1".to_string(),
+                endpoint: "http://peer-1:8080".to_string(),
+                modalities: vec![],
+                trust_level: 1.0,
+                last_seen: None,
+                response_time_ms: None,
+                secret_hash: Some(sha256_hex("psk-1")),
+            },
+        );
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Federation-PSK", "wrong".parse().unwrap());
+        let status = heartbeat(
+            State(state.clone()),
+            headers,
+            Json(HeartbeatRequest {
+                store_id: "peer-1".to_string(),
+                drift_scores: HashMap::new(),
+            }),
+        )
+        .await;
+        assert_eq!(status, Err(StatusCode::UNAUTHORIZED));
+        assert!(state.peers.read().unwrap()["peer-1"].last_seen.is_none());
     }
 
     #[test]

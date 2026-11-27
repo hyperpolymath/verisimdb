@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Property-based tests for temporal modality
 
-use chrono::{Duration, Utc};
 use proptest::prelude::*;
 use verisim_temporal::{
     diff, InMemoryTimeSeriesStore, InMemoryVersionStore, TemporalStore, TimePoint, TimeRange,
     TimeSeriesStore,
 };
+use verisim_time::{TimeDelta, Timestamp};
 
 /// Generate arbitrary entity IDs
 fn arb_entity_id() -> impl Strategy<Value = String> {
@@ -138,12 +138,12 @@ proptest! {
 async fn test_time_travel_query() {
     let store: InMemoryVersionStore<String> = InMemoryVersionStore::new();
 
-    let now = Utc::now();
+    let now = Timestamp::now();
     let entity_id = "doc-123";
 
     // Create version 1
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    let v1_time = Utc::now();
+    let v1_time = Timestamp::now();
     store
         .append(entity_id, "version 1".to_string(), "alice", Some("initial"))
         .await
@@ -151,7 +151,7 @@ async fn test_time_travel_query() {
 
     // Create version 2
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    let v2_time = Utc::now();
+    let v2_time = Timestamp::now();
     store
         .append(entity_id, "version 2".to_string(), "bob", Some("update"))
         .await
@@ -159,7 +159,7 @@ async fn test_time_travel_query() {
 
     // Create version 3
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    let v3_time = Utc::now();
+    let v3_time = Timestamp::now();
     store
         .append(entity_id, "version 3".to_string(), "charlie", Some("final"))
         .await
@@ -171,27 +171,27 @@ async fn test_time_travel_query() {
 
     // Query at v1 time
     let at_v1 = store
-        .at_time(entity_id, v1_time + Duration::milliseconds(1))
+        .at_time(entity_id, v1_time + TimeDelta::milliseconds(1))
         .await
         .unwrap();
     assert_eq!(at_v1.unwrap().data, "version 1");
 
     // Query at v2 time
     let at_v2 = store
-        .at_time(entity_id, v2_time + Duration::milliseconds(1))
+        .at_time(entity_id, v2_time + TimeDelta::milliseconds(1))
         .await
         .unwrap();
     assert_eq!(at_v2.unwrap().data, "version 2");
 
     // Query at v3 time
     let at_v3 = store
-        .at_time(entity_id, v3_time + Duration::milliseconds(1))
+        .at_time(entity_id, v3_time + TimeDelta::milliseconds(1))
         .await
         .unwrap();
     assert_eq!(at_v3.unwrap().data, "version 3");
 
     // Query after all versions
-    let after = store.at_time(entity_id, Utc::now()).await.unwrap();
+    let after = store.at_time(entity_id, Timestamp::now()).await.unwrap();
     assert_eq!(after.unwrap().data, "version 3");
 }
 
@@ -201,7 +201,7 @@ async fn test_time_range_query() {
     let store: InMemoryVersionStore<String> = InMemoryVersionStore::new();
     let entity_id = "doc-456";
 
-    let start_time = Utc::now();
+    let start_time = Timestamp::now();
 
     // Create 5 versions with small delays
     for i in 1..=5 {
@@ -217,7 +217,7 @@ async fn test_time_range_query() {
             .unwrap();
     }
 
-    let end_time = Utc::now();
+    let end_time = Timestamp::now();
 
     // Query all versions in range
     let range = TimeRange::new(start_time, end_time).unwrap();
@@ -275,7 +275,7 @@ async fn test_time_series_store() {
     let store: InMemoryTimeSeriesStore<f64> = InMemoryTimeSeriesStore::new();
     let series_id = "cpu_usage";
 
-    let start = Utc::now();
+    let start = Timestamp::now();
 
     // Append data points
     for i in 0..10 {
@@ -285,7 +285,7 @@ async fn test_time_series_store() {
         tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
     }
 
-    let end = Utc::now();
+    let end = Timestamp::now();
 
     // Query all points
     let range = TimeRange::new(start, end).unwrap();

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MPL-2.0
+
+[package]
+name = "verisim-time"
+description = "UTC timestamp type for VeriSimDB with chrono-compatible text formats, backed by the `time` crate"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false  # workspace-internal; path deps cannot be published to crates.io
+
+[dependencies]
+serde = { workspace = true }
+time = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = { workspace = true }
