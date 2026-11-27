@@ -301,7 +301,7 @@ fn append_query_log(
 ) -> Result<Vec<u8>, String> {
     let entry = QueryLogEntry {
         query_id,
-        timestamp: chrono::Utc::now().timestamp(),
+        timestamp: verisim_time::Timestamp::now().unix_seconds(),
         query_text,
         result_hash: result_hash.try_into().map_err(|_| "Invalid hash")?,
         proof,

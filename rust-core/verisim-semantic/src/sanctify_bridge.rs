@@ -247,7 +247,7 @@ pub fn bind_contract_to_octad(
         report,
         all_critical_resolved,
         all_high_resolved,
-        created_at: chrono::Utc::now().to_rfc3339(),
+        created_at: verisim_time::Timestamp::now().to_rfc3339(),
     }
 }
 
@@ -292,7 +292,7 @@ mod tests {
         ];
         let summary = IssueSummary::from_issues(&issues);
         SanctifyReport {
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: verisim_time::Timestamp::now().to_rfc3339(),
             version: "0.1.0".to_string(),
             files_analysed: 3,
             issues,
@@ -350,7 +350,7 @@ mod tests {
             report,
             all_critical_resolved: false,
             all_high_resolved: false,
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: verisim_time::Timestamp::now().to_rfc3339(),
         };
         assert!(validate_contract(&contract).is_err());
     }
@@ -364,7 +364,7 @@ mod tests {
             report,
             all_critical_resolved: true, // Claims resolved but has 1 critical
             all_high_resolved: false,
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: verisim_time::Timestamp::now().to_rfc3339(),
         };
         // Should return false (inconsistent)
         assert!(!validate_contract(&contract).unwrap());
@@ -393,7 +393,7 @@ mod tests {
     fn test_clean_report_contract() {
         // A clean report (no issues)
         let report = SanctifyReport {
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: verisim_time::Timestamp::now().to_rfc3339(),
             version: "0.1.0".to_string(),
             files_analysed: 5,
             issues: vec![],

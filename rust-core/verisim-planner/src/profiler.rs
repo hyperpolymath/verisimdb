@@ -11,8 +11,8 @@
 
 use std::fmt;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use verisim_time::Timestamp;
 
 use crate::explain::{ExplainOutput, PerformanceHint};
 use crate::plan::PhysicalPlan;
@@ -42,9 +42,9 @@ pub struct ProfileStep {
     /// Actual rows returned by the step.
     pub actual_rows: u64,
     /// Timestamp when execution of this step began.
-    pub started_at: DateTime<Utc>,
+    pub started_at: Timestamp,
     /// Timestamp when execution of this step completed.
-    pub ended_at: DateTime<Utc>,
+    pub ended_at: Timestamp,
 }
 
 impl ProfileStep {
@@ -233,8 +233,8 @@ impl Profiler {
         step_index: usize,
         actual_ms: f64,
         actual_rows: u64,
-        started_at: DateTime<Utc>,
-        ended_at: DateTime<Utc>,
+        started_at: Timestamp,
+        ended_at: Timestamp,
     ) {
         assert!(
             step_index < self.plan.steps.len(),
@@ -273,7 +273,7 @@ impl Profiler {
                 None => {
                     // Step was never recorded — fill with zero actuals.
                     let plan_step = &self.plan.steps[i];
-                    let now = Utc::now();
+                    let now = Timestamp::now();
                     ProfileStep {
                         step_name: plan_step.operation.clone(),
                         modality: plan_step.modality,
@@ -440,7 +440,7 @@ mod tests {
     use crate::config::PlannerConfig;
     use crate::cost::CostEstimate;
     use crate::plan::{ExecutionStrategy, PhysicalPlan, PlanStep};
-    use chrono::Duration;
+    use verisim_time::TimeDelta;
 
     // -----------------------------------------------------------------------
     // Helpers
@@ -495,8 +495,8 @@ mod tests {
         }
     }
 
-    fn make_timestamps(base: DateTime<Utc>, duration_ms: f64) -> (DateTime<Utc>, DateTime<Utc>) {
-        let end = base + Duration::milliseconds(duration_ms as i64);
+    fn make_timestamps(base: Timestamp, duration_ms: f64) -> (Timestamp, Timestamp) {
+        let end = base + TimeDelta::milliseconds(duration_ms as i64);
         (base, end)
     }
 
@@ -510,7 +510,7 @@ mod tests {
         let mut profiler = Profiler::new("test-query-1", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 35.0);
         let (s1, e1) = make_timestamps(base, 250.0);
 
@@ -537,7 +537,7 @@ mod tests {
         let mut profiler = Profiler::new("ratio-test", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Step 0: estimated 40ms, actual 35ms → ratio 0.875
         let (s0, e0) = make_timestamps(base, 35.0);
@@ -584,7 +584,7 @@ mod tests {
         let mut profiler = Profiler::new("slow-query", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Step 0: estimated 40ms, actual 200ms → 5x slower → should generate hint
         let (s0, e0) = make_timestamps(base, 200.0);
@@ -623,7 +623,7 @@ mod tests {
         let mut profiler = Profiler::new("row-mismatch", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Step 0: estimated 10 rows, actual 50 rows → 5x more → hint
         let (s0, e0) = make_timestamps(base, 40.0);
@@ -666,7 +666,7 @@ mod tests {
         let mut profiler = Profiler::new("total-time", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 50.0);
         let (s1, e1) = make_timestamps(base, 300.0);
 
@@ -712,7 +712,7 @@ mod tests {
         assert_eq!(stats.get(Modality::Vector).unwrap().query_count, 0);
         assert_eq!(stats.get(Modality::Graph).unwrap().query_count, 0);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 42.0);
         let (s1, e1) = make_timestamps(base, 180.0);
 
@@ -746,7 +746,7 @@ mod tests {
         let mut profiler = Profiler::new("analyze-test", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 38.0);
         let (s1, e1) = make_timestamps(base, 220.0);
 
@@ -781,7 +781,7 @@ mod tests {
         let mut stats = StatisticsCollector::new();
 
         // Only record step 0, leave step 1 unrecorded
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 50.0);
         profiler.record_step(0, 50.0, 8, s0, e0);
 
@@ -803,7 +803,7 @@ mod tests {
         let mut profiler = Profiler::new("fast-query", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         // Both steps are much faster than estimated
         let (s0, e0) = make_timestamps(base, 5.0); // estimated 40ms
         let (s1, e1) = make_timestamps(base, 20.0); // estimated 225ms
@@ -834,7 +834,7 @@ mod tests {
         let mut profiler = Profiler::new("display-test", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 40.0);
         let (s1, e1) = make_timestamps(base, 225.0);
 
@@ -858,7 +858,7 @@ mod tests {
         let mut profiler = Profiler::new("serde-test", &plan);
         let mut stats = StatisticsCollector::new();
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let (s0, e0) = make_timestamps(base, 40.0);
         let (s1, e1) = make_timestamps(base, 225.0);
 
@@ -882,7 +882,7 @@ mod tests {
 
     #[test]
     fn test_zero_estimated_produces_infinity_ratio() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let step = ProfileStep {
             step_name: "zero-est".to_string(),
             modality: Modality::Temporal,
