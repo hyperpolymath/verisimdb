@@ -49,8 +49,7 @@ na = "playground has no runnable service of its own; smoke is covered by the Rus
 [categories.p2p.node]
 na = "playground talks to the API over HTTP only; that seam is the Rust p2p test"
 [categories.build.node]
-# no package-lock.json is committed, so npm ci cannot run; npm install is the honest fallback (lockfile commit is on the later list)
-command = "cd playground && npm install --no-audit --no-fund && npm run build"
+command = "cd playground && npm ci && npm run build"
 
 # ---- Shell gates: exercised by their own workflows ----
 [categories.unit.shell]
