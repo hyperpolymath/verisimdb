@@ -39,7 +39,7 @@ impl VerificationKeyEntry {
             version: 1,
             fingerprint,
             previous_key: None,
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: verisim_time::Timestamp::now().to_rfc3339(),
         }
     }
 
@@ -49,7 +49,7 @@ impl VerificationKeyEntry {
         self.active_key = new_key;
         self.fingerprint = key_fingerprint(&self.active_key);
         self.version += 1;
-        self.created_at = chrono::Utc::now().to_rfc3339();
+        self.created_at = verisim_time::Timestamp::now().to_rfc3339();
     }
 
     /// Check if a given key matches the active or previous key

@@ -7,11 +7,11 @@
 //! Integrates with the `tracing` framework to emit structured log events
 //! and maintains an in-memory ring buffer for recent slow queries.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::RwLock;
 use tracing::warn;
+use verisim_time::Timestamp;
 
 use crate::plan::{ExecutionStrategy, PhysicalPlan};
 use crate::Modality;
@@ -52,7 +52,7 @@ impl Default for SlowQueryConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlowQueryEntry {
     /// When the query was recorded.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 
     /// The VCL query text (if available).
     pub query_text: Option<String>,
@@ -172,7 +172,7 @@ impl SlowQueryLog {
         };
 
         let entry = SlowQueryEntry {
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             query_text: query_text.map(|s| s.to_string()),
             actual_ms,
             estimated_ms,

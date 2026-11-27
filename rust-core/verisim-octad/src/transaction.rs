@@ -35,13 +35,13 @@
 //! lock held by another transaction, the manager checks for cycles. If a cycle
 //! is detected, the requesting transaction is aborted to break the deadlock.
 
-use chrono::{DateTime, Utc};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+use verisim_time::Timestamp;
 
 // ---------------------------------------------------------------------------
 // Constants: the eight VeriSimDB modalities (octad)
@@ -204,7 +204,7 @@ pub struct UndoEntry {
     /// The version of the entity before modification (for MVCC validation).
     pub previous_version: u64,
     /// When this undo entry was recorded.
-    pub recorded_at: DateTime<Utc>,
+    pub recorded_at: Timestamp,
 }
 
 /// A version-stamped read performed by a Serializable transaction, used for
@@ -235,9 +235,9 @@ pub struct Transaction {
     /// Read set for Serializable validation (entity/modality -> version read).
     pub read_set: Vec<ReadStamp>,
     /// When the transaction was started.
-    pub started_at: DateTime<Utc>,
+    pub started_at: Timestamp,
     /// When the transaction was completed (committed or rolled back).
-    pub completed_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<Timestamp>,
 }
 
 impl Transaction {
@@ -250,7 +250,7 @@ impl Transaction {
             undo_log: Vec::new(),
             locks: Vec::new(),
             read_set: Vec::new(),
-            started_at: Utc::now(),
+            started_at: Timestamp::now(),
             completed_at: None,
         }
     }
@@ -637,7 +637,7 @@ impl TransactionManager {
 
                     // Roll back instead of committing
                     txn.state = TransactionState::RolledBack;
-                    txn.completed_at = Some(Utc::now());
+                    txn.completed_at = Some(Timestamp::now());
 
                     // Release locks
                     let mut lock_table = self.lock_table.write().await;
@@ -670,7 +670,7 @@ impl TransactionManager {
         }
 
         txn.state = TransactionState::Committed;
-        txn.completed_at = Some(Utc::now());
+        txn.completed_at = Some(Timestamp::now());
 
         // Release all locks
         {
@@ -706,7 +706,7 @@ impl TransactionManager {
         }
 
         txn.state = TransactionState::RolledBack;
-        txn.completed_at = Some(Utc::now());
+        txn.completed_at = Some(Timestamp::now());
 
         // Collect undo entries in reverse order for the caller to apply
         let mut undo_entries: Vec<UndoEntry> = txn.undo_log.clone();
@@ -817,7 +817,7 @@ impl TransactionManager {
             modality: modality.to_string(),
             previous_data,
             previous_version,
-            recorded_at: Utc::now(),
+            recorded_at: Timestamp::now(),
         });
 
         debug!(

@@ -5,13 +5,13 @@
 //! This is the "early warning system" for data quality issues.
 
 #![forbid(unsafe_code)]
-use chrono::{DateTime, Utc};
 use prometheus::{Counter, Gauge, Registry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use tokio::sync::mpsc;
+use verisim_time::Timestamp;
 
 // Drift calculation algorithms
 mod calculator;
@@ -90,7 +90,7 @@ pub struct DriftEvent {
     /// Drift score (0.0 - 1.0, higher = worse)
     pub score: f64,
     /// When detected
-    pub detected_at: DateTime<Utc>,
+    pub detected_at: Timestamp,
     /// Description
     pub description: String,
     /// Suggested remediation
@@ -115,7 +115,7 @@ impl DriftEvent {
             severity,
             affected_entities: Vec::new(),
             score,
-            detected_at: Utc::now(),
+            detected_at: Timestamp::now(),
             description: description.into(),
             remediation: None,
         }
@@ -227,9 +227,9 @@ pub struct DriftMetrics {
     /// Number of measurements
     pub measurement_count: u64,
     /// Last measurement time
-    pub last_measured: DateTime<Utc>,
+    pub last_measured: Timestamp,
     /// Historical scores (last N measurements)
-    pub history: Vec<(DateTime<Utc>, f64)>,
+    pub history: Vec<(Timestamp, f64)>,
 }
 
 impl Default for DriftMetrics {
@@ -239,7 +239,7 @@ impl Default for DriftMetrics {
             moving_average: 0.0,
             max_score: 0.0,
             measurement_count: 0,
-            last_measured: Utc::now(),
+            last_measured: Timestamp::now(),
             history: Vec::new(),
         }
     }
@@ -250,7 +250,7 @@ impl DriftMetrics {
     pub fn record(&mut self, score: f64) {
         self.current_score = score;
         self.measurement_count += 1;
-        self.last_measured = Utc::now();
+        self.last_measured = Timestamp::now();
 
         if score > self.max_score {
             self.max_score = score;
@@ -261,7 +261,7 @@ impl DriftMetrics {
         self.moving_average = alpha * score + (1.0 - alpha) * self.moving_average;
 
         // Keep last 100 measurements
-        self.history.push((Utc::now(), score));
+        self.history.push((Timestamp::now(), score));
         if self.history.len() > 100 {
             self.history.remove(0);
         }
@@ -486,7 +486,7 @@ impl DriftDetector {
             status,
             worst_drift_type: worst_type,
             worst_score,
-            checked_at: Utc::now(),
+            checked_at: Timestamp::now(),
         })
     }
 }
@@ -506,7 +506,7 @@ pub struct DriftHealthStatus {
     pub status: HealthStatus,
     pub worst_drift_type: DriftType,
     pub worst_score: f64,
-    pub checked_at: DateTime<Utc>,
+    pub checked_at: Timestamp,
 }
 
 #[cfg(test)]

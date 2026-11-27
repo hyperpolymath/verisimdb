@@ -19,9 +19,9 @@
 //   [4 bytes: payload_len (u32)]    -- length of payload bytes
 //   [M bytes: payload]
 
-use chrono::{DateTime, TimeZone, Utc};
 use crc32fast::Hasher as Crc32Hasher;
 use serde::{Deserialize, Serialize};
+use verisim_time::Timestamp;
 
 use crate::error::{WalError, WalResult};
 
@@ -136,7 +136,7 @@ pub struct WalEntry {
     pub sequence: u64,
 
     /// UTC timestamp of when the entry was created.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 
     /// The mutation operation type.
     pub operation: WalOperation,
@@ -166,7 +166,7 @@ impl WalEntry {
         inner.extend_from_slice(&self.sequence.to_le_bytes());
 
         // Timestamp as Unix milliseconds (i64 LE).
-        let timestamp_millis = self.timestamp.timestamp_millis();
+        let timestamp_millis = self.timestamp.unix_millis();
         inner.extend_from_slice(&timestamp_millis.to_le_bytes());
 
         // Operation (1 byte).
@@ -253,10 +253,8 @@ impl WalEntry {
         let timestamp_millis = i64::from_le_bytes(inner[offset..offset + 8].try_into().unwrap());
         offset += 8;
 
-        let timestamp = Utc
-            .timestamp_millis_opt(timestamp_millis)
-            .single()
-            .unwrap_or_else(Utc::now);
+        let timestamp =
+            Timestamp::from_unix_millis(timestamp_millis).unwrap_or_else(Timestamp::now);
 
         // Operation (1 byte).
         if inner.len() < offset + 1 {
@@ -326,7 +324,7 @@ mod tests {
     fn sample_entry(seq: u64) -> WalEntry {
         WalEntry {
             sequence: seq,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             operation: WalOperation::Insert,
             modality: WalModality::Graph,
             entity_id: format!("entity-{seq}"),
@@ -356,8 +354,8 @@ mod tests {
         assert_eq!(entry.payload, recovered.payload);
         // Timestamps may lose sub-millisecond precision; compare millis.
         assert_eq!(
-            entry.timestamp.timestamp_millis(),
-            recovered.timestamp.timestamp_millis()
+            entry.timestamp.unix_millis(),
+            recovered.timestamp.unix_millis()
         );
     }
 
@@ -433,7 +431,7 @@ mod tests {
     fn test_empty_payload_and_entity_id() {
         let entry = WalEntry {
             sequence: 0,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             operation: WalOperation::Checkpoint,
             modality: WalModality::All,
             entity_id: String::new(),
@@ -451,7 +449,7 @@ mod tests {
         let long_id = "x".repeat(10_000);
         let entry = WalEntry {
             sequence: 99,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             operation: WalOperation::Insert,
             modality: WalModality::Document,
             entity_id: long_id.clone(),

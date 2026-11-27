@@ -17,11 +17,11 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::info;
 use verisim_storage::redb_backend::RedbBackend;
 use verisim_storage::typed::TypedStore;
+use verisim_time::Timestamp;
 
 use crate::{TemporalError, TemporalStore, TimeRange, Version};
 
@@ -155,7 +155,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static> TemporalSt
     async fn at_time(
         &self,
         entity_id: &str,
-        time: DateTime<Utc>,
+        time: Timestamp,
     ) -> Result<Option<Version<Self::Data>>, TemporalError> {
         let store = self
             .versions
