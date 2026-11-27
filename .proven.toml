@@ -18,9 +18,9 @@ until = "2026-12-31"
 
 # ---- Elixir orchestration ----
 [categories.unit.elixir]
-command = "cd elixir-orchestration && mix deps.get && mix test"
+command = "mix test"
 [categories.build.elixir]
-command = "cd elixir-orchestration && mix deps.get && mix compile"
+command = "mix compile"
 [categories.smoke.elixir.waiver]
 reason = "no @tag :smoke tests yet; arrive from proven-tests-and-benches"
 until = "2026-12-31"
@@ -50,7 +50,7 @@ na = "playground has no runnable service of its own; smoke is covered by the Rus
 [categories.p2p.node]
 na = "playground talks to the API over HTTP only; that seam is the Rust p2p test"
 [categories.build.node]
-command = "cd playground && npm ci && npm run build"
+command = "bun run build"
 
 # ---- Shell gates: exercised by their own workflows ----
 [categories.unit.shell]
@@ -69,3 +69,8 @@ reason = "formal/ proofs are checked by coq-build.yml; no runner in umbrella v0"
 reason = "ABI definitions checked by the build-abi recipe; idris2 toolchain not in umbrella v0"
 [languages.ignore.julia]
 reason = "connectors/clients/julia SDK; julia toolchain not in umbrella v0"
+
+# ---- Per-language project directories (umbrella v0.1.2 `[languages.dir]`) ----
+[languages.dir]
+elixir = "elixir-orchestration"
+node = "playground"
