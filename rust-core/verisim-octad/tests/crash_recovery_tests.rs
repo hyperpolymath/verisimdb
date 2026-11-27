@@ -177,7 +177,7 @@ fn append_uncommitted(
     writer
         .append(WalEntry {
             sequence: 0,
-            timestamp: chrono::Utc::now(),
+            timestamp: verisim_time::Timestamp::now(),
             operation,
             modality: WalModality::All,
             entity_id: id.as_str().to_owned(),

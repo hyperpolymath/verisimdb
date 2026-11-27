@@ -22,10 +22,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
+use verisim_time::Timestamp;
 
 use crate::plan::{LogicalPlan, PhysicalPlan};
 
@@ -109,9 +109,9 @@ pub struct PreparedStatement {
     /// Optionally cached optimized physical plan.
     pub cached_physical_plan: Option<PhysicalPlan>,
     /// Timestamp when this statement was first prepared.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// Timestamp of the most recent access (prepare or execute).
-    pub last_used: DateTime<Utc>,
+    pub last_used: Timestamp,
     /// Number of times this statement has been executed.
     pub use_count: u64,
     /// Rolling average execution time in milliseconds.
@@ -274,14 +274,14 @@ impl PlanCache {
                 // Update last_used on existing entry.
                 let mut stmts = self.statements.write().await;
                 if let Some(stmt) = stmts.get_mut(&id) {
-                    stmt.last_used = Utc::now();
+                    stmt.last_used = Timestamp::now();
                 }
                 self.generation.fetch_add(1, Ordering::Relaxed);
                 return id;
             }
         }
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let param_names = Self::extract_parameters(query);
 
         let stmt = PreparedStatement {
@@ -376,7 +376,7 @@ impl PlanCache {
 
         // Update usage statistics.
         stmt.use_count += 1;
-        stmt.last_used = Utc::now();
+        stmt.last_used = Timestamp::now();
 
         self.hit_count.fetch_add(1, Ordering::Relaxed);
         self.generation.fetch_add(1, Ordering::Relaxed);
@@ -507,15 +507,18 @@ impl PlanCache {
     ///
     /// Returns the number of entries evicted.
     pub async fn evict_expired(&self) -> usize {
-        let now = Utc::now();
-        let ttl = chrono::Duration::seconds(self.config.ttl_seconds as i64);
+        self.evict_expired_at(Timestamp::now()).await
+    }
 
+    /// [`Self::evict_expired`] against an explicit clock reading, so the TTL
+    /// boundary can be tested exactly.
+    async fn evict_expired_at(&self, now: Timestamp) -> usize {
         let mut stmts = self.statements.write().await;
         let mut fps = self.fingerprints.write().await;
 
         let expired_ids: Vec<PreparedId> = stmts
             .iter()
-            .filter(|(_, stmt)| now.signed_duration_since(stmt.created_at) > ttl)
+            .filter(|(_, stmt)| self.is_expired_at(stmt, now))
             .map(|(id, _)| id.clone())
             .collect();
 
@@ -588,9 +591,14 @@ impl PlanCache {
 
     /// Check whether a prepared statement has exceeded its TTL.
     fn is_expired(&self, stmt: &PreparedStatement) -> bool {
-        let now = Utc::now();
-        let ttl = chrono::Duration::seconds(self.config.ttl_seconds as i64);
-        now.signed_duration_since(stmt.created_at) > ttl
+        self.is_expired_at(stmt, Timestamp::now())
+    }
+
+    /// An entry expires once strictly more than `ttl_seconds` have passed
+    /// since it was prepared; at exactly the TTL it is still live.
+    fn is_expired_at(&self, stmt: &PreparedStatement, now: Timestamp) -> bool {
+        let ttl = verisim_time::TimeDelta::seconds(self.config.ttl_seconds as i64);
+        now - stmt.created_at > ttl
     }
 
     /// Normalize a query string for fingerprinting.
@@ -942,6 +950,61 @@ mod tests {
 
         let stats = cache.stats_async().await;
         assert_eq!(stats.total_entries, 0);
+    }
+
+    #[tokio::test]
+    async fn test_lookups_honour_the_ttl() {
+        let cache = PlanCache::new(CacheConfig {
+            ttl_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let id = cache
+            .prepare("SEARCH graph WHERE type = $t", sample_logical_plan())
+            .await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        assert!(cache.get(&id).await.is_none(), "an expired entry must miss");
+        let err = cache
+            .execute_prepared(&id, &HashMap::new())
+            .await
+            .expect_err("an expired entry must not execute");
+        assert!(matches!(err, CacheError::Expired(_)), "{err:?}");
+
+        let live = PlanCache::new(CacheConfig::default());
+        let id = live
+            .prepare("SEARCH graph WHERE type = $t", sample_logical_plan())
+            .await;
+        assert!(live.get(&id).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_ttl_boundary_is_exclusive() {
+        let config = CacheConfig {
+            ttl_seconds: 60,
+            ..CacheConfig::default()
+        };
+        let cache = PlanCache::new(config);
+        let id = cache
+            .prepare("SEARCH graph WHERE type = $t", sample_logical_plan())
+            .await;
+        let stmt = cache.statements.read().await.get(&id).cloned().unwrap();
+        let ttl = verisim_time::TimeDelta::seconds(60);
+        let one_ns = verisim_time::TimeDelta::nanoseconds(1);
+
+        assert!(!cache.is_expired_at(&stmt, stmt.created_at));
+        assert!(!cache.is_expired_at(&stmt, stmt.created_at + ttl - one_ns));
+        assert!(
+            !cache.is_expired_at(&stmt, stmt.created_at + ttl),
+            "exactly at the TTL the entry is still live"
+        );
+        assert!(cache.is_expired_at(&stmt, stmt.created_at + ttl + one_ns));
+
+        assert_eq!(cache.evict_expired_at(stmt.created_at + ttl).await, 0);
+        assert_eq!(cache.stats_async().await.total_entries, 1);
+        assert_eq!(
+            cache.evict_expired_at(stmt.created_at + ttl + one_ns).await,
+            1
+        );
+        assert_eq!(cache.stats_async().await.total_entries, 0);
     }
 
     // -- Test 9: Evict LRU when over limit --

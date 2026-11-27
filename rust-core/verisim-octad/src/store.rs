@@ -4,12 +4,12 @@
 //! Coordinates all eight modality stores (octad) for unified entity management.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, instrument};
+use verisim_time::Timestamp;
 
 use crate::transaction::{IsolationLevel, LockType, TransactionManager};
 use crate::{
@@ -29,7 +29,7 @@ pub struct OctadSnapshot {
     pub id: OctadId,
     pub input: OctadInput,
     pub modality_status: ModalityStatus,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 /// In-memory implementation of OctadStore
@@ -158,7 +158,7 @@ where
         if let Some(ref wal) = self.wal {
             let entry = WalEntry {
                 sequence: 0, // Assigned by the writer
-                timestamp: Utc::now(),
+                timestamp: Timestamp::now(),
                 operation,
                 modality,
                 entity_id: entity_id.to_string(),
@@ -267,7 +267,7 @@ where
 
         // Per-entity pending operations are paired with their own COMMITTED
         // marker in WAL order; global empty checkpoints do not commit writes.
-        let mut pending: HashMap<String, (WalOperation, Vec<u8>, DateTime<Utc>)> = HashMap::new();
+        let mut pending: HashMap<String, (WalOperation, Vec<u8>, Timestamp)> = HashMap::new();
         let mut reconstructed: HashMap<String, OctadStatus> = HashMap::new();
         let mut committed_count = 0usize;
 
@@ -694,7 +694,7 @@ where
             id: id.clone(),
             input: input.clone(),
             modality_status: status.clone(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         }
     }
 
@@ -823,7 +823,7 @@ where
     #[instrument(skip(self, input))]
     async fn create(&self, input: OctadInput) -> Result<Octad, OctadError> {
         let id = OctadId::generate();
-        let now = Utc::now();
+        let now = Timestamp::now();
         let entity_id_str = id.as_str().to_string();
 
         // Write PENDING intent to WAL before any modality writes.
@@ -1089,7 +1089,7 @@ where
         };
 
         let existing = existing.ok_or_else(|| OctadError::NotFound(id.to_string()))?;
-        let now = Utc::now();
+        let now = Timestamp::now();
         let entity_id_str = id.as_str().to_string();
 
         // Write PENDING intent to WAL before modality writes
@@ -1545,11 +1545,7 @@ where
         Ok(result)
     }
 
-    async fn at_time(
-        &self,
-        id: &OctadId,
-        time: DateTime<Utc>,
-    ) -> Result<Option<Octad>, OctadError> {
+    async fn at_time(&self, id: &OctadId, time: Timestamp) -> Result<Option<Octad>, OctadError> {
         let version = self
             .temporal
             .at_time(id.as_str(), time)
@@ -1821,7 +1817,7 @@ mod tests {
             .build();
 
         let octad = store.create(input_v1).await.unwrap();
-        let after_v1 = Utc::now();
+        let after_v1 = Timestamp::now();
 
         // Brief pause so the v2 snapshot timestamp is strictly after after_v1.
         tokio::time::sleep(std::time::Duration::from_millis(5)).await;

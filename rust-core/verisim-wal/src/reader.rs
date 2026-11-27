@@ -272,7 +272,7 @@ mod tests {
     fn test_entry(entity_id: &str, modality: WalModality) -> WalEntry {
         WalEntry {
             sequence: 0,
-            timestamp: chrono::Utc::now(),
+            timestamp: verisim_time::Timestamp::now(),
             operation: WalOperation::Insert,
             modality,
             entity_id: entity_id.to_string(),

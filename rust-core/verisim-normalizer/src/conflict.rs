@@ -24,13 +24,13 @@
 //!
 //! [`RegenerationEngine`]: crate::regeneration::RegenerationEngine
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+use verisim_time::Timestamp;
 
 use crate::regeneration::Modality;
 
@@ -143,7 +143,7 @@ pub struct Conflict {
     pub entity_id: String,
 
     /// When the conflict was first detected.
-    pub detected_at: DateTime<Utc>,
+    pub detected_at: Timestamp,
 
     /// The modalities whose data disagrees.
     pub conflicting_modalities: Vec<Modality>,
@@ -171,7 +171,7 @@ pub struct Conflict {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConflictResolution {
     /// When the resolution was applied.
-    pub resolved_at: DateTime<Utc>,
+    pub resolved_at: Timestamp,
 
     /// Which policy was used to determine the winner.
     pub policy_used: ConflictPolicy,
@@ -349,7 +349,7 @@ impl ConflictResolver {
         let conflict = Conflict {
             id: Uuid::new_v4().to_string(),
             entity_id: entity_id.to_string(),
-            detected_at: Utc::now(),
+            detected_at: Timestamp::now(),
             conflicting_modalities: modalities.clone(),
             drift_score,
             description: description.to_string(),
@@ -519,7 +519,7 @@ impl ConflictResolver {
         }
 
         let resolution = ConflictResolution {
-            resolved_at: Utc::now(),
+            resolved_at: Timestamp::now(),
             policy_used: ConflictPolicy::ManualResolve,
             winning_modality: Some(winning_modality),
             resolver: resolver.to_string(),
@@ -576,7 +576,7 @@ impl ConflictResolver {
 
         conflict.status = ConflictStatus::Dismissed;
         conflict.resolution = Some(ConflictResolution {
-            resolved_at: Utc::now(),
+            resolved_at: Timestamp::now(),
             policy_used: ConflictPolicy::LastWriterWins, // placeholder -- no actual policy used
             winning_modality: None,
             resolver: "system".to_string(),
@@ -728,7 +728,7 @@ impl ConflictResolver {
         };
 
         ConflictResolution {
-            resolved_at: Utc::now(),
+            resolved_at: Timestamp::now(),
             policy_used: policy.clone(),
             winning_modality,
             resolver: "system".to_string(),

@@ -24,13 +24,13 @@
 //! - `UserResolve`: flag the entity for manual resolution and add it to the
 //!   normalization queue.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
+use verisim_time::Timestamp;
 
 use verisim_octad::Octad;
 
@@ -294,7 +294,7 @@ pub struct NormalizationEvent {
     pub post_drift_score: Option<f64>,
 
     /// When the event was recorded.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 
     /// Whether the regeneration succeeded.
     pub success: bool,
@@ -348,7 +348,7 @@ pub struct PendingNormalization {
     pub drift_score: f64,
 
     /// When this item was added to the queue.
-    pub queued_at: DateTime<Utc>,
+    pub queued_at: Timestamp,
 }
 
 /// Thread-safe queue of entities awaiting manual resolution.
@@ -690,7 +690,7 @@ impl RegenerationEngine {
                     source_modality: None,
                     pre_drift_score: drift_score,
                     post_drift_score: None,
-                    timestamp: Utc::now(),
+                    timestamp: Timestamp::now(),
                     success: false,
                 };
                 self.record_event(event).await;
@@ -731,7 +731,7 @@ impl RegenerationEngine {
                     source_modality: Some(source),
                     pre_drift_score: drift_score,
                     post_drift_score: post_score,
-                    timestamp: Utc::now(),
+                    timestamp: Timestamp::now(),
                     success: true,
                 };
                 self.record_event(event.clone()).await;
@@ -746,7 +746,7 @@ impl RegenerationEngine {
                     source_modality: Some(source),
                     pre_drift_score: drift_score,
                     post_drift_score: None,
-                    timestamp: Utc::now(),
+                    timestamp: Timestamp::now(),
                     success: false,
                 };
                 self.record_event(event).await;
@@ -798,7 +798,7 @@ impl RegenerationEngine {
                 source_modality: None,
                 pre_drift_score: drift_score,
                 post_drift_score: None,
-                timestamp: Utc::now(),
+                timestamp: Timestamp::now(),
                 success: false,
             };
             self.record_event(event).await;
@@ -835,7 +835,7 @@ impl RegenerationEngine {
                     source_modality: None, // merge uses multiple sources
                     pre_drift_score: drift_score,
                     post_drift_score: post_score,
-                    timestamp: Utc::now(),
+                    timestamp: Timestamp::now(),
                     success: true,
                 };
                 self.record_event(event.clone()).await;
@@ -850,7 +850,7 @@ impl RegenerationEngine {
                     source_modality: None,
                     pre_drift_score: drift_score,
                     post_drift_score: None,
-                    timestamp: Utc::now(),
+                    timestamp: Timestamp::now(),
                     success: false,
                 };
                 self.record_event(event).await;
@@ -877,7 +877,7 @@ impl RegenerationEngine {
             entity_id: entity_id.clone(),
             drifted_modality,
             drift_score,
-            queued_at: Utc::now(),
+            queued_at: Timestamp::now(),
         };
 
         self.queue.enqueue(pending).await;
@@ -889,7 +889,7 @@ impl RegenerationEngine {
             source_modality: None,
             pre_drift_score: drift_score,
             post_drift_score: None,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             success: true, // queueing itself succeeded
         };
         self.record_event(event).await;
@@ -925,11 +925,11 @@ impl RegenerationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use verisim_document::Document;
     use verisim_graph::GraphNode;
     use verisim_octad::{ModalityStatus, OctadId, OctadStatus};
     use verisim_semantic::{Provenance, SemanticAnnotation};
+    use verisim_time::Timestamp;
     use verisim_vector::Embedding;
 
     // -- test helpers --------------------------------------------------------
@@ -940,8 +940,8 @@ mod tests {
             id: OctadId::new("rich-1"),
             status: OctadStatus {
                 id: OctadId::new("rich-1"),
-                created_at: Utc::now(),
-                modified_at: Utc::now(),
+                created_at: Timestamp::now(),
+                modified_at: Timestamp::now(),
                 version: 1,
                 modality_status: ModalityStatus::default(),
             },
@@ -971,8 +971,8 @@ mod tests {
             id: OctadId::new("doc-1"),
             status: OctadStatus {
                 id: OctadId::new("doc-1"),
-                created_at: Utc::now(),
-                modified_at: Utc::now(),
+                created_at: Timestamp::now(),
+                modified_at: Timestamp::now(),
                 version: 1,
                 modality_status: ModalityStatus::default(),
             },
@@ -993,8 +993,8 @@ mod tests {
             id: OctadId::new("empty-1"),
             status: OctadStatus {
                 id: OctadId::new("empty-1"),
-                created_at: Utc::now(),
-                modified_at: Utc::now(),
+                created_at: Timestamp::now(),
+                modified_at: Timestamp::now(),
                 version: 1,
                 modality_status: ModalityStatus::default(),
             },
