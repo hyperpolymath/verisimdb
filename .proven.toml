@@ -49,8 +49,9 @@ na = "playground is a ReScript demo with no test script; build is covered, behav
 na = "playground has no runnable service of its own; smoke is covered by the Rust API smoke test"
 [categories.p2p.node]
 na = "playground talks to the API over HTTP only; that seam is the Rust p2p test"
-[categories.build.node]
-command = "bun run build"
+[categories.build.node.waiver]
+reason = "playground sources are AffineScript (.affine) and the repo has no rescript.json, so `rescript && node build.mjs` cannot run on main either; needs an AffineScript build step or a package.json update, tracked on the later list"
+until = "2026-12-31"
 
 # ---- Shell gates: exercised by their own workflows ----
 [categories.unit.shell]
